@@ -16,6 +16,7 @@ description: Delegate a sub-task to a worker model. route.py picks lane, model a
 | 78 | worker changed git. Show it, inspect `git reflog`, never auto-revert |
 | 124 | timed out. Shrink the task |
 | 2, `error` | read `modes/init.md`. Never ask for a key in chat |
+| `notice` | tell the user once |
 | `needs_input` `claude_usage` | `get_usage`; rerun with `--claude-usage '<plan.windows>'` |
 
 No Python 3.8+: Agent tool only, first entry, current dir, no worktree, effort in the brief.

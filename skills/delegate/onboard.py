@@ -138,7 +138,7 @@ def build_checks(R, cfg, st):
     return checks
 
 
-def doctor(R, cfg, deep=False):
+def doctor(R, cfg, deep=False, lane=None):
     st = R.load_state()
     checks = build_checks(R, cfg, st)
     lanes = configured_lanes(R, cfg)
@@ -156,7 +156,14 @@ def doctor(R, cfg, deep=False):
         if key:
             checks.append({"id": "credit_key_valid", "lane": "CLAUDE_CREDIT", "ok": validate_key(key)[0], "skip": "CLAUDE_CREDIT" in skip,
                            "who": "user", "say": "The stored API key was rejected: " + validate_key(key)[1]})
-    blocking = [c for c in checks if not c["ok"] and not c.get("optional") and not c.get("skip")]
+    enabled = {n for n, v in R.profile_lanes().items() if v == "enabled"}
+    shared = {n for n, c in cfg["lanes"].items() if c.get("shared_with_orchestrator")}
+    if lane:
+        checks = [c for c in checks if c["lane"] == lane]
+    for c in checks:                # a lane nobody chose and the machine cannot run is on offer, not a problem
+        if not c["ok"] and not c.get("skip") and c["lane"] not in enabled | shared and c["lane"] != lane:
+            c["available"] = True
+    blocking = [c for c in checks if not c["ok"] and not c.get("optional") and not c.get("skip") and not c.get("available")]
     return {"ready": not blocking, "lanes": lanes, "declined": sorted(skip), "harness": R.harness(), "checks": checks, "notes": notes}
 
 
@@ -172,35 +179,36 @@ def validate_key(key):
 
 
 def print_doctor(d, quiet):
-    bad = [c for c in d["checks"] if not c["ok"] and not c.get("optional") and not c.get("skip")]
+    bad = [c for c in d["checks"] if not c["ok"] and not c.get("optional") and not c.get("skip") and not c.get("available")]
     if quiet:
         print("READY" if d["ready"] else "SETUP NEEDED: " + ", ".join(c["id"] for c in bad) + " (run `doctor` for what to do about each)")
         return
     for c in d["checks"]:
-        mark = "ok     " if c["ok"] else ("acked" if c.get("acked") else "skipped" if c.get("skip") else ("optional" if c.get("optional") else "MISSING"))
+        mark = "ok     " if c["ok"] else ("acked" if c.get("acked") else "skipped" if c.get("skip") else ("available" if c.get("available") else "optional" if c.get("optional") else "MISSING"))
         print(f"{mark:<9} {c['id']:<14} {c['lane']}")
-        if not c["ok"] and not c.get("skip"):
+        if not c["ok"] and not c.get("skip") and not c.get("available"):
             print(f"          -> {c['say']}")
     for n in d["notes"]:
         print(f"note [{n['id']}]: {n['say']}")
     if d["ready"]:
-        print("READY")
+        avail = sorted({c["lane"] for c in d["checks"] if c.get("available")})
+        print("READY" + (f". Not set up, your choice: {', '.join(avail)} (`doctor --lane NAME` to set one up, `doctor --decline NAME` to hide it)" if avail else ""))
     else:
-        print("SETUP NEEDED. Each MISSING item above says what to do. You choose: do it, `init --decline LANE` to drop its lane, or `config ack ID` to say it needs nothing.")
+        print("SETUP NEEDED. Each MISSING item above says what to do. You choose: do it (`doctor --fix ID`), `doctor --decline LANE` to drop its lane, or `doctor --ack ID` to say it needs nothing.")
 
 
 # ----------------------------------------------------------------------------- init: first failing check -> one step
 
 def next_step(d):
     """First failing REQUIRED check as a step; optional ones are listed, not pushed."""
-    optional = [c["id"] for c in d["checks"] if not c["ok"] and not c.get("skip") and c.get("optional")]
+    optional = [c["id"] for c in d["checks"] if not c["ok"] and not c.get("skip") and not c.get("available") and c.get("optional")]
     for c in d["checks"]:
-        if not c["ok"] and not c.get("skip") and not c.get("optional"):
+        if not c["ok"] and not c.get("skip") and not c.get("optional") and not c.get("available"):
             step = {"step": c["id"], "lane": c["lane"], "who": c["who"], "say": c["say"]}
             for k in ("run", "url", "do"):
                 if c.get(k):
                     step[k] = c[k]
-            step["then"] = f"run `init` again; or `init --decline {c['lane']}` to drop this lane; or `config ack {c['id']}` if it needs nothing"
+            step["then"] = f"run `doctor --next` again; or `doctor --decline {c['lane']}` to drop this lane; or `doctor --ack {c['id']}` if it needs nothing"
             if optional:
                 step["optional_steps_later"] = optional
             return step

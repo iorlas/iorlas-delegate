@@ -239,12 +239,15 @@ class Onboarding(unittest.TestCase):
                 os.environ[k] = v
         self.tmp.cleanup()
 
-    def test_empty_machine_is_not_ready_and_first_step_is_codex_cli(self):
+    def test_empty_machine_is_ready_with_lanes_on_offer_and_asking_for_one_gives_its_first_step(self):
         d = self.onboard.doctor(route, self.cfg)
-        self.assertFalse(d["ready"])
+        self.assertTrue(d["ready"])                                   # sub-agent-only is a complete setup
         self.assertTrue(d["lanes"]["CLAUDE_SUBSCRIPTION"])
         self.assertFalse(d["lanes"]["OPENAI_SUBSCRIPTION"])
-        step = self.onboard.init(route, self.cfg)
+        self.assertTrue(all(c.get("available") for c in d["checks"] if not c["ok"] and not c.get("optional")))
+        want = self.onboard.doctor(route, self.cfg, lane="OPENAI_SUBSCRIPTION")
+        self.assertFalse(want["ready"])
+        step = self.onboard.next_step(want)
         self.assertEqual((step["step"], step["who"], step["do"]), ("codex_cli", "agent", "codex_cli"))
 
     def test_decline_both_lanes_makes_it_ready(self):
@@ -351,7 +354,7 @@ class Onboarding(unittest.TestCase):
 
     def test_every_missing_item_says_what_to_do_and_ack_clears_it(self):
         import io
-        d = self.onboard.doctor(route, self.cfg)
+        d = self.onboard.doctor(route, self.cfg, lane="OPENAI_SUBSCRIPTION")
         self.assertFalse(d["ready"])
         buf, real = io.StringIO(), sys.stdout
         sys.stdout = buf
@@ -362,10 +365,10 @@ class Onboarding(unittest.TestCase):
         text = buf.getvalue()
         self.assertIn("MISSING   codex_cli", text)
         self.assertIn("-> Install the Codex CLI.", text)
-        self.assertIn("init --decline LANE", text)
+        self.assertIn("doctor --decline LANE", text)
         route.set_ack("codex_cli", True)
         route.set_ack("codex_login", True)
-        d2 = self.onboard.doctor(route, self.cfg)
+        d2 = self.onboard.doctor(route, self.cfg, lane="OPENAI_SUBSCRIPTION")
         self.assertTrue(next(c for c in d2["checks"] if c["id"] == "codex_cli")["acked"])
         route.set_ack("codex_cli", False)
         self.assertNotIn("codex_cli", route.acked())
@@ -376,6 +379,15 @@ class Onboarding(unittest.TestCase):
             self.assertEqual([n["id"] for n in self.onboard.doctor(route, self.cfg)["notes"]], ["volumes"])
             route.set_ack("volumes", True)
             self.assertEqual(self.onboard.doctor(route, self.cfg)["notes"], [])
+
+    def test_unset_lanes_are_offered_once_and_never_block(self):
+        import argparse
+        a = argparse.Namespace(role="worker", writer=None, failed="", premium=None, allow_degraded=False, claude_usage=None, cwd=None)
+        d1 = route.decision(a, self.cfg)[0]
+        self.assertEqual(d1["action"], "run")
+        self.assertIn("OPENAI_SUBSCRIPTION", d1["notice"])
+        self.assertNotIn("notice", route.decision(a, self.cfg)[0])      # said once
+        route.set_profile_lane("OPENAI_SUBSCRIPTION", "declined")
 
     def test_set_key_enables_a_declined_credit_lane(self):
         import io

@@ -12,8 +12,8 @@ The model supplies only what the script cannot read itself; the script decides.
   route.py run-claude --model ID --effort LEVEL --cap USD [--write] [--allow TOOL]... [--cwd DIR] [--bare] [PROMPT|-]
   route.py capture-limits [--print]  (status line JSON on stdin)
   route.py guard before|after [--cwd DIR]          snapshot/compare git state around a worker (exit 78 if a worker changed branches, commits, worktrees or stashes)
-  route.py doctor [--quiet] [--deep] [--json]      readiness of every lane (no state kept; --deep also validates the API key)
-  route.py init [--do STEP] [--decline LANE] [--undecline LANE] [--open-browser]   next onboarding step as JSON
+  route.py doctor [--lane L] [--next] [--fix ID] [--decline L] [--undecline L] [--ack ID] [--deep] [--json] [--quiet]   the one setup command: what each lane needs, and how to act on it
+  route.py init ...   deprecated alias of doctor --next / --fix / --decline
   route.py set-key [--stdin] [--force] | --web [--host IP|tailscale] [--port N] [--timeout S]   the key is handed over by the USER (terminal prompt or one-shot page); the agent never handles it
   route.py config set KEY VALUE | show | ack ID | unack ID     (ack: the user decided a doctor finding needs no action)
 
@@ -286,6 +286,20 @@ def harness():
     return "unknown" if ep else "headless"
 
 
+OFFERS = []     # lanes seen for the first time and not usable; reported once, then forgotten
+
+
+def offered():
+    return set((read_config().get("profile") or {}).get("offered") or [])
+
+
+def mark_offered(names):
+    def put(c):
+        lst = c.setdefault("profile", {}).setdefault("offered", [])
+        lst.extend(n for n in names if n not in lst)
+    update_config(put)
+
+
 def lane_mode(name, cfg_lane, ready):
     """-> "on" | "off" | "drift". Shared lanes are always on. Otherwise the profile decides;
     a lane never decided is turned on once if the machine has it ready, else left out silently."""
@@ -299,6 +313,8 @@ def lane_mode(name, cfg_lane, ready):
     if ready:
         set_profile_lane(name, "enabled")
         return "on"
+    if name not in offered() and name not in OFFERS:
+        OFFERS.append(name)
     return "off"
 
 
@@ -806,7 +822,9 @@ def decision(a, cfg):
     """next and run share this: gather, decide, remember the lane choice. -> (d, lanes, warnings, t)"""
     t = now()
     st = load_state()
+    del OFFERS[:]
     lanes = gather(cfg, st, t, parse_json_arg(a.claude_usage))
+    new_offers = list(OFFERS)
     warnings = drift_warnings(lanes, st, t)
     publish_lanes(lanes, st, t)
     args = {"writer": a.writer, "failed": [int(x) for x in a.failed.split(",") if x != ""] if a.failed else [],
@@ -821,6 +839,9 @@ def decision(a, cfg):
                 s["prev"][fam] = {"lane": d["lane"], "since": t}
         if sum(1 for l in lanes.values() if l.family == fam) > 1:
             update_state(mark)
+    if new_offers:
+        mark_offered(new_offers)
+        d["notice"] = "not set up: " + ", ".join(new_offers) + " (doctor --lane NAME to set up, doctor --decline NAME to hide)"
     return d, lanes, warnings, t
 
 
@@ -1126,11 +1147,13 @@ def run_codex_step(d, brief, timeout, t):
 def cmd_run(a, cfg):
     d, lanes, warnings, t = decision(a, cfg)
     if d["action"] != "run":
-        print(json.dumps({k: d[k] for k in ("action", "say", "resets", "ask_user", "error") if k in d}))
+        print(json.dumps({k: d[k] for k in ("action", "say", "resets", "ask_user", "error", "notice") if k in d}))
         return 0 if d["action"] == "stop" else 1
     head = {"lane": d["lane"], "model": d["model"], "effort": d["effort"], "pass": d["pass"]}
     if warnings:
         head["warnings"] = warnings
+    if d.get("notice"):
+        head["notice"] = d["notice"]
     ni = [n["what"] for n in needs_input(lanes)]
     if ni:
         head["needs_input"] = ni
@@ -1176,8 +1199,27 @@ def cmd_run(a, cfg):
 # ----------------------------------------------------------------------------- onboarding commands (code in onboard.py)
 
 def cmd_doctor(a, cfg):
+    """The one setup command: report, then --fix / --decline / --undecline / --ack / --next act on what it reported."""
     import onboard
-    d = onboard.doctor(sys.modules[__name__], cfg, deep=a.deep)
+    R = sys.modules[__name__]
+    if a.undecline:
+        if profile_lanes().get(a.undecline) == "declined":
+            set_profile_lane(a.undecline, None)
+        print(json.dumps({"done": True, "say": f"{a.undecline} back in the list."}))
+        return 0
+    if a.ack or a.unack:
+        set_ack(a.ack or a.unack, bool(a.ack))
+        print(json.dumps({"acknowledged": sorted(acked())}))
+        return 0
+    if a.decline or a.fix:
+        out = onboard.init(R, cfg, do=a.fix, decline=a.decline, open_browser=a.open_browser)
+        print(json.dumps(out, indent=1))
+        return 1 if out.get("error") else 0
+    d = onboard.doctor(R, cfg, deep=a.deep, lane=a.lane)
+    if a.next:
+        step = onboard.next_step(d)
+        print(json.dumps(step if step and "optional_only" not in step else {"step": None, "say": "READY", "lanes": d["lanes"]}, indent=1))
+        return 0
     if a.json:
         print(json.dumps(d, indent=1))
     else:
@@ -1237,6 +1279,8 @@ def main(argv=None):
     r.add_argument("--until"); r.add_argument("--message")
     cl = sub.add_parser("capture-limits"); cl.add_argument("--print", action="store_true")
     dr = sub.add_parser("doctor"); dr.add_argument("--quiet", action="store_true"); dr.add_argument("--deep", action="store_true"); dr.add_argument("--json", action="store_true")
+    dr.add_argument("--lane"); dr.add_argument("--next", action="store_true"); dr.add_argument("--fix"); dr.add_argument("--decline"); dr.add_argument("--undecline")
+    dr.add_argument("--ack"); dr.add_argument("--unack"); dr.add_argument("--open-browser", action="store_true")
     ini = sub.add_parser("init"); ini.add_argument("--do"); ini.add_argument("--decline"); ini.add_argument("--undecline"); ini.add_argument("--open-browser", action="store_true")
     gd = sub.add_parser("guard"); gd.add_argument("when", choices=["before", "after"]); gd.add_argument("--cwd")
     sk = sub.add_parser("set-key"); sk.add_argument("--stdin", action="store_true"); sk.add_argument("--force", action="store_true")
