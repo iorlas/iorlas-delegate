@@ -11,7 +11,7 @@ claude plugin install iorlas-delegate@iorlas-marketplace
 
 Then, in a Claude Code session, run `/iorlas-delegate:init`. It checks the machine, installs the Codex CLI and plugin, starts the Codex device login (you open a link and enter a code), and tells you the one command to store the API key yourself. A configured machine answers `READY` and reads nothing more.
 
-Requirements: Claude Code. Base mode (Claude sub-agents only) needs nothing else. The router, Codex lane and credit lane need Python 3.8+ (standard library only); the Codex CLI needs Node 18.18+. macOS, Linux, Windows, Docker. In a container, mount `~/.codex` and `~/.config/delegate` as volumes.
+Requirements: Claude Code. Base mode (Claude sub-agents only) needs nothing else. The router, Codex lane and credit lane need Python 3.8+ (standard library only); the Codex CLI needs Node 18.18+. macOS, Linux, Windows, Docker. In a container, mount `~/.claude` and `~/.codex` as volumes.
 
 ## Lanes
 
