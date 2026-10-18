@@ -15,7 +15,7 @@ The model supplies only what the script cannot read itself; the script decides.
   route.py doctor [--quiet] [--deep] [--json]      readiness of every lane (no state kept; --deep also validates the API key)
   route.py init [--do STEP] [--decline LANE] [--undecline LANE] [--open-browser]   next onboarding step as JSON
   route.py set-key [--stdin] [--force] | --web [--host IP|tailscale] [--port N] [--timeout S]   the key is handed over by the USER (terminal prompt or one-shot page); the agent never handles it
-  route.py config set KEY VALUE | show
+  route.py config set KEY VALUE | show | ack ID | unack ID     (ack: the user decided a doctor finding needs no action)
 
 Data: routing.json next to this file (lanes, models, roles, thresholds).
 Per-user settings: <config dir>/config.json (same keys as "settings"); state, ledger and key live in <config dir>:
@@ -245,6 +245,20 @@ def set_profile_lane(name, value):
             lanes.pop(name, None)
         else:
             lanes[name] = value
+    update_config(put)
+
+
+def acked():
+    return set((read_config().get("profile") or {}).get("ack") or [])
+
+
+def set_ack(ident, on):
+    def put(c):
+        lst = c.setdefault("profile", {}).setdefault("ack", [])
+        if on and ident not in lst:
+            lst.append(ident)
+        if not on and ident in lst:
+            lst.remove(ident)
     update_config(put)
 
 
@@ -1194,6 +1208,12 @@ def cmd_set_key(a, cfg):
 def cmd_config(a, cfg):
     import onboard
     R = sys.modules[__name__]
+    if a.action in ("ack", "unack"):
+        if not a.key:
+            sys.exit(f"route.py: config {a.action} ID  (an id from `doctor`)")
+        set_ack(a.key, a.action == "ack")
+        print(json.dumps({"acknowledged": sorted(acked())}))
+        return 0
     if a.action == "set":
         if not a.key or a.value is None:
             sys.exit("route.py: config set KEY VALUE")
@@ -1220,7 +1240,7 @@ def main(argv=None):
     gd = sub.add_parser("guard"); gd.add_argument("when", choices=["before", "after"]); gd.add_argument("--cwd")
     sk = sub.add_parser("set-key"); sk.add_argument("--stdin", action="store_true"); sk.add_argument("--force", action="store_true")
     sk.add_argument("--web", action="store_true"); sk.add_argument("--host", default="127.0.0.1"); sk.add_argument("--port", type=int, default=0); sk.add_argument("--timeout", type=int, default=300)
-    cf = sub.add_parser("config"); cf.add_argument("action", choices=["set", "show"]); cf.add_argument("key", nargs="?"); cf.add_argument("value", nargs="?")
+    cf = sub.add_parser("config"); cf.add_argument("action", choices=["set", "show", "ack", "unack"]); cf.add_argument("key", nargs="?"); cf.add_argument("value", nargs="?")
     ru = sub.add_parser("run"); ru.add_argument("role"); ru.add_argument("--writer"); ru.add_argument("--failed", default="")
     ru.add_argument("--premium", nargs="?", const="claude", metavar="FAMILY"); ru.add_argument("--allow-degraded", action="store_true")
     ru.add_argument("--claude-usage"); ru.add_argument("--cwd"); ru.add_argument("--brief"); ru.add_argument("--timeout", type=int, default=1800)

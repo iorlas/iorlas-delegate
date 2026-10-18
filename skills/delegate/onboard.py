@@ -143,9 +143,14 @@ def doctor(R, cfg, deep=False):
     checks = build_checks(R, cfg, st)
     lanes = configured_lanes(R, cfg)
     skip = {n for n, v in R.profile_lanes().items() if v == "declined"}
+    ack = R.acked()
     notes = []
-    if os.path.exists("/.dockerenv") or os.path.exists("/run/.containerenv"):
-        notes.append("Container: mount ~/.codex and ~/.config/delegate as volumes, or logins and state vanish on rebuild.")
+    if (os.path.exists("/.dockerenv") or os.path.exists("/run/.containerenv")) and "volumes" not in ack:
+        notes.append({"id": "volumes", "say": "Container: whether ~/.codex and ~/.config/delegate survive a rebuild is not checked. If your home folder is already a volume, run `route.py config ack volumes` and this goes away."})
+    for c in checks:
+        if c["id"] in ack and not c["ok"]:
+            c["skip"] = True
+            c["acked"] = True
     if deep:
         key = R.find_key(quiet=True)
         if key:
@@ -167,16 +172,21 @@ def validate_key(key):
 
 
 def print_doctor(d, quiet):
+    bad = [c for c in d["checks"] if not c["ok"] and not c.get("optional") and not c.get("skip")]
     if quiet:
-        bad = [c["id"] for c in d["checks"] if not c["ok"] and not c.get("optional") and not c.get("skip")]
-        print("READY" if d["ready"] else "SETUP NEEDED: " + ", ".join(bad))
+        print("READY" if d["ready"] else "SETUP NEEDED: " + ", ".join(c["id"] for c in bad) + " (run `doctor` for what to do about each)")
         return
     for c in d["checks"]:
-        mark = "ok     " if c["ok"] else ("skipped" if c.get("skip") else ("optional" if c.get("optional") else "MISSING"))
+        mark = "ok     " if c["ok"] else ("acked" if c.get("acked") else "skipped" if c.get("skip") else ("optional" if c.get("optional") else "MISSING"))
         print(f"{mark:<9} {c['id']:<14} {c['lane']}")
+        if not c["ok"] and not c.get("skip"):
+            print(f"          -> {c['say']}")
     for n in d["notes"]:
-        print("note:", n)
-    print("READY" if d["ready"] else "SETUP NEEDED: run `init`")
+        print(f"note [{n['id']}]: {n['say']}")
+    if d["ready"]:
+        print("READY")
+    else:
+        print("SETUP NEEDED. Each MISSING item above says what to do. You choose: do it, `init --decline LANE` to drop its lane, or `config ack ID` to say it needs nothing.")
 
 
 # ----------------------------------------------------------------------------- init: first failing check -> one step

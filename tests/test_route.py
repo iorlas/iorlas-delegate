@@ -349,6 +349,34 @@ class Onboarding(unittest.TestCase):
         self.assertTrue(self.onboard.allowed_host("192.168.1.5"))
 
 
+    def test_every_missing_item_says_what_to_do_and_ack_clears_it(self):
+        import io
+        d = self.onboard.doctor(route, self.cfg)
+        self.assertFalse(d["ready"])
+        buf, real = io.StringIO(), sys.stdout
+        sys.stdout = buf
+        try:
+            self.onboard.print_doctor(d, quiet=False)
+        finally:
+            sys.stdout = real
+        text = buf.getvalue()
+        self.assertIn("MISSING   codex_cli", text)
+        self.assertIn("-> Install the Codex CLI.", text)
+        self.assertIn("init --decline LANE", text)
+        route.set_ack("codex_cli", True)
+        route.set_ack("codex_login", True)
+        d2 = self.onboard.doctor(route, self.cfg)
+        self.assertTrue(next(c for c in d2["checks"] if c["id"] == "codex_cli")["acked"])
+        route.set_ack("codex_cli", False)
+        self.assertNotIn("codex_cli", route.acked())
+
+    def test_volumes_note_is_ackable(self):
+        import unittest.mock as m
+        with m.patch.object(self.onboard.os.path, "exists", lambda p: p == "/.dockerenv"):
+            self.assertEqual([n["id"] for n in self.onboard.doctor(route, self.cfg)["notes"]], ["volumes"])
+            route.set_ack("volumes", True)
+            self.assertEqual(self.onboard.doctor(route, self.cfg)["notes"], [])
+
     def test_set_key_enables_a_declined_credit_lane(self):
         import io
         self.onboard.validate_key = lambda k: (True, "HTTP 200")
