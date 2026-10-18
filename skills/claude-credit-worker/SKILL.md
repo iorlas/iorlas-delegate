@@ -1,43 +1,63 @@
 ---
 name: claude-credit-worker
-description: Run one self-contained coding or research task as a Sonnet worker on the Anthropic API credit (the $200/mo Max credit), not on the Max session/weekly limits. Use when `delegate` reaches lane 2, or when a task should go to Claude (Sonnet, Haiku or Opus) without draining Max.
+description: Run one self-contained coding or research task as a Claude worker (Sonnet, Haiku or Opus) billed to the Anthropic API credit, not to the Max session/weekly limits. The worker sees the project's CLAUDE.md, skills, plugins and MCP like a normal `claude` run. Use when `delegate` reaches lane 2, or when a task should go to Claude without draining Max.
 ---
 
 # claude-credit-worker
 
-Runs `claude --bare -p` with an API key from the linked Console org. `--bare` means only that key can authenticate: a missing or bad key fails loudly, it never falls back to the Max login.
+Runs `claude -p` with an API key from the Console org linked to the Max plan. The worker loads the same CLAUDE.md, skills, plugins, MCP servers, hooks and settings as a normal `claude` run in `--cwd`. Only the login differs: a missing or bad key fails loudly, it never falls back to the Max login.
 
 ## Run
 
 ```bash
-${CLAUDE_SKILL_DIR}/run.sh [--write] [--model ID] [--effort LEVEL] [--budget USD] [--cwd DIR] "<brief>"
+${CLAUDE_SKILL_DIR}/run.sh [--profile NAME] [--write] [--allow TOOL] [--model ID] [--effort LEVEL] [--budget USD] [--cwd DIR] [--bare] "<brief>"
+${CLAUDE_SKILL_DIR}/run.sh --status        # this script's own spend this month vs its cap
 ```
 
-- Default is read-only (Read, Glob, Grep). `--write` adds Edit, Write, Bash; `git push` and `git commit` are always denied.
-- `--effort low|medium|high|xhigh|max` sets reasoning effort; Opus runs use `claude-opus-5-5 --effort low` on short, split subtasks only (see `delegate`).
-- `--budget` caps one run (default $2). `--model` default `claude-sonnet-5-5`; use `claude-haiku-5-5` for routing, classification, short reviews.
+## Pick a profile
+
+| profile | model | effort | cap per run | use for |
+|---|---|---|---|---|
+| `worker` (default) | Sonnet 5.5 | medium | $2 | implementation, debugging, tests |
+| `reviewer` | Sonnet 5.5 | high | $1 | verification: rerun the checks, read the diff (read-only) |
+| `cheap` | Haiku 5.5 | low | $0.25 | routing, classification, bulk reading, short summaries; keep prompts under 100K tokens |
+| `hard` | Opus 5.5 | low | $3 | one short, split subtask of a hard ticket (see `delegate`); never the whole ticket |
+
+Flags override the profile. Raise effort only for a subtask that failed at the profile's level.
+
+## Behaviour
+
+- Read-only by default (Read, Glob, Grep). `--write` adds Edit, Write, Bash; `--allow "mcp__x__tool"` adds one more tool (repeatable). `git push` and `git commit` are always denied.
+- The worker is told it is a worker: no further delegation (`DELEGATE_DEPTH=1` is set; if you are running under it, do not call `delegate`), no commits, and a short closing report with the exit code and last lines of any check it ran.
+- `--bare` strips CLAUDE.md, skills, plugins, MCP and hooks (hermetic worker); use it only when the project's own setup would get in the way.
 - Long task: run with Bash `run_in_background`, then read the output when it ends.
 - Parallel `--write` workers need separate git worktrees (`--cwd`).
-- stdout = the answer. stderr last line = `cost=$X turns=N`.
+- stdout = the answer. stderr last line = `cost=$X turns=N month=$Y/$CAP`.
+
+## Spend limits
+
+- Per run: `--max-budget-usd` from the profile.
+- Per month: the script logs each run's cost to `~/.config/claude-credit-worker/spend.jsonl` and refuses (exit 77) when this month's spend plus the run's cap would pass `MONTHLY_CAP` (default $150, set in `~/.config/claude-credit-worker/config`). The ledger counts calendar months and only this script's runs; the real credit resets on the billing cycle, and other uses of the same key are not counted.
+- The credit balance itself is not readable. When it is empty the API says so and the script exits 75.
 
 ## Exit codes
 
 | code | meaning | next |
 |---|---|---|
 | 0 | done | review the output |
-| 75 | credit exhausted | lane is out until the billing cycle resets; fall to the next lane |
+| 75 | credit exhausted | lane is out until the billing cycle resets; fall to the next lane and tell the user |
 | 76 | rate limited or overloaded | retry once after a minute, then next lane |
+| 77 | own monthly cap reached | lane is out; tell the user, who may raise `MONTHLY_CAP` |
 | 2 | API key not stored | tell the user the one-time command printed on stderr |
 | 1 | other failure | read stderr; do not retry blindly |
 
 ## Key setup (user does this once, in their own terminal)
 
-```bash
-security add-generic-password -U -a "$USER" -s anthropic-worker-key -w
-```
+macOS: `security add-generic-password -U -a "$USER" -s anthropic-worker-key -w`
+Linux: write the key to `~/.config/claude-credit-worker/key` (mode 600) or set `CLAUDE_CREDIT_WORKER_KEY` in the worker's own environment.
 
-The key must come from a Console workspace linked to the Max plan (claude.ai → Settings → Billing → API credits), with a spend limit set. Never export `ANTHROPIC_API_KEY` globally: it would make interactive Claude Code bill the credit, which does not cover it.
+The key must come from a Console workspace linked to the Max plan (claude.ai → Settings → Billing → API credits), with a spend limit set. Never export `ANTHROPIC_API_KEY` globally: interactive Claude Code would then bill the credit, which does not cover it.
 
 ## Brief template
 
-The worker has no memory of this session and `--bare` skips CLAUDE.md. Put in the brief: goal; files and paths; constraints; acceptance check (command or test that must pass); "no commits, no pushing, do not weaken tests". Verify the result yourself (diff, run the check); do not trust the worker's report.
+The worker has no memory of this session. Put in the brief: goal; files and paths; constraints; acceptance check (command or test that must pass); "no commits, no pushing, do not weaken tests". Name any project rule the task needs even though CLAUDE.md is loaded. Verify the result yourself (rerun the check; read the diff on a risk flag); do not trust the worker's report.

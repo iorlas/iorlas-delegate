@@ -12,8 +12,10 @@ commands, limits and exhaustion signal; load it before using the lane.
 | lane | worker | skill | draws on | resets |
 |---|---|---|---|---|
 | 1 | Codex, GPT-6.1 Sol | `codex-worker` | ChatGPT Plus allowance | the 5-hour window (or the weekly cap); the limit message names the time |
-| 2 | Claude (Sonnet, Haiku, Opus) via `claude --bare -p` | `claude-credit-worker` | the $200/mo API credit; never Max | the billing cycle (exit 75) |
+| 2 | Claude (Sonnet, Haiku, Opus) via `claude -p` on an API key | `claude-credit-worker` | the $200/mo API credit; never Max | the billing cycle (exit 75) |
 | 3 | Sonnet via the native Agent tool, `model: sonnet` | (built in) | Max limits, shared with the orchestrator and Fable | last resort |
+
+If the environment variable `DELEGATE_DEPTH` is set, you are a worker: do not delegate further.
 
 ## Never delegated
 
@@ -79,7 +81,7 @@ the code.
 1. Split it into subtasks, each small enough to finish in one short Opus run and to check on its own.
 2. Run each subtask separately at low effort, and check each result before starting the next. Never give Opus the whole
    ticket in one run.
-3. Run Opus through lane 2 first (`claude-credit-worker --model claude-opus-5-5`). On Max, only if the credit is gone.
+3. Run Opus through lane 2 first (`claude-credit-worker --profile hard`: Opus 5.5, low effort, $3 cap). On Max, only if the credit is gone.
 4. Raise effort above low only for a subtask that failed at low.
 
 ## Notes
