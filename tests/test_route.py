@@ -447,6 +447,40 @@ esac
         self.assertEqual(code, 1)
 
 
+class TokenBudget(unittest.TestCase):
+    """The orchestrator pays for these files and outputs on every session / delegation. Budgets are characters (about 4 per token); ratchet them down, never up."""
+    ROOT = Path(__file__).resolve().parent.parent / "skills" / "delegate"
+
+    def test_skill_md(self):
+        text = (self.ROOT / "SKILL.md").read_text(encoding="utf-8")
+        self.assertLessEqual(len(text), 3200)
+        import re
+        desc = re.search(r"^description: (.*)$", text, re.M).group(1)
+        self.assertLessEqual(len(desc), 260)
+
+    def test_mode_files(self):
+        for f in (self.ROOT / "modes").glob("*.md"):
+            self.assertLessEqual(len(f.read_text(encoding="utf-8")), 2800, f.name)
+
+    def test_agent_step_answer_is_small(self):
+        import io
+        saved = {k: os.environ.get(k) for k in ("XDG_CONFIG_HOME", "HOME")}
+        with tempfile.TemporaryDirectory() as d:
+            os.environ["XDG_CONFIG_HOME"] = os.environ["HOME"] = d
+            real = dict(route.READERS)
+            route.READERS.update({k: (lambda lane, S, st_, t, *a: None) for k in real})
+            out, sys.stdout = sys.stdout, io.StringIO()
+            try:
+                route.main(["run", "planner"])                 # fresh machine: the Claude sub-agent step
+                answer = sys.stdout.getvalue()
+            finally:
+                sys.stdout = out
+                route.READERS.update(real)
+                for k, v in saved.items():
+                    os.environ.pop(k, None) if v is None else os.environ.__setitem__(k, v)
+        self.assertLessEqual(len(answer), 600, answer)
+
+
 class GitOwnership(unittest.TestCase):
     """Workers must not change git state; the coordinator owns branches, commits and worktrees."""
 

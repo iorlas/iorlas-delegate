@@ -795,9 +795,13 @@ def decision(a, cfg):
 def cmd_next(a, cfg):
     d, lanes, warnings, t = decision(a, cfg)
     d["needs_input"] = needs_input(lanes)
-    d["lanes"] = {n: l.brief(t) for n, l in lanes.items()}
     if warnings:
         d["warnings"] = warnings
+    if not a.verbose:       # the hot path stays small: reasoning, lane table and guard commands only on request
+        d.pop("trace", None)
+        (d.get("how") or {}).pop("guard", None)
+    else:
+        d["lanes"] = {n: l.brief(t) for n, l in lanes.items()}
     if a.text:
         if d["action"] == "run":
             print(f"RUN {d['role']} step {d['step']} on {d['lane']}: {d['model']} {d['effort']} ({d['pass']} pass)")
@@ -856,9 +860,8 @@ def cmd_capture(a, cfg):
 
 # ----------------------------------------------------------------------------- git ownership: the coordinator owns git, workers do not
 
-GIT_RULES = ("Git belongs to the coordinator. Work only in the current directory. Do not create or switch branches, do not create worktrees, "
-             "do not commit, amend, merge, rebase, cherry-pick, reset, stash, tag or push. Read-only git (status, diff, log, show) is fine. "
-             "Leave your changes uncommitted in the working tree.")
+GIT_RULES = ("Git is the coordinator's. Stay in the current directory. Do not create or switch branches or worktrees; "
+             "do not commit, amend, merge, rebase, reset, stash, tag or push. Read-only git is fine. Leave changes uncommitted.")
 
 GIT_WRITE_DENY = ["Bash(git commit:*)", "Bash(git push:*)", "Bash(git checkout:*)", "Bash(git switch:*)", "Bash(git branch:*)",
                   "Bash(git worktree:*)", "Bash(git merge:*)", "Bash(git rebase:*)", "Bash(git reset:*)", "Bash(git stash:*)",
@@ -1095,13 +1098,12 @@ def cmd_run(a, cfg):
     head = {"lane": d["lane"], "model": d["model"], "effort": d["effort"], "pass": d["pass"]}
     if warnings:
         head["warnings"] = warnings
-    ni = needs_input(lanes)
+    ni = [n["what"] for n in needs_input(lanes)]
     if ni:
         head["needs_input"] = ni
     h = d["how"]
     if h["kind"] == "agent_tool":
-        print(json.dumps({"action": "agent", **head, "agent_model": h["model"], "brief_prefix": GIT_RULES, "cwd": h["cwd"],
-                          "note": "make the Agent call yourself, in cwd, no worktree; state the effort in the brief"}))
+        print(json.dumps({"action": "agent", **head, "agent_model": h["model"], "brief_prefix": GIT_RULES, "cwd": h["cwd"]}))
         return 0
     brief = sys.stdin.read() if not a.brief else Path(a.brief).read_text(encoding="utf-8")
     if not brief.strip():
@@ -1188,7 +1190,7 @@ def main(argv=None):
     s = sub.add_parser("status"); s.add_argument("--claude-usage"); s.add_argument("--json", action="store_true")
     n = sub.add_parser("next"); n.add_argument("role"); n.add_argument("--writer"); n.add_argument("--failed", default="")
     n.add_argument("--premium", nargs="?", const="claude", metavar="FAMILY"); n.add_argument("--allow-degraded", action="store_true")
-    n.add_argument("--claude-usage"); n.add_argument("--text", action="store_true"); n.add_argument("--cwd")
+    n.add_argument("--claude-usage"); n.add_argument("--text", action="store_true"); n.add_argument("--cwd"); n.add_argument("--verbose", action="store_true")
     r = sub.add_parser("report"); r.add_argument("--lane", required=True); r.add_argument("--event", choices=["out", "ok"], required=True)
     r.add_argument("--until"); r.add_argument("--message")
     cl = sub.add_parser("capture-limits"); cl.add_argument("--print", action="store_true")
