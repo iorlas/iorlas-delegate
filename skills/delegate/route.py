@@ -203,6 +203,90 @@ def update_state(fn):
         return st
 
 
+def config_path():
+    return config_dir() / "config.json"
+
+
+def read_config():
+    try:
+        with open(config_path(), encoding="utf-8") as f:
+            d = json.load(f)
+        return d if isinstance(d, dict) else {}
+    except (OSError, ValueError):
+        return {}
+
+
+def update_config(fn):
+    """Locked read-modify-write of config.json: callers never save a stale snapshot."""
+    p = config_path()
+    with locked(p):
+        cur = read_config()
+        fn(cur)
+        tmp = p.with_suffix(f".tmp{os.getpid()}")
+        with open(tmp, "w", encoding="utf-8") as f:
+            json.dump(cur, f, indent=2)
+            f.write("\n")
+        os.replace(tmp, p)
+        private(p)
+        return cur
+
+
+def profile_lanes():
+    """{lane: "enabled"|"declined"} written by init, set-key and first use. A missing lane = not decided."""
+    return dict((read_config().get("profile") or {}).get("lanes") or {})
+
+
+def set_profile_lane(name, value):
+    """value None removes the entry (back to auto-detect)."""
+    def put(c):
+        lanes = c.setdefault("profile", {}).setdefault("lanes", {})
+        if value is None:
+            lanes.pop(name, None)
+        else:
+            lanes[name] = value
+    update_config(put)
+
+
+def migrate_profile():
+    """state.json skip_lanes (older versions) -> profile declined. Runs once; cheap when there is nothing to move."""
+    st = load_state()
+    old = st.get("skip_lanes")
+    if not old:
+        return
+    for n in old:
+        if n not in profile_lanes():
+            set_profile_lane(n, "declined")
+    update_state(lambda s: s.pop("skip_lanes", None))
+
+
+def harness():
+    """desktop | container | cli | headless | unknown, from the environment. The model never decides this."""
+    ep = os.environ.get("CLAUDE_CODE_ENTRYPOINT", "")
+    if "desktop" in ep:
+        return "desktop"
+    if os.path.exists("/.dockerenv") or os.path.exists("/run/.containerenv"):
+        return "container"
+    if ep == "cli":
+        return "cli"
+    return "unknown" if ep else "headless"
+
+
+def lane_mode(name, cfg_lane, ready):
+    """-> "on" | "off" | "drift". Shared lanes are always on. Otherwise the profile decides;
+    a lane never decided is turned on once if the machine has it ready, else left out silently."""
+    if cfg_lane.get("shared_with_orchestrator"):
+        return "on"
+    v = profile_lanes().get(name)
+    if v == "declined":
+        return "off"
+    if v == "enabled":
+        return "on" if ready else "drift"
+    if ready:
+        set_profile_lane(name, "enabled")
+        return "on"
+    return "off"
+
+
 def ledger_path():
     return config_dir() / "ledger.jsonl"
 
@@ -455,6 +539,9 @@ def gather(cfg, st, t, ai_usage=None, check_config=True):
         import onboard
         conf = onboard.configured_lanes(sys.modules[__name__], cfg)
     for name, c in cfg["lanes"].items():
+        mode = lane_mode(name, c, conf.get(name, True)) if check_config else "on"
+        if mode == "off":
+            continue
         lane = Lane(name, c["family"], c["kind"], c.get("shared_with_orchestrator", False))
         reader = READERS[c["reader"]]
         if c["reader"] == "claude_subscription":
@@ -465,9 +552,9 @@ def gather(cfg, st, t, ai_usage=None, check_config=True):
         if o and o.get("until", 0) > t and not lane.out:      # an out reported by the model or by run-claude
             lane.out, lane.out_until = True, o["until"]
             lane.notes.append(o.get("why", "reported out"))
-        if check_config and not conf.get(name, True):
+        if mode == "drift":
             lane.out, lane.out_until = True, None
-            lane.notes.insert(0, "not configured")
+            lane.notes.insert(0, "enabled but not ready (login or key gone?)")
         lanes[name] = lane
     return lanes
 
@@ -647,7 +734,7 @@ def parse_json_arg(v):
 def needs_input(lanes):
     need = []
     cs = lanes.get("CLAUDE_SUBSCRIPTION")
-    if cs and not cs.usage_known:
+    if cs and not cs.usage_known and harness() == "desktop":
         need.append({"what": "claude_usage", "why": "Claude subscription use is unknown", "how": "in the Claude desktop app call the get_usage tool and pass its windows as --claude-usage JSON ({five_hour:{used,resets_at},weekly:{used,resets_at}})"})
     ox = lanes.get("OPENAI_SUBSCRIPTION")
     if ox and not ox.usage_known and not ox.out:
@@ -672,36 +759,21 @@ def cmd_status(a, cfg):
     return 0
 
 
-def preflight(cfg, st, t):
-    """Cheap, no network. -> (setup_required_dict | None, warnings). Fires only when just the shared lane works."""
-    import onboard
-    me = sys.modules[__name__]
-    conf = onboard.configured_lanes(me, cfg)
-    skip = set(st.get("skip_lanes") or [])
-    shared = {n for n, c in cfg["lanes"].items() if c.get("shared_with_orchestrator")}
-    unconf = [n for n, ok in conf.items() if not ok and n not in skip]
-    live = {n for n, ok in conf.items() if ok}
-    if unconf and live <= shared and not st.get("setup_declined"):
-        return {"action": "setup_required", "missing": unconf, "mode": "init",
-                "say": "Only the Claude subscription lane works. Run the delegate skill's init mode (read modes/init.md), or decline."}, []
+def drift_warnings(lanes, st, t):
+    """A lane the profile enabled but the machine no longer supports: say so once a day."""
     warned = st.get("warned_at") or {}
-    warnings = []
-    for n in unconf:
-        if t - warned.get(n, 0) > 86400:
-            warnings.append(f"{n} is not configured, so it is skipped (route.py init to set it up, or init --decline {n})")
-    if warnings:
-        update_state(lambda s_: s_.setdefault("warned_at", {}).update({n: t for n in unconf}))
-    return None, warnings
+    bad = [n for n, l in lanes.items() if l.notes and l.notes[0].startswith("enabled but not ready")]
+    out = [f"{n} is enabled but not ready, so it is skipped (route.py doctor; or route.py init --decline {n})" for n in bad if t - warned.get(n, 0) > 86400]
+    if out:
+        update_state(lambda s_: s_.setdefault("warned_at", {}).update({n: t for n in bad}))
+    return out
 
 
 def cmd_next(a, cfg):
     t = now()
     st = load_state()
-    setup, warnings = preflight(cfg, st, t)
-    if setup:
-        print(json.dumps(setup, indent=1))
-        return 0
     lanes = gather(cfg, st, t, parse_json_arg(a.claude_usage))
+    warnings = drift_warnings(lanes, st, t)
     publish_lanes(lanes, st, t)
     args = {"writer": a.writer, "failed": [int(x) for x in a.failed.split(",") if x != ""] if a.failed else [],
             "premium": a.premium, "allow_degraded": a.allow_degraded, "cwd": a.cwd}
@@ -972,7 +1044,8 @@ def cmd_init(a, cfg):
     import onboard
     R = sys.modules[__name__]
     if a.undecline:
-        update_state(lambda s: s.__setitem__("skip_lanes", [x for x in s.get("skip_lanes", []) if x != a.undecline]))
+        if profile_lanes().get(a.undecline) == "declined":
+            set_profile_lane(a.undecline, None)
         print(json.dumps({"done": True, "say": f"{a.undecline} back in the setup list."}))
         return 0
     out = onboard.init(R, cfg, do=a.do, decline=a.decline, open_browser=a.open_browser)
@@ -1018,6 +1091,7 @@ def main(argv=None):
     c.add_argument("--cap", required=True); c.add_argument("--write", action="store_true"); c.add_argument("--allow", action="append")
     c.add_argument("--cwd"); c.add_argument("--bare", action="store_true"); c.add_argument("prompt", nargs="*")
     a = ap.parse_args(argv)
+    migrate_profile()
     cfg = load_routing()
     return {"status": cmd_status, "next": cmd_next, "report": cmd_report, "capture-limits": cmd_capture, "run-claude": cmd_run_claude,
             "doctor": cmd_doctor, "guard": cmd_guard, "init": cmd_init, "set-key": cmd_set_key, "config": cmd_config}[a.cmd](a, cfg)

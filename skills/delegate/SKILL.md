@@ -1,6 +1,6 @@
 ---
 name: delegate
-description: Hand a planning, implementation, debugging, review or reading sub-task to a worker model by asking the deterministic router script (route.py) which lane, model and effort to use, then executing its answer. The script reads plan limits and reset times and applies the fallback chains; the model never improvises the route. One skill with modes (init, codex, claude-credit, extend). Use before delegating any sub-task from an orchestrating session, and for setup (init).
+description: Hand a sub-task (plan, implement, debug, review, read) to a worker model. route.py picks the lane, model and effort from plan limits; never choose them yourself. Use before delegating any sub-task, and for setup.
 ---
 
 # delegate
@@ -11,7 +11,7 @@ Run: `python3 ${CLAUDE_SKILL_DIR}/route.py ...` (`python` or `py -3` on Windows)
 | mode | when | read |
 |---|---|---|
 | run | any sub-task (default) | this file |
-| init | `next` returns `setup_required`; the user runs `/iorlas-delegate:init` | `${CLAUDE_SKILL_DIR}/modes/init.md` |
+| init | the user runs `/iorlas-delegate:init`, or asks to set up a lane | `${CLAUDE_SKILL_DIR}/modes/init.md` |
 | codex | executing a step on OPENAI_SUBSCRIPTION | `modes/codex.md` |
 | claude-credit | executing a step on CLAUDE_CREDIT; exit codes; key | `modes/claude-credit.md` |
 | extend | adding a model, role or lane | `modes/extend.md` |
@@ -19,13 +19,28 @@ Run: `python3 ${CLAUDE_SKILL_DIR}/route.py ...` (`python` or `py -3` on Windows)
 
 Read a mode file only when you need it.
 
+## Base mode (no Python 3.8+, or route.py fails to start)
+
+Delegate with the Agent tool only, in the current directory, no worktree, no commits by the worker. State the effort in the brief. First model that is available; no limit checks.
+
+<!-- base-table -->
+| role | agent model + effort, in order |
+|---|---|
+| planner | opus medium |
+| worker | sonnet medium |
+| reviewer | opus medium |
+| hard | opus low > opus medium |
+| light | haiku low > sonnet low |
+<!-- /base-table -->
+
+Codex and credit lanes need Python 3.8+. Tell the user once; do not install it yourself.
+
 ## Loop
 
 ```
 d = route.py next ROLE [--cwd DIR] [--writer openai|claude] [--failed IDX,IDX] [--premium [FAMILY]] [--allow-degraded] [--claude-usage JSON]
 
 switch d.action:
-  setup_required: read modes/init.md and run it; then call next again
   run:    prefix the brief with d.how.brief_prefix; run d.how.guard.before; execute d.how (table below); run d.how.guard.after
           relay d.warnings once; mention d.pass if "relaxed" (one line)
           guard.after or run-claude exit 78 = the worker changed git state (see Git below)

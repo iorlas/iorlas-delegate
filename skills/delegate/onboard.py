@@ -104,7 +104,7 @@ def configured_lanes(R, cfg):
 
 def build_checks(R, cfg, st):
     S = cfg["settings"]
-    skip = set(st.get("skip_lanes") or [])
+    skip = {n for n, v in R.profile_lanes().items() if v == "declined"}
     py = str(sys.executable)
     rp = str(route_path())
     oa_skip = "OPENAI_SUBSCRIPTION" in skip
@@ -141,9 +141,9 @@ def doctor(R, cfg, deep=False):
     st = R.load_state()
     checks = build_checks(R, cfg, st)
     lanes = configured_lanes(R, cfg)
-    skip = set(st.get("skip_lanes") or [])
+    skip = {n for n, v in R.profile_lanes().items() if v == "declined"}
     notes = []
-    if os.path.exists("/.dockerenv"):
+    if os.path.exists("/.dockerenv") or os.path.exists("/run/.containerenv"):
         notes.append("Container: mount ~/.codex and ~/.config/delegate as volumes, or logins and state vanish on rebuild.")
     if deep:
         key = R.find_key(quiet=True)
@@ -151,7 +151,7 @@ def doctor(R, cfg, deep=False):
             checks.append({"id": "credit_key_valid", "lane": "CLAUDE_CREDIT", "ok": validate_key(key)[0], "skip": "CLAUDE_CREDIT" in skip,
                            "who": "user", "say": "The stored API key was rejected: " + validate_key(key)[1]})
     blocking = [c for c in checks if not c["ok"] and not c.get("optional") and not c.get("skip")]
-    return {"ready": not blocking, "lanes": lanes, "declined": sorted(skip), "checks": checks, "notes": notes}
+    return {"ready": not blocking, "lanes": lanes, "declined": sorted(skip), "harness": R.harness(), "checks": checks, "notes": notes}
 
 
 def validate_key(key):
@@ -298,7 +298,7 @@ def init(R, cfg, do=None, decline=None, open_browser=False):
     if decline:
         if decline not in cfg["lanes"]:
             return {"error": f"unknown lane {decline}"}
-        R.update_state(lambda s: s.setdefault("skip_lanes", []).append(decline) if decline not in s.get("skip_lanes", []) else None)
+        R.set_profile_lane(decline, "declined")
         return {"done": True, "say": f"{decline} opted out. `init --undecline {decline}` brings it back."}
     if do:
         fn = FIXERS.get(do)
@@ -341,29 +341,27 @@ def set_key(R, from_stdin=False, force=False):
     fd = os.open(str(path), flags, 0o600)
     with os.fdopen(fd, "w", encoding="utf-8") as f:
         f.write(key + "\n")
+    R.set_profile_lane("CLAUDE_CREDIT", "enabled")
     ok, why = validate_key(key)
     print(f"saved to {path} (not printed). Key check: " + ("accepted" if ok else ("rejected, " + why if ok is False else why)))
     return 0
 
 
 def config_set(R, key, value):
-    p = R.config_dir() / "config.json"
-    try:
-        cur = json.loads(p.read_text(encoding="utf-8")) if p.exists() else {}
-    except ValueError:
-        cur = {}
     try:
         val = json.loads(value)
     except ValueError:
         val = value
-    node = cur
-    parts = key.split(".")
-    for part in parts[:-1]:
-        node = node.setdefault(part, {})
-    node[parts[-1]] = val
-    p.write_text(json.dumps(cur, indent=2) + "\n", encoding="utf-8")
-    R.private(p)
-    return cur
+
+    def put(cur):
+        node = cur
+        parts = key.split(".")
+        for part in parts[:-1]:
+            if not isinstance(node.get(part), dict):
+                node[part] = {}
+            node = node[part]
+        node[parts[-1]] = val
+    return R.update_config(put)
 
 
 def config_show(R, cfg):

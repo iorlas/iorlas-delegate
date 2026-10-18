@@ -234,12 +234,76 @@ class Onboarding(unittest.TestCase):
         self.assertTrue(self.onboard.doctor(route, self.cfg)["ready"])
         self.assertIsNone(self.onboard.init(route, self.cfg)["step"])
 
-    def test_preflight_setup_required_only_when_just_the_shared_lane_works(self):
-        setup, warns = route.preflight(self.cfg, {}, T)
-        self.assertEqual(setup["action"], "setup_required")
-        self.assertIn("OPENAI_SUBSCRIPTION", setup["missing"])
-        setup, warns = route.preflight(self.cfg, {"skip_lanes": ["OPENAI_SUBSCRIPTION", "CLAUDE_CREDIT"]}, T)
-        self.assertIsNone(setup)
+    def _gather(self, st=None):
+        real = dict(route.READERS)
+        route.READERS.update({k: (lambda lane, S, st_, t, *a: None) for k in real})
+        try:
+            return route.gather(self.cfg, st or {}, T)
+        finally:
+            route.READERS.update(real)
+
+    def _make_codex_ready(self):
+        self.onboard.shutil.which = lambda name: "/x/codex" if name == "codex" else None
+        home = Path(os.environ["HOME"]) / ".codex"
+        home.mkdir(parents=True, exist_ok=True)
+        (home / "auth.json").write_text("{}")
+
+    def test_fresh_machine_is_sub_agent_only_with_no_nag(self):
+        ls = self._gather()
+        self.assertEqual(list(ls), ["CLAUDE_SUBSCRIPTION"])
+        self.assertEqual(route.profile_lanes(), {})
+        self.assertEqual(route.drift_warnings(ls, {}, T), [])
+
+    def test_ready_lane_is_enabled_once_and_remembered(self):
+        self._make_codex_ready()
+        self.assertIn("OPENAI_SUBSCRIPTION", self._gather())
+        self.assertEqual(route.profile_lanes()["OPENAI_SUBSCRIPTION"], "enabled")
+
+    def test_declined_lane_stays_out_even_when_ready(self):
+        self._make_codex_ready()
+        route.set_profile_lane("OPENAI_SUBSCRIPTION", "declined")
+        self.assertNotIn("OPENAI_SUBSCRIPTION", self._gather())
+
+    def test_enabled_but_no_longer_ready_is_out_and_warns_once_a_day(self):
+        route.set_profile_lane("OPENAI_SUBSCRIPTION", "enabled")          # nothing on this fake machine
+        ls = self._gather()
+        self.assertTrue(ls["OPENAI_SUBSCRIPTION"].out)
+        st = {}
+        self.assertEqual(len(route.drift_warnings(ls, st, T)), 1)
+        route.update_state(lambda s: s.update(st))
+        self.assertEqual(route.drift_warnings(ls, route.load_state(), T + 60), [])
+
+    def test_old_skip_lanes_migrate_into_the_profile(self):
+        route.update_state(lambda s: s.__setitem__("skip_lanes", ["CLAUDE_CREDIT"]))
+        route.migrate_profile()
+        self.assertEqual(route.profile_lanes()["CLAUDE_CREDIT"], "declined")
+        self.assertNotIn("skip_lanes", route.load_state())
+
+    def test_usage_is_requested_only_on_desktop(self):
+        ls = self._gather()
+        saved = os.environ.get("CLAUDE_CODE_ENTRYPOINT")
+        try:
+            os.environ["CLAUDE_CODE_ENTRYPOINT"] = "claude-desktop"
+            self.assertEqual([n["what"] for n in route.needs_input(ls)], ["claude_usage"])
+            os.environ["CLAUDE_CODE_ENTRYPOINT"] = "cli"
+            self.assertEqual(route.needs_input(ls), [])
+            os.environ.pop("CLAUDE_CODE_ENTRYPOINT")
+            self.assertEqual(route.needs_input(ls), [])
+        finally:
+            if saved is not None:
+                os.environ["CLAUDE_CODE_ENTRYPOINT"] = saved
+
+    def test_set_key_enables_a_declined_credit_lane(self):
+        import io
+        self.onboard.validate_key = lambda k: (True, "HTTP 200")
+        route.set_profile_lane("CLAUDE_CREDIT", "declined")
+        real = sys.stdin
+        try:
+            sys.stdin = io.StringIO("sk-ant-test-key\n")
+            self.onboard.set_key(route, from_stdin=True)
+        finally:
+            sys.stdin = real
+        self.assertEqual(route.profile_lanes()["CLAUDE_CREDIT"], "enabled")
 
     def test_config_set_and_show(self):
         self.onboard.config_set(route, "credit.reset_day", "15")
@@ -266,6 +330,27 @@ class Onboarding(unittest.TestCase):
         finally:
             sys.stdin = real
         self.assertEqual(route.find_key(quiet=True), "sk-ant-test-key")
+
+
+class BaseTable(unittest.TestCase):
+    """SKILL.md carries a fixed role table for installs without Python. It must equal what routing.json gives for Claude sub-agents."""
+
+    def test_skill_table_matches_routing_json(self):
+        import re
+        skill = (Path(__file__).resolve().parent.parent / "skills" / "delegate" / "SKILL.md").read_text(encoding="utf-8")
+        block = re.search(r"<!-- base-table -->(.*?)<!-- /base-table -->", skill, re.S).group(1)
+        table = {}
+        for line in block.splitlines():
+            cells = [c.strip() for c in line.strip().strip("|").split("|")]
+            if len(cells) == 2 and cells[0] not in ("role", "---", ""):
+                table[cells[0]] = cells[1]
+        cfg = route.load_routing()
+        want = {}
+        for name, role in cfg["roles"].items():
+            steps = role["by_writer"]["openai"] if "by_writer" in role else role["steps"]
+            seq = [f"{cfg['models'][s['model']]['agent']} {s['effort']}" for s in steps if s["on"] == "claude" and s.get("flag") != "degraded"]
+            want[name] = " > ".join(seq)
+        self.assertEqual(table, want)
 
 
 class GitOwnership(unittest.TestCase):
