@@ -826,7 +826,7 @@ def cmd_report(a, cfg):
     until = to_epoch(a.until)
     if until is None:
         st = load_state()
-        lanes = gather(cfg, st, t)
+        lanes = gather(cfg, st, t, check_config=False)     # a lane the profile leaves out can still be reported out
         lane = lanes[a.lane]
         until = lane.out_until or (lane.week_reset if lane.week_reset and lane.week_reset > t and lane.kind == "credit" else None) or t + 3600
     update_state(lambda s: s.setdefault("out", {}).__setitem__(a.lane, {"until": until, "why": a.message or "reported out", "at": t}))
