@@ -158,18 +158,9 @@ class Roles(unittest.TestCase):
 
 
 class Helpers(unittest.TestCase):
-    def test_normalize_usage_shapes(self):
-        n = route.normalize_usage({"five_hour": {"used_percent": 37, "resets_at": T + 100}, "weekly": {"utilization": 52, "resetsAt": T + 1000}}, T)
-        self.assertEqual((n["five_hour"]["used"], n["weekly"]["used"]), (37.0, 52.0))
-        self.assertIsNone(route.normalize_usage({"x": 1}, T))
-
-    def test_window_after_reset_is_zero(self):
-        self.assertEqual(route.window(95, T - 5, 300, T)[0], 0.0)
-
-    def test_credit_cycle(self):
-        t = dt.datetime(2026, 10, 18, 12).timestamp()
-        s, n = route.credit_cycle(1, t)
-        self.assertEqual((dt.datetime.fromtimestamp(s).date(), dt.datetime.fromtimestamp(n).date()), (dt.date(2026, 10, 1), dt.date(2026, 11, 1)))
+    def test_unknown_usage_shapes_are_rejected(self):
+        self.assertIsNone(route.normalize_usage({"x": 1}))
+        self.assertIsNone(route.normalize_usage({"five_hour": {"used": 37}}))      # only get_usage's real shape is understood
 
     def test_real_get_usage_result_is_understood(self):
         real = {"plan": {"status": "ok", "plan": "Max", "windows": [
@@ -177,10 +168,10 @@ class Helpers(unittest.TestCase):
             {"label": "Weekly \u00b7 all models", "percentUsed": 3, "resetsAt": "2026-10-25T13:59:59.908Z", "resetsIn": "6d 21h"},
             {"label": "Weekly \u00b7 Fable", "percentUsed": 1, "resetsAt": "2026-10-25T13:59:59.908Z"}],
             "extraUsage": {"enabled": True}}, "context": {"percentUsed": 25}}
-        u = route.normalize_usage(real, T)
+        u = route.normalize_usage(real)
         self.assertEqual((u["five_hour"]["used"], u["weekly"]["used"], u["fable"]["used"]), (1.0, 3.0, 1.0))
         self.assertAlmostEqual(u["weekly"]["resets_at"], dt.datetime(2026, 10, 25, 13, 59, 59, 908000, tzinfo=dt.timezone.utc).timestamp(), places=2)
-        self.assertEqual(route.normalize_usage(real["plan"], T), u)
+        self.assertEqual(route.normalize_usage(real["plan"]), u)
 
     def test_next_weekly(self):
         t = dt.datetime(2026, 10, 18, 17, 1).timestamp()          # Sunday just after 17:00
@@ -252,10 +243,10 @@ class Onboarding(unittest.TestCase):
         self.assertEqual((step["step"], step["who"], step["do"]), ("codex_cli", "agent", "codex_cli"))
 
     def test_decline_both_lanes_makes_it_ready(self):
-        self.onboard.init(route, self.cfg, decline="OPENAI_SUBSCRIPTION")
-        self.onboard.init(route, self.cfg, decline="CLAUDE_CREDIT")
+        self.onboard.act(route, self.cfg, decline="OPENAI_SUBSCRIPTION")
+        self.onboard.act(route, self.cfg, decline="CLAUDE_CREDIT")
         self.assertTrue(self.onboard.doctor(route, self.cfg)["ready"])
-        self.assertIsNone(self.onboard.init(route, self.cfg)["step"])
+        self.assertNotIn("step", self.onboard.next_step(self.onboard.doctor(route, self.cfg)))     # nothing required is left
 
     def _gather(self, st=None):
         real = dict(route.READERS)
@@ -295,12 +286,6 @@ class Onboarding(unittest.TestCase):
         self.assertEqual(len(route.drift_warnings(ls, st, T)), 1)
         route.update_state(lambda s: s.update(st))
         self.assertEqual(route.drift_warnings(ls, route.load_state(), T + 60), [])
-
-    def test_old_skip_lanes_migrate_into_the_profile(self):
-        route.update_state(lambda s: s.__setitem__("skip_lanes", ["CLAUDE_CREDIT"]))
-        route.migrate_profile()
-        self.assertEqual(route.profile_lanes()["CLAUDE_CREDIT"], "declined")
-        self.assertNotIn("skip_lanes", route.load_state())
 
     def test_usage_is_requested_only_on_desktop(self):
         ls = self._gather()
@@ -572,20 +557,6 @@ class ConfigLocation(unittest.TestCase):
         self.installed()
         os.environ["DELEGATE_CONFIG_DIR"] = str(Path(self.tmp.name) / "mine")
         self.assertEqual(route.config_dir(), Path(self.tmp.name) / "mine")
-
-    def test_old_files_are_moved_once_and_never_overwritten(self):
-        old = Path(self.tmp.name) / "delegate"
-        old.mkdir()
-        (old / "config.json").write_text('{"claude_weekly_reset": "Sun 17:00"}')
-        (old / "claude-credit.key").write_text("sk-ant-old\n")
-        want = self.installed()
-        self.assertEqual(route.config_dir(), want)
-        self.assertEqual((want / "claude-credit.key").read_text(), "sk-ant-old\n")
-        self.assertFalse((old / "claude-credit.key").exists())                      # moved: no second copy of the key
-        self.assertFalse(old.exists())                                              # empty old dir removed
-        (want / "config.json").write_text("{}")
-        route.config_dir()                                                          # second call: nothing re-moved
-        self.assertEqual((want / "config.json").read_text(), "{}")
 
 
 class TokenBudget(unittest.TestCase):

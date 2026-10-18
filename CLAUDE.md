@@ -2,6 +2,16 @@
 
 This file provides instructions and context for AI coding agents working on this project.
 
+## Constitution (Denis's standing rules for this repo)
+
+1. **No duplication, no redundancy.** One way to do each thing; one place for each fact and each copy of data (never two copies of a key or setting).
+2. **No backward compatibility** (no shims, aliases, deprecated flags, migrations, old-format readers) **until Denis says the plugin has been given to someone else.** Public code does not change this. When a thing changes, change its callers and delete the old form; fix his own machine by hand.
+3. **Small and simple.** Less code, fewer concepts, fewer commands. Prefer deleting to adding.
+4. **Instructions are strict, terse and constrained.** Everything the orchestrator reads (SKILL.md, modes, script output) costs tokens in every session; the budgets are enforced by `tests/test_route.py` (`TokenBudget`).
+5. **The script decides, the model supplies only what the script cannot read.** Portability lives in the script, not in the markdown.
+6. **Workers never touch git;** the coordinator owns branches, worktrees, commits, merges.
+7. Before changing how workers launch or limits are computed, read `docs/dev/integrations.md`.
+
 <!-- BEGIN BEADS INTEGRATION v:1 profile:minimal hash:1105d646 -->
 ## Beads Issue Tracker
 

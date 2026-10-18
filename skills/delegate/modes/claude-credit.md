@@ -16,4 +16,4 @@
 | 1 | other | read stderr; no blind retry |
 
 Spend: `--cap` per run; every run is appended to `ledger.jsonl`; a run is refused (77) when the cycle's spend plus its cap passes `credit.monthly_cap` (default 150; cycle starts on `credit.reset_day`, default 1). The balance itself is unreadable.
-Key lookup: env `CLAUDE_CREDIT_WORKER_KEY` (not an `ANTHROPIC_*` name), else `claude-credit.key` in the config dir, else `~/.config/claude-credit-worker/key`, else macOS keychain `anthropic-worker-key`. The user stores it (`set-key`, `set-key --web`). Never export `ANTHROPIC_API_KEY` globally: interactive Claude Code would bill the credit.
+Key lookup: env `CLAUDE_CREDIT_WORKER_KEY` (not an `ANTHROPIC_*` name), else `claude-credit.key` in the config dir, else macOS keychain `anthropic-worker-key`. The user stores it (`set-key`, `set-key --web`). Never export `ANTHROPIC_API_KEY` globally: interactive Claude Code would bill the credit.

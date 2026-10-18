@@ -1,7 +1,7 @@
-"""Onboarding for the delegate router: doctor, init, set-key, config. Loaded lazily by route.py.
+"""Onboarding for the delegate router: doctor, set-key, config. Loaded lazily by route.py.
 
 Rules:
-  - `doctor` is the state. It derives readiness from the machine on every call; init stores no progress.
+  - `doctor` is the state. It derives readiness from the machine on every call; no progress is stored.
   - The agent never handles a secret. The API key is set by the user, in their own terminal (set-key).
   - Login is always device-auth: works on a laptop, over SSH and in a container. It is a user step.
   - Everything the user must read is produced here as `say`; skills only relay it.
@@ -100,7 +100,7 @@ def configured_lanes(R, cfg):
     return {n: lane_configured(R, c) for n, c in cfg["lanes"].items()}
 
 
-# ----------------------------------------------------------------------------- the check list (order = init order)
+# ----------------------------------------------------------------------------- the check list (order = setup order)
 
 def build_checks(R, cfg, st):
     S = cfg["settings"]
@@ -125,7 +125,7 @@ def build_checks(R, cfg, st):
                  "Console > Settings > API keys: key in a workspace with a spend limit). Never paste it into chat. Give it to the tool one of these ways: "
                  f"(1) set env CLAUDE_CREDIT_WORKER_KEY on this host; (2) in your own terminal run: {py} \"{rp}\" set-key; "
                  f"(3) no terminal: tell the agent to run `{py} \"{rp}\" set-key --web` (add `--host tailscale` to open the link from another device) and open the link it shows; "
-                 f"(4) skip the lane: `{py} \"{rp}\" init --decline CLAUDE_CREDIT`."),
+                 f"(4) skip the lane: `{py} \"{rp}\" doctor --decline CLAUDE_CREDIT`."),
          "url": "https://platform.claude.com"},
         {"id": "weekly_reset", "lane": "CLAUDE_SUBSCRIPTION", "ok": bool(S.get("claude_weekly_reset")), "who": "user", "optional": True,
          "say": f"When does your Claude weekly limit reset (day and local time, e.g. Sun 17:00)? Then run: {py} \"{rp}\" config set claude_weekly_reset \"Sun 17:00\"",
@@ -197,7 +197,7 @@ def print_doctor(d, quiet):
         print("SETUP NEEDED. Each MISSING item above says what to do. You choose: do it (`doctor --fix ID`), `doctor --decline LANE` to drop its lane, or `doctor --ack ID` to say it needs nothing.")
 
 
-# ----------------------------------------------------------------------------- init: first failing check -> one step
+# ----------------------------------------------------------------------------- doctor --next: first failing check -> one step
 
 def next_step(d):
     """First failing REQUIRED check as a step; optional ones are listed, not pushed."""
@@ -226,7 +226,7 @@ def run_cmd(argv, timeout=300):
 def do_codex_cli(R):
     npm = shutil.which("npm")
     if not npm:
-        return {"done": False, "say": "npm is not installed, so the Codex CLI cannot be installed automatically. Install Node.js 18.18+ then run `init` again."}
+        return {"done": False, "say": "npm is not installed, so the Codex CLI cannot be installed automatically. Install Node.js 18.18+ then run `doctor --next` again."}
     ok, out = run_cmd([npm, "install", "-g", "@openai/codex"])
     return {"done": ok, "say": "Codex CLI installed." if ok else "npm install failed: " + out}
 
@@ -243,7 +243,7 @@ def do_codex_plugin(R):
 def do_codex_login(R, open_browser=False):
     codex = shutil.which("codex")
     if not codex:
-        return {"done": False, "say": "Install the Codex CLI first (`init` will do it)."}
+        return {"done": False, "say": "Install the Codex CLI first (`doctor --fix codex_cli` does it)."}
     log = R.config_dir() / "codex-login.log"
     st = R.load_state()
     pid = st.get("codex_login_pid")
@@ -273,7 +273,7 @@ def do_codex_login(R, open_browser=False):
             import webbrowser
             webbrowser.open(url)
     return {"done": False, "waiting_for_user": True,
-            "say": f"Open {url} on any device and enter the code {code or '(shown on that page)'}. The login keeps waiting in the background; run `init` again when you are done."}
+            "say": f"Open {url} on any device and enter the code {code or '(shown on that page)'}. The login keeps waiting in the background; run `doctor --next` again when you are done."}
 
 
 def write_shim(R):
@@ -299,7 +299,7 @@ def do_statusline(R):
         try:
             s = json.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
         except ValueError:
-            return {"done": False, "say": f"{path} is not valid JSON; fix it, then run `init` again."}
+            return {"done": False, "say": f"{path} is not valid JSON; fix it, then run `doctor --next` again."}
         s["statusLine"] = {"type": "command", "command": cmd}
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(json.dumps(s, indent=2) + "\n", encoding="utf-8")
@@ -313,26 +313,17 @@ def do_statusline(R):
 FIXERS = {"codex_cli": do_codex_cli, "codex_plugin": do_codex_plugin, "codex_login": do_codex_login, "statusline": do_statusline, "usage_source": do_statusline}
 
 
-def init(R, cfg, do=None, decline=None, open_browser=False):
+def act(R, cfg, do=None, decline=None, open_browser=False):
+    """Run one fixer (`doctor --fix ID`) or drop a lane (`doctor --decline LANE`)."""
     if decline:
         if decline not in cfg["lanes"]:
             return {"error": f"unknown lane {decline}"}
         R.set_profile_lane(decline, "declined")
-        return {"done": True, "say": f"{decline} opted out. `init --undecline {decline}` brings it back."}
-    if do:
-        fn = FIXERS.get(do)
-        if not fn:
-            return {"error": f"no automatic fixer for {do}; the step's `say` tells the user what to do"}
-        return fn(R, open_browser) if do == "codex_login" else fn(R)
-    d = doctor(R, cfg)
-    step = next_step(d)
-    if step is None or "optional_only" in step:
-        out = {"step": None, "say": "READY", "lanes": d["lanes"], "notes": d["notes"]}
-        if step:
-            out["optional_steps"] = step["optional_only"]
-            out["optional_hint"] = "run `init --do <id>` for an optional step if the user wants it"
-        return out
-    return {**step, "notes": d["notes"]}
+        return {"done": True, "say": f"{decline} opted out. `doctor --undecline {decline}` brings it back."}
+    fn = FIXERS.get(do)
+    if not fn:
+        return {"error": f"no automatic fixer for {do}; the step's `say` tells the user what to do"}
+    return fn(R, open_browser) if do == "codex_login" else fn(R)
 
 
 # ----------------------------------------------------------------------------- set-key, config

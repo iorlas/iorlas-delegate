@@ -6,16 +6,15 @@ The model supplies only what the script cannot read itself; the script decides.
 
   route.py status [--claude-usage JSON|@file|-] [--json]
   route.py next ROLE [--writer openai|claude] [--failed 0,1] [--premium [FAMILY]] [--allow-degraded]
-                     [--claude-usage JSON|@file|-] [--text]
+                     [--claude-usage JSON|@file|-] [--cwd DIR] [--verbose]
   route.py run ROLE [same flags as next] [--brief FILE] [--timeout SEC]   brief on stdin; runs a Codex or credit step end to end (guard, stdin, timeout, limit refusal)
   route.py report --lane LANE --event out|ok [--until EPOCH|ISO] [--message TEXT]
   route.py run-claude --model ID --effort LEVEL --cap USD [--write] [--allow TOOL]... [--cwd DIR] [--bare] [PROMPT|-]
   route.py capture-limits [--print]  (status line JSON on stdin)
   route.py guard before|after [--cwd DIR]          snapshot/compare git state around a worker (exit 78 if a worker changed branches, commits, worktrees or stashes)
   route.py doctor [--lane L] [--next] [--fix ID] [--decline L] [--undecline L] [--ack ID] [--deep] [--json] [--quiet]   the one setup command: what each lane needs, and how to act on it
-  route.py init ...   deprecated alias of doctor --next / --fix / --decline
   route.py set-key [--stdin] [--force] | --web [--host IP|tailscale] [--port N] [--timeout S]   the key is handed over by the USER (terminal prompt or one-shot page); the agent never handles it
-  route.py config set KEY VALUE | show | ack ID | unack ID     (ack: the user decided a doctor finding needs no action)
+  route.py config set KEY VALUE | show
 
 Data: routing.json next to this file (lanes, models, roles, thresholds).
 Per-user settings: <config dir>/config.json (same keys as "settings"); state, ledger and key live in <config dir>:
@@ -58,10 +57,8 @@ def now():
     return float(v) if v else time.time()
 
 
-LEGACY_FILES = ("config.json", "state.json", "ledger.jsonl", "claude-credit.key", "statusline.py")
-
-
-def legacy_dir():
+def checkout_dir():
+    """Where a checkout (not an installed plugin) keeps its files."""
     if os.name == "nt":
         base = os.environ.get("APPDATA") or str(Path.home() / "AppData" / "Roaming")
     else:
@@ -82,25 +79,13 @@ def plugin_data_dir():
 
 def config_dir():
     """Where settings, profile, state, ledger and the key live. Order: DELEGATE_CONFIG_DIR, the plugin's data dir (installed plugin),
-    else ~/.config/delegate (checkout). CLAUDE_PLUGIN_DATA is deliberately not read: it names whichever plugin launched the process.
-    Files from the old location are moved in once."""
+    else ~/.config/delegate (checkout). CLAUDE_PLUGIN_DATA is deliberately not read: it names whichever plugin launched the process."""
     explicit = os.environ.get("DELEGATE_CONFIG_DIR")
-    p = Path(explicit) if explicit else (plugin_data_dir() or legacy_dir())
-    fresh = not p.exists()
+    p = Path(explicit) if explicit else (plugin_data_dir() or checkout_dir())
     p.mkdir(parents=True, exist_ok=True)
     if os.name != "nt":
         with contextlib.suppress(OSError):
             os.chmod(p, 0o700)        # holds the API key file, state and ledger: private to the user
-    if fresh and not explicit:
-        old = legacy_dir()
-        if old != p and old.is_dir():
-            for name in LEGACY_FILES:
-                src = old / name
-                if src.is_file() and not (p / name).exists():
-                    with contextlib.suppress(OSError):
-                        shutil.move(str(src), str(p / name))        # moved, not copied: one copy of the key
-            with contextlib.suppress(OSError):
-                old.rmdir()                                         # only succeeds when empty
     return p
 
 
@@ -294,18 +279,6 @@ def set_ack(ident, on):
         if not on and ident in lst:
             lst.remove(ident)
     update_config(put)
-
-
-def migrate_profile():
-    """state.json skip_lanes (older versions) -> profile declined. Runs once; cheap when there is nothing to move."""
-    st = load_state()
-    old = st.get("skip_lanes")
-    if not old:
-        return
-    for n in old:
-        if n not in profile_lanes():
-            set_profile_lane(n, "declined")
-    update_state(lambda s: s.pop("skip_lanes", None))
 
 
 def harness():
@@ -511,53 +484,28 @@ def read_codex(lane, S, st, t):
         lane.out_until = max(resets) if resets else t + 3600
 
 
-def normalize_usage(raw, t):
-    """Accept the Claude subscription's windows in the shapes tools produce -> {five_hour, weekly, fable} each {used, resets_at}."""
-    if isinstance(raw, dict) and isinstance(raw.get("plan"), dict):      # the whole get_usage tool result
+def normalize_usage(raw):
+    """get_usage's result (or its `plan`, or its `windows` list) -> {five_hour, weekly, fable}, each {used, resets_at}; None if no window matches."""
+    if isinstance(raw, dict) and isinstance(raw.get("plan"), dict):
         raw = raw["plan"]
-    if isinstance(raw, dict) and isinstance(raw.get("windows"), list):   # {"windows":[{"label","percentUsed","resetsAt"}]}
-        raw = raw["windows"]
-    if isinstance(raw, list):
-        found = {}
-        for w in raw:
-            label = str((w or {}).get("label", "")).lower()
-            if "fable" in label:
-                key = "fable"
-            elif "5" in label and "hour" in label:
-                key = "five_hour"
-            elif "week" in label and "all" in label:
-                key = "weekly"
-            else:
-                continue
-            found[key] = w
-        raw = found
-    if not isinstance(raw, dict):
-        return None
-
-    def pick(d, names):
-        for n in names:
-            if n in d:
-                return d[n]
-        return None
-
-    def one(w):
-        if not isinstance(w, dict):
-            return None
-        used = pick(w, ["used", "used_percent", "used_percentage", "percent_used", "utilization", "percent", "usedPercent", "percentUsed"])
-        reset = to_epoch(pick(w, ["resets_at", "resetsAt", "reset_at", "reset", "resets"]))
-        return {"used": float(used), "resets_at": reset} if used is not None else None
-
-    out = {"five_hour": one(pick(raw, ["five_hour", "fiveHour", "session", "5h"])),
-           "weekly": one(pick(raw, ["weekly", "seven_day", "sevenDay", "week", "weekly_all", "all_models"])),
-           "fable": one(pick(raw, ["fable", "weekly_fable", "fable_weekly"]))}
-    return out if any(out.values()) else None
+    if isinstance(raw, dict):
+        raw = raw.get("windows")
+    out = {}
+    for w in raw if isinstance(raw, list) else []:
+        if not isinstance(w, dict) or w.get("percentUsed") is None:
+            continue
+        label = str(w.get("label", "")).lower()
+        key = "fable" if "fable" in label else "five_hour" if "5" in label and "hour" in label else "weekly" if "week" in label and "all" in label else None
+        if key:
+            out[key] = {"used": float(w["percentUsed"]), "resets_at": to_epoch(w.get("resetsAt"))}
+    return out or None
 
 
 def read_claude_subscription(lane, S, st, t, ai_usage=None):
     stale = S["usage_stale_minutes"] * 60
     usage = None
     if ai_usage:
-        usage = normalize_usage(ai_usage, t)
+        usage = normalize_usage(ai_usage)
         if usage:
             update_state(lambda s: s.__setitem__("claude_usage", {"at": t, "data": usage}))
     if usage is None:
@@ -572,8 +520,8 @@ def read_claude_subscription(lane, S, st, t, ai_usage=None):
                 d = json.load(fh)
             if t - float(d.get("updated", 0)) <= stale:
                 rl = d.get("rate_limits") or {}
-                usage = normalize_usage({"five_hour": {"used": (rl.get("five_hour") or {}).get("used_percentage"), "resets_at": (rl.get("five_hour") or {}).get("resets_at")},
-                                         "weekly": {"used": (rl.get("seven_day") or {}).get("used_percentage"), "resets_at": (rl.get("seven_day") or {}).get("resets_at")}}, t)
+                usage = {k: {"used": float(w["used_percentage"]), "resets_at": w.get("resets_at")}
+                         for k, w in (("five_hour", rl.get("five_hour") or {}), ("weekly", rl.get("seven_day") or {})) if w.get("used_percentage") is not None} or None
                 if usage:
                     lane.notes.append("usage from the status-line file")
         except (OSError, ValueError, TypeError):
@@ -846,7 +794,7 @@ def drift_warnings(lanes, st, t):
     """A lane the profile enabled but the machine no longer supports: say so once a day."""
     warned = st.get("warned_at") or {}
     bad = [n for n, l in lanes.items() if l.notes and l.notes[0].startswith("enabled but not ready")]
-    out = [f"{n} is enabled but not ready, so it is skipped (route.py doctor; or route.py init --decline {n})" for n in bad if t - warned.get(n, 0) > 86400]
+    out = [f"{n} is enabled but not ready, so it is skipped (route.py doctor; or route.py doctor --decline {n})" for n in bad if t - warned.get(n, 0) > 86400]
     if out:
         update_state(lambda s_: s_.setdefault("warned_at", {}).update({n: t for n in bad}))
     return out
@@ -889,19 +837,6 @@ def cmd_next(a, cfg):
         (d.get("how") or {}).pop("guard", None)
     else:
         d["lanes"] = {n: l.brief(t) for n, l in lanes.items()}
-    if a.text:
-        if d["action"] == "run":
-            print(f"RUN {d['role']} step {d['step']} on {d['lane']}: {d['model']} {d['effort']} ({d['pass']} pass)")
-            print("how:", json.dumps(d["how"]))
-        else:
-            print("STOP:", d.get("say") or d.get("error"))
-            if d.get("ask_user"):
-                print("ask the user:", d["ask_user"]["question"], d["ask_user"]["options"])
-            if d.get("resets"):
-                print("resets:", d["resets"])
-        for line in d.get("trace", []):
-            print("  -", line)
-        return 0
     print(json.dumps(d, indent=1))
     return 0 if d["action"] != "error" else 1
 
@@ -1017,13 +952,13 @@ def find_key(quiet=False):
     k = os.environ.get("CLAUDE_CREDIT_WORKER_KEY", "").strip()
     if k:
         return k
-    for p in (config_dir() / "claude-credit.key", Path.home() / ".config" / "claude-credit-worker" / "key"):
-        with contextlib.suppress(OSError):
-            k = p.read_text(encoding="utf-8").strip()
-            if k:
-                if not quiet and os.name != "nt" and (p.stat().st_mode & 0o077):
-                    print(f"route.py: warning: {p} is readable by others; run: chmod 600 {p}", file=sys.stderr)
-                return k
+    p = config_dir() / "claude-credit.key"
+    with contextlib.suppress(OSError):
+        k = p.read_text(encoding="utf-8").strip()
+        if k:
+            if not quiet and os.name != "nt" and (p.stat().st_mode & 0o077):
+                print(f"route.py: warning: {p} is readable by others; run: chmod 600 {p}", file=sys.stderr)
+            return k
     if sys.platform == "darwin" and shutil.which("security"):
         r = subprocess.run(["security", "find-generic-password", "-s", "anthropic-worker-key", "-w"], capture_output=True, text=True)
         if r.returncode == 0 and r.stdout.strip():
@@ -1054,7 +989,7 @@ def cmd_run_claude(a, cfg):
         sys.exit("route.py: empty prompt")
     key = find_key()
     if not key:
-        print("route.py: no API key for the credit lane. Run `route.py init` and relay its step to the user; do not ask for the key in chat.", file=sys.stderr)
+        print("route.py: no API key for the credit lane. Run `route.py doctor --lane CLAUDE_CREDIT` and relay it to the user; do not ask for the key in chat.", file=sys.stderr)
         return 2
     c = S["credit"]
     start, nxt = credit_cycle(c["reset_day"], t)
@@ -1148,7 +1083,7 @@ def run_codex_step(d, brief, timeout, t):
     cwd = h["cwd"]
     exe = shutil.which("codex")
     if not exe:
-        return 2, "codex CLI not found on PATH (route.py init)"
+        return 2, "codex CLI not found on PATH (route.py doctor --lane OPENAI_SUBSCRIPTION)"
     out_file = config_dir() / f"codex-last-{uuid.uuid4().hex[:8]}.txt"
     cmd = [exe] + h["cli"][1:] + ["-o", str(out_file), "-"]
     run_id = str(uuid.uuid4())
@@ -1246,7 +1181,7 @@ def cmd_doctor(a, cfg):
         print(json.dumps({"acknowledged": sorted(acked())}))
         return 0
     if a.decline or a.fix:
-        out = onboard.init(R, cfg, do=a.fix, decline=a.decline, open_browser=a.open_browser)
+        out = onboard.act(R, cfg, do=a.fix, decline=a.decline, open_browser=a.open_browser)
         print(json.dumps(out, indent=1))
         return 1 if out.get("error") else 0
     d = onboard.doctor(R, cfg, deep=a.deep, lane=a.lane)
@@ -1261,19 +1196,6 @@ def cmd_doctor(a, cfg):
     return 0 if d["ready"] else 1
 
 
-def cmd_init(a, cfg):
-    import onboard
-    R = sys.modules[__name__]
-    if a.undecline:
-        if profile_lanes().get(a.undecline) == "declined":
-            set_profile_lane(a.undecline, None)
-        print(json.dumps({"done": True, "say": f"{a.undecline} back in the setup list."}))
-        return 0
-    out = onboard.init(R, cfg, do=a.do, decline=a.decline, open_browser=a.open_browser)
-    print(json.dumps(out, indent=1))
-    return 1 if out.get("error") else 0
-
-
 def cmd_set_key(a, cfg):
     import onboard
     R = sys.modules[__name__]
@@ -1285,12 +1207,6 @@ def cmd_set_key(a, cfg):
 def cmd_config(a, cfg):
     import onboard
     R = sys.modules[__name__]
-    if a.action in ("ack", "unack"):
-        if not a.key:
-            sys.exit(f"route.py: config {a.action} ID  (an id from `doctor`)")
-        set_ack(a.key, a.action == "ack")
-        print(json.dumps({"acknowledged": sorted(acked())}))
-        return 0
     if a.action == "set":
         if not a.key or a.value is None:
             sys.exit("route.py: config set KEY VALUE")
@@ -1308,18 +1224,17 @@ def main(argv=None):
     s = sub.add_parser("status"); s.add_argument("--claude-usage"); s.add_argument("--json", action="store_true")
     n = sub.add_parser("next"); n.add_argument("role"); n.add_argument("--writer"); n.add_argument("--failed", default="")
     n.add_argument("--premium", nargs="?", const="claude", metavar="FAMILY"); n.add_argument("--allow-degraded", action="store_true")
-    n.add_argument("--claude-usage"); n.add_argument("--text", action="store_true"); n.add_argument("--cwd"); n.add_argument("--verbose", action="store_true")
+    n.add_argument("--claude-usage"); n.add_argument("--cwd"); n.add_argument("--verbose", action="store_true")
     r = sub.add_parser("report"); r.add_argument("--lane", required=True); r.add_argument("--event", choices=["out", "ok"], required=True)
     r.add_argument("--until"); r.add_argument("--message")
     cl = sub.add_parser("capture-limits"); cl.add_argument("--print", action="store_true")
     dr = sub.add_parser("doctor"); dr.add_argument("--quiet", action="store_true"); dr.add_argument("--deep", action="store_true"); dr.add_argument("--json", action="store_true")
     dr.add_argument("--lane"); dr.add_argument("--next", action="store_true"); dr.add_argument("--fix"); dr.add_argument("--decline"); dr.add_argument("--undecline")
     dr.add_argument("--ack"); dr.add_argument("--unack"); dr.add_argument("--open-browser", action="store_true")
-    ini = sub.add_parser("init"); ini.add_argument("--do"); ini.add_argument("--decline"); ini.add_argument("--undecline"); ini.add_argument("--open-browser", action="store_true")
     gd = sub.add_parser("guard"); gd.add_argument("when", choices=["before", "after"]); gd.add_argument("--cwd")
     sk = sub.add_parser("set-key"); sk.add_argument("--stdin", action="store_true"); sk.add_argument("--force", action="store_true")
     sk.add_argument("--web", action="store_true"); sk.add_argument("--host", default="127.0.0.1"); sk.add_argument("--port", type=int, default=0); sk.add_argument("--timeout", type=int, default=300)
-    cf = sub.add_parser("config"); cf.add_argument("action", choices=["set", "show", "ack", "unack"]); cf.add_argument("key", nargs="?"); cf.add_argument("value", nargs="?")
+    cf = sub.add_parser("config"); cf.add_argument("action", choices=["set", "show"]); cf.add_argument("key", nargs="?"); cf.add_argument("value", nargs="?")
     ru = sub.add_parser("run"); ru.add_argument("role"); ru.add_argument("--writer"); ru.add_argument("--failed", default="")
     ru.add_argument("--premium", nargs="?", const="claude", metavar="FAMILY"); ru.add_argument("--allow-degraded", action="store_true")
     ru.add_argument("--claude-usage"); ru.add_argument("--cwd"); ru.add_argument("--brief"); ru.add_argument("--timeout", type=int, default=1800)
@@ -1327,10 +1242,9 @@ def main(argv=None):
     c.add_argument("--cap", required=True); c.add_argument("--write", action="store_true"); c.add_argument("--allow", action="append")
     c.add_argument("--cwd"); c.add_argument("--bare", action="store_true"); c.add_argument("prompt", nargs="*")
     a = ap.parse_args(argv)
-    migrate_profile()
     cfg = load_routing()
     return {"status": cmd_status, "next": cmd_next, "report": cmd_report, "capture-limits": cmd_capture, "run-claude": cmd_run_claude,
-            "run": cmd_run, "doctor": cmd_doctor, "guard": cmd_guard, "init": cmd_init, "set-key": cmd_set_key, "config": cmd_config}[a.cmd](a, cfg)
+            "run": cmd_run, "doctor": cmd_doctor, "guard": cmd_guard, "set-key": cmd_set_key, "config": cmd_config}[a.cmd](a, cfg)
 
 
 if __name__ == "__main__":
