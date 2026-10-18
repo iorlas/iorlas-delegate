@@ -5,9 +5,9 @@ Python 3.8+, standard library only. Windows, macOS, Linux, Docker.
 The model supplies only what the script cannot read itself; the script decides.
 
   route.py status [--claude-usage JSON|@file|-] [--json]
-  route.py next ROLE [--writer openai|claude] [--failed 0,1] [--premium [FAMILY]] [--allow-degraded]
+  route.py next ROLE [--authored-by openai|claude] [--failed 0,1] [--premium [FAMILY]] [--allow-degraded]
                      [--claude-usage JSON|@file|-] [--cwd DIR] [--verbose]
-  route.py run ROLE [--cwd DIR] [--brief FILE] [--schema FILE] [--resume REF] [--cap USD] [--timeout SEC] [--writer W] [--failed I,J] [--premium] [--allow-degraded]
+  route.py run ROLE [--cwd DIR] [--brief FILE] [--schema FILE] [--resume REF] [--cap USD] [--timeout SEC] [--authored-by W] [--failed I,J] [--premium] [--allow-degraded]
                     [--claude-usage JSON] [--parent SESSION] [--task ID] [--title T]    brief on stdin; one JSON object on stdout, exit 0 (see docs/dev/integrations.md)
   route.py report --lane LANE --event out|ok [--until EPOCH|ISO] [--message TEXT]
   route.py capture-limits [--print]  (status line JSON on stdin)
@@ -654,11 +654,11 @@ LATE_FLAGS = ("degraded", "same_family")
 def build_tiers(role, cfg, args):
     """-> list of tiers; each tier is a list of steps tried strict then relaxed before the next tier."""
     steps = list(role.get("steps") or [])
-    if "by_writer" in role:
-        w = args.get("writer") or "unknown"
-        if w not in role["by_writer"]:
+    if "by_author" in role:
+        w = args.get("authored_by") or "unknown"
+        if w not in role["by_author"]:
             return None
-        steps = list(role["by_writer"][w])
+        steps = list(role["by_author"][w])
     prem = args.get("premium")
     if prem:
         step = (cfg.get("premium") or {}).get(prem)
@@ -690,7 +690,7 @@ def decide(role_name, cfg, lanes, st, t, args):
     if tiers is None:
         if args.get("premium") and not (cfg.get("premium") or {}).get(args["premium"]):
             return {"action": "error", "error": f"no premium model configured for family {args['premium']}; premium: {[k for k, v in (cfg.get('premium') or {}).items() if v and k != 'about']}"}
-        return {"action": "error", "error": f"--writer must be {' or '.join(k for k in role['by_writer'] if k != 'unknown')} (or omitted)"}
+        return {"action": "error", "error": f"--authored-by must be {' or '.join(k for k in role['by_author'] if k != 'unknown')} (or omitted)"}
     trace = []
     for tier in tiers:
         for relaxed in (False, True):
@@ -812,7 +812,7 @@ def decision(a, cfg):
         step = {"model": rec["model"], "effort": rec["effort"], "mode": rec["mode"], "cap": a.cap or rec.get("cap")}
         return {"action": "run", "role": a.role, "step": None, "pass": "resume", "lane": lane.name, "model": rec["model"], "effort": rec["effort"],
                 "mode": rec["mode"], "cap": step["cap"], "how": how(lane, step, cfg, a.cwd, headless)}, lanes, warnings, t
-    args = {"writer": a.writer, "failed": [int(x) for x in a.failed.split(",") if x != ""] if a.failed else [],
+    args = {"authored_by": a.authored_by, "failed": [int(x) for x in a.failed.split(",") if x != ""] if a.failed else [],
             "premium": a.premium, "allow_degraded": a.allow_degraded and not headless, "cwd": a.cwd, "headless": headless}
     d = decide(a.role, cfg, lanes, st, t, args)
     if d["action"] == "run":
@@ -1280,7 +1280,7 @@ def main(argv=None):
     ap = argparse.ArgumentParser(prog="route.py", description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = ap.add_subparsers(dest="cmd", required=True)
     s = sub.add_parser("status"); s.add_argument("--claude-usage"); s.add_argument("--json", action="store_true")
-    n = sub.add_parser("next"); n.add_argument("role"); n.add_argument("--writer"); n.add_argument("--failed", default="")
+    n = sub.add_parser("next"); n.add_argument("role"); n.add_argument("--authored-by"); n.add_argument("--failed", default="")
     n.add_argument("--premium", nargs="?", const="claude", metavar="FAMILY"); n.add_argument("--allow-degraded", action="store_true")
     n.add_argument("--claude-usage"); n.add_argument("--cwd"); n.add_argument("--verbose", action="store_true")
     r = sub.add_parser("report"); r.add_argument("--lane", required=True); r.add_argument("--event", choices=["out", "ok"], required=True)
@@ -1292,7 +1292,7 @@ def main(argv=None):
     sk = sub.add_parser("set-key"); sk.add_argument("--stdin", action="store_true"); sk.add_argument("--force", action="store_true")
     sk.add_argument("--web", action="store_true"); sk.add_argument("--host", default="127.0.0.1"); sk.add_argument("--port", type=int, default=0); sk.add_argument("--timeout", type=int, default=300)
     cf = sub.add_parser("config"); cf.add_argument("action", choices=["set", "show"]); cf.add_argument("key", nargs="?"); cf.add_argument("value", nargs="?")
-    ru = sub.add_parser("run"); ru.add_argument("role"); ru.add_argument("--writer"); ru.add_argument("--failed", default="")
+    ru = sub.add_parser("run"); ru.add_argument("role"); ru.add_argument("--authored-by"); ru.add_argument("--failed", default="")
     ru.add_argument("--premium", nargs="?", const="claude", metavar="FAMILY"); ru.add_argument("--allow-degraded", action="store_true")
     ru.add_argument("--claude-usage"); ru.add_argument("--cwd"); ru.add_argument("--brief"); ru.add_argument("--timeout", type=int, default=1800)
     ru.add_argument("--schema"); ru.add_argument("--resume"); ru.add_argument("--cap", type=float); ru.add_argument("--parent"); ru.add_argument("--task"); ru.add_argument("--title")

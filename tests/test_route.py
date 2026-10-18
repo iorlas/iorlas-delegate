@@ -35,14 +35,14 @@ def lanes(openai=None, sub=None, credit=None):
 
 
 def decide(role, ls, st=None, **args):
-    a = {"writer": None, "failed": [], "premium": None, "allow_degraded": False}
+    a = {"authored_by": None, "failed": [], "premium": None, "allow_degraded": False}
     a.update(args)
     return route.decide(role, copy.deepcopy(CFG), ls, st or {}, T, a)
 
 
 def argparse_ns(role, **kw):
     import argparse
-    base = dict(role=role, writer=None, failed="", premium=None, allow_degraded=False, claude_usage=None, cwd=None, resume=None, cap=None)
+    base = dict(role=role, authored_by=None, failed="", premium=None, allow_degraded=False, claude_usage=None, cwd=None, resume=None, cap=None)
     base.update(kw)
     return argparse.Namespace(**base)
 
@@ -110,7 +110,7 @@ class SecondPass(unittest.TestCase):
 
     def test_normal_relaxed_beats_degraded_strict(self):
         ls = lanes(openai={"out": True, "out_until": T + 1}, credit={"out": True, "out_until": T + 99}, sub={"week": 92})
-        d = decide("reviewer", ls, writer="openai")
+        d = decide("reviewer", ls, authored_by="openai")
         self.assertEqual((d["model"], d["effort"], d["pass"]), ("opus-5.5", "medium", "relaxed"))
 
 
@@ -137,19 +137,19 @@ class Roles(unittest.TestCase):
         self.assertEqual((d["model"], d["effort"]), ("opus-5.5", "medium"))
         self.assertEqual(decide("hard", ls, failed=[0, 1, 2])["action"], "stop")
 
-    def test_reviewer_prefers_the_other_family_and_the_writer_is_optional(self):
-        self.assertEqual(decide("reviewer", lanes())["model"], "opus-5.5")                  # no writer: Claude first, no claim of independence
-        self.assertEqual(decide("reviewer", lanes(), writer="openai")["lane"], "CLAUDE_SUBSCRIPTION")
-        self.assertEqual(decide("reviewer", lanes(), writer="claude")["lane"], "OPENAI_SUBSCRIPTION")
-        self.assertEqual(decide("reviewer", lanes(), writer="gemini")["action"], "error")
+    def test_reviewer_prefers_the_other_family_and_authored_by_is_optional(self):
+        self.assertEqual(decide("reviewer", lanes())["model"], "opus-5.5")                  # no author given: Claude first, no claim of independence
+        self.assertEqual(decide("reviewer", lanes(), authored_by="openai")["lane"], "CLAUDE_SUBSCRIPTION")
+        self.assertEqual(decide("reviewer", lanes(), authored_by="claude")["lane"], "OPENAI_SUBSCRIPTION")
+        self.assertEqual(decide("reviewer", lanes(), authored_by="gemini")["action"], "error")
 
     def test_same_family_review_is_the_last_resort_and_flagged(self):
         out = {"out": True, "out_until": T + 3600}
-        d = decide("reviewer", lanes(sub=out, credit=out), writer="openai")                  # Claude is out: Codex reviews Codex
+        d = decide("reviewer", lanes(sub=out, credit=out), authored_by="openai")                  # Claude is out: Codex reviews Codex
         self.assertEqual((d["action"], d["lane"], d["flag"]), ("run", "OPENAI_SUBSCRIPTION", "same_family"))
-        d = decide("reviewer", lanes(openai=out), writer="claude")                           # Codex is out: Claude reviews Claude
+        d = decide("reviewer", lanes(openai=out), authored_by="claude")                           # Codex is out: Claude reviews Claude
         self.assertEqual((d["action"], d["lane"], d["flag"]), ("run", "CLAUDE_SUBSCRIPTION", "same_family"))
-        d = decide("reviewer", lanes(openai=out, sub=out, credit=out), writer="claude")
+        d = decide("reviewer", lanes(openai=out, sub=out, credit=out), authored_by="claude")
         self.assertEqual(d["action"], "stop")                                                # nobody left: stop, not an exception
 
     def test_premium_only_when_requested(self):
@@ -439,7 +439,7 @@ class BaseTable(unittest.TestCase):
         cfg = route.load_routing()
         want = {}
         for name, role in cfg["roles"].items():
-            steps = role["by_writer"]["openai"] if "by_writer" in role else role["steps"]
+            steps = role["by_author"]["openai"] if "by_author" in role else role["steps"]
             seq = [f"{cfg['models'][s['model']]['agent']} {s['effort']}" for s in steps if s["on"] == "claude" and s.get("flag") != "degraded"]
             want[name] = " > ".join(seq)
         self.assertEqual(table, want)

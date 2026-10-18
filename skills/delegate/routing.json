@@ -148,9 +148,9 @@
       "stop": "No worker lane is available. Hold the task; a few lines the orchestrator may write itself."
     },
     "reviewer": {
-      "about": "verify, review a diff. Prefer a different family than the writer (--writer openai|claude, optional); the same family is the last resort and is flagged same_family. Always rerun the acceptance check.",
+      "about": "verify, review a diff. Prefer a different family than the author (--authored-by openai|claude, optional); the same family is the last resort and is flagged same_family. Always rerun the acceptance check.",
       "advance": "on_unavailable",
-      "by_writer": {
+      "by_author": {
         "openai": [
           {
             "model": "opus-5.5",

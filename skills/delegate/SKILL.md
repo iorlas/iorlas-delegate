@@ -4,8 +4,8 @@ description: Delegate a sub-task to a worker model. route.py picks lane, model a
 ---
 
 `DELEGATE_DEPTH` set = you are a worker: do not delegate.
-`python3 ${CLAUDE_SKILL_DIR}/route.py run ROLE [--cwd D] [--writer openai|claude] [--failed I,J] [--premium] [--allow-degraded] [--claude-usage JSON] < brief`
-(`py -3` on Windows.) Roles: planner (plan, design) · worker (implement, debug) · reviewer (`--writer`: who wrote it) · hard (after 2 failures; `--failed`) · light (read, summarise, tiny edits).
+`python3 ${CLAUDE_SKILL_DIR}/route.py run ROLE [--cwd D] [--authored-by openai|claude] [--failed I,J] [--premium] [--allow-degraded] [--claude-usage JSON] < brief`
+(`py -3` on Windows.) Roles: planner (plan, design) · worker (implement, debug) · reviewer (`--authored-by`: family that wrote it) · hard (after 2 failures; `--failed`) · light (read, summarise).
 
 | `status` | do |
 |---|---|
