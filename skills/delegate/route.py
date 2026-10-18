@@ -621,8 +621,11 @@ def _how(lane, step, cfg, runner, m, write, wd):
     if runner == "agent_tool":
         return {"kind": "agent_tool", "model": m["agent"], "note": "set model on the Agent call; effort cannot be set per call, so state the effort in the brief"}
     if runner == "codex":
+        cli = ["codex", "exec", "-C", wd, "-s", "workspace-write" if write else "read-only", "-m", m["api"], "-c", f"model_reasoning_effort={step['effort']}"]
+        if git_state(wd) is None:
+            cli.append("--skip-git-repo-check")      # codex refuses a directory that is not a git work tree
         return {"kind": "codex", "doc": "modes/codex.md", "use": step.get("use", "task"), "model": m["api"], "effort": step["effort"], "mode": step.get("mode", "read_only"),
-                "cli": ["codex", "exec", "-C", wd, "-s", "workspace-write" if write else "read-only", "-m", m["api"], "-c", f"model_reasoning_effort={step['effort']}"]}
+                "cli": cli, "stdin": "close_unless_brief", "timeout_kills_process_group": True}
     return {"kind": "unknown", "runner": runner}
 
 

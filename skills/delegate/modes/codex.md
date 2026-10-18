@@ -20,7 +20,7 @@ d.use == "read_only_exec"                # GPT-6 Luna: reading and summarising o
 - Continue earlier Codex work: `--resume-last` (threads are per workspace, so parallel worktrees never pick up each other's). Unrelated task: fresh.
 - Parallel Codex writers each need their own directory, made by the coordinator; one directory takes one writer. Codex never creates worktrees or branches here: `codex exec -C <cwd>` pins it to the directory the router gives; run `d.how.guard` around it.
 - Luna has a very large Plus allowance (350-3,000 messages per 5 hours on OpenAI's page) and is weak (13.6% on Terminal-Bench 4.0).
-- If `codex exec` seems to hang with no output, it may be waiting on stdin (seen once with `-C` in a background shell): close it with `< /dev/null`.
+- `codex exec` waits forever on an open stdin pipe (it prints "Reading additional input from stdin..."; reproduced 2026-10-18). Give it the brief as an argument and close stdin (`< /dev/null`; Windows `< NUL`), or pipe the brief in. To stop a stuck one, kill its process group: killing only `codex` leaves the vendor binary running.
 - Never trust Codex's summary: read the diff, rerun the acceptance check.
 
 ## When Codex refuses

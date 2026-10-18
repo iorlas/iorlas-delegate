@@ -43,6 +43,14 @@ class Pick(unittest.TestCase):
         d = decide("worker", lanes())
         self.assertEqual((d["lane"], d["model"], d["pass"]), ("OPENAI_SUBSCRIPTION", "gpt-6.1-sol", "strict"))
 
+    def test_codex_command_closes_stdin_and_handles_non_git_dirs(self):
+        with tempfile.TemporaryDirectory() as d_:
+            d = decide("worker", lanes(), cwd=d_)
+        self.assertEqual(d["how"]["stdin"], "close_unless_brief")
+        self.assertIn("--skip-git-repo-check", d["how"]["cli"])      # not a git work tree
+        d2 = decide("worker", lanes(), cwd=str(Path(__file__).resolve().parent.parent))
+        self.assertNotIn("--skip-git-repo-check", d2["how"]["cli"])  # this repo is one
+
     def test_codex_out_falls_to_claude_subscription_when_healthy(self):
         d = decide("worker", lanes(openai={"out": True, "out_until": T + 3600}))
         self.assertEqual((d["lane"], d["model"]), ("CLAUDE_SUBSCRIPTION", "sonnet-5.5"))
