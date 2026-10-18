@@ -19,7 +19,8 @@ ${CLAUDE_SKILL_DIR}/run.sh --status        # this script's own spend this month 
 | profile | model | effort | cap per run | use for |
 |---|---|---|---|---|
 | `worker` (default) | Sonnet 5.5 | medium | $2 | implementation, debugging, tests |
-| `reviewer` | Sonnet 5.5 | high | $1 | verification: rerun the checks, read the diff (read-only) |
+| `light` | Sonnet 5.5 | low | $1 | small, clear edits and simple checks where a miss is cheap |
+| `reviewer` | Opus 5.5 | medium | $2 | verification and code review: rerun the checks, read the diff (read-only). Opus 5.5 scored a little above Sonnet 5.5 on Terminal-Bench 4.0 at a lower cost per test, and Sonnet's scores drop sharply below max effort. No code-review benchmark exists: measure on your own diffs |
 | `cheap` | Haiku 5.5 | low | $0.25 | routing, classification, bulk reading, short summaries; keep prompts under 100K tokens |
 | `hard` | Opus 5.5 | low | $3 | one short, split subtask of a hard ticket (see `delegate`); never the whole ticket |
 | `very-hard` | Opus 5.5 | medium | $5 | a subtask that failed at `hard` |

@@ -54,7 +54,7 @@ The 5-hour window caps every reading: unused weekly cannot be spent faster than 
    out) gets one cheap probe from its skill; it answers → use it again. Tell the user once, in one line, when a lane
    runs out and when it comes back.
 2. **What goes where.** Implementation, debugging, boilerplate, tests → lane 1 first. Verification (rerun the checks,
-   read the diff, run what lane 1's sandbox cannot) → lane 2 first: a Codex worker must not judge its own work, and
+   read the diff, run what lane 1's sandbox cannot) → lane 2 first, profile `reviewer`: a Codex worker must not judge its own work, and
    lane 2 runs unsandboxed. Bulk reading (search a codebase, summarise long logs) → lane 2 with Haiku or Sonnet.
 3. **Brief like a ticket:** goal, files, constraints, acceptance check, "no commits, no pushing, do not weaken tests".
    Workers do not see this session; lane 2 loads the project's CLAUDE.md like a normal run, but still name the rules the task needs.
