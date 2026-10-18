@@ -137,12 +137,20 @@ class Roles(unittest.TestCase):
         self.assertEqual((d["model"], d["effort"]), ("opus-5.5", "medium"))
         self.assertEqual(decide("hard", ls, failed=[0, 1, 2])["action"], "stop")
 
-    def test_reviewer_needs_writer_and_crosses_family(self):
-        self.assertEqual(decide("reviewer", lanes())["action"], "error")
-        d = decide("reviewer", lanes(), writer="openai")
-        self.assertEqual(d["lane"] in ("CLAUDE_SUBSCRIPTION", "CLAUDE_CREDIT"), True)
-        d = decide("reviewer", lanes(), writer="claude")
-        self.assertEqual((d["lane"], d["use"]), ("OPENAI_SUBSCRIPTION", "review"))
+    def test_reviewer_prefers_the_other_family_and_the_writer_is_optional(self):
+        self.assertEqual(decide("reviewer", lanes())["model"], "opus-5.5")                  # no writer: Claude first, no claim of independence
+        self.assertEqual(decide("reviewer", lanes(), writer="openai")["lane"], "CLAUDE_SUBSCRIPTION")
+        self.assertEqual(decide("reviewer", lanes(), writer="claude")["lane"], "OPENAI_SUBSCRIPTION")
+        self.assertEqual(decide("reviewer", lanes(), writer="gemini")["action"], "error")
+
+    def test_same_family_review_is_the_last_resort_and_flagged(self):
+        out = {"out": True, "out_until": T + 3600}
+        d = decide("reviewer", lanes(sub=out, credit=out), writer="openai")                  # Claude is out: Codex reviews Codex
+        self.assertEqual((d["action"], d["lane"], d["flag"]), ("run", "OPENAI_SUBSCRIPTION", "same_family"))
+        d = decide("reviewer", lanes(openai=out), writer="claude")                           # Codex is out: Claude reviews Claude
+        self.assertEqual((d["action"], d["lane"], d["flag"]), ("run", "CLAUDE_SUBSCRIPTION", "same_family"))
+        d = decide("reviewer", lanes(openai=out, sub=out, credit=out), writer="claude")
+        self.assertEqual(d["action"], "stop")                                                # nobody left: stop, not an exception
 
     def test_premium_only_when_requested(self):
         self.assertNotEqual(decide("hard", lanes())["model"], "fable-5.1")

@@ -31,7 +31,7 @@ task-loop's engine calls `route.py run ROLE --brief FILE --cwd DIR [--schema F] 
 as a script, with no Claude session behind it. The spec belongs to the consumer:
 https://github.com/iorlas/iorlas-task-loop/blob/main/docs/contracts/worker-run-v1.md
 
-- stdout is exactly one JSON object (`v`, `status`, `data`, `text`, `ref`, `lane`, `model`, `effort`, `family`, `cost`, `secs`, `run_id`,
+- stdout is exactly one JSON object (`v`, `status`, `data`, `text`, `ref`, `lane`, `model`, `effort`, `family`, `flag`, `cost`, `secs`, `run_id`,
   `transcript`, `retry_after`, `say`, `git_violation`); exit 0 whenever it was printed. Statuses: `done`, `failed`, `timeout`, `lane_out`, `stop`, `error`
   (plus `agent` for interactive callers only).
 - Headless = no `CLAUDE_CODE_ENTRYPOINT` (the engine strips `CLAUDE_*`). Headless never gets `agent`, `ask_user` or `needs_input`; CLAUDE_CREDIT is never
@@ -39,6 +39,8 @@ https://github.com/iorlas/iorlas-task-loop/blob/main/docs/contracts/worker-run-v
   from the status line, or `state.json`, newer than `usage_stale_minutes`); otherwise `stop` with `retry_after`. `orchestrator_reserve` applies.
 - `route.py status --claude-usage '<get_usage plan.windows JSON>'` is part of the contract: it stores the reading, and a headless `run` uses it for
   `usage_stale_minutes` (30). Keep that command and input shape, or bump `v`.
+- `reviewer`: `--writer openai|claude` is optional (the family that wrote the diff). The other family reviews first; the same family is the last resort
+  and comes back with `flag: "same_family"`; with no reviewer at all the answer is `stop`, never an exception.
 - Everything else (`next`, `doctor`, flags not listed above, `state.json`, `routing.json`, mode files) is private and may change in any release. Changing
   the contract above means changing the spec in iorlas-task-loop first.
 

@@ -648,11 +648,14 @@ def pick_lane(family, lanes, S, st, t, relaxed, trace):
     return sub if (not prev or prev.get("lane") == sub.name) else credit
 
 
+LATE_FLAGS = ("degraded", "same_family")
+
+
 def build_tiers(role, cfg, args):
     """-> list of tiers; each tier is a list of steps tried strict then relaxed before the next tier."""
     steps = list(role.get("steps") or [])
     if "by_writer" in role:
-        w = args.get("writer")
+        w = args.get("writer") or "unknown"
         if w not in role["by_writer"]:
             return None
         steps = list(role["by_writer"][w])
@@ -667,8 +670,8 @@ def build_tiers(role, cfg, args):
         failed = args.get("failed") or []
         start = (max(failed) + 1) if failed else 0
         steps = steps[start:]
-    main = [s for s in steps if s.get("flag") != "degraded"]
-    flagged = [s for s in steps if s.get("flag") == "degraded"]
+    main = [s for s in steps if s.get("flag") not in LATE_FLAGS]
+    flagged = [s for s in steps if s.get("flag") in LATE_FLAGS]       # tried only after every unflagged step, strict then relaxed
     tiers = [main]
     if flagged:
         tiers.append(flagged)
@@ -687,7 +690,7 @@ def decide(role_name, cfg, lanes, st, t, args):
     if tiers is None:
         if args.get("premium") and not (cfg.get("premium") or {}).get(args["premium"]):
             return {"action": "error", "error": f"no premium model configured for family {args['premium']}; premium: {[k for k, v in (cfg.get('premium') or {}).items() if v and k != 'about']}"}
-        return {"action": "error", "error": f"role {role_name} needs --writer ({'|'.join(role['by_writer'])})"}
+        return {"action": "error", "error": f"--writer must be {' or '.join(k for k in role['by_writer'] if k != 'unknown')} (or omitted)"}
     trace = []
     for tier in tiers:
         for relaxed in (False, True):
@@ -1148,7 +1151,7 @@ def launch_claude(d, brief, a, rid, t, cfg, meta):
 
 def result(status, **kw):
     r = {"v": 1, "status": status, "data": None, "text": "", "ref": None, "lane": None, "model": None, "effort": None, "family": None,
-         "cost": 0, "secs": 0, "run_id": None, "transcript": None, "retry_after": None, "say": "", "git_violation": []}
+         "flag": None, "cost": 0, "secs": 0, "run_id": None, "transcript": None, "retry_after": None, "say": "", "git_violation": []}
     r.update(kw)
     return r
 
@@ -1180,7 +1183,7 @@ def cmd_run(a, cfg):
         return emit(result("stop", say=d["say"], retry_after=retry, **extra))
     h = d["how"]
     fam = cfg["lanes"][d["lane"]]["family"]
-    who = dict(lane=d["lane"], model=d["model"], effort=d["effort"], family=fam)
+    who = dict(lane=d["lane"], model=d["model"], effort=d["effort"], family=fam, flag=d.get("flag"))
     if not headless:
         ni = [n["what"] for n in needs_input(lanes)]
         if ni:

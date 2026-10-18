@@ -5,20 +5,20 @@ description: Delegate a sub-task to a worker model. route.py picks lane, model a
 
 `DELEGATE_DEPTH` set = you are a worker: do not delegate.
 `python3 ${CLAUDE_SKILL_DIR}/route.py run ROLE [--cwd D] [--writer openai|claude] [--failed I,J] [--premium] [--allow-degraded] [--claude-usage JSON] < brief`
-(`py -3` on Windows.) Roles: planner (plan, design) · worker (implement, debug) · reviewer (needs `--writer`) · hard (after 2 failures; `--failed`) · light (read, summarise, tiny edits).
+(`py -3` on Windows.) Roles: planner (plan, design) · worker (implement, debug) · reviewer (`--writer`: who wrote it) · hard (after 2 failures; `--failed`) · light (read, summarise, tiny edits).
 
 | `status` | do |
 |---|---|
 | `agent` | Agent call: `agent_model`, `brief_prefix` + brief, in `cwd`, no worktree, effort in the brief |
-| `done` | `text` is the answer; rerun the acceptance check. `git_violation`: show it, check `git reflog`, never auto-revert |
+| `done` | `text` is the answer; rerun the acceptance check. `git_violation`: show it, check `git reflog`, never auto-revert. `flag` same_family: say so |
 | `stop` | tell the user `say`. `ask_user`: ask; yes = `--allow-degraded` |
 | `lane_out` | rerun; it advances |
 | `timeout` | shrink the task |
-| `failed`, `error` | read `say`; setup: `modes/init.md`; never ask for a key in chat |
+| `failed`, `error` | read `say`; setup: `modes/init.md`; no key in chat |
 | `needs_input` `claude_usage` | `get_usage`; rerun with `--claude-usage '<plan.windows>'` |
 | `notice` | tell the user once |
 
-No Python 3.8+: Agent tool only, first entry, no worktree, effort in the brief.
+No Python 3.8+: Agent tool only, no worktree, effort in the brief.
 
 <!-- base-table -->
 | role | agent, in order |
@@ -30,5 +30,5 @@ No Python 3.8+: Agent tool only, first entry, no worktree, effort in the brief.
 | light | haiku low > sonnet low |
 <!-- /base-table -->
 
-Brief: goal, files, constraints, acceptance check, "no commits". You own git; parallel writers: one directory each. `--premium` only if the user names that model. Never delegate scope, design, plan, acceptance.
-`modes/`: init, codex, claude-credit, extend.
+Brief: goal, files, constraints, acceptance check, "no commits". You own git; parallel writers: one directory each. `--premium` only if the user names it. Never delegate scope, design, plan, acceptance.
+`modes/`: init codex claude-credit extend
