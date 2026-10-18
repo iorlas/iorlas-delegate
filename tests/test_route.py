@@ -320,25 +320,28 @@ class GitOwnership(unittest.TestCase):
             self.assertIn(f"Bash(git {verb}:*)", route.GIT_WRITE_DENY)
 
 
-class RunRecord(unittest.TestCase):
-    """claude -p runs leave a record a dashboard can link to the session that started them."""
+class AgentRuns(unittest.TestCase):
+    """delegate publishes agent-runs v1 (iorlas-task-loop docs/contracts/agent-runs-v1.md), never its own state."""
 
-    def test_record_merges_and_prunes(self):
+    def test_run_and_lanes_records(self):
         saved = {k: os.environ.get(k) for k in ("XDG_CONFIG_HOME", "APPDATA")}
         with tempfile.TemporaryDirectory() as d:
             os.environ["XDG_CONFIG_HOME"] = d
             os.environ["APPDATA"] = d
             try:
-                runs = route.config_dir() / "runs"
-                runs.mkdir(parents=True, exist_ok=True)
-                old = runs / "old.json"
-                old.write_text("{}")
-                os.utime(old, (0, 0))
-                route.run_record("r1", {"status": "running", "parent": "p"})
-                route.run_record("r1", {"status": "completed", "exit": 0})
-                rec = json.loads((runs / "r1.json").read_text())
-                self.assertEqual(rec, {"status": "completed", "parent": "p", "exit": 0})
-                self.assertFalse(old.exists())
+                ar = route.agent_runs
+                ar.run("r1", kind="claude-p", parent_session="p", cwd="/w", started=1.0, status="running", ended=None)
+                ar.run("r1", status="completed", exit=0)
+                rec = json.loads((ar.root() / "runs" / "r1.json").read_text())
+                self.assertEqual((rec["v"], rec["producer"], rec["id"], rec["parent_session"], rec["status"], rec["exit"]),
+                                 (1, "delegate", "r1", "p", "completed", 0))
+                self.assertNotIn("ended", rec)
+                lane = route.Lane("OPENAI_SUBSCRIPTION", "openai", "subscription")
+                lane.five, lane.five_reset = 41, 99
+                route.publish_lanes({"OPENAI_SUBSCRIPTION": lane}, {}, 5.0)
+                lr = json.loads((ar.root() / "lanes" / "delegate.json").read_text())
+                self.assertEqual(lr["lanes"][0]["usage"], [{"window": "5h", "used_pct": 41, "resets_at": 99}])
+                self.assertEqual(lr["at"], 5.0)
             finally:
                 for k, v in saved.items():
                     if v is None:

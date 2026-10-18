@@ -37,6 +37,12 @@ import time
 import uuid
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+try:
+    import agent_runs  # publishes runs and lane limits for dashboards (agent-runs v1); optional
+except ImportError:  # pragma: no cover
+    agent_runs = None
+
 HERE = Path(__file__).resolve().parent
 if str(HERE) not in sys.path:
     sys.path.insert(0, str(HERE))
@@ -650,6 +656,7 @@ def cmd_status(a, cfg):
     t = now()
     st = load_state()
     lanes = gather(cfg, st, t, parse_json_arg(a.claude_usage))
+    publish_lanes(lanes, st, t)
     if a.json:
         print(json.dumps({"lanes": {n: {"family": l.family, "kind": l.kind, "out": l.out, "out_until": l.out_until, "five": l.five, "week": l.week,
                                         "pace": l.pace, "burn": l.burn, "spend": l.spend, "cap": l.cap, "notes": l.notes} for n, l in lanes.items()},
@@ -692,6 +699,7 @@ def cmd_next(a, cfg):
         print(json.dumps(setup, indent=1))
         return 0
     lanes = gather(cfg, st, t, parse_json_arg(a.claude_usage))
+    publish_lanes(lanes, st, t)
     args = {"writer": a.writer, "failed": [int(x) for x in a.failed.split(",") if x != ""] if a.failed else [],
             "premium": a.premium, "allow_degraded": a.allow_degraded, "cwd": a.cwd}
     d = decide(a.role, cfg, lanes, st, t, args)
@@ -851,25 +859,16 @@ def find_key(quiet=False):
     return ""
 
 
-def run_record(run_id, fields):
-    """One file per claude -p run (runs/<id>.json), kept 7 days: what a dashboard needs to link it to its parent."""
-    d = config_dir() / "runs"
-    d.mkdir(parents=True, exist_ok=True)
-    f = d / (run_id + ".json")
+def publish_lanes(lanes, st, t):
+    """Lane limits as agent-runs v1 (agent_runs.py), for dashboards. Never fails the caller."""
+    if agent_runs is None:
+        return
     try:
-        rec = json.loads(f.read_text(encoding="utf-8"))
-    except (OSError, ValueError):
-        rec = {}
-    rec.update(fields)
-    f.write_text(json.dumps(rec), encoding="utf-8")
-    private(f)
-    cut = now() - 7 * 86400
-    for old in d.glob("*.json"):
-        try:
-            if old.stat().st_mtime < cut:
-                old.unlink()
-        except OSError:
-            pass
+        outs = st.get("out") or {}
+        agent_runs.lanes([(n, l.out_until if l.out else None, (outs.get(n) or {}).get("why") if l.out else None,
+                           [("5h", l.five, l.five_reset), ("week", l.week, l.week_reset)]) for n, l in lanes.items()], t)
+    except Exception:
+        pass
 
 
 def cmd_run_claude(a, cfg):
@@ -912,12 +911,14 @@ def cmd_run_claude(a, cfg):
     env["DELEGATE_DEPTH"] = "1"
     workdir = os.path.abspath(a.cwd) if a.cwd else os.getcwd()
     git_before = git_state(workdir)
-    run_record(run_id, {"session": run_id, "lane": "CLAUDE_CREDIT", "model": a.model, "cwd": workdir,
-                        "parent": os.environ.get("CLAUDE_CODE_SESSION_ID", ""), "started": t, "status": "running",
-                        "title": prompt.strip().splitlines()[0][:120]})
+    if agent_runs:
+        agent_runs.run(run_id, kind="claude-p", session=run_id, lane="CLAUDE_CREDIT", model=a.model, cwd=workdir,
+                       parent_session=os.environ.get("CLAUDE_CODE_SESSION_ID", ""), started=t, status="running",
+                       title=prompt.strip().splitlines()[0][:120])
     print(f"session={run_id}", file=sys.stderr, flush=True)
     r = subprocess.run(cmd, input=prompt, capture_output=True, text=True, cwd=workdir, env=env)
-    run_record(run_id, {"ended": now(), "status": "failed" if r.returncode else "completed", "exit": r.returncode})
+    if agent_runs:
+        agent_runs.run(run_id, ended=now(), status="failed" if r.returncode else "completed", exit=r.returncode)
     violations = git_changes(git_before, git_state(workdir))
     out = (r.stdout or "") + (r.stderr or "")
     try:

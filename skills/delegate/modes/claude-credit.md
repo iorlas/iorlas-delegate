@@ -7,7 +7,7 @@ run: d.how.argv, brief on stdin (Bash run_in_background for long tasks)
      python3 route.py run-claude --model <key from routing.json> --effort low|medium|high --cap <usd> [--write] [--allow TOOL] [--cwd DIR] [--bare]
 default tools: Read Glob Grep.   --write adds Edit Write Bash.   --allow adds one tool.   every git write command is denied (commit, push, checkout, switch, branch, worktree, merge, rebase, reset, stash, tag, cherry-pick, revert, am, pull) and the runner compares git state before and after.
 --bare strips CLAUDE.md, skills, plugins, MCP, hooks.   The worker is told: no delegation (DELEGATE_DEPTH=1), no commits, short closing report.
-stdout = answer;  stderr first line = `session=<id>` (the worker's Claude session: its transcript is `~/.claude/projects/*/<id>.jsonl`, and `runs/<id>.json` in the config dir names the session that started it, for dashboards); stderr last line = cost, turns, cycle spend / cap.
+stdout = answer;  stderr first line = `session=<id>` (the worker's Claude session: its transcript is `~/.claude/projects/*/<id>.jsonl`, and an agent-runs v1 record names the session that started it, for dashboards); stderr last line = cost, turns, cycle spend / cap.
 ```
 
 | exit | meaning | do |
