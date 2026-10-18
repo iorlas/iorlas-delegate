@@ -6,6 +6,7 @@ import json
 import os
 import sys
 import tempfile
+import time
 import unittest
 from pathlib import Path
 
@@ -36,6 +37,13 @@ def decide(role, ls, st=None, **args):
     a = {"writer": None, "failed": [], "premium": None, "allow_degraded": False}
     a.update(args)
     return route.decide(role, copy.deepcopy(CFG), ls, st or {}, T, a)
+
+
+def argparse_ns(role, **kw):
+    import argparse
+    base = dict(role=role, writer=None, failed="", premium=None, allow_degraded=False, claude_usage=None, cwd=None)
+    base.update(kw)
+    return argparse.Namespace(**base)
 
 
 class Pick(unittest.TestCase):
@@ -351,6 +359,92 @@ class BaseTable(unittest.TestCase):
             seq = [f"{cfg['models'][s['model']]['agent']} {s['effort']}" for s in steps if s["on"] == "claude" and s.get("flag") != "degraded"]
             want[name] = " > ".join(seq)
         self.assertEqual(table, want)
+
+
+@unittest.skipIf(os.name == "nt", "fake codex is a shell script; Windows is covered by hand (delegate-5b6)")
+class RunCommand(unittest.TestCase):
+    """route.py run executes a Codex step end to end against a fake `codex` on PATH."""
+
+    FAKE = """#!/bin/sh
+out=""
+while [ $# -gt 0 ]; do case "$1" in -o) out="$2"; shift;; esac; shift; done
+brief=$(cat)
+case "$FAKE_MODE" in
+  ok) printf 'done: %s' "$(echo "$brief" | tail -1)" > "$out";;
+  limit) echo "You have hit your usage limit. Try again later."; exit 1;;
+  hang) sleep 300 & echo $! > "$FAKE_PIDFILE"; wait;;
+  git) git checkout -q -b rogue; printf x > "$out";;
+esac
+"""
+
+    def setUp(self):
+        import subprocess as sp
+        self.sp = sp
+        self.tmp = tempfile.TemporaryDirectory()
+        base = Path(self.tmp.name)
+        (base / "bin").mkdir()
+        (base / "bin" / "codex").write_text(self.FAKE)
+        (base / "bin" / "codex").chmod(0o755)
+        (base / "codex_home").mkdir()
+        (base / "codex_home" / "auth.json").write_text("{}")
+        (base / "repo").mkdir()
+        for c in (["init", "-q"], ["-c", "user.name=t", "-c", "user.email=t@t", "commit", "-q", "--allow-empty", "-m", "i"]):
+            sp.run(["git", "-C", str(base / "repo")] + c, check=True, capture_output=True)
+        self.saved = {k: os.environ.get(k) for k in ("PATH", "HOME", "XDG_CONFIG_HOME", "CODEX_HOME", "FAKE_MODE", "FAKE_PIDFILE", "DELEGATE_NOW")}
+        os.environ.update(PATH=str(base / "bin") + os.pathsep + os.environ["PATH"], HOME=self.tmp.name, XDG_CONFIG_HOME=self.tmp.name,
+                          CODEX_HOME=str(base / "codex_home"), FAKE_PIDFILE=str(base / "pid"))
+        os.environ.pop("DELEGATE_NOW", None)
+        self.repo = str(base / "repo")
+        self.cfg = route.load_routing()
+        self.real = dict(route.READERS)
+        route.READERS.update({k: (lambda lane, S, st_, t, *a: None) for k in self.real})
+
+    def tearDown(self):
+        route.READERS.update(self.real)
+        for k, v in self.saved.items():
+            os.environ.pop(k, None) if v is None else os.environ.__setitem__(k, v)
+        self.tmp.cleanup()
+
+    def run_it(self, mode, brief="do the thing", timeout=30):
+        import io
+        os.environ["FAKE_MODE"] = mode
+        real_in, real_out, real_err = sys.stdin, sys.stdout, sys.stderr
+        sys.stdin, sys.stdout, sys.stderr = io.StringIO(brief), io.StringIO(), io.StringIO()
+        try:
+            code = route.main(["run", "worker", "--cwd", self.repo, "--timeout", str(timeout)])
+            return code, sys.stdout.getvalue(), sys.stderr.getvalue()
+        finally:
+            sys.stdin, sys.stdout, sys.stderr = real_in, real_out, real_err
+
+    def test_ok_returns_the_workers_last_message(self):
+        code, out, err = self.run_it("ok", "line one\nthe brief")
+        self.assertEqual(code, 0)
+        self.assertEqual(out.strip(), "done: the brief")
+        self.assertIn('"action": "done"', err)
+
+    def test_limit_refusal_marks_the_lane_out_so_next_advances(self):
+        code, out, err = self.run_it("limit")
+        self.assertEqual(code, 76)
+        self.assertIn("OPENAI_SUBSCRIPTION", route.load_state()["out"])
+        d = route.decision(argparse_ns("worker"), self.cfg)[0]
+        self.assertEqual(d["lane"], "CLAUDE_SUBSCRIPTION")
+
+    def test_timeout_kills_the_whole_process_group(self):
+        code, out, err = self.run_it("hang", timeout=2)
+        self.assertEqual(code, 124)
+        pid = int(Path(os.environ["FAKE_PIDFILE"]).read_text())
+        time.sleep(0.3)
+        with self.assertRaises(OSError):
+            os.kill(pid, 0)
+
+    def test_git_change_by_the_worker_exits_78(self):
+        code, out, err = self.run_it("git")
+        self.assertEqual(code, 78)
+        self.assertIn("GIT-VIOLATION", err)
+
+    def test_empty_brief_is_an_error(self):
+        code, out, err = self.run_it("ok", "  ")
+        self.assertEqual(code, 1)
 
 
 class GitOwnership(unittest.TestCase):

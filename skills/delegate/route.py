@@ -7,6 +7,7 @@ The model supplies only what the script cannot read itself; the script decides.
   route.py status [--claude-usage JSON|@file|-] [--json]
   route.py next ROLE [--writer openai|claude] [--failed 0,1] [--premium [FAMILY]] [--allow-degraded]
                      [--claude-usage JSON|@file|-] [--text]
+  route.py run ROLE [same flags as next] [--brief FILE] [--timeout SEC]   brief on stdin; runs a Codex or credit step end to end (guard, stdin, timeout, limit refusal)
   route.py report --lane LANE --event out|ok [--until EPOCH|ISO] [--message TEXT]
   route.py run-claude --model ID --effort LEVEL --cap USD [--write] [--allow TOOL]... [--cwd DIR] [--bare] [PROMPT|-]
   route.py capture-limits [--print]  (status line JSON on stdin)
@@ -769,7 +770,8 @@ def drift_warnings(lanes, st, t):
     return out
 
 
-def cmd_next(a, cfg):
+def decision(a, cfg):
+    """next and run share this: gather, decide, remember the lane choice. -> (d, lanes, warnings, t)"""
     t = now()
     st = load_state()
     lanes = gather(cfg, st, t, parse_json_arg(a.claude_usage))
@@ -787,6 +789,11 @@ def cmd_next(a, cfg):
                 s["prev"][fam] = {"lane": d["lane"], "since": t}
         if sum(1 for l in lanes.values() if l.family == fam) > 1:
             update_state(mark)
+    return d, lanes, warnings, t
+
+
+def cmd_next(a, cfg):
+    d, lanes, warnings, t = decision(a, cfg)
     d["needs_input"] = needs_input(lanes)
     d["lanes"] = {n: l.brief(t) for n, l in lanes.items()}
     if warnings:
@@ -1028,6 +1035,109 @@ def cmd_run_claude(a, cfg):
     return 0
 
 
+# ----------------------------------------------------------------------------- run: execute one step (Codex or credit) end to end
+
+LIMIT_RE = re.compile(r"usage limit|rate.?limit|quota|too many requests|\b429\b|try again (later|in)|credit balance", re.I)
+
+
+def kill_tree(p):
+    """Kill the worker and everything it started. Killing only the codex wrapper leaves the vendor binary running."""
+    with contextlib.suppress(Exception):
+        if os.name == "nt":
+            subprocess.run(["taskkill", "/F", "/T", "/PID", str(p.pid)], capture_output=True)
+        else:
+            import signal
+            os.killpg(p.pid, signal.SIGKILL)
+    with contextlib.suppress(Exception):
+        p.kill()
+
+
+def run_codex_step(d, brief, timeout, t):
+    """-> (exit_code, text). stdin carries the brief and is then closed, so codex never waits on it."""
+    h = d["how"]
+    cwd = h["cwd"]
+    exe = shutil.which("codex")
+    if not exe:
+        return 2, "codex CLI not found on PATH (route.py init)"
+    out_file = config_dir() / f"codex-last-{uuid.uuid4().hex[:8]}.txt"
+    cmd = [exe] + h["cli"][1:] + ["-o", str(out_file), "-"]
+    run_id = str(uuid.uuid4())
+    if agent_runs:
+        agent_runs.run(run_id, kind="codex", lane=d["lane"], model=d["model"], cwd=cwd, parent_session=os.environ.get("CLAUDE_CODE_SESSION_ID", ""),
+                       started=t, status="running", title=brief.strip().splitlines()[0][:120] if brief.strip() else "codex")
+    kw = {"start_new_session": True} if os.name != "nt" else {"creationflags": 0x00000200}
+    p = subprocess.Popen(cmd, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, cwd=cwd, **kw)
+    try:
+        log, _ = p.communicate(input=brief, timeout=timeout)
+        code = p.returncode
+    except subprocess.TimeoutExpired:
+        kill_tree(p)
+        log, _ = p.communicate()
+        code = 124
+    text = ""
+    with contextlib.suppress(OSError):
+        text = out_file.read_text(encoding="utf-8").strip()
+        out_file.unlink()
+    if agent_runs:
+        agent_runs.run(run_id, ended=now(), status="failed" if code else "completed", exit=code)
+    if code == 124:
+        return 124, f"codex did not finish within {timeout}s and was killed (process group). Last output:\n" + (log or "")[-600:]
+    if code != 0:
+        return code, (text or (log or "")[-1500:])
+    return 0, text or (log or "")[-1500:]
+
+
+def cmd_run(a, cfg):
+    d, lanes, warnings, t = decision(a, cfg)
+    if d["action"] != "run":
+        print(json.dumps({k: d[k] for k in ("action", "say", "resets", "ask_user", "error") if k in d}))
+        return 0 if d["action"] == "stop" else 1
+    head = {"lane": d["lane"], "model": d["model"], "effort": d["effort"], "pass": d["pass"]}
+    if warnings:
+        head["warnings"] = warnings
+    ni = needs_input(lanes)
+    if ni:
+        head["needs_input"] = ni
+    h = d["how"]
+    if h["kind"] == "agent_tool":
+        print(json.dumps({"action": "agent", **head, "agent_model": h["model"], "brief_prefix": GIT_RULES, "cwd": h["cwd"],
+                          "note": "make the Agent call yourself, in cwd, no worktree; state the effort in the brief"}))
+        return 0
+    brief = sys.stdin.read() if not a.brief else Path(a.brief).read_text(encoding="utf-8")
+    if not brief.strip():
+        print(json.dumps({"action": "error", "error": "empty brief: pass it on stdin or with --brief FILE"}))
+        return 1
+    cwd = h["cwd"]
+    if h["kind"] == "codex":
+        full = GIT_RULES + "\n\n" + brief
+        git_before = git_state(cwd)
+        code, text = run_codex_step(d, full, a.timeout, t)
+        violations = git_changes(git_before, git_state(cwd))
+        if code not in (0, 124) and LIMIT_RE.search(text):
+            until = t + 3600
+            update_state(lambda s: s.setdefault("out", {}).__setitem__(d["lane"], {"until": until, "why": "limit refusal: " + text[:120].replace("\n", " "), "at": t}))
+            print(text, file=sys.stderr)
+            print(json.dumps({"action": "limit", **head, "exit": 76, "say": f"{d['lane']} marked out until {local(until)}; call run again to advance"}), file=sys.stderr)
+            return 76
+        if code == 0:
+            update_state(lambda s: s.setdefault("out", {}).pop(d["lane"], None))
+        print(text)
+        status = {"action": "done" if code == 0 else "failed", **head, "exit": code}
+        if violations:
+            status.update(git_violation=violations, exit=78)
+            print("GIT-VIOLATION: the worker changed git state: " + "; ".join(violations) + ". The file changes are still on disk; inspect with git reflog and decide.", file=sys.stderr)
+            code = 78
+        print(json.dumps(status), file=sys.stderr)
+        return code
+    if h["kind"] == "command":          # CLAUDE_CREDIT: run-claude does its own guard, ledger and out marking
+        ns = argparse.Namespace(model=d["model"], effort=d["effort"], cap=str(d.get("cap") or 2), write=d["mode"] == "write", allow=None, cwd=cwd, bare=False, prompt=[brief])
+        code = cmd_run_claude(ns, cfg)
+        print(json.dumps({"action": "done" if code == 0 else "failed", **head, "exit": code}), file=sys.stderr)
+        return code
+    print(json.dumps({"action": "error", "error": f"cannot run kind {h['kind']}"}))
+    return 1
+
+
 # ----------------------------------------------------------------------------- onboarding commands (code in onboard.py)
 
 def cmd_doctor(a, cfg):
@@ -1087,6 +1197,9 @@ def main(argv=None):
     gd = sub.add_parser("guard"); gd.add_argument("when", choices=["before", "after"]); gd.add_argument("--cwd")
     sk = sub.add_parser("set-key"); sk.add_argument("--stdin", action="store_true"); sk.add_argument("--force", action="store_true")
     cf = sub.add_parser("config"); cf.add_argument("action", choices=["set", "show"]); cf.add_argument("key", nargs="?"); cf.add_argument("value", nargs="?")
+    ru = sub.add_parser("run"); ru.add_argument("role"); ru.add_argument("--writer"); ru.add_argument("--failed", default="")
+    ru.add_argument("--premium", nargs="?", const="claude", metavar="FAMILY"); ru.add_argument("--allow-degraded", action="store_true")
+    ru.add_argument("--claude-usage"); ru.add_argument("--cwd"); ru.add_argument("--brief"); ru.add_argument("--timeout", type=int, default=1800)
     c = sub.add_parser("run-claude"); c.add_argument("--model", required=True); c.add_argument("--effort", required=True)
     c.add_argument("--cap", required=True); c.add_argument("--write", action="store_true"); c.add_argument("--allow", action="append")
     c.add_argument("--cwd"); c.add_argument("--bare", action="store_true"); c.add_argument("prompt", nargs="*")
@@ -1094,7 +1207,7 @@ def main(argv=None):
     migrate_profile()
     cfg = load_routing()
     return {"status": cmd_status, "next": cmd_next, "report": cmd_report, "capture-limits": cmd_capture, "run-claude": cmd_run_claude,
-            "doctor": cmd_doctor, "guard": cmd_guard, "init": cmd_init, "set-key": cmd_set_key, "config": cmd_config}[a.cmd](a, cfg)
+            "run": cmd_run, "doctor": cmd_doctor, "guard": cmd_guard, "init": cmd_init, "set-key": cmd_set_key, "config": cmd_config}[a.cmd](a, cfg)
 
 
 if __name__ == "__main__":
