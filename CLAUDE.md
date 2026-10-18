@@ -60,18 +60,22 @@ This protocol applies when ending a Beads implementation workflow. It is subordi
 
 ## Build & Test
 
-_Add your build and test commands here_
-
 ```bash
-# Example:
-# npm install
-# npm test
+python3 -m unittest discover -s tests
 ```
+
+CI: Ubuntu, macOS, Windows x Python 3.8 and 3.12.
 
 ## Architecture Overview
 
-_Add a brief overview of your project architecture_
+README.md (Layout). The skill (`skills/delegate/SKILL.md`) is the only file read on a normal call; `route.py` decides.
+
+## Before changing how workers launch, how limits are computed, or what state is kept
+
+Read `docs/dev/integrations.md`: other tools (the iorlas-task-loop dashboard) rely on the agent-runs v1 records
+`skills/delegate/agent_runs.py` writes, and on nothing else. It says what a rewrite must keep and what it may drop.
 
 ## Conventions & Patterns
 
-_Add your project-specific conventions here_
+- Python 3.8+, standard library only; macOS, Linux (also in containers), Windows.
+- Bump `.claude-plugin/plugin.json` and the iorlas-marketplace entry on every release.

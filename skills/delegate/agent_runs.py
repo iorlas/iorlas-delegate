@@ -2,6 +2,7 @@
 
 The format is a public contract, not delegate's state: github.com/iorlas/iorlas-task-loop,
 docs/contracts/agent-runs-v1.md. Keep this file the only place that writes it; never fail a run because of it.
+Call sites, and what a rewrite must keep: docs/dev/integrations.md.
 """
 
 import json
