@@ -16,7 +16,7 @@ sys.modules["route"] = route
 spec.loader.exec_module(route)
 
 T = 1_000_000_000.0   # a fixed "now"
-CFG = json.load(open(ROOT / "skills" / "delegate" / "routing.json"))
+CFG = json.loads((ROOT / "skills" / "delegate" / "routing.json").read_text(encoding="utf-8"))
 
 
 def lanes(openai=None, sub=None, credit=None):
@@ -172,7 +172,7 @@ class Cli(unittest.TestCase):
                 real = dict(route.READERS)
                 route.READERS.update({k: (lambda lane, S, st_, t, *a: None) for k in real})
                 try:
-                    ls = route.gather(cfg, st, T)
+                    ls = route.gather(cfg, st, T, check_config=False)
                 finally:
                     route.READERS.update(real)
                 self.assertTrue(ls["OPENAI_SUBSCRIPTION"].out)
@@ -181,6 +181,81 @@ class Cli(unittest.TestCase):
             finally:
                 for k in ("XDG_CONFIG_HOME", "APPDATA", "DELEGATE_NOW"):
                     os.environ.pop(k, None)
+
+
+class Onboarding(unittest.TestCase):
+    """Run against an empty fake home so nothing depends on the machine's real setup."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.saved = {k: os.environ.get(k) for k in ("HOME", "USERPROFILE", "XDG_CONFIG_HOME", "APPDATA", "CODEX_HOME", "CLAUDE_CREDIT_WORKER_KEY")}
+        for k in ("HOME", "USERPROFILE", "XDG_CONFIG_HOME", "APPDATA"):
+            os.environ[k] = self.tmp.name
+        os.environ.pop("CODEX_HOME", None)
+        os.environ.pop("CLAUDE_CREDIT_WORKER_KEY", None)
+        import onboard
+        self.onboard = onboard
+        self.which = onboard.shutil.which
+        onboard.shutil.which = lambda name: None
+        route.shutil.which = lambda name: None
+        self.cfg = route.load_routing()
+
+    def tearDown(self):
+        self.onboard.shutil.which = self.which
+        route.shutil.which = self.which
+        for k, v in self.saved.items():
+            if v is None:
+                os.environ.pop(k, None)
+            else:
+                os.environ[k] = v
+        self.tmp.cleanup()
+
+    def test_empty_machine_is_not_ready_and_first_step_is_codex_cli(self):
+        d = self.onboard.doctor(route, self.cfg)
+        self.assertFalse(d["ready"])
+        self.assertTrue(d["lanes"]["CLAUDE_SUBSCRIPTION"])
+        self.assertFalse(d["lanes"]["OPENAI_SUBSCRIPTION"])
+        step = self.onboard.init(route, self.cfg)
+        self.assertEqual((step["step"], step["who"], step["do"]), ("codex_cli", "agent", "codex_cli"))
+
+    def test_decline_both_lanes_makes_it_ready(self):
+        self.onboard.init(route, self.cfg, decline="OPENAI_SUBSCRIPTION")
+        self.onboard.init(route, self.cfg, decline="CLAUDE_CREDIT")
+        self.assertTrue(self.onboard.doctor(route, self.cfg)["ready"])
+        self.assertIsNone(self.onboard.init(route, self.cfg)["step"])
+
+    def test_preflight_setup_required_only_when_just_the_shared_lane_works(self):
+        setup, warns = route.preflight(self.cfg, {}, T)
+        self.assertEqual(setup["action"], "setup_required")
+        self.assertIn("OPENAI_SUBSCRIPTION", setup["missing"])
+        setup, warns = route.preflight(self.cfg, {"skip_lanes": ["OPENAI_SUBSCRIPTION", "CLAUDE_CREDIT"]}, T)
+        self.assertIsNone(setup)
+
+    def test_config_set_and_show(self):
+        self.onboard.config_set(route, "credit.reset_day", "15")
+        self.onboard.config_set(route, "claude_weekly_reset", "Sun 17:00")
+        cfg = route.load_routing()
+        self.assertEqual(cfg["settings"]["credit"]["reset_day"], 15)
+        self.assertEqual(cfg["settings"]["claude_weekly_reset"], "Sun 17:00")
+        self.assertEqual(cfg["settings"]["credit"]["monthly_cap"], 150)     # untouched defaults survive the merge
+
+    def test_set_key_stdin_is_private_and_not_overwritten(self):
+        import io
+        self.onboard.validate_key = lambda k: (True, "HTTP 200")
+        real = sys.stdin
+        try:
+            sys.stdin = io.StringIO("sk-ant-test-key\n")
+            self.assertEqual(self.onboard.set_key(route, from_stdin=True), 0)
+            path = route.config_dir() / "claude-credit.key"
+            self.assertEqual(path.read_text().strip(), "sk-ant-test-key")
+            if os.name != "nt":
+                self.assertEqual(path.stat().st_mode & 0o077, 0)
+            sys.stdin = io.StringIO("sk-ant-other\n")
+            self.assertEqual(self.onboard.set_key(route, from_stdin=True), 1)
+            self.assertEqual(path.read_text().strip(), "sk-ant-test-key")
+        finally:
+            sys.stdin = real
+        self.assertEqual(route.find_key(quiet=True), "sk-ant-test-key")
 
 
 if __name__ == "__main__":

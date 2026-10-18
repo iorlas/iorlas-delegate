@@ -1,47 +1,38 @@
 # iorlas-delegate
 
-A Claude Code plugin that tells an orchestrating session how to hand sub-tasks to worker models, in a fixed order, and to check plan limits first.
+A Claude Code plugin that hands sub-tasks to worker models through a deterministic router. The model asks `route.py next ROLE` and gets back which lane, model and effort to run; the script reads plan limits and reset times, applies the fallback chains, and records state. One skill, `delegate`, with modes that are read only when needed.
 
-## How it works
-
-`skills/delegate/route.py` is a deterministic router (Python 3.8+, standard library only; macOS, Linux, Windows, Docker). The model asks it `route.py next ROLE` and gets back which lane, model and effort to run, and the command shape. The script reads plan limits and reset times itself where it can (Codex live from `codex app-server`; the Claude subscription from the status-line file or from what the model passes in; the API credit from its own ledger and an out marker), applies one pick function and the role chains, runs a second pass with relaxed gates before it stops, and records state under `~/.config/delegate` (`%APPDATA%\delegate` on Windows). The model provides only what the script cannot read, executes the answer, and reports refusals.
-
-- `delegate` skill: the loop, the inputs the model supplies, and the rules a script cannot enforce.
-- `codex-worker` skill: how to run the `OPENAI_SUBSCRIPTION` lane (Codex plugin).
-- `claude-credit-worker` skill: the `CLAUDE_CREDIT` lane (`route.py run-claude`), spend caps and key setup.
-- `routing.json`: lanes, models, roles and thresholds as data. Add a lane or role by editing it. Fable only when the task names it.
-
-## Install
+## Install (any machine)
 
 ```sh
 claude plugin marketplace add iorlas/iorlas-marketplace
 claude plugin install iorlas-delegate@iorlas-marketplace
-claude plugin marketplace add openai/codex-plugin-cc
-claude plugin install codex@openai-codex
-codex login
 ```
 
-Store the worker key once, in your own terminal (the `-w` flag prompts, so it stays out of shell history):
+Then, in a Claude Code session, run `/iorlas-delegate:init`. It checks the machine, installs the Codex CLI and plugin, starts the Codex device login (you open a link and enter a code), and tells you the one command to store the API key yourself. A configured machine answers `READY` and reads nothing more.
 
-```sh
-security add-generic-password -U -a "$USER" -s anthropic-worker-key -w
+Requirements: Python 3.8+, Claude Code, Node 18.18+ (Codex CLI). macOS, Linux, Windows, Docker. In a container, mount `~/.codex` and `~/.config/delegate` as volumes.
+
+## Lanes
+
+| lane | pays with | credential |
+|---|---|---|
+| `CLAUDE_SUBSCRIPTION` | the Claude Max plan, shared with the orchestrator | none |
+| `CLAUDE_CREDIT` | the Max plan's monthly API credit | an API key, stored by you with `route.py set-key` |
+| `OPENAI_SUBSCRIPTION` | the ChatGPT Plus plan, through Codex | `codex login` |
+
+Roles: `planner`, `worker`, `reviewer`, `hard`, `light`. Chains, models and thresholds are data in `skills/delegate/routing.json`. Fable only when the task names it.
+
+## Layout
+
+```
+skills/delegate/SKILL.md      dispatcher and the run loop (the only file read on a normal call)
+skills/delegate/modes/        init, codex, claude-credit, extend: read on demand
+skills/delegate/route.py      the router: next, report, status, run-claude, capture-limits, doctor, init, set-key, config
+skills/delegate/onboard.py    readiness checks and setup steps
+skills/delegate/routing.json  lanes, models, roles, thresholds
+commands/                     /iorlas-delegate:init, /iorlas-delegate:status
+tests/                        python3 -m unittest discover -s tests   (CI: 3 OS x Python 3.8 and 3.12)
 ```
 
-The key comes from a Console workspace linked to the Max plan (claude.ai, Settings, Billing, API credits), with a spend limit. Key lookup order: env `CLAUDE_CREDIT_WORKER_KEY` (not an `ANTHROPIC_*` name, so interactive Claude Code ignores it), then the file `~/.config/claude-credit-worker/key` (mode 600; Linux), then the macOS keychain.
-
-## Limit awareness
-
-- Codex: asked live.
-- Claude subscription: Claude Code gives plan limits only to the status line. Call `route.py capture-limits` from your status line (`printf '%s' "$input" | python3 route.py capture-limits`) to save them, or pass the desktop app's `get_usage` windows with `--claude-usage`.
-- Credit: no balance reading; the router counts its own spend per cycle and marks the lane out on "credit balance too low".
-- Settings (reset day, caps, `claude_weekly_reset`) go in `config.json` in the config directory.
-
-## Tests
-
-```sh
-python3 -m unittest discover -s tests
-```
-
-## Requirements
-
-`claude`, `codex`, `python3`, Node 18.18+ (for the Codex plugin).
+State, ledger, settings and the key file live in `~/.config/delegate` (`%APPDATA%\delegate`), owner-only. Nothing secret is in this repository. Work is tracked with beads (`bd list`).

@@ -1,44 +1,128 @@
 {
   "version": 1,
   "settings": {
-    "orchestrator_reserve": {"weekly": 90, "five_hour": 85},
-    "worker_lane_gate": {"five_hour": 90, "weekly": 95},
-    "relaxed_ceiling": {"five_hour": 97, "weekly": 98, "orchestrator_five_hour": 95, "orchestrator_weekly": 95},
-    "strain": {"five_hour": 80, "weekly_pace": -15},
-    "recover": {"five_hour": 50, "weekly_pace": -5},
-    "burn": {"minutes": 120, "min_left_percent": 10},
-    "credit": {"use_before_reset_days": 3, "under_cap_fraction": 0.7, "monthly_cap": 150, "reset_day": 1},
+    "orchestrator_reserve": {
+      "weekly": 90,
+      "five_hour": 85
+    },
+    "worker_lane_gate": {
+      "five_hour": 90,
+      "weekly": 95
+    },
+    "relaxed_ceiling": {
+      "five_hour": 97,
+      "weekly": 98,
+      "orchestrator_five_hour": 95,
+      "orchestrator_weekly": 95
+    },
+    "strain": {
+      "five_hour": 80,
+      "weekly_pace": -15
+    },
+    "recover": {
+      "five_hour": 50,
+      "weekly_pace": -5
+    },
+    "burn": {
+      "minutes": 120,
+      "min_left_percent": 10
+    },
+    "credit": {
+      "use_before_reset_days": 3,
+      "under_cap_fraction": 0.7,
+      "monthly_cap": 150,
+      "reset_day": 1
+    },
     "min_dwell_minutes": 30,
     "usage_stale_minutes": 30,
     "claude_weekly_reset": ""
   },
-
   "models": {
-    "opus-5.5":    {"family": "claude", "api": "claude-opus-5-5",   "agent": "opus"},
-    "sonnet-5.5":  {"family": "claude", "api": "claude-sonnet-5-5", "agent": "sonnet"},
-    "haiku-5.5":   {"family": "claude", "api": "claude-haiku-5-5",  "agent": "haiku"},
-    "fable-5.1":   {"family": "claude", "api": "claude-fable-5-1",  "agent": "fable"},
-    "gpt-6.1-sol": {"family": "openai", "api": "gpt-6.1-sol"},
-    "gpt-6-luna":  {"family": "openai", "api": "gpt-6-luna"}
+    "opus-5.5": {
+      "family": "claude",
+      "api": "claude-opus-5-5",
+      "agent": "opus"
+    },
+    "sonnet-5.5": {
+      "family": "claude",
+      "api": "claude-sonnet-5-5",
+      "agent": "sonnet"
+    },
+    "haiku-5.5": {
+      "family": "claude",
+      "api": "claude-haiku-5-5",
+      "agent": "haiku"
+    },
+    "fable-5.1": {
+      "family": "claude",
+      "api": "claude-fable-5-1",
+      "agent": "fable"
+    },
+    "gpt-6.1-sol": {
+      "family": "openai",
+      "api": "gpt-6.1-sol"
+    },
+    "gpt-6-luna": {
+      "family": "openai",
+      "api": "gpt-6-luna"
+    }
   },
-
   "lanes": {
-    "CLAUDE_SUBSCRIPTION": {"family": "claude", "kind": "subscription", "reader": "claude_subscription", "runner": "agent_tool", "shared_with_orchestrator": true},
-    "CLAUDE_CREDIT":       {"family": "claude", "kind": "credit",       "reader": "claude_credit",       "runner": "claude_credit_worker"},
-    "OPENAI_SUBSCRIPTION": {"family": "openai", "kind": "subscription", "reader": "codex_app_server",    "runner": "codex"}
+    "CLAUDE_SUBSCRIPTION": {
+      "family": "claude",
+      "kind": "subscription",
+      "reader": "claude_subscription",
+      "runner": "agent_tool",
+      "shared_with_orchestrator": true,
+      "ready": "always"
+    },
+    "CLAUDE_CREDIT": {
+      "family": "claude",
+      "kind": "credit",
+      "reader": "claude_credit",
+      "runner": "claude_credit_worker",
+      "ready": "claude_credit"
+    },
+    "OPENAI_SUBSCRIPTION": {
+      "family": "openai",
+      "kind": "subscription",
+      "reader": "codex_app_server",
+      "runner": "codex",
+      "ready": "codex"
+    }
   },
-
   "roles": {
     "planner": {
       "about": "brainstorm, plan, design, split a ticket. Never degrades without the user's yes.",
       "advance": "on_unavailable",
       "steps": [
-        {"model": "opus-5.5", "effort": "medium", "on": "claude", "cap": 3},
-        {"model": "gpt-6.1-sol", "effort": "high", "on": "openai", "mode": "read_only", "use": "adversarial_review_of_plan"}
+        {
+          "model": "opus-5.5",
+          "effort": "medium",
+          "on": "claude",
+          "cap": 3
+        },
+        {
+          "model": "gpt-6.1-sol",
+          "effort": "high",
+          "on": "openai",
+          "mode": "read_only",
+          "use": "adversarial_review_of_plan"
+        }
       ],
       "degraded_needs_consent": [
-        {"model": "opus-5.5", "effort": "low", "on": "claude", "cap": 3},
-        {"model": "sonnet-5.5", "effort": "high", "on": "claude", "cap": 2}
+        {
+          "model": "opus-5.5",
+          "effort": "low",
+          "on": "claude",
+          "cap": 3
+        },
+        {
+          "model": "sonnet-5.5",
+          "effort": "high",
+          "on": "claude",
+          "cap": 2
+        }
       ],
       "stop": "No adequate reasoning model is available now."
     },
@@ -46,8 +130,20 @@
       "about": "implement, debug, write tests.",
       "advance": "on_unavailable",
       "steps": [
-        {"model": "gpt-6.1-sol", "effort": "medium", "on": "openai", "mode": "write", "use": "task"},
-        {"model": "sonnet-5.5", "effort": "medium", "on": "claude", "mode": "write", "cap": 2}
+        {
+          "model": "gpt-6.1-sol",
+          "effort": "medium",
+          "on": "openai",
+          "mode": "write",
+          "use": "task"
+        },
+        {
+          "model": "sonnet-5.5",
+          "effort": "medium",
+          "on": "claude",
+          "mode": "write",
+          "cap": 2
+        }
       ],
       "stop": "No worker lane is available. Hold the task; a few lines the orchestrator may write itself."
     },
@@ -56,13 +152,45 @@
       "advance": "on_unavailable",
       "by_writer": {
         "openai": [
-          {"model": "opus-5.5", "effort": "medium", "on": "claude", "mode": "read_only", "cap": 2},
-          {"model": "opus-5.5", "effort": "low", "on": "claude", "mode": "read_only", "cap": 2, "flag": "degraded"}
+          {
+            "model": "opus-5.5",
+            "effort": "medium",
+            "on": "claude",
+            "mode": "read_only",
+            "cap": 2
+          },
+          {
+            "model": "opus-5.5",
+            "effort": "low",
+            "on": "claude",
+            "mode": "read_only",
+            "cap": 2,
+            "flag": "degraded"
+          }
         ],
         "claude": [
-          {"model": "gpt-6.1-sol", "effort": "high", "on": "openai", "mode": "read_only", "use": "review"},
-          {"model": "opus-5.5", "effort": "medium", "on": "claude", "mode": "read_only", "cap": 2},
-          {"model": "opus-5.5", "effort": "low", "on": "claude", "mode": "read_only", "cap": 2, "flag": "degraded"}
+          {
+            "model": "gpt-6.1-sol",
+            "effort": "high",
+            "on": "openai",
+            "mode": "read_only",
+            "use": "review"
+          },
+          {
+            "model": "opus-5.5",
+            "effort": "medium",
+            "on": "claude",
+            "mode": "read_only",
+            "cap": 2
+          },
+          {
+            "model": "opus-5.5",
+            "effort": "low",
+            "on": "claude",
+            "mode": "read_only",
+            "cap": 2,
+            "flag": "degraded"
+          }
         ]
       },
       "stop": "No reviewer is available. Mark the diff unreviewed; the orchestrator reads it only if small or risk-flagged."
@@ -71,9 +199,27 @@
       "about": "two workers failed it, or it needs real design reasoning inside the code. Split into short subtasks; only the failed subtask climbs. Pass the indexes of steps that ran and failed with --failed.",
       "advance": "on_failure",
       "steps": [
-        {"model": "gpt-6.1-sol", "effort": "high", "on": "openai", "mode": "write", "use": "task"},
-        {"model": "opus-5.5", "effort": "low", "on": "claude", "mode": "write", "cap": 3},
-        {"model": "opus-5.5", "effort": "medium", "on": "claude", "mode": "write", "cap": 5}
+        {
+          "model": "gpt-6.1-sol",
+          "effort": "high",
+          "on": "openai",
+          "mode": "write",
+          "use": "task"
+        },
+        {
+          "model": "opus-5.5",
+          "effort": "low",
+          "on": "claude",
+          "mode": "write",
+          "cap": 3
+        },
+        {
+          "model": "opus-5.5",
+          "effort": "medium",
+          "on": "claude",
+          "mode": "write",
+          "cap": 5
+        }
       ],
       "stop": "Every rung was tried or is unavailable. Report what was tried; if a rung needed more than a couple of tries the plan or the split is wrong. Fable only if the user says so."
     },
@@ -81,13 +227,37 @@
       "about": "simple, low-risk, low-reasoning work: read many files, summarise logs, classify, mechanical small edits. Not about parallelism.",
       "advance": "on_unavailable",
       "steps": [
-        {"model": "gpt-6-luna", "effort": "low", "on": "openai", "mode": "read_only", "use": "read_only_exec"},
-        {"model": "haiku-5.5", "effort": "low", "on": "claude", "mode": "read_only", "cap": 0.25},
-        {"model": "sonnet-5.5", "effort": "low", "on": "claude", "mode": "write", "cap": 1}
+        {
+          "model": "gpt-6-luna",
+          "effort": "low",
+          "on": "openai",
+          "mode": "read_only",
+          "use": "read_only_exec"
+        },
+        {
+          "model": "haiku-5.5",
+          "effort": "low",
+          "on": "claude",
+          "mode": "read_only",
+          "cap": 0.25
+        },
+        {
+          "model": "sonnet-5.5",
+          "effort": "low",
+          "on": "claude",
+          "mode": "write",
+          "cap": 1
+        }
       ],
       "stop": "No light lane is available. Do it directly if it is tiny."
     }
   },
-
-  "fable_step": {"model": "fable-5.1", "effort": "medium", "on": "claude", "mode": "write", "cap": 6, "flag": "user_requested_fable"}
+  "fable_step": {
+    "model": "fable-5.1",
+    "effort": "medium",
+    "on": "claude",
+    "mode": "write",
+    "cap": 6,
+    "flag": "user_requested_fable"
+  }
 }

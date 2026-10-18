@@ -9,7 +9,11 @@ The model supplies only what the script cannot read itself; the script decides.
                      [--claude-usage JSON|@file|-] [--text]
   route.py report --lane LANE --event out|ok [--until EPOCH|ISO] [--message TEXT]
   route.py run-claude --model ID --effort LEVEL --cap USD [--write] [--allow TOOL]... [--cwd DIR] [--bare] [PROMPT|-]
-  route.py capture-limits            (status line JSON on stdin)
+  route.py capture-limits [--print]  (status line JSON on stdin)
+  route.py doctor [--quiet] [--deep] [--json]      readiness of every lane (no state kept; --deep also validates the API key)
+  route.py init [--do STEP] [--decline LANE] [--undecline LANE] [--open-browser]   next onboarding step as JSON
+  route.py set-key [--stdin] [--force]             the USER runs this in their own terminal; the agent never handles the key
+  route.py config set KEY VALUE | show
 
 Data: routing.json next to this file (lanes, models, roles, thresholds).
 Per-user settings: <config dir>/config.json (same keys as "settings"); state, ledger and key live in <config dir>:
@@ -31,6 +35,8 @@ import time
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
+if str(HERE) not in sys.path:
+    sys.path.insert(0, str(HERE))
 WEEK_MIN = 7 * 24 * 60
 
 
@@ -277,17 +283,16 @@ def apply_burn(lane, S, week_mins):
 
 # ----------------------------------------------------------------------------- readers (the script gathers what it can)
 
-def read_codex(lane, S, st, t):
+def fetch_codex_limits():
+    """-> (result_dict, error_text). Spawns `codex app-server` once; ~1-2 s."""
     exe = shutil.which("codex")
     if not exe:
-        lane.notes.append("codex CLI not installed")
-        return
+        return None, "codex CLI not installed"
     try:
         p = subprocess.Popen([exe, "app-server"], stdin=subprocess.PIPE, stdout=subprocess.PIPE,
                              stderr=subprocess.DEVNULL, text=True)
     except OSError as e:
-        lane.notes.append(f"codex app-server failed to start: {e}")
-        return
+        return None, f"codex app-server failed to start: {e}"
 
     def send(m):
         p.stdin.write(json.dumps(m) + "\n")
@@ -309,12 +314,11 @@ def read_codex(lane, S, st, t):
 
     try:
         send({"id": 1, "method": "initialize", "params": {"clientInfo": {"name": "delegate-route", "title": "delegate route", "version": "1"}}})
-        if read(1, 15) is None:
-            lane.notes.append("codex app-server did not answer")
-            return
+        if read(1, 8) is None:
+            return None, "codex app-server did not answer"
         send({"method": "initialized"})
         send({"id": 2, "method": "account/rateLimits/read"})
-        r = read(2, 20)
+        r = read(2, 8)
     finally:
         p.kill()
         p.wait()
@@ -322,9 +326,21 @@ def read_codex(lane, S, st, t):
             with contextlib.suppress(OSError):
                 f.close()
     if not r or "result" not in r:
-        lane.notes.append((r or {}).get("error", {}).get("message", "codex gave no limits (logged in? run `codex login`)"))
+        return None, (r or {}).get("error", {}).get("message", "codex gave no limits (logged in? run `codex login`)")
+    return r["result"], None
+
+
+def read_codex(lane, S, st, t):
+    cached = st.get("codex_limits")
+    if cached and t - cached.get("at", 0) <= 60 and not os.environ.get("DELEGATE_NOCACHE"):
+        res, err = cached["res"], None
+    else:
+        res, err = fetch_codex_limits()
+        if res is not None:
+            update_state(lambda s_: s_.__setitem__("codex_limits", {"at": t, "res": res}))
+    if res is None:
+        lane.notes.append(err)
         return
-    res = r["result"]
     rl = res.get("rateLimits") or {}
     pr, se = rl.get("primary") or {}, rl.get("secondary") or {}
     lane.five_reset, lane.week_reset = pr.get("resetsAt"), se.get("resetsAt")
@@ -422,9 +438,13 @@ def read_claude_credit(lane, S, st, t):
 READERS = {"codex_app_server": read_codex, "claude_subscription": read_claude_subscription, "claude_credit": read_claude_credit}
 
 
-def gather(cfg, st, t, ai_usage=None, only_known=False):
+def gather(cfg, st, t, ai_usage=None, check_config=True):
     S = cfg["settings"]
     lanes = {}
+    conf = {}
+    if check_config:
+        import onboard
+        conf = onboard.configured_lanes(sys.modules[__name__], cfg)
     for name, c in cfg["lanes"].items():
         lane = Lane(name, c["family"], c["kind"], c.get("shared_with_orchestrator", False))
         reader = READERS[c["reader"]]
@@ -436,6 +456,9 @@ def gather(cfg, st, t, ai_usage=None, only_known=False):
         if o and o.get("until", 0) > t and not lane.out:      # an out reported by the model or by run-claude
             lane.out, lane.out_until = True, o["until"]
             lane.notes.append(o.get("why", "reported out"))
+        if check_config and not conf.get(name, True):
+            lane.out, lane.out_until = True, None
+            lane.notes.insert(0, "not configured")
         lanes[name] = lane
     return lanes
 
@@ -618,9 +641,35 @@ def cmd_status(a, cfg):
     return 0
 
 
+def preflight(cfg, st, t):
+    """Cheap, no network. -> (setup_required_dict | None, warnings). Fires only when just the shared lane works."""
+    import onboard
+    me = sys.modules[__name__]
+    conf = onboard.configured_lanes(me, cfg)
+    skip = set(st.get("skip_lanes") or [])
+    shared = {n for n, c in cfg["lanes"].items() if c.get("shared_with_orchestrator")}
+    unconf = [n for n, ok in conf.items() if not ok and n not in skip]
+    live = {n for n, ok in conf.items() if ok}
+    if unconf and live <= shared and not st.get("setup_declined"):
+        return {"action": "setup_required", "missing": unconf, "mode": "init",
+                "say": "Only the Claude subscription lane works. Run the delegate skill's init mode (read modes/init.md), or decline."}, []
+    warned = st.get("warned_at") or {}
+    warnings = []
+    for n in unconf:
+        if t - warned.get(n, 0) > 86400:
+            warnings.append(f"{n} is not configured, so it is skipped (route.py init to set it up, or init --decline {n})")
+    if warnings:
+        update_state(lambda s_: s_.setdefault("warned_at", {}).update({n: t for n in unconf}))
+    return None, warnings
+
+
 def cmd_next(a, cfg):
     t = now()
     st = load_state()
+    setup, warnings = preflight(cfg, st, t)
+    if setup:
+        print(json.dumps(setup, indent=1))
+        return 0
     lanes = gather(cfg, st, t, parse_json_arg(a.claude_usage))
     args = {"writer": a.writer, "failed": [int(x) for x in a.failed.split(",") if x != ""] if a.failed else [],
             "fable": a.fable, "allow_degraded": a.allow_degraded}
@@ -636,6 +685,8 @@ def cmd_next(a, cfg):
             update_state(mark)
     d["needs_input"] = needs_input(lanes)
     d["lanes"] = {n: l.brief(t) for n, l in lanes.items()}
+    if warnings:
+        d["warnings"] = warnings
     if a.text:
         if d["action"] == "run":
             print(f"RUN {d['role']} step {d['step']} on {d['lane']}: {d['model']} {d['effort']} ({d['pass']} pass)")
@@ -681,6 +732,9 @@ def cmd_capture(a, cfg):
     rl = d.get("rate_limits")
     if not rl:
         return 0
+    if getattr(a, "print", False):
+        f5, f7 = (rl.get("five_hour") or {}).get("used_percentage"), (rl.get("seven_day") or {}).get("used_percentage")
+        print("5h %s%% wk %s%%" % ("?" if f5 is None else round(f5), "?" if f7 is None else round(f7)))
     p = Path.home() / ".claude" / "state"
     p.mkdir(parents=True, exist_ok=True)
     tmp = p / f"max-limits.json.{os.getpid()}"
@@ -695,7 +749,7 @@ PREAMBLE = ("You are a delegated worker. Do exactly the task in the brief. Do no
             "Do not commit or push. Finish with a short report: what you changed or found, and the exit code and last lines of any check you ran.")
 
 
-def find_key():
+def find_key(quiet=False):
     k = os.environ.get("CLAUDE_CREDIT_WORKER_KEY", "").strip()
     if k:
         return k
@@ -703,7 +757,7 @@ def find_key():
         with contextlib.suppress(OSError):
             k = p.read_text(encoding="utf-8").strip()
             if k:
-                if os.name != "nt" and (p.stat().st_mode & 0o077):
+                if not quiet and os.name != "nt" and (p.stat().st_mode & 0o077):
                     print(f"route.py: warning: {p} is readable by others; run: chmod 600 {p}", file=sys.stderr)
                 return k
     if sys.platform == "darwin" and shutil.which("security"):
@@ -724,10 +778,7 @@ def cmd_run_claude(a, cfg):
         sys.exit("route.py: empty prompt")
     key = find_key()
     if not key:
-        print("route.py: no API key. Store it once, in your own terminal:\n"
-              f"  file (any OS): write it to {config_dir() / 'claude-credit.key'} (private to you)\n"
-              "  macOS: security add-generic-password -U -a \"$USER\" -s anthropic-worker-key -w\n"
-              "  or set CLAUDE_CREDIT_WORKER_KEY in this worker's own environment (not ANTHROPIC_*).", file=sys.stderr)
+        print("route.py: no API key for the credit lane. Run `route.py init` and relay its step to the user; do not ask for the key in chat.", file=sys.stderr)
         return 2
     c = S["credit"]
     start, nxt = credit_cycle(c["reset_day"], t)
@@ -782,6 +833,47 @@ def cmd_run_claude(a, cfg):
     return 0
 
 
+# ----------------------------------------------------------------------------- onboarding commands (code in onboard.py)
+
+def cmd_doctor(a, cfg):
+    import onboard
+    d = onboard.doctor(sys.modules[__name__], cfg, deep=a.deep)
+    if a.json:
+        print(json.dumps(d, indent=1))
+    else:
+        onboard.print_doctor(d, a.quiet)
+    return 0 if d["ready"] else 1
+
+
+def cmd_init(a, cfg):
+    import onboard
+    R = sys.modules[__name__]
+    if a.undecline:
+        update_state(lambda s: s.__setitem__("skip_lanes", [x for x in s.get("skip_lanes", []) if x != a.undecline]))
+        print(json.dumps({"done": True, "say": f"{a.undecline} back in the setup list."}))
+        return 0
+    out = onboard.init(R, cfg, do=a.do, decline=a.decline, open_browser=a.open_browser)
+    print(json.dumps(out, indent=1))
+    return 1 if out.get("error") else 0
+
+
+def cmd_set_key(a, cfg):
+    import onboard
+    return onboard.set_key(sys.modules[__name__], from_stdin=a.stdin, force=a.force)
+
+
+def cmd_config(a, cfg):
+    import onboard
+    R = sys.modules[__name__]
+    if a.action == "set":
+        if not a.key or a.value is None:
+            sys.exit("route.py: config set KEY VALUE")
+        print(json.dumps(onboard.config_set(R, a.key, a.value), indent=1))
+    else:
+        print(json.dumps(onboard.config_show(R, cfg), indent=1))
+    return 0
+
+
 # ----------------------------------------------------------------------------- cli
 
 def main(argv=None):
@@ -793,13 +885,18 @@ def main(argv=None):
     n.add_argument("--claude-usage"); n.add_argument("--text", action="store_true")
     r = sub.add_parser("report"); r.add_argument("--lane", required=True); r.add_argument("--event", choices=["out", "ok"], required=True)
     r.add_argument("--until"); r.add_argument("--message")
-    sub.add_parser("capture-limits")
+    cl = sub.add_parser("capture-limits"); cl.add_argument("--print", action="store_true")
+    dr = sub.add_parser("doctor"); dr.add_argument("--quiet", action="store_true"); dr.add_argument("--deep", action="store_true"); dr.add_argument("--json", action="store_true")
+    ini = sub.add_parser("init"); ini.add_argument("--do"); ini.add_argument("--decline"); ini.add_argument("--undecline"); ini.add_argument("--open-browser", action="store_true")
+    sk = sub.add_parser("set-key"); sk.add_argument("--stdin", action="store_true"); sk.add_argument("--force", action="store_true")
+    cf = sub.add_parser("config"); cf.add_argument("action", choices=["set", "show"]); cf.add_argument("key", nargs="?"); cf.add_argument("value", nargs="?")
     c = sub.add_parser("run-claude"); c.add_argument("--model", required=True); c.add_argument("--effort", required=True)
     c.add_argument("--cap", required=True); c.add_argument("--write", action="store_true"); c.add_argument("--allow", action="append")
     c.add_argument("--cwd"); c.add_argument("--bare", action="store_true"); c.add_argument("prompt", nargs="*")
     a = ap.parse_args(argv)
     cfg = load_routing()
-    return {"status": cmd_status, "next": cmd_next, "report": cmd_report, "capture-limits": cmd_capture, "run-claude": cmd_run_claude}[a.cmd](a, cfg)
+    return {"status": cmd_status, "next": cmd_next, "report": cmd_report, "capture-limits": cmd_capture, "run-claude": cmd_run_claude,
+            "doctor": cmd_doctor, "init": cmd_init, "set-key": cmd_set_key, "config": cmd_config}[a.cmd](a, cfg)
 
 
 if __name__ == "__main__":
