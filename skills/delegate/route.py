@@ -19,7 +19,8 @@ The model supplies only what the script cannot read itself; the script decides.
 
 Data: routing.json next to this file (lanes, models, roles, thresholds).
 Per-user settings: <config dir>/config.json (same keys as "settings"); state, ledger and key live in <config dir>:
-  Windows %APPDATA%\\delegate, otherwise $XDG_CONFIG_HOME/delegate or ~/.config/delegate.
+  $DELEGATE_CONFIG_DIR, else Claude Code's plugin data dir (~/.claude/plugins/data/<plugin>-<marketplace>), else (a checkout) ~/.config/delegate
+  (%APPDATA%\\delegate on Windows). Files from the old location are copied in once.
 
 Exit codes of run-claude: 0 ok | 75 credit exhausted | 76 rate limited | 77 own cap reached | 78 worker changed git state | 2 key missing | 1 other.
 Workers never create branches or worktrees and never commit, merge, push or stash: the coordinator owns git.
@@ -57,16 +58,47 @@ def now():
     return float(v) if v else time.time()
 
 
-def config_dir():
+LEGACY_FILES = ("config.json", "state.json", "ledger.jsonl", "claude-credit.key", "statusline.py")
+
+
+def legacy_dir():
     if os.name == "nt":
         base = os.environ.get("APPDATA") or str(Path.home() / "AppData" / "Roaming")
     else:
         base = os.environ.get("XDG_CONFIG_HOME") or str(Path.home() / ".config")
-    p = Path(base) / "delegate"
+    return Path(base) / "delegate"
+
+
+def plugin_data_dir():
+    """Claude Code's persistent data dir for this plugin: <plugins>/data/<plugin>-<marketplace>, derived from where this copy is installed
+    (<plugins>/cache/<marketplace>/<plugin>/<version>/skills/delegate). None when running from a checkout."""
+    parts = HERE.parts
+    for i in range(1, len(parts) - 3):
+        if parts[i] == "cache" and parts[i - 1] == "plugins":
+            ident = re.sub(r"[^A-Za-z0-9_-]", "-", f"{parts[i + 2]}@{parts[i + 1]}")
+            return Path(*parts[:i]) / "data" / ident
+    return None
+
+
+def config_dir():
+    """Where settings, profile, state, ledger and the key live. Order: DELEGATE_CONFIG_DIR, the plugin's data dir (installed plugin),
+    else ~/.config/delegate (checkout). CLAUDE_PLUGIN_DATA is deliberately not read: it names whichever plugin launched the process.
+    Files from the old location are copied in once."""
+    explicit = os.environ.get("DELEGATE_CONFIG_DIR")
+    p = Path(explicit) if explicit else (plugin_data_dir() or legacy_dir())
+    fresh = not p.exists()
     p.mkdir(parents=True, exist_ok=True)
     if os.name != "nt":
         with contextlib.suppress(OSError):
             os.chmod(p, 0o700)        # holds the API key file, state and ledger: private to the user
+    if fresh and not explicit:
+        old = legacy_dir()
+        if old != p and old.is_dir():
+            for name in LEGACY_FILES:
+                src = old / name
+                if src.is_file() and not (p / name).exists():
+                    with contextlib.suppress(OSError):
+                        shutil.copy2(src, p / name)
     return p
 
 

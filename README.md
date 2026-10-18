@@ -40,4 +40,4 @@ Git stays with the coordinator: workers never create branches or worktrees and n
 
 Dashboards: each `claude -p` run and the lanes' limits are published as [agent-runs v1](https://github.com/iorlas/iorlas-task-loop/blob/main/docs/contracts/agent-runs-v1.md) records in `~/.config/agent-runs` (`skills/delegate/agent_runs.py` is the only writer). That format is a public contract; everything else here is internal and may change.
 
-State, ledger, settings and the key file live in `~/.config/delegate` (`%APPDATA%\delegate`), owner-only. Nothing secret is in this repository. Work is tracked with beads (`bd list`).
+State, ledger, settings, profile and the key file live in Claude Code's data folder for the plugin (`~/.claude/plugins/data/iorlas-delegate-<marketplace>`), owner-only; from a checkout, in `~/.config/delegate` (`%APPDATA%\delegate`). `DELEGATE_CONFIG_DIR` overrides both. Files from the old location are copied in once. Uninstalling the plugin deletes that folder, key included. Nothing secret is in this repository. Work is tracked with beads (`bd list`).

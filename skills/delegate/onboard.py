@@ -146,7 +146,7 @@ def doctor(R, cfg, deep=False, lane=None):
     ack = R.acked()
     notes = []
     if (os.path.exists("/.dockerenv") or os.path.exists("/run/.containerenv")) and "volumes" not in ack:
-        notes.append({"id": "volumes", "say": "Container: whether ~/.codex and ~/.config/delegate survive a rebuild is not checked. If your home folder is already a volume, run `route.py config ack volumes` and this goes away."})
+        notes.append({"id": "volumes", "say": "Container: whether ~/.codex and ~/.claude survive a rebuild is not checked. If your home folder is already a volume, run `route.py config ack volumes` and this goes away."})
     for c in checks:
         if c["id"] in ack and not c["ok"]:
             c["skip"] = True

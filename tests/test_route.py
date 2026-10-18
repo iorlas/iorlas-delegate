@@ -16,6 +16,7 @@ route = importlib.util.module_from_spec(spec)
 sys.modules["route"] = route
 spec.loader.exec_module(route)
 
+os.environ.pop("DELEGATE_CONFIG_DIR", None)      # tests isolate with XDG_CONFIG_HOME / HOME
 T = 1_000_000_000.0   # a fixed "now"
 CFG = json.loads((ROOT / "skills" / "delegate" / "routing.json").read_text(encoding="utf-8"))
 
@@ -533,6 +534,57 @@ esac
     def test_empty_brief_is_an_error(self):
         code, out, err = self.run_it("ok", "  ")
         self.assertEqual(code, 1)
+
+
+class ConfigLocation(unittest.TestCase):
+    """Settings, state and the key live in Claude Code's plugin data dir when installed, ~/.config/delegate in a checkout."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.saved_here = route.HERE
+        self.saved = {k: os.environ.get(k) for k in ("HOME", "USERPROFILE", "XDG_CONFIG_HOME", "APPDATA", "DELEGATE_CONFIG_DIR", "CLAUDE_PLUGIN_DATA")}
+        for k in ("HOME", "USERPROFILE", "XDG_CONFIG_HOME", "APPDATA"):
+            os.environ[k] = self.tmp.name
+        os.environ.pop("DELEGATE_CONFIG_DIR", None)
+        os.environ["CLAUDE_PLUGIN_DATA"] = str(Path(self.tmp.name) / "someone-elses-data")      # must be ignored
+
+    def tearDown(self):
+        route.HERE = self.saved_here
+        for k, v in self.saved.items():
+            os.environ.pop(k, None) if v is None else os.environ.__setitem__(k, v)
+        self.tmp.cleanup()
+
+    def installed(self):
+        root = Path(self.tmp.name) / ".claude" / "plugins"
+        route.HERE = root / "cache" / "iorlas-marketplace" / "iorlas-delegate" / "0.12.0" / "skills" / "delegate"
+        return root / "data" / "iorlas-delegate-iorlas-marketplace"
+
+    def test_checkout_uses_the_xdg_dir(self):
+        self.assertEqual(route.config_dir(), Path(self.tmp.name) / "delegate")
+
+    def test_installed_copy_uses_the_plugin_data_dir_and_ignores_foreign_env(self):
+        want = self.installed()
+        self.assertEqual(route.plugin_data_dir(), want)
+        self.assertEqual(route.config_dir(), want)
+        self.assertFalse((Path(self.tmp.name) / "someone-elses-data").exists())
+
+    def test_explicit_override_wins(self):
+        self.installed()
+        os.environ["DELEGATE_CONFIG_DIR"] = str(Path(self.tmp.name) / "mine")
+        self.assertEqual(route.config_dir(), Path(self.tmp.name) / "mine")
+
+    def test_old_files_are_copied_once_and_never_overwritten(self):
+        old = Path(self.tmp.name) / "delegate"
+        old.mkdir()
+        (old / "config.json").write_text('{"claude_weekly_reset": "Sun 17:00"}')
+        (old / "claude-credit.key").write_text("sk-ant-old\n")
+        want = self.installed()
+        self.assertEqual(route.config_dir(), want)
+        self.assertEqual((want / "claude-credit.key").read_text(), "sk-ant-old\n")
+        self.assertTrue((old / "claude-credit.key").exists())                       # copied, not moved
+        (want / "config.json").write_text("{}")
+        route.config_dir()                                                          # second call: nothing re-copied
+        self.assertEqual((want / "config.json").read_text(), "{}")
 
 
 class TokenBudget(unittest.TestCase):
