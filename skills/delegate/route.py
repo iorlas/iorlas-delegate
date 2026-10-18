@@ -594,7 +594,7 @@ def how(lane, step, cfg):
     if runner == "agent_tool":
         return {"kind": "agent_tool", "model": m["agent"], "note": "set model on the Agent call; effort cannot be set per call, so state the effort in the brief"}
     if runner == "codex":
-        return {"kind": "codex", "skill": "codex-worker", "use": step.get("use", "task"), "model": m["api"], "effort": step["effort"], "mode": step.get("mode", "read_only"),
+        return {"kind": "codex", "doc": "modes/codex.md", "use": step.get("use", "task"), "model": m["api"], "effort": step["effort"], "mode": step.get("mode", "read_only"),
                 "cli": ["codex", "exec", "-s", "workspace-write" if write else "read-only", "-m", m["api"], "-c", f"model_reasoning_effort={step['effort']}"]}
     return {"kind": "unknown", "runner": runner}
 
