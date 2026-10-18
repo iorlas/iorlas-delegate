@@ -1,119 +1,144 @@
 ---
 name: delegate
-description: Strategy for handing sub-tasks to worker models. Defines three execution lanes (Codex, Claude Max, Claude API credit), a fallback chain per role (planner, worker, reviewer, hard, bulk) that names every lane, a rule for choosing between Max and the credit from live limits, and when to stop. Use before delegating any planning, implementation, debugging, review, research or bulk-reading sub-task from an orchestrating session. Mechanics live in the lane skills.
+description: Routing rules for handing sub-tasks to worker models. Three execution lanes (CODEX, MAX, CREDIT), a function that picks between the two Claude lanes from live limits, and an ordered chain per role (planner, worker, reviewer, hard, light) that ends in STOP. Use before delegating any planning, implementation, debugging, review, or reading sub-task from an orchestrating session. Commands live in the lane skills.
 ---
 
 # delegate
 
-The orchestrating session (Opus on Max) decides; workers execute bounded sub-tasks. Every role has a chain of fallbacks that names all three lanes and ends in STOP. Take the first step whose lane is not out and whose gate passes. Read the state first, keep the model floor, tell the user in one line when the state changes the route.
+Treat this file as a program: glossary, one function, one table of chains, a few rules. Do not improvise outside it.
+If the environment variable `DELEGATE_DEPTH` is set you are a worker: do not delegate.
 
-If the environment variable `DELEGATE_DEPTH` is set, you are a worker: do not delegate further.
+## Glossary
 
-## Lanes
-
-| lane | pays with | models | how to run | resets |
-|---|---|---|---|---|
-| `codex` | ChatGPT Plus subscription | GPT-6.1 Sol, GPT-6 Luna | skill `codex-worker` | rolling 5-hour window plus a weekly cap |
-| `max` | Claude Max subscription, shared with the orchestrator and Fable | Opus 5.5, Sonnet 5.5, Haiku 5.5 | native Agent tool, `model:` set per call | weekly moment fixed per account (`MAX_WEEKLY_RESET`, the user's is Sunday 17:00 local) plus a rolling 5-hour window |
-| `credit` | the Max plan's monthly API credit (prepaid) | Opus, Sonnet, Haiku (Fable only on request) | skill `claude-credit-worker` | billing cycle (`CREDIT_RESET_DAY`, the 1st); no balance reading |
-
-`max` and `credit` are the two Claude sources. Allowance that is unused and expires soonest is free; allowance that resets last must be rationed.
+| term | meaning |
+|---|---|
+| lane | a place work runs, named by what pays for it |
+| `CODEX` | lane. GPT models through the Codex plugin. Pays with the ChatGPT Plus subscription. Resets: rolling 5-hour window plus a weekly cap. Skill: `codex-worker` |
+| `MAX` | lane. Claude models through the native Agent tool (`model:` per call). Pays with the Claude Max subscription, which the orchestrator itself also uses. Resets: a rolling 5-hour window plus a weekly moment (`MAX_WEEKLY_RESET`, the user's is Sunday 17:00 local) |
+| `CREDIT` | lane. Claude models through `claude -p` with an API key. Pays with the Max plan's monthly API credit (prepaid). Resets on `CREDIT_RESET_DAY` (the 1st). No balance reading. Skill: `claude-credit-worker` |
+| Claude lane | `MAX` or `CREDIT`: the two lanes that run the same Claude models |
+| `CLAUDE_PREFERRED` | the Claude lane that `pick_claude_lane()` returns now |
+| `CLAUDE_OTHER` | the other Claude lane |
+| role | the kind of job: planner, worker, reviewer, hard, light |
+| step | one entry of a role's chain: a model, an effort, and the lanes it may run on |
+| effort | reasoning level of a model: low, medium, high |
+| fallback | go to the next step because no lane of this step is available |
+| escalation | go to the next step because this step's result failed the acceptance check |
+| STOP | end of a chain: do not run anything; report to the user |
+| out | a lane cannot be used now (limit reached, credit empty, cap reached) until its reset time |
+| pace | share of a window already elapsed minus share used, in points. Positive: slack. Negative: spending faster than the window allows |
 
 ## Never delegated
 
-Decisions stay with the orchestrator: requirements and scope, design and architecture, game-design judgement, the plan and its split into sub-tasks, whether a result is accepted, what becomes a new ticket. A worker may be asked for options or findings; the choice is the orchestrator's.
+Requirements and scope, design and architecture, game-design judgement, the plan and its split into sub-tasks, whether a result is accepted, what becomes a new ticket. A worker may be asked for options or findings; the choice is the orchestrator's.
 
 ## Read the state before every sub-task
 
-| lane | reading |
+| lane | where to read it |
 |---|---|
-| `max` | Desktop app Code tab: `mcp__ccd_session_mgmt__get_usage` (deferred: load it with ToolSearch once): 5-hour limit, weekly limit for all models, weekly limit for Fable, each with percent used and reset time. Elsewhere `limits.py` reads the status-line file; failing that it knows only the reset moment |
-| `codex` | `python3 ${CLAUDE_SKILL_DIR}/limits.py`: live 5-hour and weekly use, reset times |
-| `credit` | no balance. `limits.py` shows the reset date, this script's own spend against its cap, and the out marker `run.sh` writes on "credit balance too low" |
+| `MAX` | Desktop app Code tab: tool `mcp__ccd_session_mgmt__get_usage` (deferred: load it with ToolSearch once): 5-hour limit, weekly limit for all models, weekly limit for Fable, each with percent used and reset time. Elsewhere: `python3 ${CLAUDE_SKILL_DIR}/limits.py` (status-line file; failing that only the reset moment) |
+| `CODEX` | `python3 ${CLAUDE_SKILL_DIR}/limits.py`: 5-hour and weekly use with reset times |
+| `CREDIT` | no balance. `limits.py` shows the reset date, the spend this script logged against its cap, and the out marker that `run.sh` writes on "credit balance too low" (exit 75; exit 77 = own cap) |
 
-Pace = share of the window elapsed minus share used. Positive means slack; negative means spending faster than the window allows. `limits.py` prints verdicts OK / BURN / OUT / STALE / UNKNOWN. BURN: the weekly window resets within 2 hours with 10% or more left, so that allowance is about to be lost.
+`limits.py` prints OK / BURN / OUT / STALE / UNKNOWN per lane. BURN: the weekly window resets within 2 hours and 10% or more is left, so that allowance is about to be lost.
 
-## Max or credit: choosing the Claude source
+## Function: pick_claude_lane
 
-Written `claude(S)` below. Default is `max`; spend a little credit when Max is strained; return to Max when it recovers. The first matching row wins.
+```
+def pick_claude_lane(max, credit, previous):
+    # hard limits first
+    if max.out and credit.out:                   return NONE
+    if credit.out:                               return MAX if (max.weekly_used < 90 and max.five_hour_used < 80) else NONE
+    if max.out or max.weekly_used >= 90:         return CREDIT      # the orchestrator needs what is left of Max
+    # use-it-or-lose-it
+    if max.burn:                                 return MAX
+    if credit.resets_within_days(3) and credit.own_spend < 0.7 * credit.cap:  return CREDIT
+    # spend a little credit when Max is strained, come back when it recovers
+    if max.five_hour_used >= 80 or max.weekly_pace <= -15:   return CREDIT
+    if max.five_hour_used < 50 and max.weekly_pace > -5:     return MAX
+    return previous or MAX                                  # between thresholds: keep the last choice
+```
 
-| condition | S |
-|---|---|
-| `max` BURN, or a reading with the weekly reset within 2 hours | `max` |
-| `credit` cycle ends within 3 days and this script's spend is under 70% of its cap | `credit` (use it before it resets) |
-| `max` 5-hour ≥ 80%, or weekly pace ≤ -15, or weekly ≥ 90% | `credit` |
-| `max` 5-hour < 50% and weekly pace > -5 | `max` |
-| between those thresholds | keep the previous source |
-| `credit` OUT (exit 75 or out marker, exit 77 cap) | `max` |
-| `max` OUT, or weekly ≥ 90% (the orchestrator needs the rest) | `credit` |
-| both OUT | no Claude source: go on to the chain's next step |
+`CLAUDE_OTHER` = the other of MAX / CREDIT, if it is not out.
 
-`claude(other)` is the other source, tried next. Never push `max` weekly past 90% with native subagents: the orchestrator stops when Max stops.
+## Chains
 
-## Roles and fallback chains
+```
+def available(lane):  return not lane.out and (lane != CODEX or codex.five_hour_used < 90)
 
-Gate for `codex` steps: verdict not OUT and 5-hour < 90%. If `codex` pace ≤ -15 while the Claude source has pace ≥ +25, swap the two steps so the Claude source goes first. Efforts below are floors; do not go lower without saying so. Profiles are `claude-credit-worker` profiles; on `max` use the same model and effort in the Agent call.
+def run_role(role, task):
+    steps = ROLES[role].steps
+    if role == worker and codex.pace <= -15 and claude.pace >= 25: swap(steps[0], steps[1])
+    for step in steps:
+        if step is STOP: report(step.say); return
+        lane = first(l for l in step.lanes if available(l))
+        if lane is None: continue                           # fallback
+        result = run(lane, step.model, step.effort, task)
+        if ROLES[role].advance == "on_failure" and failed(result): continue   # escalation
+        return result
+```
 
-**Planner** (brainstorm, plan, design, split a ticket). No silent degrading: a bad plan costs more than waiting.
+Keep the model floor: never run a step below its listed effort without saying so. Commands: `CODEX` via `codex-worker`; `CREDIT` via `claude-credit-worker --profile <profile>`; `MAX` via the Agent tool with the same `model`.
 
-| step | lane | model, effort |
-|---|---|---|
-| 1 | claude(S) | Opus 5.5 medium (`max`: the orchestrator itself or Agent `model: opus`; `credit`: `--profile planner`) |
-| 2 | claude(other) | Opus 5.5 medium |
-| 3 | `codex` | Sol high, read-only: `/codex:adversarial-review` on the draft plan, or `codex-rescue` read-only with a planning brief |
-| 4 | STOP | tell the user there is no adequate reasoning model now; give each lane's reset time. Offer the degraded options and wait: Opus 5.5 low (preferred, it is cheaper per task than Sonnet in the benchmark), or Sonnet 5.5 high |
+```yaml
+planner:            # brainstorm, plan, design, split a ticket. Never degrade silently.
+  advance: on_unavailable
+  steps:
+    - {model: opus-5.5, effort: medium, lanes: [CLAUDE_PREFERRED, CLAUDE_OTHER]}   # CREDIT profile: planner; on MAX the orchestrator itself may do it
+    - {model: gpt-6.1-sol, effort: high, read_only: true, lanes: [CODEX]}          # /codex:adversarial-review on the draft plan
+    - STOP: "no adequate reasoning model now. Give each lane's reset time. Offer: opus-5.5 low (preferred: cheaper per task than Sonnet), or sonnet-5.5 high. Run a degraded option only after the user says yes."
 
-**Worker** (implement, debug, tests).
+worker:             # implement, debug, write tests
+  advance: on_unavailable
+  steps:
+    - {model: gpt-6.1-sol, effort: medium, lanes: [CODEX]}
+    - {model: sonnet-5.5, effort: medium, lanes: [CLAUDE_PREFERRED, CLAUDE_OTHER]}   # CREDIT profile: worker
+    - STOP: "hold the task; report the earliest reset. A few lines the orchestrator may write itself."
 
-| step | lane | model, effort |
-|---|---|---|
-| 1 | `codex` | Sol medium |
-| 2 | claude(S) | Sonnet 5.5 medium (`--profile worker`) |
-| 3 | claude(other) | Sonnet 5.5 medium |
-| 4 | STOP | hold the task, report the earliest reset; a few lines the orchestrator may write itself |
+reviewer:           # verify, review a diff. The reviewer is from a different model family than the writer. Always rerun the acceptance check; report exit codes and the last lines of output.
+  advance: on_unavailable
+  steps_if_writer_is_codex:
+    - {model: opus-5.5, effort: medium, lanes: [CLAUDE_PREFERRED, CLAUDE_OTHER]}   # CREDIT profile: reviewer
+    - {model: opus-5.5, effort: low, lanes: [CLAUDE_PREFERRED, CLAUDE_OTHER], flag: degraded}
+    - STOP: "mark the diff unreviewed; the orchestrator reads it only if small or risk-flagged"
+  steps_if_writer_is_claude:
+    - {model: gpt-6.1-sol, effort: high, read_only: true, lanes: [CODEX]}          # /codex:review
+    - {model: opus-5.5, effort: medium, lanes: [CLAUDE_PREFERRED, CLAUDE_OTHER]}
+    - {model: opus-5.5, effort: low, lanes: [CLAUDE_PREFERRED, CLAUDE_OTHER], flag: degraded}
+    - STOP: "mark the diff unreviewed"
+  never: "gpt-6.1-sol reviewing a diff written by gpt-6.1-sol"
+  risk_flags: [public API change, test weakened or deleted, suppression added, files outside the brief]   # the orchestrator reads the diff itself on any of these
 
-**Reviewer** (verify, review a diff). The reviewer comes from a different family than the writer. Always rerun the acceptance check; the reviewer reports exit codes and the last lines of output.
+hard:               # two workers failed it, or it needs real design reasoning inside the code. Split into short subtasks; only the failed subtask climbs.
+  advance: on_failure          # each step runs only if the previous one failed the acceptance check
+  steps:
+    - {model: gpt-6.1-sol, effort: high, lanes: [CODEX]}
+    - {model: opus-5.5, effort: low, lanes: [CLAUDE_PREFERRED, CLAUDE_OTHER]}      # CREDIT profile: hard
+    - {model: opus-5.5, effort: medium, lanes: [CLAUDE_PREFERRED, CLAUDE_OTHER]}   # CREDIT profile: very-hard
+    - STOP: "report what was tried. If a step needed more than a couple of tries, the plan or the split is wrong: rethink it. Fable only if the user says so."
 
-| step | writer was Codex | writer was Claude |
-|---|---|---|
-| 1 | claude(S) Opus 5.5 medium (`--profile reviewer`) | `codex` Sol high read-only: `/codex:review` |
-| 2 | claude(other) Opus 5.5 medium | claude(S) Opus 5.5 medium |
-| 3 | claude(S or other) Opus 5.5 low, flagged degraded | claude(other) Opus 5.5 medium |
-| 4 | STOP: mark the diff unreviewed; the orchestrator reads it only if small or risk-flagged | Opus 5.5 low flagged degraded, then STOP as on the left |
+light:              # simple, low-risk, low-reasoning work: read many files, summarise logs, classify, mechanical small edits. Not about parallelism.
+  advance: on_unavailable
+  steps:
+    - {model: gpt-6-luna, effort: low, read_only: true, lanes: [CODEX]}            # huge Plus allowance, weak model: reading and summarising only, never edits or judgement
+    - {model: haiku-5.5, effort: low, lanes: [CLAUDE_PREFERRED, CLAUDE_OTHER]}     # CREDIT profile: cheap
+    - {model: sonnet-5.5, effort: low, lanes: [CLAUDE_PREFERRED, CLAUDE_OTHER]}    # small clear edits; CREDIT profile: light
+    - STOP: "or do it directly if it is tiny"
+```
 
-Never Sol reviewing Sol. Risk flags that make the orchestrator read the diff itself: public API change, test weakened or deleted, suppression added, files outside the brief.
-
-**Hard** (two workers failed it, or it needs real design reasoning inside the code). Split into short subtasks, check each, and let only the failed subtask climb, one rung at a time:
-
-| rung | lane | model, effort |
-|---|---|---|
-| 1 | `codex` | Sol high |
-| 2 | claude(S), then claude(other) | Opus 5.5 low (`--profile hard`) |
-| 3 | claude(S), then claude(other) | Opus 5.5 medium (`--profile very-hard`) |
-| 4 | STOP | report what was tried; Fable is available only if the user says so |
-
-If a rung needs more than a couple of tries, the plan or the split is wrong; rethink that before climbing.
-
-**Bulk** (read a codebase, summarise logs, classify, small clear edits).
-
-| step | lane | model, effort |
-|---|---|---|
-| 1 | `codex` | GPT-6 Luna, read-only (`codex exec -m gpt-6-luna`): very large Plus allowance, weak model; reading and summarising only |
-| 2 | claude(S) | Haiku 5.5 low (`--profile cheap`); small clear edits: Sonnet 5.5 low (`--profile light`) |
-| 3 | claude(other) | same |
-| 4 | STOP or do it directly if tiny |
+Why two steps can show the same model and effort with different lanes: that is one step. The model is fixed; the lane is whichever of the listed lanes is available.
 
 ## Fable
 
-Only when the user's task text names Fable. Never escalate to it on your own. Run it as `claude-credit-worker --profile impossible` (Fable 5.1 medium, $6 cap) or Agent `model: fable` on `max`, where it counts against the weekly Fable cap (half of the weekly limit).
+Only when the user's task text names Fable. Never choose it yourself. `CREDIT`: `--profile impossible` (Fable 5.1, medium, $6 cap). `MAX`: Agent `model: fable`, which counts against the weekly Fable cap (half of the weekly limit).
 
 ## Rules
 
-1. **Out, then back.** A lane is out when its skill or reading says so. Note its reset time. Before a new sub-task, a lane whose reset time has passed (or, when unknown, an hour after it went out) gets one cheap probe from its skill; if it answers, use it again.
+1. **Out, then back.** When a lane is out, note its reset time. Before a new sub-task, a lane whose reset time has passed (or, if unknown, an hour after it went out) gets one cheap probe from its skill; if it answers it is available again. Tell the user in one line when a lane goes out, comes back, or changes the route.
 2. **Brief like a ticket:** goal, files, constraints, acceptance check, "no commits, no pushing, do not weaken tests". Workers do not see this session; name the project rules the task needs.
 3. **Never trust a worker's summary.** The verifier reruns the acceptance check from the brief, not from the writer's report.
-4. **Failed fix:** resume the same worker thread with the findings. Two failed fixes: rethink the plan; only then raise effort or climb.
-5. **Parallel writers need separate git worktrees.** Parallel sessions share each lane's allowance: expect `codex` to run out faster and the chains to move on.
+4. **Failed fix:** resume the same worker thread with the findings. Two failed fixes: rethink the plan; only then change effort or use the `hard` chain.
+5. **Parallel writers need separate git worktrees.** Parallel sessions share each lane's allowance: expect `CODEX` to run out sooner.
 6. **Cheap read-only questions** (one grep, one short file) need no worker.
 7. **The project's runbook wins** on how a worker runs there (sandbox limits, build flags, forbidden commands): read it before the first brief, e.g. a repo's `docs/agents/codex.md`.
 8. Missing or broken lane skill, key or login: say so in one line and take the next step; do not improvise another route.

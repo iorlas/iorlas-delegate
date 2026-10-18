@@ -1,7 +1,7 @@
 {
   "name": "iorlas-delegate",
   "description": "Hand sub-tasks to worker models in a fixed lane order (Codex, Claude on the API credit, Sonnet on Max), with plan-limit awareness.",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "author": {
     "name": "iorlas"
   },

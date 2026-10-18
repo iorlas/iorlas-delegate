@@ -4,7 +4,7 @@ A Claude Code plugin that tells an orchestrating session how to hand sub-tasks t
 
 ## Skills
 
-- `delegate`: strategy. Three execution lanes (`codex`, `max`, `credit`), a fallback chain per role (planner, worker, reviewer, hard, bulk) that names every lane and ends in STOP, a rule for choosing between Max and the API credit from live limits and reset times, and a limits check (`limits.py`). Fable only when the task names it.
+- `delegate`: strategy. Three execution lanes (`codex`, `max`, `credit`), a glossary, a function that picks between the two Claude lanes, and one ordered chain per role (planner, worker, reviewer, hard, light) that lists every lane and ends in STOP, a rule for choosing between Max and the API credit from live limits and reset times, and a limits check (`limits.py`). Fable only when the task names it.
 - `codex-worker`: the `codex` lane. Codex (GPT-6.1 Sol on ChatGPT Plus) through the official `codex@openai-codex` plugin, and how to tell the allowance is used up.
 - `claude-credit-worker`: the `credit` lane. `claude -p` on an Anthropic API key (the Max plan's monthly API credit), so it never draws on the Max limits. It sees the project's CLAUDE.md, skills, plugins and MCP like a normal run; profiles (`worker`, `reviewer`, `cheap`, `hard` = Opus low, `very-hard` = Opus medium, `impossible` = Fable medium) set model, effort and per-run cap; a per-cycle cap (`MONTHLY_CAP`, default $150) and the reset day (`CREDIT_RESET_DAY`) guard the credit. The `max` lane is the native subagent on Max.
 

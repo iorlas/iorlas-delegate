@@ -37,7 +37,7 @@ Not yet seen in practice: the exact wording of the usage-limit message. When it 
 - Worker: Sol medium, write access (the default above).
 - Reviewer of Claude-written work: `/codex:review`, or `/codex:adversarial-review` with a focus line. Read-only. Sol never reviews Sol's own diff.
 - Planner, last resort: Sol high, read-only. `/codex:adversarial-review` on the draft plan file, or `codex-rescue --effort high` with a planning brief that forbids edits.
-- Bulk reading and summaries: GPT-6 Luna, read-only: `codex exec -s read-only -m gpt-6-luna -c model_reasoning_effort=low "<brief>"`. Luna has a very large Plus allowance (350-3,000 messages per 5 hours on OpenAI's page) and is a weak model (13.6% on Terminal-Bench 4.0): never for edits or judgement.
+- Light work (reading, summarising): GPT-6 Luna, read-only: `codex exec -s read-only -m gpt-6-luna -c model_reasoning_effort=low "<brief>"`. Luna has a very large Plus allowance (350-3,000 messages per 5 hours on OpenAI's page) and is a weak model (13.6% on Terminal-Bench 4.0): never for edits or judgement.
 - Hard rung 1: Sol at `--effort high`, after Sol medium and a Claude worker have both failed.
 
 ## Never
