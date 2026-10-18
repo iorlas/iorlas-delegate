@@ -1114,7 +1114,8 @@ def run_codex_step(d, brief, timeout, t):
         text = out_file.read_text(encoding="utf-8").strip()
         out_file.unlink()
     if agent_runs:
-        agent_runs.run(run_id, ended=now(), status="failed" if code else "completed", exit=code)
+        m = re.search(r"session id:\s*([0-9a-f-]{16,})", log or "")      # codex prints its thread id in the header
+        agent_runs.run(run_id, ended=now(), status="failed" if code else "completed", exit=code, thread=m.group(1) if m else None)
     if code == 124:
         return 124, f"codex did not finish within {timeout}s and was killed (process group). Last output:\n" + (log or "")[-600:]
     if code != 0:
