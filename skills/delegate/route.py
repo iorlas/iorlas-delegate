@@ -449,6 +449,24 @@ def read_codex(lane, S, st, t):
 
 def normalize_usage(raw, t):
     """Accept the Claude subscription's windows in the shapes tools produce -> {five_hour, weekly, fable} each {used, resets_at}."""
+    if isinstance(raw, dict) and isinstance(raw.get("plan"), dict):      # the whole get_usage tool result
+        raw = raw["plan"]
+    if isinstance(raw, dict) and isinstance(raw.get("windows"), list):   # {"windows":[{"label","percentUsed","resetsAt"}]}
+        raw = raw["windows"]
+    if isinstance(raw, list):
+        found = {}
+        for w in raw:
+            label = str((w or {}).get("label", "")).lower()
+            if "fable" in label:
+                key = "fable"
+            elif "5" in label and "hour" in label:
+                key = "five_hour"
+            elif "week" in label and "all" in label:
+                key = "weekly"
+            else:
+                continue
+            found[key] = w
+        raw = found
     if not isinstance(raw, dict):
         return None
 
@@ -461,7 +479,7 @@ def normalize_usage(raw, t):
     def one(w):
         if not isinstance(w, dict):
             return None
-        used = pick(w, ["used", "used_percent", "used_percentage", "percent_used", "utilization", "percent", "usedPercent"])
+        used = pick(w, ["used", "used_percent", "used_percentage", "percent_used", "utilization", "percent", "usedPercent", "percentUsed"])
         reset = to_epoch(pick(w, ["resets_at", "resetsAt", "reset_at", "reset", "resets"]))
         return {"used": float(used), "resets_at": reset} if used is not None else None
 

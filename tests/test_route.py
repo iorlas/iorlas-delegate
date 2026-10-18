@@ -170,6 +170,17 @@ class Helpers(unittest.TestCase):
         s, n = route.credit_cycle(1, t)
         self.assertEqual((dt.datetime.fromtimestamp(s).date(), dt.datetime.fromtimestamp(n).date()), (dt.date(2026, 10, 1), dt.date(2026, 11, 1)))
 
+    def test_real_get_usage_result_is_understood(self):
+        real = {"plan": {"status": "ok", "plan": "Max", "windows": [
+            {"label": "5-hour limit", "percentUsed": 1, "resetsAt": "2026-10-18T21:29:59.908Z", "resetsIn": "4h 47m"},
+            {"label": "Weekly \u00b7 all models", "percentUsed": 3, "resetsAt": "2026-10-25T13:59:59.908Z", "resetsIn": "6d 21h"},
+            {"label": "Weekly \u00b7 Fable", "percentUsed": 1, "resetsAt": "2026-10-25T13:59:59.908Z"}],
+            "extraUsage": {"enabled": True}}, "context": {"percentUsed": 25}}
+        u = route.normalize_usage(real, T)
+        self.assertEqual((u["five_hour"]["used"], u["weekly"]["used"], u["fable"]["used"]), (1.0, 3.0, 1.0))
+        self.assertAlmostEqual(u["weekly"]["resets_at"], dt.datetime(2026, 10, 25, 13, 59, 59, 908000, tzinfo=dt.timezone.utc).timestamp(), places=2)
+        self.assertEqual(route.normalize_usage(real["plan"], T), u)
+
     def test_next_weekly(self):
         t = dt.datetime(2026, 10, 18, 17, 1).timestamp()          # Sunday just after 17:00
         n = dt.datetime.fromtimestamp(route.next_weekly("Sun 17:00", t))

@@ -23,7 +23,7 @@ route.py run ROLE [--cwd DIR] [--writer openai|claude] [--failed IDX,IDX] [--pre
 | exit 78 | worker changed git. Show the line, inspect `git reflog`, decide. Never auto-revert |
 | exit 124 | worker timed out and was killed. Shrink the task |
 | exit 2 or `error` | read `${CLAUDE_SKILL_DIR}/modes/init.md`. Never ask for a key in chat |
-| `needs_input` has `claude_usage` | call `get_usage` (load via ToolSearch once), rerun with `--claude-usage` |
+| `needs_input` lists `claude_usage` | call `get_usage` (load via ToolSearch once); rerun with `--claude-usage '<its plan.windows array>'` |
 | `warnings` | tell the user once. `pass:"relaxed"`: one line |
 
 Long jobs: Bash `run_in_background`. `route.py next ROLE` shows the choice without running it.
