@@ -200,7 +200,7 @@ def next_step(d):
             for k in ("run", "url", "do"):
                 if c.get(k):
                     step[k] = c[k]
-            step["then"] = f"run `init` again; or `init --decline {c['lane']}` to opt this lane out"
+            step["then"] = f"run `init` again; or `init --decline {c['lane']}` to drop this lane; or `config ack {c['id']}` if it needs nothing"
             if optional:
                 step["optional_steps_later"] = optional
             return step

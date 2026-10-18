@@ -11,6 +11,7 @@ loop:
                       r.waiting_for_user: show r.say (link and code); wait for "done"
     who == "user":    show out.say verbatim; wait for "done"
 decline a lane:      route.py init --decline <LANE>      (undo: --undecline)
+needs nothing:       route.py config ack <ID>            (undo: unack)   e.g. volumes, when the home folder is already a volume
 ```
 
 No terminal (Claude RC, phone): run `route.py set-key --web` in Bash `run_in_background`, read its first output line, show only that link. Add `--host tailscale` (or a private IP) when the user is on another device. Plain HTTP: loopback, private and tailnet addresses only; one use; closes after 5 min.
