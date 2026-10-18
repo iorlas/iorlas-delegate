@@ -14,7 +14,7 @@ The model supplies only what the script cannot read itself; the script decides.
   route.py guard before|after [--cwd DIR]          snapshot/compare git state around a worker (exit 78 if a worker changed branches, commits, worktrees or stashes)
   route.py doctor [--quiet] [--deep] [--json]      readiness of every lane (no state kept; --deep also validates the API key)
   route.py init [--do STEP] [--decline LANE] [--undecline LANE] [--open-browser]   next onboarding step as JSON
-  route.py set-key [--stdin] [--force]             the USER runs this in their own terminal; the agent never handles the key
+  route.py set-key [--stdin] [--force] | --web [--host IP|tailscale] [--port N] [--timeout S]   the key is handed over by the USER (terminal prompt or one-shot page); the agent never handles it
   route.py config set KEY VALUE | show
 
 Data: routing.json next to this file (lanes, models, roles, thresholds).
@@ -1185,7 +1185,10 @@ def cmd_init(a, cfg):
 
 def cmd_set_key(a, cfg):
     import onboard
-    return onboard.set_key(sys.modules[__name__], from_stdin=a.stdin, force=a.force)
+    R = sys.modules[__name__]
+    if a.web:
+        return onboard.set_key_web(R, host=a.host, port=a.port, timeout=a.timeout, force=a.force)
+    return onboard.set_key(R, from_stdin=a.stdin, force=a.force)
 
 
 def cmd_config(a, cfg):
@@ -1216,6 +1219,7 @@ def main(argv=None):
     ini = sub.add_parser("init"); ini.add_argument("--do"); ini.add_argument("--decline"); ini.add_argument("--undecline"); ini.add_argument("--open-browser", action="store_true")
     gd = sub.add_parser("guard"); gd.add_argument("when", choices=["before", "after"]); gd.add_argument("--cwd")
     sk = sub.add_parser("set-key"); sk.add_argument("--stdin", action="store_true"); sk.add_argument("--force", action="store_true")
+    sk.add_argument("--web", action="store_true"); sk.add_argument("--host", default="127.0.0.1"); sk.add_argument("--port", type=int, default=0); sk.add_argument("--timeout", type=int, default=300)
     cf = sub.add_parser("config"); cf.add_argument("action", choices=["set", "show"]); cf.add_argument("key", nargs="?"); cf.add_argument("value", nargs="?")
     ru = sub.add_parser("run"); ru.add_argument("role"); ru.add_argument("--writer"); ru.add_argument("--failed", default="")
     ru.add_argument("--premium", nargs="?", const="claude", metavar="FAMILY"); ru.add_argument("--allow-degraded", action="store_true")

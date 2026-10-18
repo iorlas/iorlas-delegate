@@ -121,10 +121,11 @@ def build_checks(R, cfg, st):
         {"id": "claude_cli", "lane": "CLAUDE_CREDIT", "ok": check_claude_cli(R), "skip": cr_skip, "who": "user",
          "say": "The `claude` CLI is not on PATH, so the credit lane cannot run workers. Install Claude Code."},
         {"id": "credit_key", "lane": "CLAUDE_CREDIT", "ok": check_credit_key(R), "skip": cr_skip, "who": "user",
-         "say": ("Create an API key for the credit lane and store it yourself; do not paste it into this chat. "
-                 "1) claude.ai > Settings > Billing > API credits: link a Console organization. "
-                 "2) Console (platform.claude.com) > Settings > API keys: create a key in a workspace with a spend limit. "
-                 f"3) In your own terminal run: {py} \"{rp}\" set-key"),
+         "say": ("Create an API key for the credit lane (claude.ai > Settings > Billing > API credits: link a Console organization; "
+                 "Console > Settings > API keys: key in a workspace with a spend limit). Never paste it into chat. Give it to the tool one of these ways: "
+                 f"(1) set env CLAUDE_CREDIT_WORKER_KEY on this host; (2) in your own terminal run: {py} \"{rp}\" set-key; "
+                 f"(3) no terminal: tell the agent to run `{py} \"{rp}\" set-key --web` (add `--host tailscale` to open the link from another device) and open the link it shows; "
+                 f"(4) skip the lane: `{py} \"{rp}\" init --decline CLAUDE_CREDIT`."),
          "url": "https://platform.claude.com"},
         {"id": "weekly_reset", "lane": "CLAUDE_SUBSCRIPTION", "ok": bool(S.get("claude_weekly_reset")), "who": "user", "optional": True,
          "say": f"When does your Claude weekly limit reset (day and local time, e.g. Sun 17:00)? Then run: {py} \"{rp}\" config set claude_weekly_reset \"Sun 17:00\"",
@@ -318,33 +319,137 @@ def init(R, cfg, do=None, decline=None, open_browser=False):
 
 # ----------------------------------------------------------------------------- set-key, config
 
-def set_key(R, from_stdin=False, force=False):
+def store_key(R, key, force=False):
+    """Write the key file (mode 0600), enable the credit lane, check the key. -> (ok, message). Never echoes the key."""
     path = R.config_dir() / "claude-credit.key"
     if path.exists() and not force:
-        print(f"route.py: {path} exists; use --force to replace it", file=sys.stderr)
-        return 1
+        return False, f"{path} exists; use --force to replace it"
+    if not key:
+        return False, "empty key"
+    if path.exists():
+        path.unlink()
+    fd = os.open(str(path), os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    with os.fdopen(fd, "w", encoding="utf-8") as f:
+        f.write(key + "\n")
+    R.set_profile_lane("CLAUDE_CREDIT", "enabled")
+    ok, why = validate_key(key)
+    warn = "" if key.startswith("sk-ant-") else " Warning: the key does not start with sk-ant-."
+    return True, f"saved to {path} (not printed). Key check: " + ("accepted" if ok else ("rejected, " + why if ok is False else why)) + "." + warn
+
+
+def set_key(R, from_stdin=False, force=False):
     if from_stdin:
         key = sys.stdin.read().strip()
     elif sys.stdin.isatty():
         key = getpass.getpass("Anthropic API key (input is hidden): ").strip()
     else:
-        print("route.py: no terminal. Run this in your own terminal, or pipe the key: <command that prints the key> | route.py set-key --stdin", file=sys.stderr)
+        print("route.py: no terminal. Run this in your own terminal, or use `route.py set-key --web`.", file=sys.stderr)
         return 2
-    if not key:
-        print("route.py: empty key", file=sys.stderr)
+    ok, msg = store_key(R, key, force)
+    print(("" if ok else "route.py: ") + msg, file=sys.stdout if ok else sys.stderr)
+    return 0 if ok else 1
+
+
+def allowed_host(host):
+    """Loopback, private or tailnet (100.64.0.0/10) addresses only: the page is plain HTTP, so never a public interface."""
+    import ipaddress
+    try:
+        ip = ipaddress.ip_address(host)
+    except ValueError:
+        return False
+    if ip.is_unspecified or ip.is_multicast:        # 0.0.0.0 counts as private in Python but listens on every interface
+        return False
+    return ip.is_loopback or ip.is_private or ip in ipaddress.ip_network("100.64.0.0/10")
+
+
+def tailscale_ip():
+    ts = shutil.which("tailscale")
+    if not ts:
+        return None
+    ok, out = run_cmd([ts, "ip", "-4"], timeout=10)
+    return out.split()[0] if ok and out else None
+
+
+PAGE = """<!doctype html><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1"><title>delegate: API key</title>
+<body style="font:16px system-ui;max-width:32rem;margin:2rem auto;padding:0 1rem">%s</body>"""
+
+
+def set_key_web(R, host="127.0.0.1", port=0, timeout=300, force=False, on_ready=None):
+    """One-shot page to hand over the API key with no terminal. Plain HTTP: loopback/private/tailnet only, one-time token in the path,
+    key in the POST body only, closes after one submit or `timeout` seconds. -> exit code."""
+    import hmac
+    import secrets
+    from http.server import BaseHTTPRequestHandler, HTTPServer
+    path = R.config_dir() / "claude-credit.key"
+    if host == "tailscale":
+        host = tailscale_ip()
+        if not host:
+            print("route.py: tailscale not found or not connected; use --host <private IP>", file=sys.stderr)
+            return 2
+    if not allowed_host(host):
+        print(f"route.py: --host {host} is not loopback, private or tailnet; refusing to serve a key form over plain HTTP there", file=sys.stderr)
+        return 2
+    if path.exists() and not force:
+        print(f"route.py: {path} exists; use --force to replace it", file=sys.stderr)
         return 1
-    if not key.startswith("sk-ant-"):
-        print("route.py: warning: the key does not start with sk-ant-", file=sys.stderr)
-    if path.exists():
-        path.unlink()
-    flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL
-    fd = os.open(str(path), flags, 0o600)
-    with os.fdopen(fd, "w", encoding="utf-8") as f:
-        f.write(key + "\n")
-    R.set_profile_lane("CLAUDE_CREDIT", "enabled")
-    ok, why = validate_key(key)
-    print(f"saved to {path} (not printed). Key check: " + ("accepted" if ok else ("rejected, " + why if ok is False else why)))
-    return 0
+    token = secrets.token_urlsafe(16)
+    result = {}
+
+    class H(BaseHTTPRequestHandler):
+        def log_message(self, *a):
+            pass
+
+        def _send(self, code, body):
+            data = body.encode("utf-8")
+            self.send_response(code)
+            self.send_header("Content-Type", "text/html; charset=utf-8")
+            self.send_header("Content-Length", str(len(data)))
+            self.send_header("Cache-Control", "no-store")
+            self.send_header("Referrer-Policy", "no-referrer")
+            self.send_header("X-Content-Type-Options", "nosniff")
+            self.end_headers()
+            self.wfile.write(data)
+
+        def _ok(self):
+            hostname = (self.headers.get("Host") or "").rsplit(":", 1)[0].strip("[]")
+            return hmac.compare_digest(self.path, "/k/" + token) and hostname == host
+
+        def do_GET(self):
+            if not self._ok():
+                return self._send(404, "not found")
+            self._send(200, PAGE % ('<h2>Anthropic API key</h2><p>For the delegate credit lane. It is saved on this machine only and never printed.</p>'
+                                    '<form method=post><input name=key type=password autofocus autocomplete=off style="width:100%;font-size:16px;padding:.5rem">'
+                                    '<p><button style="font-size:16px;padding:.5rem 1rem">Save</button></p></form>'))
+
+        def do_POST(self):
+            if not self._ok():
+                return self._send(404, "not found")
+            n = min(int(self.headers.get("Content-Length") or 0), 4096)
+            from urllib.parse import parse_qs
+            key = (parse_qs(self.rfile.read(n).decode("utf-8", "replace")).get("key") or [""])[0].strip()
+            ok, msg = store_key(R, key, force)
+            result["ok"] = ok
+            self._send(200 if ok else 400, PAGE % ("<h2>%s</h2><p>You can close this tab.</p>" % ("Saved" if ok else "Not saved: " + msg.replace("<", "&lt;"))))
+            if ok:
+                result["done"] = True
+
+    try:
+        srv = HTTPServer((host, port), H)
+    except OSError as e:
+        print(f"route.py: cannot listen on {host}: {e}", file=sys.stderr)
+        return 1
+    srv.timeout = 1.0
+    url = f"http://{host}:{srv.server_address[1]}/k/{token}"
+    (on_ready or (lambda u: print(f"Open this link on any device that can reach {host} and paste the key (valid {max(1, timeout // 60)} min, one use): {u}", flush=True)))(url)
+    end = time.time() + timeout
+    while not result.get("done") and time.time() < end:
+        srv.handle_request()
+    srv.server_close()
+    if result.get("done"):
+        print("key saved", flush=True)
+        return 0
+    print("route.py: timed out waiting for the key; nothing was saved", file=sys.stderr)
+    return 1
 
 
 def config_set(R, key, value):

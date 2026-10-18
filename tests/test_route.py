@@ -312,6 +312,43 @@ class Onboarding(unittest.TestCase):
             if saved is not None:
                 os.environ["CLAUDE_CODE_ENTRYPOINT"] = saved
 
+    def test_set_key_web_takes_the_key_once_and_stays_private(self):
+        import threading
+        import urllib.error
+        import urllib.parse
+        import urllib.request
+        self.onboard.validate_key = lambda k: (True, "HTTP 200")
+        box = {}
+        ready = threading.Event()
+
+        def on_ready(url):
+            box["url"] = url
+            ready.set()
+        th = threading.Thread(target=lambda: box.__setitem__("code", self.onboard.set_key_web(route, timeout=20, on_ready=on_ready)))
+        th.start()
+        self.assertTrue(ready.wait(5))
+        url = box["url"]
+        with self.assertRaises(urllib.error.HTTPError) as ctx:                     # wrong token
+            urllib.request.urlopen(url[:-3] + "xxx")
+        self.assertEqual(ctx.exception.code, 404)
+        self.assertIn(b"password", urllib.request.urlopen(url).read())              # the form
+        data = urllib.parse.urlencode({"key": "sk-ant-web-key"}).encode()
+        self.assertIn(b"Saved", urllib.request.urlopen(url, data=data).read())
+        th.join(5)
+        self.assertEqual(box["code"], 0)
+        path = route.config_dir() / "claude-credit.key"
+        self.assertEqual(path.read_text().strip(), "sk-ant-web-key")
+        if os.name != "nt":
+            self.assertEqual(path.stat().st_mode & 0o077, 0)
+        self.assertEqual(route.profile_lanes()["CLAUDE_CREDIT"], "enabled")
+
+    def test_set_key_web_refuses_public_and_wildcard_hosts(self):
+        for h in ("0.0.0.0", "8.8.8.8"):
+            self.assertEqual(self.onboard.set_key_web(route, host=h, timeout=1), 2)
+        self.assertTrue(self.onboard.allowed_host("100.101.102.103"))      # tailnet
+        self.assertTrue(self.onboard.allowed_host("192.168.1.5"))
+
+
     def test_set_key_enables_a_declined_credit_lane(self):
         import io
         self.onboard.validate_key = lambda k: (True, "HTTP 200")
