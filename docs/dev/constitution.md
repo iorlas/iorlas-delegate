@@ -29,7 +29,7 @@ Read this before changing anything in this repo. Rules are Denis's; the lessons 
 - Codex's marketplace reader ignores `"source": "github"` entries; use the `url` form.
 - Plugin skills cannot be hidden from the skill listing; `modes/*.md` inside the skill folder is the way to keep instructions out of context until needed.
 - Tests must not depend on the machine: isolate `HOME`, `XDG_CONFIG_HOME`, `DELEGATE_CONFIG_DIR`, `CODEX_HOME`, `PATH`. Before pushing, run the suite with an empty HOME and a minimal PATH (CI has no Codex). A test run once wrote into the Codex plugin's data dir through an inherited variable.
-- Dev runs of `route.py` from a checkout write to `~/.config/delegate`; set `DELEGATE_CONFIG_DIR` to a temp dir for experiments.
+- A checkout has no config location of its own: `route.py` refuses to run without `DELEGATE_CONFIG_DIR` (a default would split state from the installed plugin; task-loop hit this). Use a temp dir for experiments.
 
 ## Release
 

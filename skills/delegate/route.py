@@ -16,10 +16,8 @@ The model supplies only what the script cannot read itself; the script decides.
   route.py config set KEY VALUE | show
 
 Data: routing.json next to this file (lanes, models, roles, thresholds).
-Per-user settings: <config dir>/config.json (same keys as "settings"); state, ledger and key live in <config dir>:
-  $DELEGATE_CONFIG_DIR, else Claude Code's plugin data dir (~/.claude/plugins/data/<plugin>-<marketplace>), else (a checkout) ~/.config/delegate
-  (%APPDATA%\\delegate on Windows). Files from the old location are moved in once.
-
+Per-user settings: <config dir>/config.json (same keys as "settings"); profile, state, ledger and key live in <config dir>:
+  $DELEGATE_CONFIG_DIR, else Claude Code's plugin data dir (~/.claude/plugins/data/<plugin>-<marketplace>); a checkout must set the variable.
 Workers never create branches or worktrees and never commit, merge, push or stash: the coordinator owns git.
 """
 import argparse
@@ -56,15 +54,6 @@ def now():
     return float(v) if v else time.time()
 
 
-def checkout_dir():
-    """Where a checkout (not an installed plugin) keeps its files."""
-    if os.name == "nt":
-        base = os.environ.get("APPDATA") or str(Path.home() / "AppData" / "Roaming")
-    else:
-        base = os.environ.get("XDG_CONFIG_HOME") or str(Path.home() / ".config")
-    return Path(base) / "delegate"
-
-
 def plugin_data_dir():
     """Claude Code's persistent data dir for this plugin: <plugins>/data/<plugin>-<marketplace>, derived from where this copy is installed
     (<plugins>/cache/<marketplace>/<plugin>/<version>/skills/delegate). None when running from a checkout."""
@@ -77,10 +66,12 @@ def plugin_data_dir():
 
 
 def config_dir():
-    """Where settings, profile, state, ledger and the key live. Order: DELEGATE_CONFIG_DIR, the plugin's data dir (installed plugin),
-    else ~/.config/delegate (checkout). CLAUDE_PLUGIN_DATA is deliberately not read: it names whichever plugin launched the process."""
+    """Where settings, profile, state, ledger and the key live: DELEGATE_CONFIG_DIR, else Claude Code's data dir for the installed plugin.
+    CLAUDE_PLUGIN_DATA is deliberately not read (it names whichever plugin launched the process). A checkout has no default: two places would split the state."""
     explicit = os.environ.get("DELEGATE_CONFIG_DIR")
-    p = Path(explicit) if explicit else (plugin_data_dir() or checkout_dir())
+    p = Path(explicit) if explicit else plugin_data_dir()
+    if p is None:
+        sys.exit("route.py: not running from an installed plugin; set DELEGATE_CONFIG_DIR to the folder for settings and state")
     p.mkdir(parents=True, exist_ok=True)
     if os.name != "nt":
         with contextlib.suppress(OSError):

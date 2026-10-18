@@ -16,7 +16,7 @@ route = importlib.util.module_from_spec(spec)
 sys.modules["route"] = route
 spec.loader.exec_module(route)
 
-os.environ.pop("DELEGATE_CONFIG_DIR", None)      # tests isolate with XDG_CONFIG_HOME / HOME
+os.environ["DELEGATE_CONFIG_DIR"] = tempfile.mkdtemp()      # tests never touch a real config; classes that need their own set one
 T = 1_000_000_000.0   # a fixed "now"
 CFG = json.loads((ROOT / "skills" / "delegate" / "routing.json").read_text(encoding="utf-8"))
 
@@ -181,7 +181,7 @@ class Helpers(unittest.TestCase):
 class Cli(unittest.TestCase):
     def test_report_and_next_roundtrip(self):
         with tempfile.TemporaryDirectory() as d:
-            os.environ["XDG_CONFIG_HOME"] = d
+            os.environ["XDG_CONFIG_HOME"] = os.environ["DELEGATE_CONFIG_DIR"] = d
             os.environ["APPDATA"] = d
             os.environ["DELEGATE_NOW"] = str(T)
             try:
@@ -199,7 +199,7 @@ class Cli(unittest.TestCase):
                 route.main(["report", "--lane", "OPENAI_SUBSCRIPTION", "--event", "ok"])
                 self.assertNotIn("OPENAI_SUBSCRIPTION", route.load_state().get("out", {}))
             finally:
-                for k in ("XDG_CONFIG_HOME", "APPDATA", "DELEGATE_NOW"):
+                for k in ("XDG_CONFIG_HOME", "APPDATA", "DELEGATE_NOW", "DELEGATE_CONFIG_DIR"):
                     os.environ.pop(k, None)
 
 
@@ -208,8 +208,8 @@ class Onboarding(unittest.TestCase):
 
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
-        self.saved = {k: os.environ.get(k) for k in ("HOME", "USERPROFILE", "XDG_CONFIG_HOME", "APPDATA", "CODEX_HOME", "CLAUDE_CREDIT_WORKER_KEY")}
-        for k in ("HOME", "USERPROFILE", "XDG_CONFIG_HOME", "APPDATA"):
+        self.saved = {k: os.environ.get(k) for k in ("HOME", "USERPROFILE", "XDG_CONFIG_HOME", "APPDATA", "DELEGATE_CONFIG_DIR", "CODEX_HOME", "CLAUDE_CREDIT_WORKER_KEY")}
+        for k in ("HOME", "USERPROFILE", "XDG_CONFIG_HOME", "APPDATA", "DELEGATE_CONFIG_DIR"):
             os.environ[k] = self.tmp.name
         os.environ.pop("CODEX_HOME", None)
         os.environ.pop("CLAUDE_CREDIT_WORKER_KEY", None)
@@ -475,11 +475,11 @@ printf '{"result":"claude says hi","session_id":"sess-1","total_cost_usd":0.5,"i
         (base / "repo").mkdir()
         for c in (["init", "-q"], ["-c", "user.name=t", "-c", "user.email=t@t", "commit", "-q", "--allow-empty", "-m", "i"]):
             sp.run(["git", "-C", str(base / "repo")] + c, check=True, capture_output=True)
-        keys = ("PATH", "HOME", "USERPROFILE", "XDG_CONFIG_HOME", "CODEX_HOME", "FAKE_MODE", "FAKE_PIDFILE", "FAKE_ARGS", "FAKE_ENV",
+        keys = ("PATH", "HOME", "USERPROFILE", "XDG_CONFIG_HOME", "DELEGATE_CONFIG_DIR", "CODEX_HOME", "FAKE_MODE", "FAKE_PIDFILE", "FAKE_ARGS", "FAKE_ENV",
                 "DELEGATE_NOW", "CLAUDE_CODE_ENTRYPOINT", "CLAUDE_FOO", "ANTHROPIC_FOO", "CLAUDE_CREDIT_WORKER_KEY")
         self.saved = {k: os.environ.get(k) for k in keys}
         os.environ.update(PATH=str(base / "bin") + os.pathsep + os.environ["PATH"], HOME=self.tmp.name, USERPROFILE=self.tmp.name,
-                          XDG_CONFIG_HOME=self.tmp.name, CODEX_HOME=str(base / "codex_home"), FAKE_PIDFILE=str(base / "pid"),
+                          XDG_CONFIG_HOME=self.tmp.name, DELEGATE_CONFIG_DIR=self.tmp.name, CODEX_HOME=str(base / "codex_home"), FAKE_PIDFILE=str(base / "pid"),
                           FAKE_ARGS=str(base / "args"), FAKE_ENV=str(base / "env"), CLAUDE_FOO="1", ANTHROPIC_FOO="1")
         for k in ("DELEGATE_NOW", "CLAUDE_CODE_ENTRYPOINT", "CLAUDE_CREDIT_WORKER_KEY"):
             os.environ.pop(k, None)
@@ -671,8 +671,9 @@ class ConfigLocation(unittest.TestCase):
         route.HERE = root / "cache" / "iorlas-marketplace" / "iorlas-delegate" / "0.12.0" / "skills" / "delegate"
         return root / "data" / "iorlas-delegate-iorlas-marketplace"
 
-    def test_checkout_uses_the_xdg_dir(self):
-        self.assertEqual(route.config_dir(), Path(self.tmp.name) / "delegate")
+    def test_checkout_without_an_override_refuses_instead_of_splitting_the_state(self):
+        with self.assertRaises(SystemExit):
+            route.config_dir()
 
     def test_installed_copy_uses_the_plugin_data_dir_and_ignores_foreign_env(self):
         want = self.installed()
@@ -703,9 +704,9 @@ class TokenBudget(unittest.TestCase):
 
     def test_agent_step_answer_is_small(self):
         import io
-        saved = {k: os.environ.get(k) for k in ("XDG_CONFIG_HOME", "HOME", "CLAUDE_CODE_ENTRYPOINT")}
+        saved = {k: os.environ.get(k) for k in ("XDG_CONFIG_HOME", "DELEGATE_CONFIG_DIR", "HOME", "CLAUDE_CODE_ENTRYPOINT")}
         with tempfile.TemporaryDirectory() as d:
-            os.environ["XDG_CONFIG_HOME"] = os.environ["HOME"] = d
+            os.environ["XDG_CONFIG_HOME"] = os.environ["DELEGATE_CONFIG_DIR"] = os.environ["HOME"] = d
             os.environ["CLAUDE_CODE_ENTRYPOINT"] = "cli"
             real = dict(route.READERS)
             route.READERS.update({k: (lambda lane, S, st_, t, *a: None) for k in real})
