@@ -5,11 +5,12 @@ Python 3.8+, standard library only. Windows, macOS, Linux, Docker.
 The model supplies only what the script cannot read itself; the script decides.
 
   route.py status [--claude-usage JSON|@file|-] [--json]
-  route.py next ROLE [--writer openai|claude] [--failed 0,1] [--fable] [--allow-degraded]
+  route.py next ROLE [--writer openai|claude] [--failed 0,1] [--premium [FAMILY]] [--allow-degraded]
                      [--claude-usage JSON|@file|-] [--text]
   route.py report --lane LANE --event out|ok [--until EPOCH|ISO] [--message TEXT]
   route.py run-claude --model ID --effort LEVEL --cap USD [--write] [--allow TOOL]... [--cwd DIR] [--bare] [PROMPT|-]
   route.py capture-limits [--print]  (status line JSON on stdin)
+  route.py guard before|after [--cwd DIR]          snapshot/compare git state around a worker (exit 78 if a worker changed branches, commits, worktrees or stashes)
   route.py doctor [--quiet] [--deep] [--json]      readiness of every lane (no state kept; --deep also validates the API key)
   route.py init [--do STEP] [--decline LANE] [--undecline LANE] [--open-browser]   next onboarding step as JSON
   route.py set-key [--stdin] [--force]             the USER runs this in their own terminal; the agent never handles the key
@@ -19,7 +20,8 @@ Data: routing.json next to this file (lanes, models, roles, thresholds).
 Per-user settings: <config dir>/config.json (same keys as "settings"); state, ledger and key live in <config dir>:
   Windows %APPDATA%\\delegate, otherwise $XDG_CONFIG_HOME/delegate or ~/.config/delegate.
 
-Exit codes of run-claude: 0 ok | 75 credit exhausted | 76 rate limited | 77 own cap reached | 2 key missing | 1 other.
+Exit codes of run-claude: 0 ok | 75 credit exhausted | 76 rate limited | 77 own cap reached | 78 worker changed git state | 2 key missing | 1 other.
+Workers never create branches or worktrees and never commit, merge, push or stash: the coordinator owns git.
 """
 import argparse
 import contextlib
@@ -534,8 +536,12 @@ def build_tiers(role, cfg, args):
         if w not in role["by_writer"]:
             return None
         steps = list(role["by_writer"][w])
-    if args.get("fable"):
-        steps = [dict(cfg["fable_step"])] + steps
+    prem = args.get("premium")
+    if prem:
+        step = (cfg.get("premium") or {}).get(prem)
+        if not step:
+            return None
+        steps = [dict(step)] + steps
     steps = [dict(s, idx=i) for i, s in enumerate(steps)]
     if role["advance"] == "on_failure":
         failed = args.get("failed") or []
@@ -559,6 +565,8 @@ def decide(role_name, cfg, lanes, st, t, args):
         return {"action": "error", "error": f"unknown role {role_name}; roles: {', '.join(cfg['roles'])}"}
     tiers = build_tiers(role, cfg, args)
     if tiers is None:
+        if args.get("premium") and not (cfg.get("premium") or {}).get(args["premium"]):
+            return {"action": "error", "error": f"no premium model configured for family {args['premium']}; premium: {[k for k, v in (cfg.get('premium') or {}).items() if v and k != 'about']}"}
         return {"action": "error", "error": f"role {role_name} needs --writer ({'|'.join(role['by_writer'])})"}
     trace = []
     for tier in tiers:
@@ -570,7 +578,7 @@ def decide(role_name, cfg, lanes, st, t, args):
                 return {"action": "run", "role": role_name, "step": step.get("idx"), "pass": "relaxed" if relaxed else "strict",
                         "lane": lane.name, "model": step["model"], "effort": step["effort"], "mode": step.get("mode", "read_only"),
                         "cap": step.get("cap"), "use": step.get("use"), "flag": step.get("flag"),
-                        "how": how(lane, step, cfg), "trace": trace}
+                        "how": how(lane, step, cfg, args.get("cwd")), "trace": trace}
     resets = {l.name: local(l.out_until) for l in lanes.values() if l.out and l.out_until}
     stop = {"action": "stop", "role": role_name, "say": role["stop"], "resets": resets, "trace": trace}
     consent = role.get("degraded_needs_consent")
@@ -581,13 +589,25 @@ def decide(role_name, cfg, lanes, st, t, args):
     return stop
 
 
-def how(lane, step, cfg):
+def how(lane, step, cfg, cwd=None):
     """Command shape for the step. The orchestrator executes it; the router never runs a model."""
     m = cfg["models"][step["model"]]
     runner = cfg["lanes"][lane.name]["runner"]
     write = step.get("mode") == "write"
+    wd = os.path.abspath(cwd) if cwd else os.getcwd()
+    common = {"cwd": wd, "brief_prefix": GIT_RULES,
+              "guard": {"before": [sys.executable, str(HERE / "route.py"), "guard", "before", "--cwd", wd],
+                        "after": [sys.executable, str(HERE / "route.py"), "guard", "after", "--cwd", wd]}}
+    res = _how(lane, step, cfg, runner, m, write, wd)
+    res.update(common)
     if runner == "claude_credit_worker":
-        argv = [sys.executable, str(HERE / "route.py"), "run-claude", "--model", step["model"], "--effort", step["effort"], "--cap", str(step.get("cap", 2))]
+        res.pop("guard")          # run-claude guards git itself
+    return res
+
+
+def _how(lane, step, cfg, runner, m, write, wd):
+    if runner == "claude_credit_worker":
+        argv = [sys.executable, str(HERE / "route.py"), "run-claude", "--model", step["model"], "--effort", step["effort"], "--cap", str(step.get("cap", 2)), "--cwd", wd]
         if write:
             argv.append("--write")
         return {"kind": "command", "argv": argv, "prompt": "stdin or last argument", "background": "use Bash run_in_background for long tasks"}
@@ -595,7 +615,7 @@ def how(lane, step, cfg):
         return {"kind": "agent_tool", "model": m["agent"], "note": "set model on the Agent call; effort cannot be set per call, so state the effort in the brief"}
     if runner == "codex":
         return {"kind": "codex", "doc": "modes/codex.md", "use": step.get("use", "task"), "model": m["api"], "effort": step["effort"], "mode": step.get("mode", "read_only"),
-                "cli": ["codex", "exec", "-s", "workspace-write" if write else "read-only", "-m", m["api"], "-c", f"model_reasoning_effort={step['effort']}"]}
+                "cli": ["codex", "exec", "-C", wd, "-s", "workspace-write" if write else "read-only", "-m", m["api"], "-c", f"model_reasoning_effort={step['effort']}"]}
     return {"kind": "unknown", "runner": runner}
 
 
@@ -672,7 +692,7 @@ def cmd_next(a, cfg):
         return 0
     lanes = gather(cfg, st, t, parse_json_arg(a.claude_usage))
     args = {"writer": a.writer, "failed": [int(x) for x in a.failed.split(",") if x != ""] if a.failed else [],
-            "fable": a.fable, "allow_degraded": a.allow_degraded}
+            "premium": a.premium, "allow_degraded": a.allow_degraded, "cwd": a.cwd}
     d = decide(a.role, cfg, lanes, st, t, args)
     if d["action"] == "run":
         fam = cfg["lanes"][d["lane"]]["family"]
@@ -743,10 +763,73 @@ def cmd_capture(a, cfg):
     return 0
 
 
+# ----------------------------------------------------------------------------- git ownership: the coordinator owns git, workers do not
+
+GIT_RULES = ("Git belongs to the coordinator. Work only in the current directory. Do not create or switch branches, do not create worktrees, "
+             "do not commit, amend, merge, rebase, cherry-pick, reset, stash, tag or push. Read-only git (status, diff, log, show) is fine. "
+             "Leave your changes uncommitted in the working tree.")
+
+GIT_WRITE_DENY = ["Bash(git commit:*)", "Bash(git push:*)", "Bash(git checkout:*)", "Bash(git switch:*)", "Bash(git branch:*)",
+                  "Bash(git worktree:*)", "Bash(git merge:*)", "Bash(git rebase:*)", "Bash(git reset:*)", "Bash(git stash:*)",
+                  "Bash(git cherry-pick:*)", "Bash(git tag:*)", "Bash(git revert:*)", "Bash(git am:*)", "Bash(git pull:*)"]
+
+
+def git_state(cwd):
+    """Snapshot of what a worker must not change, or None when cwd is not a git work tree."""
+    def git(*args):
+        r = subprocess.run(["git", "-C", str(cwd)] + list(args), capture_output=True, text=True)
+        return r.stdout if r.returncode == 0 else None
+    if shutil.which("git") is None or git("rev-parse", "--is-inside-work-tree") is None:
+        return None
+    refs = {}
+    for line in (git("for-each-ref", "--format=%(refname) %(objectname)") or "").splitlines():
+        name, _, sha = line.partition(" ")
+        refs[name] = sha
+    return {"head": (git("rev-parse", "HEAD") or "").strip(), "branch": (git("symbolic-ref", "-q", "--short", "HEAD") or "").strip(),
+            "refs": refs, "worktrees": sorted(l for l in (git("worktree", "list", "--porcelain") or "").splitlines() if l.startswith("worktree "))}
+
+
+def git_changes(before, after):
+    """-> list of human-readable differences; empty when the worker left git alone."""
+    if before is None or after is None:
+        return []
+    out = []
+    if before["branch"] != after["branch"]:
+        out.append(f"branch {before['branch'] or '(detached)'} -> {after['branch'] or '(detached)'}")
+    if before["head"] != after["head"]:
+        out.append(f"HEAD {before['head'][:9]} -> {after['head'][:9]}")
+    for name in sorted(set(before["refs"]) | set(after["refs"])):
+        a, b = before["refs"].get(name), after["refs"].get(name)
+        if a != b:
+            out.append(f"ref {name}: " + ("created" if a is None else "deleted" if b is None else "moved"))
+    if before["worktrees"] != after["worktrees"]:
+        out.append("worktrees changed")
+    return out
+
+
+def cmd_guard(a, cfg):
+    cwd = os.path.abspath(a.cwd or os.getcwd())
+    key = "git_guard:" + cwd
+    if a.when == "before":
+        snap = git_state(cwd)
+        update_state(lambda s: s.setdefault("guard", {}).__setitem__(cwd, snap))
+        print(json.dumps({"guard": "armed" if snap else "not a git work tree", "cwd": cwd}))
+        return 0
+    before = (load_state().get("guard") or {}).get(cwd)
+    diffs = git_changes(before, git_state(cwd))
+    update_state(lambda s: s.setdefault("guard", {}).pop(cwd, None))
+    if diffs:
+        print("GIT-VIOLATION: the worker changed git state: " + "; ".join(diffs) +
+              ". The file changes are still on disk; inspect with git reflog and decide. Workers must not create branches or worktrees, commit, merge or stash.", file=sys.stderr)
+        return 78
+    print(json.dumps({"guard": "clean", "cwd": cwd}))
+    return 0
+
+
 # ----------------------------------------------------------------------------- run-claude (the CLAUDE_CREDIT runner)
 
-PREAMBLE = ("You are a delegated worker. Do exactly the task in the brief. Do not delegate further and do not use the delegate skills. "
-            "Do not commit or push. Finish with a short report: what you changed or found, and the exit code and last lines of any check you ran.")
+PREAMBLE = ("You are a delegated worker. Do exactly the task in the brief. Do not delegate further and do not use the delegate skill. "
+            + GIT_RULES + " Finish with a short report: what you changed or found, and the exit code and last lines of any check you ran.")
 
 
 def find_key(quiet=False):
@@ -798,13 +881,16 @@ def cmd_run_claude(a, cfg):
         "-p", "--output-format", "json", "--model", model["api"], "--effort", a.effort, "--max-budget-usd", str(cap),
         "--no-session-persistence", "--append-system-prompt", PREAMBLE,
         "--permission-mode", "acceptEdits" if write else "default",
-        "--allowedTools", *tools, "--disallowedTools", "Bash(git push:*)", "Bash(git commit:*)"]
+        "--allowedTools", *tools, "--disallowedTools", *GIT_WRITE_DENY]
     env = dict(os.environ)
     for k in ("ANTHROPIC_AUTH_TOKEN", "CLAUDE_CODE_OAUTH_TOKEN"):
         env.pop(k, None)
     env["ANTHROPIC_API_KEY"] = key
     env["DELEGATE_DEPTH"] = "1"
-    r = subprocess.run(cmd, input=prompt, capture_output=True, text=True, cwd=a.cwd or None, env=env)
+    workdir = os.path.abspath(a.cwd) if a.cwd else os.getcwd()
+    git_before = git_state(workdir)
+    r = subprocess.run(cmd, input=prompt, capture_output=True, text=True, cwd=workdir, env=env)
+    violations = git_changes(git_before, git_state(workdir))
     out = (r.stdout or "") + (r.stderr or "")
     try:
         j = json.loads(r.stdout)
@@ -829,6 +915,11 @@ def cmd_run_claude(a, cfg):
         return 1
     update_state(lambda s: s.setdefault("out", {}).pop("CLAUDE_CREDIT", None))
     print(text)
+    if violations:
+        print("GIT-VIOLATION: the worker changed git state: " + "; ".join(violations) +
+              ". The file changes are still on disk; inspect with git reflog and decide.", file=sys.stderr)
+        print(f"cost=${cost:.4f} turns={j.get('num_turns', 0)}", file=sys.stderr)
+        return 78
     print(f"cost=${cost:.4f} turns={j.get('num_turns', 0)} cycle=${ledger_spend(start):.2f}/${float(c['monthly_cap']):.0f}", file=sys.stderr)
     return 0
 
@@ -881,13 +972,14 @@ def main(argv=None):
     sub = ap.add_subparsers(dest="cmd", required=True)
     s = sub.add_parser("status"); s.add_argument("--claude-usage"); s.add_argument("--json", action="store_true")
     n = sub.add_parser("next"); n.add_argument("role"); n.add_argument("--writer"); n.add_argument("--failed", default="")
-    n.add_argument("--fable", action="store_true"); n.add_argument("--allow-degraded", action="store_true")
-    n.add_argument("--claude-usage"); n.add_argument("--text", action="store_true")
+    n.add_argument("--premium", nargs="?", const="claude", metavar="FAMILY"); n.add_argument("--allow-degraded", action="store_true")
+    n.add_argument("--claude-usage"); n.add_argument("--text", action="store_true"); n.add_argument("--cwd")
     r = sub.add_parser("report"); r.add_argument("--lane", required=True); r.add_argument("--event", choices=["out", "ok"], required=True)
     r.add_argument("--until"); r.add_argument("--message")
     cl = sub.add_parser("capture-limits"); cl.add_argument("--print", action="store_true")
     dr = sub.add_parser("doctor"); dr.add_argument("--quiet", action="store_true"); dr.add_argument("--deep", action="store_true"); dr.add_argument("--json", action="store_true")
     ini = sub.add_parser("init"); ini.add_argument("--do"); ini.add_argument("--decline"); ini.add_argument("--undecline"); ini.add_argument("--open-browser", action="store_true")
+    gd = sub.add_parser("guard"); gd.add_argument("when", choices=["before", "after"]); gd.add_argument("--cwd")
     sk = sub.add_parser("set-key"); sk.add_argument("--stdin", action="store_true"); sk.add_argument("--force", action="store_true")
     cf = sub.add_parser("config"); cf.add_argument("action", choices=["set", "show"]); cf.add_argument("key", nargs="?"); cf.add_argument("value", nargs="?")
     c = sub.add_parser("run-claude"); c.add_argument("--model", required=True); c.add_argument("--effort", required=True)
@@ -896,7 +988,7 @@ def main(argv=None):
     a = ap.parse_args(argv)
     cfg = load_routing()
     return {"status": cmd_status, "next": cmd_next, "report": cmd_report, "capture-limits": cmd_capture, "run-claude": cmd_run_claude,
-            "doctor": cmd_doctor, "init": cmd_init, "set-key": cmd_set_key, "config": cmd_config}[a.cmd](a, cfg)
+            "doctor": cmd_doctor, "guard": cmd_guard, "init": cmd_init, "set-key": cmd_set_key, "config": cmd_config}[a.cmd](a, cfg)
 
 
 if __name__ == "__main__":

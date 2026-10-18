@@ -33,7 +33,7 @@ def lanes(openai=None, sub=None, credit=None):
 
 
 def decide(role, ls, st=None, **args):
-    a = {"writer": None, "failed": [], "fable": False, "allow_degraded": False}
+    a = {"writer": None, "failed": [], "premium": None, "allow_degraded": False}
     a.update(args)
     return route.decide(role, copy.deepcopy(CFG), ls, st or {}, T, a)
 
@@ -128,10 +128,12 @@ class Roles(unittest.TestCase):
         d = decide("reviewer", lanes(), writer="claude")
         self.assertEqual((d["lane"], d["use"]), ("OPENAI_SUBSCRIPTION", "review"))
 
-    def test_fable_only_when_requested(self):
+    def test_premium_only_when_requested(self):
         self.assertNotEqual(decide("hard", lanes())["model"], "fable-5.1")
-        d = decide("worker", lanes(), fable=True)
-        self.assertEqual(d["model"], "fable-5.1")
+        d = decide("worker", lanes(), premium="claude")
+        self.assertEqual((d["model"], d["flag"]), ("fable-5.1", "user_requested_premium"))
+        d = decide("worker", lanes(), premium="openai")
+        self.assertEqual(d["action"], "error")      # no premium model mapped for openai yet
 
     def test_light_uses_luna_first(self):
         d = decide("light", lanes())
@@ -256,6 +258,66 @@ class Onboarding(unittest.TestCase):
         finally:
             sys.stdin = real
         self.assertEqual(route.find_key(quiet=True), "sk-ant-test-key")
+
+
+class GitOwnership(unittest.TestCase):
+    """Workers must not change git state; the coordinator owns branches, commits and worktrees."""
+
+    def setUp(self):
+        import subprocess
+        self.sp = subprocess
+        self.tmp = tempfile.TemporaryDirectory()
+        self.dir = self.tmp.name
+        run = lambda *a: subprocess.run(["git", "-C", self.dir] + list(a), capture_output=True, text=True, check=True)
+        self.git = run
+        run("init", "-q")
+        run("config", "user.email", "t@example.com")
+        run("config", "user.name", "t")
+        Path(self.dir, "f.txt").write_text("1")
+        run("add", ".")
+        run("commit", "-qm", "init")
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def test_editing_files_is_clean(self):
+        before = route.git_state(self.dir)
+        Path(self.dir, "f.txt").write_text("2")
+        Path(self.dir, "new.txt").write_text("x")
+        self.assertEqual(route.git_changes(before, route.git_state(self.dir)), [])
+
+    def test_branch_commit_and_worktree_are_violations(self):
+        before = route.git_state(self.dir)
+        self.git("checkout", "-qb", "feature")
+        Path(self.dir, "f.txt").write_text("3")
+        self.git("commit", "-qam", "x")
+        wt = tempfile.mkdtemp()
+        self.git("worktree", "add", "-q", os.path.join(wt, "w"), "-b", "other")
+        changes = route.git_changes(before, route.git_state(self.dir))
+        text = " ".join(changes)
+        self.assertIn("branch", text)
+        self.assertIn("HEAD", text)
+        self.assertIn("worktrees changed", text)
+        self.assertIn("refs/heads/other: created", text)
+
+    def test_not_a_repo_is_a_no_op(self):
+        with tempfile.TemporaryDirectory() as d:
+            self.assertIsNone(route.git_state(d))
+            self.assertEqual(route.git_changes(None, None), [])
+
+    def test_how_carries_rules_cwd_and_guard(self):
+        ls = lanes()
+        d = decide("worker", ls)
+        self.assertIn("Do not create or switch branches", d["how"]["brief_prefix"])
+        self.assertEqual(d["how"]["guard"]["before"][2:5], ["guard", "before", "--cwd"])
+        d2 = decide("worker", lanes(openai={"out": True, "out_until": T + 5}, sub={"five": 85}))
+        self.assertEqual(d2["lane"], "CLAUDE_CREDIT")
+        self.assertIn("--cwd", d2["how"]["argv"])
+        self.assertNotIn("guard", d2["how"])        # run-claude guards git itself
+
+    def test_deny_list_blocks_every_git_write(self):
+        for verb in ("commit", "push", "checkout", "switch", "branch", "worktree", "merge", "rebase", "reset", "stash"):
+            self.assertIn(f"Bash(git {verb}:*)", route.GIT_WRITE_DENY)
 
 
 if __name__ == "__main__":

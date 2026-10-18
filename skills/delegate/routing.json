@@ -252,12 +252,16 @@
       "stop": "No light lane is available. Do it directly if it is tiny."
     }
   },
-  "fable_step": {
-    "model": "fable-5.1",
-    "effort": "medium",
-    "on": "claude",
-    "mode": "write",
-    "cap": 6,
-    "flag": "user_requested_fable"
+  "premium": {
+    "about": "The most capable model per family. Runs only when the user's task asks for it by name (--premium FAMILY). Never chosen by a chain.",
+    "claude": {
+      "model": "fable-5.1",
+      "effort": "medium",
+      "on": "claude",
+      "mode": "write",
+      "cap": 6,
+      "flag": "user_requested_premium"
+    },
+    "openai": null
   }
 }

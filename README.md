@@ -21,7 +21,7 @@ Requirements: Python 3.8+, Claude Code, Node 18.18+ (Codex CLI). macOS, Linux, W
 | `CLAUDE_CREDIT` | the Max plan's monthly API credit | an API key, stored by you with `route.py set-key` |
 | `OPENAI_SUBSCRIPTION` | the ChatGPT Plus plan, through Codex | `codex login` |
 
-Roles: `planner`, `worker`, `reviewer`, `hard`, `light`. Chains, models and thresholds are data in `skills/delegate/routing.json`. Fable only when the task names it.
+Roles: `planner`, `worker`, `reviewer`, `hard`, `light`. Chains, models and thresholds are data in `skills/delegate/routing.json`. The premium tier (Fable for claude) runs only when the user asks for it by name (`--premium`).
 
 ## Layout
 
@@ -34,5 +34,7 @@ skills/delegate/routing.json  lanes, models, roles, thresholds
 commands/                     /iorlas-delegate:init, /iorlas-delegate:status
 tests/                        python3 -m unittest discover -s tests   (CI: 3 OS x Python 3.8 and 3.12)
 ```
+
+Git stays with the coordinator: workers never create branches or worktrees and never commit, merge or push; a before/after guard exits 78 if one does.
 
 State, ledger, settings and the key file live in `~/.config/delegate` (`%APPDATA%\delegate`), owner-only. Nothing secret is in this repository. Work is tracked with beads (`bd list`).

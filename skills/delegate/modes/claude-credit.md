@@ -5,7 +5,7 @@
 ```
 run: d.how.argv, brief on stdin (Bash run_in_background for long tasks)
      python3 route.py run-claude --model <key from routing.json> --effort low|medium|high --cap <usd> [--write] [--allow TOOL] [--cwd DIR] [--bare]
-default tools: Read Glob Grep.   --write adds Edit Write Bash.   --allow adds one tool.   git push / git commit always denied.
+default tools: Read Glob Grep.   --write adds Edit Write Bash.   --allow adds one tool.   every git write command is denied (commit, push, checkout, switch, branch, worktree, merge, rebase, reset, stash, tag, cherry-pick, revert, am, pull) and the runner compares git state before and after.
 --bare strips CLAUDE.md, skills, plugins, MCP, hooks.   The worker is told: no delegation (DELEGATE_DEPTH=1), no commits, short closing report.
 stdout = answer;  stderr last line = cost, turns, cycle spend / cap.
 ```
@@ -16,6 +16,7 @@ stdout = answer;  stderr last line = cost, turns, cycle spend / cap.
 | 75 | credit empty; lane marked out until the next reset day | `route.py next` again |
 | 76 | rate limited | retry once after a minute, then `route.py next` |
 | 77 | own cycle cap reached; lane out | `route.py next` again; the user may raise `credit.monthly_cap` |
+| 78 | the worker changed git state (branch, commit, worktree, stash); its answer was still printed | inspect `git reflog`; the coordinator decides; never auto-revert |
 | 2 | no API key | `route.py init`; never ask for the key in chat |
 | 1 | other | read stderr; do not retry blindly |
 
