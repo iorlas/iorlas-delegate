@@ -1,6 +1,6 @@
 ---
 name: claude-credit-worker
-description: Run one self-contained coding or research task as a Claude worker (Sonnet, Haiku or Opus) billed to the Anthropic API credit, not to the Max session/weekly limits. The worker sees the project's CLAUDE.md, skills, plugins and MCP like a normal `claude` run. Use when `delegate` reaches lane 2, or when a task should go to Claude without draining Max.
+description: Run one self-contained coding or research task as a Claude worker (Sonnet, Haiku or Opus) billed to the Anthropic API credit, not to the Max session/weekly limits. The worker sees the project's CLAUDE.md, skills, plugins and MCP like a normal `claude` run. Use when `delegate` routes a step to the credit lane, or when a task should go to Claude without draining Max.
 ---
 
 # claude-credit-worker
@@ -21,10 +21,11 @@ ${CLAUDE_SKILL_DIR}/run.sh --status        # this script's own spend this month 
 | `worker` (default) | Sonnet 5.5 | medium | $2 | implementation, debugging, tests |
 | `light` | Sonnet 5.5 | low | $1 | small, clear edits and simple checks where a miss is cheap |
 | `reviewer` | Opus 5.5 | medium | $2 | verification and code review: rerun the checks, read the diff (read-only). Opus 5.5 scored a little above Sonnet 5.5 on Terminal-Bench 4.0 at a lower cost per test, and Sonnet's scores drop sharply below max effort. No code-review benchmark exists: measure on your own diffs |
+| `planner` | Opus 5.5 | medium | $3 | planning and design in the planner chain (read-only; the brief holds the context) |
 | `cheap` | Haiku 5.5 | low | $0.25 | routing, classification, bulk reading, short summaries; keep prompts under 100K tokens |
 | `hard` | Opus 5.5 | low | $3 | one short, split subtask of a hard ticket (see `delegate`); never the whole ticket |
 | `very-hard` | Opus 5.5 | medium | $5 | a subtask that failed at `hard` |
-| `impossible` | Fable 5.1 | medium | $6 | a subtask that failed twice at `very-hard`; Fable costs about 2.5x Opus per token |
+| `impossible` | Fable 5.1 | medium | $6 | only when the user's task names Fable; costs about 2.5x Opus per token |
 
 Flags override the profile. Raise effort only for a subtask that failed at the profile's level.
 

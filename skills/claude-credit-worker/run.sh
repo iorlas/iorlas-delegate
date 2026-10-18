@@ -9,6 +9,7 @@
 #   worker    (default)             claude-sonnet-5-5  medium  $2
 #   light                           claude-sonnet-5-5  low     $1
 #   reviewer                        claude-opus-5-5    medium  $2
+#   planner                         claude-opus-5-5    medium  $3
 #   cheap                           claude-haiku-5-5   low     $0.25
 #   hard                            claude-opus-5-5    low     $3
 #   very-hard                       claude-opus-5-5    medium  $5
@@ -90,11 +91,12 @@ case "$profile" in
   worker)   p_model="claude-sonnet-5-5"; p_effort="medium"; p_budget="2" ;;
   light)    p_model="claude-sonnet-5-5"; p_effort="low";    p_budget="1" ;;
   reviewer) p_model="claude-opus-5-5";   p_effort="medium"; p_budget="2" ;;
+  planner)  p_model="claude-opus-5-5";   p_effort="medium"; p_budget="3" ;;
   cheap)    p_model="claude-haiku-5-5";  p_effort="low";    p_budget="0.25" ;;
   hard)       p_model="claude-opus-5-5";  p_effort="low";    p_budget="3" ;;
   very-hard)  p_model="claude-opus-5-5";  p_effort="medium"; p_budget="5" ;;
   impossible) p_model="claude-fable-5-1"; p_effort="medium"; p_budget="6" ;;
-  *) echo "run.sh: unknown profile '$profile' (cheap, light, worker, reviewer, hard, very-hard, impossible)" >&2; exit 1 ;;
+  *) echo "run.sh: unknown profile '$profile' (cheap, light, worker, reviewer, planner, hard, very-hard, impossible)" >&2; exit 1 ;;
 esac
 model="${model:-$p_model}"; effort="${effort:-$p_effort}"; budget="${budget:-$p_budget}"
 
