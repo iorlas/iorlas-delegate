@@ -529,14 +529,14 @@ class TokenBudget(unittest.TestCase):
 
     def test_skill_md(self):
         text = (self.ROOT / "SKILL.md").read_text(encoding="utf-8")
-        self.assertLessEqual(len(text), 3200)
+        self.assertLessEqual(len(text), 1800)
         import re
         desc = re.search(r"^description: (.*)$", text, re.M).group(1)
-        self.assertLessEqual(len(desc), 260)
+        self.assertLessEqual(len(desc), 170)
 
     def test_mode_files(self):
         for f in (self.ROOT / "modes").glob("*.md"):
-            self.assertLessEqual(len(f.read_text(encoding="utf-8")), 2800, f.name)
+            self.assertLessEqual(len(f.read_text(encoding="utf-8")), 1900, f.name)
 
     def test_agent_step_answer_is_small(self):
         import io
