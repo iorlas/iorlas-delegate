@@ -1,7 +1,7 @@
 {
   "name": "iorlas-delegate",
   "description": "Deterministic router (route.py) that tells an orchestrating session which lane, model and effort to use for each sub-task, from live plan limits and reset times.",
-  "version": "0.16.0",
+  "version": "0.17.0",
   "author": {
     "name": "iorlas"
   },
