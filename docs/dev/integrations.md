@@ -37,6 +37,8 @@ https://github.com/iorlas/iorlas-task-loop/blob/main/docs/contracts/worker-run-v
 - Headless = no `CLAUDE_CODE_ENTRYPOINT` (the engine strips `CLAUDE_*`). Headless never gets `agent`, `ask_user` or `needs_input`; CLAUDE_CREDIT is never
   picked; CLAUDE_SUBSCRIPTION runs `claude -p` on the logged-in account, and only while a fresh reading of its use exists (`~/.claude/state/max-limits.json`
   from the status line, or `state.json`, newer than `usage_stale_minutes`); otherwise `stop` with `retry_after`. `orchestrator_reserve` applies.
+- `route.py status --claude-usage '<get_usage plan.windows JSON>'` is part of the contract: it stores the reading, and a headless `run` uses it for
+  `usage_stale_minutes` (30). Keep that command and input shape, or bump `v`.
 - Everything else (`next`, `doctor`, flags not listed above, `state.json`, `routing.json`, mode files) is private and may change in any release. Changing
   the contract above means changing the spec in iorlas-task-loop first.
 

@@ -42,7 +42,7 @@ def decide(role, ls, st=None, **args):
 
 def argparse_ns(role, **kw):
     import argparse
-    base = dict(role=role, writer=None, failed="", premium=None, allow_degraded=False, claude_usage=None, cwd=None)
+    base = dict(role=role, writer=None, failed="", premium=None, allow_degraded=False, claude_usage=None, cwd=None, resume=None, cap=None)
     base.update(kw)
     return argparse.Namespace(**base)
 
@@ -366,13 +366,16 @@ class Onboarding(unittest.TestCase):
             self.assertEqual(self.onboard.doctor(route, self.cfg)["notes"], [])
 
     def test_unset_lanes_are_offered_once_and_never_block(self):
-        import argparse
-        a = argparse.Namespace(role="worker", writer=None, failed="", premium=None, allow_degraded=False, claude_usage=None, cwd=None)
-        d1 = route.decision(a, self.cfg)[0]
-        self.assertEqual(d1["action"], "run")
-        self.assertIn("OPENAI_SUBSCRIPTION", d1["notice"])
-        self.assertNotIn("notice", route.decision(a, self.cfg)[0])      # said once
-        route.set_profile_lane("OPENAI_SUBSCRIPTION", "declined")
+        a = argparse_ns("worker")
+        saved = os.environ.get("CLAUDE_CODE_ENTRYPOINT")
+        os.environ["CLAUDE_CODE_ENTRYPOINT"] = "cli"                    # a Claude session: the Agent tool is available
+        try:
+            d1 = route.decision(a, self.cfg)[0]
+            self.assertEqual(d1["action"], "run")
+            self.assertIn("OPENAI_SUBSCRIPTION", d1["notice"])
+            self.assertNotIn("notice", route.decision(a, self.cfg)[0])      # said once
+        finally:
+            os.environ.pop("CLAUDE_CODE_ENTRYPOINT", None) if saved is None else os.environ.__setitem__("CLAUDE_CODE_ENTRYPOINT", saved)
 
     def test_set_key_enables_a_declined_credit_lane(self):
         import io
@@ -543,6 +546,23 @@ printf '{"result":"claude says hi","session_id":"sess-1","total_cost_usd":0.5,"i
         self.assertEqual((code, r["status"]), (0, "stop"))
         self.assertGreater(r["retry_after"], time.time())
         self.fresh_usage()
+        _, r = self.run_it()
+        self.assertEqual((r["status"], r["lane"]), ("done", "CLAUDE_SUBSCRIPTION"))
+
+    def test_status_with_get_usage_windows_feeds_the_next_headless_run(self):
+        import io
+        Path(self.tmp.name, ".claude", "state", "max-limits.json").unlink()          # the Desktop app: no status line, no file
+        route.update_state(lambda s: s.setdefault("out", {}).__setitem__("OPENAI_SUBSCRIPTION", {"until": route.now() + 3600, "why": "t"}))
+        _, r = self.run_it()
+        self.assertEqual(r["status"], "stop")                                        # nothing known, nothing spent
+        windows = json.dumps([{"label": "5-hour limit", "percentUsed": 1, "resetsAt": "2099-01-01T00:00:00Z"},
+                              {"label": "Weekly \u00b7 all models", "percentUsed": 3, "resetsAt": "2099-01-01T00:00:00Z"}])
+        real = sys.stdout
+        sys.stdout = io.StringIO()
+        try:
+            route.main(["status", "--claude-usage", windows])
+        finally:
+            sys.stdout = real
         _, r = self.run_it()
         self.assertEqual((r["status"], r["lane"]), ("done", "CLAUDE_SUBSCRIPTION"))
 
