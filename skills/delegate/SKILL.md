@@ -7,19 +7,18 @@ description: Delegate a sub-task to a worker model. route.py picks lane, model a
 `python3 ${CLAUDE_SKILL_DIR}/route.py run ROLE [--cwd D] [--writer openai|claude] [--failed I,J] [--premium] [--allow-degraded] [--claude-usage JSON] < brief`
 (`py -3` on Windows.) Roles: planner (plan, design) · worker (implement, debug) · reviewer (needs `--writer`) · hard (after 2 failures; `--failed`) · light (read, summarise, tiny edits).
 
-| result | do |
+| `status` | do |
 |---|---|
 | `agent` | Agent call: `agent_model`, `brief_prefix` + brief, in `cwd`, no worktree, effort in the brief |
-| exit 0 | stdout = answer. Rerun the acceptance check |
-| `stop` | tell the user `say`, `resets`. `ask_user`: ask; yes = `--allow-degraded` |
-| 76 | lane out. Rerun |
-| 78 | worker changed git. Show it, inspect `git reflog`, never auto-revert |
-| 124 | timed out. Shrink the task |
-| 2, `error` | read `modes/init.md`. Never ask for a key in chat |
-| `notice` | tell the user once |
+| `done` | `text` is the answer; rerun the acceptance check. `git_violation`: show it, check `git reflog`, never auto-revert |
+| `stop` | tell the user `say`. `ask_user`: ask; yes = `--allow-degraded` |
+| `lane_out` | rerun; it advances |
+| `timeout` | shrink the task |
+| `failed`, `error` | read `say`; setup: `modes/init.md`; never ask for a key in chat |
 | `needs_input` `claude_usage` | `get_usage`; rerun with `--claude-usage '<plan.windows>'` |
+| `notice` | tell the user once |
 
-No Python 3.8+: Agent tool only, first entry, current dir, no worktree, effort in the brief.
+No Python 3.8+: Agent tool only, first entry, no worktree, effort in the brief.
 
 <!-- base-table -->
 | role | agent, in order |

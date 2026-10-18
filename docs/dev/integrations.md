@@ -15,25 +15,33 @@ Delegate writes them from one file, `skills/delegate/agent_runs.py`, the only co
 
 | call site | what it publishes | why the dashboard needs it |
 |---|---|---|
-| `cmd_run_claude`, before the `claude -p` call: `agent_runs.run(id, kind="claude-p", session=id, parent_session=$CLAUDE_CODE_SESSION_ID, cwd, started, status="running", ...)` | a run record | ties the headless worker to the session (and so the task) that launched it; `session` finds its live log |
-| `cmd_run_claude`, after it: `agent_runs.run(id, ended, status, exit)` | the same record, finished | shows done or failed and how long it ran |
+| `launch_codex` / `launch_claude` (route.py), before the worker starts: `agent_runs.run(id, kind="codex"\|"claude-p", lane, model, cwd, parent_session, title[, task], started, status="running")`; codex adds `thread` as soon as `thread.started` arrives, claude passes `session=ref` | a run record | ties the headless worker to the session (and so the task) that launched it; `session`/`thread` find its live log |
+| `cmd_run`, after it: `agent_runs.run(id, ended, status, transcript)` | the same record, finished | shows done or failed and how long it ran |
 | `publish_lanes(lanes, st, t)` after `gather()` in `cmd_status` and `cmd_next` | `lanes/delegate.json` | the limits chips (5h and weekly use, a lane that is out and why); a reader ignores it once it is 6 hours old |
 
-`run-claude` passes `--session-id <id>` (not `--no-session-persistence`) so that the worker's transcript exists at
+`claude -p` runs pass `--session-id <id>` (not `--no-session-persistence`) so that the worker's transcript exists at
 `~/.claude/projects/*/<id>.jsonl`. Without it the run record still shows, with no log behind it.
 
 Codex runs and Agent-tool subagents need nothing from delegate: the dashboard finds them in the codex plugin's job
 state and in Claude Code's own transcripts.
 
-## 2. Exit codes and stdout of `route.py next` are not a contract
+## 2. `route.py run` is a contract; everything else is not
 
-task-loop's skill says "ask delegate for each worker and run what it answers" and maps its worker kinds to delegate's
-role names in one table (`skills/task-loop/SKILL.md`, Workers). Renaming roles or changing `next`'s output is fine;
-update that table in iorlas-task-loop in the same change.
+task-loop's engine calls `route.py run ROLE --brief FILE --cwd DIR [--schema F] [--resume REF] [--cap USD] [--timeout S] [--parent SESSION] [--task ID] [--title T]`
+as a script, with no Claude session behind it. The spec belongs to the consumer:
+https://github.com/iorlas/iorlas-task-loop/blob/main/docs/contracts/worker-run-v1.md
+
+- stdout is exactly one JSON object (`v`, `status`, `data`, `text`, `ref`, `lane`, `model`, `effort`, `family`, `cost`, `secs`, `run_id`,
+  `transcript`, `retry_after`, `say`, `git_violation`); exit 0 whenever it was printed. Statuses: `done`, `failed`, `timeout`, `lane_out`, `stop`, `error`
+  (plus `agent` for interactive callers only).
+- Headless = no `CLAUDE_CODE_ENTRYPOINT` (the engine strips `CLAUDE_*`). Headless never gets `agent`, `ask_user` or `needs_input`; CLAUDE_CREDIT is never
+  picked; CLAUDE_SUBSCRIPTION runs `claude -p` on the logged-in account.
+- Everything else (`next`, `doctor`, flags not listed above, `state.json`, `routing.json`, mode files) is private and may change in any release. Changing
+  the contract above means changing the spec in iorlas-task-loop first.
 
 ## If you rewrite delegate
 
-- Launching workers somewhere new (a new lane, a new runner, run-claude replaced): call `agent_runs.run(...)` there
+- Launching workers somewhere new (a new lane or runner): call `agent_runs.run(...)` there
   with the required fields, once at start and once at the end. Codex launched outside the codex plugin: set `kind`
   to `codex` and `thread` to its thread id.
 - Limits computed somewhere new: call `agent_runs.lanes(...)` with the new numbers, at least whenever `next` runs.

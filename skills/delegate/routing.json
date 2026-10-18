@@ -80,7 +80,7 @@
       "family": "claude",
       "kind": "credit",
       "reader": "claude_credit",
-      "runner": "claude_credit_worker",
+      "runner": "claude_p",
       "ready": "claude_credit"
     },
     "OPENAI_SUBSCRIPTION": {

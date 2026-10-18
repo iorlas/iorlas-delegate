@@ -52,10 +52,9 @@ class Pick(unittest.TestCase):
         d = decide("worker", lanes())
         self.assertEqual((d["lane"], d["model"], d["pass"]), ("OPENAI_SUBSCRIPTION", "gpt-6.1-sol", "strict"))
 
-    def test_codex_command_closes_stdin_and_handles_non_git_dirs(self):
+    def test_codex_command_handles_non_git_dirs(self):
         with tempfile.TemporaryDirectory() as d_:
             d = decide("worker", lanes(), cwd=d_)
-        self.assertEqual(d["how"]["stdin"], "close_unless_brief")
         self.assertIn("--skip-git-repo-check", d["how"]["cli"])      # not a git work tree
         d2 = decide("worker", lanes(), cwd=str(Path(__file__).resolve().parent.parent))
         self.assertNotIn("--skip-git-repo-check", d2["how"]["cli"])  # this repo is one
@@ -435,41 +434,53 @@ class BaseTable(unittest.TestCase):
         self.assertEqual(table, want)
 
 
-@unittest.skipIf(os.name == "nt", "fake codex is a shell script; Windows is covered by hand (delegate-5b6)")
+@unittest.skipIf(os.name == "nt", "fake codex/claude are shell scripts; Windows is covered by hand (delegate-5b6)")
 class RunCommand(unittest.TestCase):
-    """route.py run executes a Codex step end to end against a fake `codex` on PATH."""
+    """route.py run executes a step against fake `codex` and `claude` on PATH and prints one JSON object (worker-run v1)."""
 
-    FAKE = """#!/bin/sh
-out=""
+    FAKE_CODEX = """#!/bin/sh
+out=""; args="$*"
 while [ $# -gt 0 ]; do case "$1" in -o) out="$2"; shift;; esac; shift; done
 brief=$(cat)
+echo "$args" >> "$FAKE_ARGS"; env | sort > "$FAKE_ENV"
+echo '{"type":"thread.started","thread_id":"thread-123"}'
 case "$FAKE_MODE" in
   ok) printf 'done: %s' "$(echo "$brief" | tail -1)" > "$out";;
-  limit) echo "You have hit your usage limit. Try again later."; exit 1;;
+  json) printf '{"a": 1}' > "$out";;
+  limit) echo "You have hit your usage limit. Try again later." >&2; exit 1;;
   hang) sleep 300 & echo $! > "$FAKE_PIDFILE"; wait;;
   git) git checkout -q -b rogue; printf x > "$out";;
 esac
 """
+    FAKE_CLAUDE = """#!/bin/sh
+echo "$*" >> "$FAKE_ARGS"; env | sort > "$FAKE_ENV"
+cat > /dev/null
+printf '{"result":"claude says hi","session_id":"sess-1","total_cost_usd":0.5,"is_error":false}'
+"""
 
     def setUp(self):
         import subprocess as sp
-        self.sp = sp
         self.tmp = tempfile.TemporaryDirectory()
         base = Path(self.tmp.name)
+        self.base = base
         (base / "bin").mkdir()
-        (base / "bin" / "codex").write_text(self.FAKE)
-        (base / "bin" / "codex").chmod(0o755)
+        for name, body in (("codex", self.FAKE_CODEX), ("claude", self.FAKE_CLAUDE)):
+            (base / "bin" / name).write_text(body)
+            (base / "bin" / name).chmod(0o755)
         (base / "codex_home").mkdir()
         (base / "codex_home" / "auth.json").write_text("{}")
         (base / "repo").mkdir()
         for c in (["init", "-q"], ["-c", "user.name=t", "-c", "user.email=t@t", "commit", "-q", "--allow-empty", "-m", "i"]):
             sp.run(["git", "-C", str(base / "repo")] + c, check=True, capture_output=True)
-        self.saved = {k: os.environ.get(k) for k in ("PATH", "HOME", "XDG_CONFIG_HOME", "CODEX_HOME", "FAKE_MODE", "FAKE_PIDFILE", "DELEGATE_NOW")}
-        os.environ.update(PATH=str(base / "bin") + os.pathsep + os.environ["PATH"], HOME=self.tmp.name, XDG_CONFIG_HOME=self.tmp.name,
-                          CODEX_HOME=str(base / "codex_home"), FAKE_PIDFILE=str(base / "pid"))
-        os.environ.pop("DELEGATE_NOW", None)
+        keys = ("PATH", "HOME", "USERPROFILE", "XDG_CONFIG_HOME", "CODEX_HOME", "FAKE_MODE", "FAKE_PIDFILE", "FAKE_ARGS", "FAKE_ENV",
+                "DELEGATE_NOW", "CLAUDE_CODE_ENTRYPOINT", "CLAUDE_FOO", "ANTHROPIC_FOO", "CLAUDE_CREDIT_WORKER_KEY")
+        self.saved = {k: os.environ.get(k) for k in keys}
+        os.environ.update(PATH=str(base / "bin") + os.pathsep + os.environ["PATH"], HOME=self.tmp.name, USERPROFILE=self.tmp.name,
+                          XDG_CONFIG_HOME=self.tmp.name, CODEX_HOME=str(base / "codex_home"), FAKE_PIDFILE=str(base / "pid"),
+                          FAKE_ARGS=str(base / "args"), FAKE_ENV=str(base / "env"), CLAUDE_FOO="1", ANTHROPIC_FOO="1")
+        for k in ("DELEGATE_NOW", "CLAUDE_CODE_ENTRYPOINT", "CLAUDE_CREDIT_WORKER_KEY"):
+            os.environ.pop(k, None)
         self.repo = str(base / "repo")
-        self.cfg = route.load_routing()
         self.real = dict(route.READERS)
         route.READERS.update({k: (lambda lane, S, st_, t, *a: None) for k in self.real})
 
@@ -479,46 +490,110 @@ esac
             os.environ.pop(k, None) if v is None else os.environ.__setitem__(k, v)
         self.tmp.cleanup()
 
-    def run_it(self, mode, brief="do the thing", timeout=30):
+    def run_it(self, *args, mode="ok", brief="do the thing\nthe brief", role="worker", timeout=30):
         import io
         os.environ["FAKE_MODE"] = mode
         real_in, real_out, real_err = sys.stdin, sys.stdout, sys.stderr
         sys.stdin, sys.stdout, sys.stderr = io.StringIO(brief), io.StringIO(), io.StringIO()
         try:
-            code = route.main(["run", "worker", "--cwd", self.repo, "--timeout", str(timeout)])
-            return code, sys.stdout.getvalue(), sys.stderr.getvalue()
+            code = route.main(["run", role, "--cwd", self.repo, "--timeout", str(timeout)] + list(args))
+            out = sys.stdout.getvalue()
         finally:
             sys.stdin, sys.stdout, sys.stderr = real_in, real_out, real_err
+        return code, json.loads(out)          # stdout is exactly one JSON object
 
-    def test_ok_returns_the_workers_last_message(self):
-        code, out, err = self.run_it("ok", "line one\nthe brief")
+    def args_seen(self):
+        return Path(os.environ["FAKE_ARGS"]).read_text() if Path(os.environ["FAKE_ARGS"]).exists() else ""
+
+    def test_done_is_one_object_with_ref_family_and_a_clean_child_env(self):
+        code, r = self.run_it()
         self.assertEqual(code, 0)
-        self.assertEqual(out.strip(), "done: the brief")
-        self.assertIn('"action": "done"', err)
+        self.assertEqual((r["v"], r["status"], r["family"], r["lane"], r["ref"]), (1, "done", "openai", "OPENAI_SUBSCRIPTION", "thread-123"))
+        self.assertEqual(r["text"], "done: the brief")
+        self.assertEqual(r["git_violation"], [])
+        env = Path(os.environ["FAKE_ENV"]).read_text()
+        self.assertNotIn("CLAUDE_FOO", env)
+        self.assertNotIn("ANTHROPIC_FOO", env)
+        self.assertIn("DELEGATE_DEPTH=1", env)
 
-    def test_limit_refusal_marks_the_lane_out_so_next_advances(self):
-        code, out, err = self.run_it("limit")
-        self.assertEqual(code, 76)
-        self.assertIn("OPENAI_SUBSCRIPTION", route.load_state()["out"])
-        d = route.decision(argparse_ns("worker"), self.cfg)[0]
-        self.assertEqual(d["lane"], "CLAUDE_SUBSCRIPTION")
+    def test_limit_marks_the_lane_out_and_the_next_call_goes_to_the_subscription_via_claude_p(self):
+        code, r = self.run_it(mode="limit")
+        self.assertEqual((code, r["status"], r["lane"]), (0, "lane_out", "OPENAI_SUBSCRIPTION"))
+        self.assertGreater(r["retry_after"], 0)
+        code, r = self.run_it()
+        self.assertEqual((r["status"], r["lane"], r["family"], r["cost"]), ("done", "CLAUDE_SUBSCRIPTION", "claude", 0))
+        seen = self.args_seen()
+        self.assertIn("--session-id", seen)
+        self.assertNotIn("--max-budget-usd", seen)                         # a subscription has no dollar cap
+        self.assertNotIn("ANTHROPIC_API_KEY", Path(os.environ["FAKE_ENV"]).read_text())
+
+    def test_headless_never_picks_the_credit_lane_even_with_a_key(self):
+        os.environ["CLAUDE_CREDIT_WORKER_KEY"] = "sk-ant-x"
+        route.update_state(lambda s: s.setdefault("out", {}).__setitem__("OPENAI_SUBSCRIPTION", {"until": route.now() + 3600, "why": "t"}))
+        _, r = self.run_it()
+        self.assertEqual(r["lane"], "CLAUDE_SUBSCRIPTION")
+
+    def test_headless_never_answers_agent_ask_user_or_needs_input(self):
+        route.update_state(lambda s: s.setdefault("out", {}).update(
+            {n: {"until": route.now() + 3600, "why": "t"} for n in ("OPENAI_SUBSCRIPTION", "CLAUDE_SUBSCRIPTION")}))
+        code, r = self.run_it(role="planner")
+        self.assertEqual((code, r["status"]), (0, "stop"))
+        self.assertNotIn("ask_user", r)
+        self.assertNotIn("needs_input", r)
+        route.update_state(lambda s: s.pop("out"))
+        _, r = self.run_it(role="planner")                                 # no Agent tool here: the subscription runs claude -p
+        self.assertNotEqual(r["status"], "agent")
+        self.assertEqual((r["status"], r["lane"]), ("done", "CLAUDE_SUBSCRIPTION"))
+
+    def test_interactive_session_gets_the_agent_step_and_the_consent_question(self):
+        os.environ["CLAUDE_CODE_ENTRYPOINT"] = "cli"
+        _, r = self.run_it(role="planner")
+        self.assertEqual((r["status"], r["lane"], r["agent_model"]), ("agent", "CLAUDE_SUBSCRIPTION", "opus"))
+        self.assertIn("coordinator", r["brief_prefix"])
+        route.update_state(lambda s: s.setdefault("out", {}).update(
+            {n: {"until": route.now() + 3600, "why": "t"} for n in ("OPENAI_SUBSCRIPTION", "CLAUDE_SUBSCRIPTION")}))
+        _, r = self.run_it(role="planner")
+        self.assertEqual(r["status"], "stop")
+        self.assertIn("ask_user", r)
 
     def test_timeout_kills_the_whole_process_group(self):
-        code, out, err = self.run_it("hang", timeout=2)
-        self.assertEqual(code, 124)
+        code, r = self.run_it(mode="hang", timeout=2)
+        self.assertEqual((code, r["status"]), (0, "timeout"))
         pid = int(Path(os.environ["FAKE_PIDFILE"]).read_text())
         time.sleep(0.3)
         with self.assertRaises(OSError):
             os.kill(pid, 0)
 
-    def test_git_change_by_the_worker_exits_78(self):
-        code, out, err = self.run_it("git")
-        self.assertEqual(code, 78)
-        self.assertIn("GIT-VIOLATION", err)
+    def test_git_changes_are_reported_not_failed(self):
+        code, r = self.run_it(mode="git")
+        self.assertEqual((code, r["status"]), (0, "done"))
+        self.assertTrue(any("branch" in x for x in r["git_violation"]), r["git_violation"])
 
-    def test_empty_brief_is_an_error(self):
-        code, out, err = self.run_it("ok", "  ")
-        self.assertEqual(code, 1)
+    def test_empty_brief_is_an_error_object(self):
+        code, r = self.run_it(brief="  ")
+        self.assertEqual((code, r["status"]), (0, "error"))
+
+    def test_schema_is_passed_and_the_answer_parsed(self):
+        schema = self.base / "s.json"
+        schema.write_text('{"type": "object"}')
+        _, r = self.run_it("--schema", str(schema), mode="json")
+        self.assertEqual((r["status"], r["data"]), ("done", {"a": 1}))
+        self.assertIn("--output-schema", self.args_seen())
+
+    def test_resume_continues_on_the_same_lane_and_never_switches(self):
+        _, first = self.run_it()
+        self.assertEqual(first["ref"], "thread-123")
+        _, r = self.run_it("--resume", "thread-123")
+        self.assertEqual((r["status"], r["lane"]), ("done", "OPENAI_SUBSCRIPTION"))
+        self.assertIn("exec resume", self.args_seen())
+        self.assertIn('sandbox_mode="workspace-write"', self.args_seen())
+        route.update_state(lambda s: s.setdefault("out", {}).__setitem__("OPENAI_SUBSCRIPTION", {"until": route.now() + 3600, "why": "t"}))
+        n = len(self.args_seen().splitlines())
+        _, r = self.run_it("--resume", "thread-123")
+        self.assertEqual((r["status"], r["lane"]), ("lane_out", "OPENAI_SUBSCRIPTION"))
+        self.assertEqual(len(self.args_seen().splitlines()), n)            # nothing was launched
+        _, r = self.run_it("--resume", "nope")
+        self.assertEqual(r["status"], "error")
 
 
 class ConfigLocation(unittest.TestCase):
@@ -576,9 +651,10 @@ class TokenBudget(unittest.TestCase):
 
     def test_agent_step_answer_is_small(self):
         import io
-        saved = {k: os.environ.get(k) for k in ("XDG_CONFIG_HOME", "HOME")}
+        saved = {k: os.environ.get(k) for k in ("XDG_CONFIG_HOME", "HOME", "CLAUDE_CODE_ENTRYPOINT")}
         with tempfile.TemporaryDirectory() as d:
             os.environ["XDG_CONFIG_HOME"] = os.environ["HOME"] = d
+            os.environ["CLAUDE_CODE_ENTRYPOINT"] = "cli"
             real = dict(route.READERS)
             route.READERS.update({k: (lambda lane, S, st_, t, *a: None) for k in real})
             out, sys.stdout = sys.stdout, io.StringIO()
@@ -619,34 +695,22 @@ class GitOwnership(unittest.TestCase):
         Path(self.dir, "new.txt").write_text("x")
         self.assertEqual(route.git_changes(before, route.git_state(self.dir)), [])
 
-    def test_branch_commit_and_worktree_are_violations(self):
+    def test_branch_and_head_changes_are_reported_other_refs_and_worktrees_are_not(self):
         before = route.git_state(self.dir)
+        wt = tempfile.mkdtemp()
+        self.git("worktree", "add", "-q", os.path.join(wt, "w"), "-b", "other")         # parallel slots do this all the time
+        self.assertEqual(route.git_changes(before, route.git_state(self.dir)), [])
         self.git("checkout", "-qb", "feature")
         Path(self.dir, "f.txt").write_text("3")
         self.git("commit", "-qam", "x")
-        wt = tempfile.mkdtemp()
-        self.git("worktree", "add", "-q", os.path.join(wt, "w"), "-b", "other")
-        changes = route.git_changes(before, route.git_state(self.dir))
-        text = " ".join(changes)
+        text = " ".join(route.git_changes(before, route.git_state(self.dir)))
         self.assertIn("branch", text)
         self.assertIn("HEAD", text)
-        self.assertIn("worktrees changed", text)
-        self.assertIn("refs/heads/other: created", text)
 
     def test_not_a_repo_is_a_no_op(self):
         with tempfile.TemporaryDirectory() as d:
             self.assertIsNone(route.git_state(d))
             self.assertEqual(route.git_changes(None, None), [])
-
-    def test_how_carries_rules_cwd_and_guard(self):
-        ls = lanes()
-        d = decide("worker", ls)
-        self.assertIn("Do not create or switch branches", d["how"]["brief_prefix"])
-        self.assertEqual(d["how"]["guard"]["before"][2:5], ["guard", "before", "--cwd"])
-        d2 = decide("worker", lanes(openai={"out": True, "out_until": T + 5}, sub={"five": 85}))
-        self.assertEqual(d2["lane"], "CLAUDE_CREDIT")
-        self.assertIn("--cwd", d2["how"]["argv"])
-        self.assertNotIn("guard", d2["how"])        # run-claude guards git itself
 
     def test_deny_list_blocks_every_git_write(self):
         for verb in ("commit", "push", "checkout", "switch", "branch", "worktree", "merge", "rebase", "reset", "stash"):

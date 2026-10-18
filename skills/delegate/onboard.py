@@ -56,6 +56,17 @@ def check_claude_cli(R):
     return bool(shutil.which("claude"))
 
 
+def check_claude_login(R):
+    exe = shutil.which("claude")
+    if not exe:
+        return False
+    ok, out = run_cmd([exe, "auth", "status"], timeout=15)
+    try:
+        return bool(json.loads(out).get("loggedIn"))
+    except ValueError:
+        return False
+
+
 def check_credit_key(R):
     return bool(R.find_key(quiet=True))
 
@@ -127,6 +138,8 @@ def build_checks(R, cfg, st):
                  f"(3) no terminal: tell the agent to run `{py} \"{rp}\" set-key --web` (add `--host tailscale` to open the link from another device) and open the link it shows; "
                  f"(4) skip the lane: `{py} \"{rp}\" doctor --decline CLAUDE_CREDIT`."),
          "url": "https://platform.claude.com"},
+        {"id": "claude_login", "lane": "CLAUDE_SUBSCRIPTION", "ok": check_claude_login(R), "who": "user", "optional": True,
+         "say": "Headless callers (task-loop, cron) run `claude -p` on your Claude login, and it is not signed in. Run `claude auth login`."},
         {"id": "weekly_reset", "lane": "CLAUDE_SUBSCRIPTION", "ok": bool(S.get("claude_weekly_reset")), "who": "user", "optional": True,
          "say": f"When does your Claude weekly limit reset (day and local time, e.g. Sun 17:00)? Then run: {py} \"{rp}\" config set claude_weekly_reset \"Sun 17:00\"",
          "do": None},

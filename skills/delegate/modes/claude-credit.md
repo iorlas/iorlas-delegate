@@ -1,19 +1,17 @@
 # mode: claude-credit (lane CLAUDE_CREDIT)
 
-`claude -p` with an API key from the Console organization linked to the Max plan. `route.py run` launches it (`run-claude` underneath); you never build the command. The credit covers the API and Agent SDK, not interactive Claude Code, so only this runner uses the key. A missing or bad key fails loudly, never falls back to the Max login.
+`claude -p` with an API key from the Console organization linked to the Max plan. `route.py run` launches it; you never build the command. Headless callers (no Claude session behind the process) never get this lane: CLAUDE_SUBSCRIPTION runs `claude -p` on the logged-in account instead, with no API key and no dollar cap. The credit covers the API and Agent SDK, not interactive Claude Code, so only this runner uses the key. A missing or bad key fails loudly, never falls back to the Max login.
 
-- Tools: Read Glob Grep; `--write` adds Edit Write Bash. Every git write command is denied and git state is compared before and after (exit 78).
-- stdout = answer; stderr: `session=<id>` first (transcript `~/.claude/projects/*/<id>.jsonl`), cost and cycle spend last.
+- Tools: Read Glob Grep; `--write` adds Edit Write Bash. Every git write command is denied; HEAD and branch are compared before and after (`git_violation`).
+- The worker's Claude session id is `ref`; its transcript is `~/.claude/projects/*/<ref>.jsonl`.
 
-| exit | meaning | do |
+| `status` | meaning | do |
 |---|---|---|
-| 0 | done | judge it |
-| 75 | credit empty, lane out until the reset day | rerun `run` |
-| 76 | rate limited | retry once after a minute, then rerun `run` |
-| 77 | own cycle cap reached, lane out | rerun `run`; the user may raise `credit.monthly_cap` |
-| 78 | worker changed git; answer still printed | `git reflog`; you decide; never auto-revert |
-| 2 | no API key | read `modes/init.md`; never ask for it in chat |
-| 1 | other | read stderr; no blind retry |
+| `done` | answer in `text`; `ref` is the session id (`--resume REF` continues it) | judge it |
+| `lane_out` | credit empty, rate limited, or the cycle cap reached; `retry_after` says when | rerun `run`; the user may raise `credit.monthly_cap` |
+| `timeout` | killed after `--timeout` | shrink the task |
+| `error` | no API key, or `claude` missing | read `modes/init.md`; never ask for a key in chat |
+| `failed` | anything else; `say` has the tail of stderr | no blind retry |
 
 Spend: `--cap` per run; every run is appended to `ledger.jsonl`; a run is refused (77) when the cycle's spend plus its cap passes `credit.monthly_cap` (default 150; cycle starts on `credit.reset_day`, default 1). The balance itself is unreadable.
 Key lookup: env `CLAUDE_CREDIT_WORKER_KEY` (not an `ANTHROPIC_*` name), else `claude-credit.key` in the config dir, else macOS keychain `anthropic-worker-key`. The user stores it (`set-key`, `set-key --web`). Never export `ANTHROPIC_API_KEY` globally: interactive Claude Code would bill the credit.

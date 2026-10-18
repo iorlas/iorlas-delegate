@@ -18,6 +18,9 @@ Read this before changing anything in this repo. Rules are Denis's; the lessons 
 ## Lessons
 
 - `codex exec` waits forever on an open stdin pipe; give it the brief on stdin with `-` and close it. `-o FILE` returns only the final message. A non-git directory needs `--skip-git-repo-check`. Killing only the `codex` wrapper leaves the vendor binary running: kill the process group.
+- `codex exec --json` prints JSONL; `thread.started` carries `thread_id` and arrives first. `codex exec resume` takes `-m`, `-c`, `-o`, `--json`, `--output-schema`, `--skip-git-repo-check` but not `-s`/`-C`: set the sandbox with `-c sandbox_mode="..."` and the folder with the process cwd. `claude -p --output-format json` returns `result`, `session_id`, `total_cost_usd`, `structured_output` (with `--json-schema`); `--session-id` fixes the id up front, `--resume ID` continues it. Both verified live 2026-10-18.
+- Headless is derived (no `CLAUDE_CODE_ENTRYPOINT`), never a flag. Headless callers have no Agent tool: the subscription lane runs `claude -p` on the login; credit lanes are never picked.
+- Parallel slots of one repo change refs and worktrees while a worker runs; compare only the cwd's HEAD and branch.
 - macOS has no `timeout`; use `subprocess` timeouts.
 - `HTTPServer.server_bind` does a reverse-DNS lookup that stalls for seconds on macOS runners; skip it.
 - `ipaddress`: `0.0.0.0` is `is_private`; check `is_unspecified`.

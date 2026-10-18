@@ -7,11 +7,10 @@ The model supplies only what the script cannot read itself; the script decides.
   route.py status [--claude-usage JSON|@file|-] [--json]
   route.py next ROLE [--writer openai|claude] [--failed 0,1] [--premium [FAMILY]] [--allow-degraded]
                      [--claude-usage JSON|@file|-] [--cwd DIR] [--verbose]
-  route.py run ROLE [same flags as next] [--brief FILE] [--timeout SEC]   brief on stdin; runs a Codex or credit step end to end (guard, stdin, timeout, limit refusal)
+  route.py run ROLE [--cwd DIR] [--brief FILE] [--schema FILE] [--resume REF] [--cap USD] [--timeout SEC] [--writer W] [--failed I,J] [--premium] [--allow-degraded]
+                    [--claude-usage JSON] [--parent SESSION] [--task ID] [--title T]    brief on stdin; one JSON object on stdout, exit 0 (see docs/dev/integrations.md)
   route.py report --lane LANE --event out|ok [--until EPOCH|ISO] [--message TEXT]
-  route.py run-claude --model ID --effort LEVEL --cap USD [--write] [--allow TOOL]... [--cwd DIR] [--bare] [PROMPT|-]
   route.py capture-limits [--print]  (status line JSON on stdin)
-  route.py guard before|after [--cwd DIR]          snapshot/compare git state around a worker (exit 78 if a worker changed branches, commits, worktrees or stashes)
   route.py doctor [--lane L] [--next] [--fix ID] [--decline L] [--undecline L] [--ack ID] [--deep] [--json] [--quiet]   the one setup command: what each lane needs, and how to act on it
   route.py set-key [--stdin] [--force] | --web [--host IP|tailscale] [--port N] [--timeout S]   the key is handed over by the USER (terminal prompt or one-shot page); the agent never handles it
   route.py config set KEY VALUE | show
@@ -21,7 +20,6 @@ Per-user settings: <config dir>/config.json (same keys as "settings"); state, le
   $DELEGATE_CONFIG_DIR, else Claude Code's plugin data dir (~/.claude/plugins/data/<plugin>-<marketplace>), else (a checkout) ~/.config/delegate
   (%APPDATA%\\delegate on Windows). Files from the old location are moved in once.
 
-Exit codes of run-claude: 0 ok | 75 credit exhausted | 76 rate limited | 77 own cap reached | 78 worker changed git state | 2 key missing | 1 other.
 Workers never create branches or worktrees and never commit, merge, push or stash: the coordinator owns git.
 """
 import argparse
@@ -34,6 +32,7 @@ import re
 import shutil
 import subprocess
 import sys
+import threading
 import time
 import uuid
 from pathlib import Path
@@ -291,6 +290,11 @@ def harness():
     if ep == "cli":
         return "cli"
     return "unknown" if ep else "headless"
+
+
+def interactive():
+    """A Claude session (Desktop or CLI) is behind this process: the Agent tool, get_usage and the user exist. Anything else is headless."""
+    return harness() in ("desktop", "cli")
 
 
 OFFERS = []     # lanes seen for the first time and not usable; reported once, then forgotten
@@ -580,7 +584,7 @@ def gather(cfg, st, t, ai_usage=None, check_config=True):
         else:
             reader(lane, S, st, t)
         o = (st.get("out") or {}).get(name)
-        if o and o.get("until", 0) > t and not lane.out:      # an out reported by the model or by run-claude
+        if o and o.get("until", 0) > t and not lane.out:      # an out reported by the model or by a launcher
             lane.out, lane.out_until = True, o["until"]
             lane.notes.append(o.get("why", "reported out"))
         if mode == "drift":
@@ -703,7 +707,7 @@ def decide(role_name, cfg, lanes, st, t, args):
                 return {"action": "run", "role": role_name, "step": step.get("idx"), "pass": "relaxed" if relaxed else "strict",
                         "lane": lane.name, "model": step["model"], "effort": step["effort"], "mode": step.get("mode", "read_only"),
                         "cap": step.get("cap"), "use": step.get("use"), "flag": step.get("flag"),
-                        "how": how(lane, step, cfg, args.get("cwd")), "trace": trace}
+                        "how": how(lane, step, cfg, args.get("cwd"), args.get("headless", False)), "trace": trace}
     resets = {l.name: local(l.out_until) for l in lanes.values() if l.out and l.out_until}
     stop = {"action": "stop", "role": role_name, "say": role["stop"], "resets": resets, "trace": trace}
     consent = role.get("degraded_needs_consent")
@@ -714,37 +718,22 @@ def decide(role_name, cfg, lanes, st, t, args):
     return stop
 
 
-def how(lane, step, cfg, cwd=None):
-    """Command shape for the step. The orchestrator executes it; the router never runs a model."""
+def how(lane, step, cfg, cwd=None, headless=False):
+    """What a step runs on. Headless callers have no Agent tool, so the subscription lane runs `claude -p` on the logged-in account."""
     m = cfg["models"][step["model"]]
     runner = cfg["lanes"][lane.name]["runner"]
-    write = step.get("mode") == "write"
     wd = os.path.abspath(cwd) if cwd else os.getcwd()
-    common = {"cwd": wd, "brief_prefix": GIT_RULES,
-              "guard": {"before": [sys.executable, str(HERE / "route.py"), "guard", "before", "--cwd", wd],
-                        "after": [sys.executable, str(HERE / "route.py"), "guard", "after", "--cwd", wd]}}
-    res = _how(lane, step, cfg, runner, m, write, wd)
-    res.update(common)
-    if runner == "claude_credit_worker":
-        res.pop("guard")          # run-claude guards git itself
-    return res
-
-
-def _how(lane, step, cfg, runner, m, write, wd):
-    if runner == "claude_credit_worker":
-        argv = [sys.executable, str(HERE / "route.py"), "run-claude", "--model", step["model"], "--effort", step["effort"], "--cap", str(step.get("cap", 2)), "--cwd", wd]
-        if write:
-            argv.append("--write")
-        return {"kind": "command", "argv": argv, "prompt": "stdin or last argument", "background": "use Bash run_in_background for long tasks"}
+    write = step.get("mode") == "write"
+    if runner == "agent_tool" and headless:
+        runner = "claude_p"
+    if runner == "claude_p":
+        return {"kind": "claude_p", "model": m["api"], "write": write, "cap": step.get("cap", 2), "cwd": wd}
     if runner == "agent_tool":
-        return {"kind": "agent_tool", "model": m["agent"], "note": "set model on the Agent call; effort cannot be set per call, so state the effort in the brief"}
-    if runner == "codex":
-        cli = ["codex", "exec", "-C", wd, "-s", "workspace-write" if write else "read-only", "-m", m["api"], "-c", f"model_reasoning_effort={step['effort']}"]
-        if git_state(wd) is None:
-            cli.append("--skip-git-repo-check")      # codex refuses a directory that is not a git work tree
-        return {"kind": "codex", "doc": "modes/codex.md", "use": step.get("use", "task"), "model": m["api"], "effort": step["effort"], "mode": step.get("mode", "read_only"),
-                "cli": cli, "stdin": "close_unless_brief", "timeout_kills_process_group": True}
-    return {"kind": "unknown", "runner": runner}
+        return {"kind": "agent_tool", "model": m["agent"], "cwd": wd}
+    cli = ["codex", "exec", "-C", wd, "-s", "workspace-write" if write else "read-only", "-m", m["api"], "-c", f"model_reasoning_effort={step['effort']}"]
+    if git_state(wd) is None:
+        cli.append("--skip-git-repo-check")      # codex refuses a directory that is not a git work tree
+    return {"kind": "codex", "model": m["api"], "cli": cli, "cwd": wd}
 
 
 # ----------------------------------------------------------------------------- commands
@@ -804,16 +793,34 @@ def decision(a, cfg):
     """next and run share this: gather, decide, remember the lane choice. -> (d, lanes, warnings, t)"""
     t = now()
     st = load_state()
+    headless = not interactive()
     del OFFERS[:]
     lanes = gather(cfg, st, t, parse_json_arg(a.claude_usage))
     new_offers = list(OFFERS)
     warnings = drift_warnings(lanes, st, t)
     publish_lanes(lanes, st, t)
+    if headless:        # no one to pay the API credit knowingly: credit lanes are never picked headless
+        lanes = {n: l for n, l in lanes.items() if l.kind != "credit"}
+    S = cfg["settings"]
+    ref = getattr(a, "resume", None)
+    if ref:             # continue on the lane that made the ref; never switch lanes silently
+        rec = (st.get("refs") or {}).get(ref)
+        lane = lanes.get(rec["lane"]) if rec else None
+        if not rec:
+            return {"action": "error", "error": f"unknown --resume ref {ref}"}, lanes, warnings, t
+        if lane is None or not usable(lane, S, True)[0]:
+            return {"action": "lane_out", "lane": rec["lane"], "retry_after": lane.out_until if lane else None,
+                    "say": f"{rec['lane']} cannot continue {ref} now"}, lanes, warnings, t
+        step = {"model": rec["model"], "effort": rec["effort"], "mode": rec["mode"], "cap": a.cap or rec.get("cap")}
+        return {"action": "run", "role": a.role, "step": None, "pass": "resume", "lane": lane.name, "model": rec["model"], "effort": rec["effort"],
+                "mode": rec["mode"], "cap": step["cap"], "how": how(lane, step, cfg, a.cwd, headless)}, lanes, warnings, t
     args = {"writer": a.writer, "failed": [int(x) for x in a.failed.split(",") if x != ""] if a.failed else [],
-            "premium": a.premium, "allow_degraded": a.allow_degraded, "cwd": a.cwd}
+            "premium": a.premium, "allow_degraded": a.allow_degraded and not headless, "cwd": a.cwd, "headless": headless}
     d = decide(a.role, cfg, lanes, st, t, args)
     if d["action"] == "run":
         fam = cfg["lanes"][d["lane"]]["family"]
+        if getattr(a, "cap", None):
+            d["cap"] = d["how"]["cap"] = a.cap if d["how"]["kind"] == "claude_p" else d["how"].get("cap")
 
         def mark(s):
             prev = s.setdefault("prev", {}).get(fam)
@@ -821,6 +828,8 @@ def decision(a, cfg):
                 s["prev"][fam] = {"lane": d["lane"], "since": t}
         if sum(1 for l in lanes.values() if l.family == fam) > 1:
             update_state(mark)
+    if headless and d.get("action") == "stop":
+        d.pop("ask_user", None)
     if new_offers:
         mark_offered(new_offers)
         d["notice"] = "not set up: " + ", ".join(new_offers) + " (doctor --lane NAME to set up, doctor --decline NAME to hide)"
@@ -832,9 +841,8 @@ def cmd_next(a, cfg):
     d["needs_input"] = needs_input(lanes)
     if warnings:
         d["warnings"] = warnings
-    if not a.verbose:       # the hot path stays small: reasoning, lane table and guard commands only on request
+    if not a.verbose:       # the hot path stays small: reasoning and the lane table only on request
         d.pop("trace", None)
-        (d.get("how") or {}).pop("guard", None)
     else:
         d["lanes"] = {n: l.brief(t) for n, l in lanes.items()}
     print(json.dumps(d, indent=1))
@@ -891,22 +899,17 @@ GIT_WRITE_DENY = ["Bash(git commit:*)", "Bash(git push:*)", "Bash(git checkout:*
 
 
 def git_state(cwd):
-    """Snapshot of what a worker must not change, or None when cwd is not a git work tree."""
+    """HEAD and current branch of cwd, or None when cwd is not a git work tree. Other refs and worktrees change while parallel slots work and land, so they are not compared."""
     def git(*args):
         r = subprocess.run(["git", "-C", str(cwd)] + list(args), capture_output=True, text=True)
         return r.stdout if r.returncode == 0 else None
     if shutil.which("git") is None or git("rev-parse", "--is-inside-work-tree") is None:
         return None
-    refs = {}
-    for line in (git("for-each-ref", "--format=%(refname) %(objectname)") or "").splitlines():
-        name, _, sha = line.partition(" ")
-        refs[name] = sha
-    return {"head": (git("rev-parse", "HEAD") or "").strip(), "branch": (git("symbolic-ref", "-q", "--short", "HEAD") or "").strip(),
-            "refs": refs, "worktrees": sorted(l for l in (git("worktree", "list", "--porcelain") or "").splitlines() if l.startswith("worktree "))}
+    return {"head": (git("rev-parse", "HEAD") or "").strip(), "branch": (git("symbolic-ref", "-q", "--short", "HEAD") or "").strip()}
 
 
 def git_changes(before, after):
-    """-> list of human-readable differences; empty when the worker left git alone."""
+    """-> list of human-readable differences; empty when the worker left HEAD and branch alone."""
     if before is None or after is None:
         return []
     out = []
@@ -914,35 +917,10 @@ def git_changes(before, after):
         out.append(f"branch {before['branch'] or '(detached)'} -> {after['branch'] or '(detached)'}")
     if before["head"] != after["head"]:
         out.append(f"HEAD {before['head'][:9]} -> {after['head'][:9]}")
-    for name in sorted(set(before["refs"]) | set(after["refs"])):
-        a, b = before["refs"].get(name), after["refs"].get(name)
-        if a != b:
-            out.append(f"ref {name}: " + ("created" if a is None else "deleted" if b is None else "moved"))
-    if before["worktrees"] != after["worktrees"]:
-        out.append("worktrees changed")
     return out
 
 
-def cmd_guard(a, cfg):
-    cwd = os.path.abspath(a.cwd or os.getcwd())
-    key = "git_guard:" + cwd
-    if a.when == "before":
-        snap = git_state(cwd)
-        update_state(lambda s: s.setdefault("guard", {}).__setitem__(cwd, snap))
-        print(json.dumps({"guard": "armed" if snap else "not a git work tree", "cwd": cwd}))
-        return 0
-    before = (load_state().get("guard") or {}).get(cwd)
-    diffs = git_changes(before, git_state(cwd))
-    update_state(lambda s: s.setdefault("guard", {}).pop(cwd, None))
-    if diffs:
-        print("GIT-VIOLATION: the worker changed git state: " + "; ".join(diffs) +
-              ". The file changes are still on disk; inspect with git reflog and decide. Workers must not create branches or worktrees, commit, merge or stash.", file=sys.stderr)
-        return 78
-    print(json.dumps({"guard": "clean", "cwd": cwd}))
-    return 0
-
-
-# ----------------------------------------------------------------------------- run-claude (the CLAUDE_CREDIT runner)
+# ----------------------------------------------------------------------------- shared by the claude -p launcher
 
 PREAMBLE = ("You are a delegated worker. Do exactly the task in the brief. Do not delegate further and do not use the delegate skill. "
             + GIT_RULES + " Finish with a short report: what you changed or found, and the exit code and last lines of any check you ran.")
@@ -978,89 +956,7 @@ def publish_lanes(lanes, st, t):
         pass
 
 
-def cmd_run_claude(a, cfg):
-    t = now()
-    S = cfg["settings"]
-    model = cfg["models"].get(a.model)
-    if not model or model["family"] != "claude":
-        sys.exit(f"route.py: run-claude needs a claude model from routing.json, got {a.model}")
-    prompt = sys.stdin.read() if (not a.prompt or a.prompt == ["-"]) else " ".join(a.prompt)
-    if not prompt.strip():
-        sys.exit("route.py: empty prompt")
-    key = find_key()
-    if not key:
-        print("route.py: no API key for the credit lane. Run `route.py doctor --lane CLAUDE_CREDIT` and relay it to the user; do not ask for the key in chat.", file=sys.stderr)
-        return 2
-    c = S["credit"]
-    start, nxt = credit_cycle(c["reset_day"], t)
-    spent = ledger_spend(start)
-    cap = float(a.cap)
-    if spent + cap > float(c["monthly_cap"]):
-        print(f"route.py: cycle cap: ${spent:.2f} spent + ${cap:.2f} this run > ${c['monthly_cap']} "
-              f"(raise monthly_cap in {config_dir() / 'config.json'}, or treat CLAUDE_CREDIT as out)", file=sys.stderr)
-        return 77
-    exe = shutil.which("claude")
-    if not exe:
-        print("route.py: claude CLI not found on PATH", file=sys.stderr)
-        return 1
-    run_id = str(uuid.uuid4())  # the worker's session id: its transcript is ~/.claude/projects/*/<run_id>.jsonl
-    write = bool(a.write)
-    tools = ["Read", "Glob", "Grep"] + (["Edit", "Write", "Bash"] if write else []) + list(a.allow or [])
-    cmd = [exe] + (["--bare"] if a.bare else []) + [
-        "-p", "--output-format", "json", "--model", model["api"], "--effort", a.effort, "--max-budget-usd", str(cap),
-        "--session-id", run_id, "--append-system-prompt", PREAMBLE,
-        "--permission-mode", "acceptEdits" if write else "default",
-        "--allowedTools", *tools, "--disallowedTools", *GIT_WRITE_DENY]
-    env = dict(os.environ)
-    for k in ("ANTHROPIC_AUTH_TOKEN", "CLAUDE_CODE_OAUTH_TOKEN"):
-        env.pop(k, None)
-    env["ANTHROPIC_API_KEY"] = key
-    env["DELEGATE_DEPTH"] = "1"
-    workdir = os.path.abspath(a.cwd) if a.cwd else os.getcwd()
-    git_before = git_state(workdir)
-    if agent_runs:
-        agent_runs.run(run_id, kind="claude-p", session=run_id, lane="CLAUDE_CREDIT", model=a.model, cwd=workdir,
-                       parent_session=os.environ.get("CLAUDE_CODE_SESSION_ID", ""), started=t, status="running",
-                       title=prompt.strip().splitlines()[0][:120])
-    print(f"session={run_id}", file=sys.stderr, flush=True)
-    r = subprocess.run(cmd, input=prompt, capture_output=True, text=True, cwd=workdir, env=env)
-    if agent_runs:
-        agent_runs.run(run_id, ended=now(), status="failed" if r.returncode else "completed", exit=r.returncode)
-    violations = git_changes(git_before, git_state(workdir))
-    out = (r.stdout or "") + (r.stderr or "")
-    try:
-        j = json.loads(r.stdout)
-    except ValueError:
-        j = {}
-    text = j.get("result") or out.strip()
-    cost = float(j.get("total_cost_usd") or 0)
-    if cost > 0:
-        ledger_add(cost, a.model, t)
-    failed = r.returncode != 0 or j.get("is_error")
-    if failed:
-        if re.search(r"credit balance (is )?too low", text, re.I):
-            update_state(lambda s: s.setdefault("out", {}).__setitem__("CLAUDE_CREDIT", {"until": nxt, "why": "credit balance too low", "at": t}))
-            print(text, file=sys.stderr)
-            print(f"route.py: credit exhausted, CLAUDE_CREDIT marked out until {local(nxt)}", file=sys.stderr)
-            return 75
-        if re.search(r"rate.?limit|overloaded|\b429\b|\b529\b", text, re.I):
-            print(text, file=sys.stderr)
-            print("route.py: rate limited", file=sys.stderr)
-            return 76
-        print(text, file=sys.stderr)
-        return 1
-    update_state(lambda s: s.setdefault("out", {}).pop("CLAUDE_CREDIT", None))
-    print(text)
-    if violations:
-        print("GIT-VIOLATION: the worker changed git state: " + "; ".join(violations) +
-              ". The file changes are still on disk; inspect with git reflog and decide.", file=sys.stderr)
-        print(f"cost=${cost:.4f} turns={j.get('num_turns', 0)}", file=sys.stderr)
-        return 78
-    print(f"cost=${cost:.4f} turns={j.get('num_turns', 0)} cycle=${ledger_spend(start):.2f}/${float(c['monthly_cap']):.0f}", file=sys.stderr)
-    return 0
-
-
-# ----------------------------------------------------------------------------- run: execute one step (Codex or credit) end to end
+# ----------------------------------------------------------------------------- run: one step, end to end, one JSON answer
 
 LIMIT_RE = re.compile(r"usage limit|rate.?limit|quota|too many requests|\b429\b|try again (later|in)|credit balance", re.I)
 
@@ -1077,92 +973,256 @@ def kill_tree(p):
         p.kill()
 
 
-def run_codex_step(d, brief, timeout, t):
-    """-> (exit_code, text). stdin carries the brief and is then closed, so codex never waits on it."""
+def child_env(extra=None):
+    """The worker gets the caller's environment minus Claude, Anthropic and delegate variables, plus DELEGATE_DEPTH=1."""
+    env = {k: v for k, v in os.environ.items() if not k.startswith(("CLAUDE_", "ANTHROPIC_", "DELEGATE_"))}
+    env["DELEGATE_DEPTH"] = "1"
+    env.update(extra or {})
+    return env
+
+
+def run_proc(cmd, text, cwd, env, timeout, on_line=None):
+    """-> (returncode, stdout, stderr, timed_out). Own process group; the timeout kills the group; stdin carries `text` then closes; UTF-8, errors replaced."""
+    kw = {"start_new_session": True} if os.name != "nt" else {"creationflags": 0x00000200}
+    p = subprocess.Popen(cmd, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=cwd, env=env, **kw)
+    out, err = [], []
+
+    def pump(stream, sink, cb):
+        for raw in iter(stream.readline, b""):
+            line = raw.decode("utf-8", "replace")
+            sink.append(line)
+            if cb:
+                cb(line)
+
+    def feed():
+        with contextlib.suppress(OSError):
+            p.stdin.write(text.encode("utf-8"))
+            p.stdin.close()
+    threads = [threading.Thread(target=pump, args=(p.stdout, out, on_line), daemon=True),
+               threading.Thread(target=pump, args=(p.stderr, err, None), daemon=True), threading.Thread(target=feed, daemon=True)]
+    for th in threads:
+        th.start()
+    timed_out = False
+    try:
+        p.wait(timeout=timeout)
+    except subprocess.TimeoutExpired:
+        timed_out = True
+        kill_tree(p)
+        p.wait()
+    for th in threads:
+        th.join(5)
+    return p.returncode, "".join(out), "".join(err), timed_out
+
+
+def find_transcript(ref, family):
+    if not ref:
+        return None
+    import glob
+    pattern = (str(Path.home() / ".claude" / "projects" / "*" / (ref + ".jsonl")) if family == "claude"
+               else str(Path.home() / ".codex" / "sessions" / "**" / ("*" + ref + ".jsonl")))
+    hits = glob.glob(pattern, recursive=True)
+    return hits[0] if hits else None
+
+
+def parse_data(text, schema):
+    if not schema or not text:
+        return None
+    try:
+        return json.loads(text)
+    except ValueError:
+        return None
+
+
+def mark_out(lane, until, why, t):
+    update_state(lambda s: s.setdefault("out", {}).__setitem__(lane, {"until": until, "why": why, "at": t}))
+
+
+def launch_codex(d, brief, a, rid, t, meta):
+    """-> dict of result fields."""
     h = d["how"]
-    cwd = h["cwd"]
     exe = shutil.which("codex")
     if not exe:
-        return 2, "codex CLI not found on PATH (route.py doctor --lane OPENAI_SUBSCRIPTION)"
-    out_file = config_dir() / f"codex-last-{uuid.uuid4().hex[:8]}.txt"
-    cmd = [exe] + h["cli"][1:] + ["-o", str(out_file), "-"]
-    run_id = str(uuid.uuid4())
+        return {"status": "error", "say": "codex CLI not found on PATH (route.py doctor --lane OPENAI_SUBSCRIPTION)"}
+    out_file = config_dir() / f"codex-last-{rid[:8]}.txt"
+    if a.resume:
+        sandbox = "workspace-write" if d["mode"] == "write" else "read-only"
+        cmd = [exe, "exec", "resume", "-m", h["model"], "-c", f"model_reasoning_effort={d['effort']}", "-c", f'sandbox_mode="{sandbox}"']
+        cmd += [x for x in h["cli"] if x == "--skip-git-repo-check"] + ["--json", "-o", str(out_file)]
+        cmd += (["--output-schema", a.schema] if a.schema else []) + [a.resume, "-"]
+    else:
+        cmd = [exe] + h["cli"][1:] + ["--json", "-o", str(out_file)] + (["--output-schema", a.schema] if a.schema else []) + ["-"]
+    seen = {"ref": a.resume, "last": ""}
+
+    def on_line(line):
+        try:
+            ev = json.loads(line)
+        except ValueError:
+            return
+        if not isinstance(ev, dict):
+            return
+        if ev.get("type") == "thread.started" and ev.get("thread_id"):
+            seen["ref"] = ev["thread_id"]
+            if agent_runs:
+                agent_runs.run(rid, thread=seen["ref"])
+        item = ev.get("item") or {}
+        if ev.get("type") == "item.completed" and item.get("type") == "agent_message":
+            seen["last"] = item.get("text", "")
     if agent_runs:
-        agent_runs.run(run_id, kind="codex", lane=d["lane"], model=d["model"], cwd=cwd, parent_session=os.environ.get("CLAUDE_CODE_SESSION_ID", ""),
-                       started=t, status="running", title=brief.strip().splitlines()[0][:120] if brief.strip() else "codex")
-    kw = {"start_new_session": True} if os.name != "nt" else {"creationflags": 0x00000200}
-    p = subprocess.Popen(cmd, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, cwd=cwd, **kw)
-    try:
-        log, _ = p.communicate(input=brief, timeout=timeout)
-        code = p.returncode
-    except subprocess.TimeoutExpired:
-        kill_tree(p)
-        log, _ = p.communicate()
-        code = 124
+        agent_runs.run(rid, kind="codex", lane=d["lane"], model=d["model"], cwd=h["cwd"], started=t, status="running", **meta)
+    rc, out, err, timed_out = run_proc(cmd, GIT_RULES + "\n\n" + brief, h["cwd"], child_env(), a.timeout, on_line)
     text = ""
     with contextlib.suppress(OSError):
-        text = out_file.read_text(encoding="utf-8").strip()
+        text = out_file.read_text(encoding="utf-8", errors="replace").strip()
         out_file.unlink()
+    text = text or seen["last"]
+    res = {"text": text, "ref": seen["ref"], "stderr": err}
+    if timed_out:
+        res.update(status="timeout", say=f"codex did not finish within {a.timeout}s and was killed")
+    elif rc != 0 and LIMIT_RE.search(text + err):
+        until = t + 3600
+        mark_out(d["lane"], until, "limit refusal: " + (err or text)[:120].replace("\n", " "), t)
+        res.update(status="lane_out", retry_after=until, say=f"{d['lane']} hit a limit; out until {local(until)}")
+    elif rc != 0:
+        res.update(status="failed", say=(err or text)[-300:].strip())
+    else:
+        update_state(lambda s: s.setdefault("out", {}).pop(d["lane"], None))
+        res.update(status="done", data=parse_data(text, a.schema))
+    return res
+
+
+def launch_claude(d, brief, a, rid, t, cfg, meta):
+    """claude -p on the credit key (CLAUDE_CREDIT) or the logged-in subscription (CLAUDE_SUBSCRIPTION, headless). -> dict of result fields."""
+    h = d["how"]
+    credit = cfg["lanes"][d["lane"]]["kind"] == "credit"
+    exe = shutil.which("claude")
+    if not exe:
+        return {"status": "error", "say": "claude CLI not found on PATH"}
+    extra, cap, nxt = {}, float(h.get("cap") or 2), None
+    if credit:
+        key = find_key()
+        if not key:
+            return {"status": "error", "say": "no API key for the credit lane: route.py doctor --lane CLAUDE_CREDIT (never paste the key in chat)"}
+        c = cfg["settings"]["credit"]
+        start, nxt = credit_cycle(c["reset_day"], t)
+        if ledger_spend(start) + cap > float(c["monthly_cap"]):
+            return {"status": "lane_out", "retry_after": nxt, "say": f"cycle cap: ${ledger_spend(start):.2f} spent + ${cap:.2f} > ${c['monthly_cap']}"}
+        extra["ANTHROPIC_API_KEY"] = key
+    write = bool(h["write"])
+    tools = ["Read", "Glob", "Grep"] + (["Edit", "Write", "Bash"] if write else [])
+    cmd = [exe, "-p", "--output-format", "json", "--model", h["model"], "--effort", d["effort"]]
+    cmd += ["--max-budget-usd", str(cap)] if credit else []
+    cmd += ["--resume", a.resume] if a.resume else ["--session-id", rid]
+    cmd += ["--append-system-prompt", PREAMBLE, "--permission-mode", "acceptEdits" if write else "default",
+            "--allowedTools", *tools, "--disallowedTools", *GIT_WRITE_DENY]
+    if a.schema:
+        cmd += ["--json-schema", Path(a.schema).read_text(encoding="utf-8")]
+    ref = a.resume or rid
     if agent_runs:
-        m = re.search(r"session id:\s*([0-9a-f-]{16,})", log or "")      # codex prints its thread id in the header
-        agent_runs.run(run_id, ended=now(), status="failed" if code else "completed", exit=code, thread=m.group(1) if m else None)
-    if code == 124:
-        return 124, f"codex did not finish within {timeout}s and was killed (process group). Last output:\n" + (log or "")[-600:]
-    if code != 0:
-        return code, (text or (log or "")[-1500:])
-    return 0, text or (log or "")[-1500:]
+        agent_runs.run(rid, kind="claude-p", session=ref, lane=d["lane"], model=d["model"], cwd=h["cwd"], started=t, status="running", **meta)
+    rc, out, err, timed_out = run_proc(cmd, brief, h["cwd"], child_env(extra), a.timeout)
+    try:
+        j = json.loads(out)
+    except ValueError:
+        j = {}
+    if not isinstance(j, dict):
+        j = {}
+    text = j.get("result") if isinstance(j.get("result"), str) else out.strip()
+    cost = float(j.get("total_cost_usd") or 0) if credit else 0.0
+    if credit and cost > 0:
+        ledger_add(cost, d["model"], t)
+    res = {"text": text, "ref": j.get("session_id") or ref, "cost": cost, "stderr": err}
+    if timed_out:
+        res.update(status="timeout", say=f"claude did not finish within {a.timeout}s and was killed")
+    elif rc != 0 or j.get("is_error"):
+        blob = text + err
+        if credit and re.search(r"credit balance (is )?too low", blob, re.I):
+            mark_out(d["lane"], nxt, "credit balance too low", t)
+            res.update(status="lane_out", retry_after=nxt, say=f"credit exhausted; out until {local(nxt)}")
+        elif LIMIT_RE.search(blob):
+            until = t + 3600
+            mark_out(d["lane"], until, "limit refusal: " + blob[:120].replace("\n", " "), t)
+            res.update(status="lane_out", retry_after=until, say=f"{d['lane']} hit a limit; out until {local(until)}")
+        else:
+            res.update(status="failed", say=blob[-300:].strip())
+    else:
+        update_state(lambda s: s.setdefault("out", {}).pop(d["lane"], None))
+        data = j.get("structured_output") if isinstance(j.get("structured_output"), (dict, list)) else parse_data(text, a.schema)
+        res.update(status="done", data=data)
+    return res
+
+
+def result(status, **kw):
+    r = {"v": 1, "status": status, "data": None, "text": "", "ref": None, "lane": None, "model": None, "effort": None, "family": None,
+         "cost": 0, "secs": 0, "run_id": None, "transcript": None, "retry_after": None, "say": "", "git_violation": []}
+    r.update(kw)
+    return r
+
+
+def emit(r):
+    """One object on stdout. A model reads it when a Claude session is behind us, so empty fields are dropped there; scripts get every field."""
+    if interactive():
+        r = {k: v for k, v in r.items() if k in ("v", "status") or v not in (None, "", [], 0)}
+    print(json.dumps(r))
+    return 0        # exit 0 whenever the object was printed; non-zero only if route.py itself crashed
 
 
 def cmd_run(a, cfg):
+    headless = not interactive()
     d, lanes, warnings, t = decision(a, cfg)
-    if d["action"] != "run":
-        print(json.dumps({k: d[k] for k in ("action", "say", "resets", "ask_user", "error", "notice") if k in d}))
-        return 0 if d["action"] == "stop" else 1
-    head = {"lane": d["lane"], "model": d["model"], "effort": d["effort"], "pass": d["pass"]}
+    extra = {}
     if warnings:
-        head["warnings"] = warnings
+        extra["warnings"] = warnings
     if d.get("notice"):
-        head["notice"] = d["notice"]
-    ni = [n["what"] for n in needs_input(lanes)]
-    if ni:
-        head["needs_input"] = ni
+        extra["notice"] = d["notice"]
+    if d["action"] == "error":
+        return emit(result("error", say=d["error"], **extra))
+    if d["action"] == "lane_out":
+        return emit(result("lane_out", lane=d["lane"], retry_after=d.get("retry_after"), say=d["say"], **extra))
+    if d["action"] == "stop":
+        retry = min([l.out_until for l in lanes.values() if l.out and l.out_until] or [None], key=lambda x: (x is None, x))
+        if not headless and d.get("ask_user"):
+            extra["ask_user"] = d["ask_user"]
+        return emit(result("stop", say=d["say"], retry_after=retry, **extra))
     h = d["how"]
+    fam = cfg["lanes"][d["lane"]]["family"]
+    who = dict(lane=d["lane"], model=d["model"], effort=d["effort"], family=fam)
+    if not headless:
+        ni = [n["what"] for n in needs_input(lanes)]
+        if ni:
+            extra["needs_input"] = ni
     if h["kind"] == "agent_tool":
-        print(json.dumps({"action": "agent", **head, "agent_model": h["model"], "brief_prefix": GIT_RULES, "cwd": h["cwd"]}))
-        return 0
-    brief = sys.stdin.read() if not a.brief else Path(a.brief).read_text(encoding="utf-8")
+        return emit(result("agent", **who, agent_model=h["model"], brief_prefix=GIT_RULES, cwd=h["cwd"], **extra))
+    brief = Path(a.brief).read_text(encoding="utf-8", errors="replace") if a.brief else sys.stdin.read()
     if not brief.strip():
-        print(json.dumps({"action": "error", "error": "empty brief: pass it on stdin or with --brief FILE"}))
-        return 1
+        return emit(result("error", **who, say="empty brief: pass it on stdin or with --brief FILE", **extra))
     cwd = h["cwd"]
-    if h["kind"] == "codex":
-        full = GIT_RULES + "\n\n" + brief
-        git_before = git_state(cwd)
-        code, text = run_codex_step(d, full, a.timeout, t)
-        violations = git_changes(git_before, git_state(cwd))
-        if code not in (0, 124) and LIMIT_RE.search(text):
-            until = t + 3600
-            update_state(lambda s: s.setdefault("out", {}).__setitem__(d["lane"], {"until": until, "why": "limit refusal: " + text[:120].replace("\n", " "), "at": t}))
-            print(text, file=sys.stderr)
-            print(json.dumps({"action": "limit", **head, "exit": 76, "say": f"{d['lane']} marked out until {local(until)}; call run again to advance"}), file=sys.stderr)
-            return 76
-        if code == 0:
-            update_state(lambda s: s.setdefault("out", {}).pop(d["lane"], None))
-        print(text)
-        status = {"action": "done" if code == 0 else "failed", **head, "exit": code}
-        if violations:
-            status.update(git_violation=violations, exit=78)
-            print("GIT-VIOLATION: the worker changed git state: " + "; ".join(violations) + ". The file changes are still on disk; inspect with git reflog and decide.", file=sys.stderr)
-            code = 78
-        print(json.dumps(status), file=sys.stderr)
-        return code
-    if h["kind"] == "command":          # CLAUDE_CREDIT: run-claude does its own guard, ledger and out marking
-        ns = argparse.Namespace(model=d["model"], effort=d["effort"], cap=str(d.get("cap") or 2), write=d["mode"] == "write", allow=None, cwd=cwd, bare=False, prompt=[brief])
-        code = cmd_run_claude(ns, cfg)
-        print(json.dumps({"action": "done" if code == 0 else "failed", **head, "exit": code}), file=sys.stderr)
-        return code
-    print(json.dumps({"action": "error", "error": f"cannot run kind {h['kind']}"}))
-    return 1
+    rid = str(uuid.uuid4())
+    meta = {"parent_session": a.parent or "", "title": a.title or brief.strip().splitlines()[0][:120]}
+    if a.task:
+        meta["task"] = a.task
+    git_before = git_state(cwd)
+    t0 = time.time()
+    try:
+        res = launch_codex(d, brief, a, rid, t, meta) if h["kind"] == "codex" else launch_claude(d, brief, a, rid, t, cfg, meta)
+    except Exception as e:      # a launcher bug is an error object, not a stack trace
+        res = {"status": "error", "say": f"{type(e).__name__}: {e}"}
+    err = res.pop("stderr", "")
+    if err:
+        print(err[-2000:], file=sys.stderr)
+    if agent_runs:
+        agent_runs.run(rid, ended=now(), status="completed" if res["status"] == "done" else "failed", transcript=find_transcript(res.get("ref"), fam))
+    if res.get("ref") and res["status"] == "done":
+        rec = {"lane": d["lane"], "model": d["model"], "effort": d["effort"], "mode": d["mode"], "cap": d.get("cap")}
+
+        def keep(s):
+            refs = s.setdefault("refs", {})
+            refs[res["ref"]] = rec
+            for k in list(refs)[:-200]:
+                refs.pop(k)
+        update_state(keep)
+    res.update(**who, run_id=rid, secs=round(time.time() - t0, 1), git_violation=git_changes(git_before, git_state(cwd)),
+               transcript=find_transcript(res.get("ref"), fam), **extra)
+    return emit(result(res.pop("status"), **res))
 
 
 # ----------------------------------------------------------------------------- onboarding commands (code in onboard.py)
@@ -1231,20 +1291,17 @@ def main(argv=None):
     dr = sub.add_parser("doctor"); dr.add_argument("--quiet", action="store_true"); dr.add_argument("--deep", action="store_true"); dr.add_argument("--json", action="store_true")
     dr.add_argument("--lane"); dr.add_argument("--next", action="store_true"); dr.add_argument("--fix"); dr.add_argument("--decline"); dr.add_argument("--undecline")
     dr.add_argument("--ack"); dr.add_argument("--unack"); dr.add_argument("--open-browser", action="store_true")
-    gd = sub.add_parser("guard"); gd.add_argument("when", choices=["before", "after"]); gd.add_argument("--cwd")
     sk = sub.add_parser("set-key"); sk.add_argument("--stdin", action="store_true"); sk.add_argument("--force", action="store_true")
     sk.add_argument("--web", action="store_true"); sk.add_argument("--host", default="127.0.0.1"); sk.add_argument("--port", type=int, default=0); sk.add_argument("--timeout", type=int, default=300)
     cf = sub.add_parser("config"); cf.add_argument("action", choices=["set", "show"]); cf.add_argument("key", nargs="?"); cf.add_argument("value", nargs="?")
     ru = sub.add_parser("run"); ru.add_argument("role"); ru.add_argument("--writer"); ru.add_argument("--failed", default="")
     ru.add_argument("--premium", nargs="?", const="claude", metavar="FAMILY"); ru.add_argument("--allow-degraded", action="store_true")
     ru.add_argument("--claude-usage"); ru.add_argument("--cwd"); ru.add_argument("--brief"); ru.add_argument("--timeout", type=int, default=1800)
-    c = sub.add_parser("run-claude"); c.add_argument("--model", required=True); c.add_argument("--effort", required=True)
-    c.add_argument("--cap", required=True); c.add_argument("--write", action="store_true"); c.add_argument("--allow", action="append")
-    c.add_argument("--cwd"); c.add_argument("--bare", action="store_true"); c.add_argument("prompt", nargs="*")
+    ru.add_argument("--schema"); ru.add_argument("--resume"); ru.add_argument("--cap", type=float); ru.add_argument("--parent"); ru.add_argument("--task"); ru.add_argument("--title")
     a = ap.parse_args(argv)
     cfg = load_routing()
-    return {"status": cmd_status, "next": cmd_next, "report": cmd_report, "capture-limits": cmd_capture, "run-claude": cmd_run_claude,
-            "run": cmd_run, "doctor": cmd_doctor, "guard": cmd_guard, "set-key": cmd_set_key, "config": cmd_config}[a.cmd](a, cfg)
+    return {"status": cmd_status, "next": cmd_next, "report": cmd_report, "capture-limits": cmd_capture,
+            "run": cmd_run, "doctor": cmd_doctor, "set-key": cmd_set_key, "config": cmd_config}[a.cmd](a, cfg)
 
 
 if __name__ == "__main__":

@@ -1,6 +1,6 @@
 # iorlas-delegate
 
-A Claude Code plugin that hands sub-tasks to worker models through a deterministic router. The model asks `route.py next ROLE` and gets back which lane, model and effort to run; the script reads plan limits and reset times, applies the fallback chains, and records state. One skill, `delegate`, with modes that are read only when needed.
+A Claude Code plugin that hands sub-tasks to worker models through a deterministic router. The model (or a script) calls `route.py run ROLE` with a brief; the script picks the lane, model and effort, runs the worker and prints one JSON result; it reads plan limits and reset times, applies the fallback chains, and records state. One skill, `delegate`, with modes that are read only when needed.
 
 ## Install (any machine)
 
@@ -28,7 +28,7 @@ Roles: `planner`, `worker`, `reviewer`, `hard`, `light`. Chains, models and thre
 ```
 skills/delegate/SKILL.md      dispatcher and the run loop (the only file read on a normal call)
 skills/delegate/modes/        init, codex, claude-credit, extend: read on demand
-skills/delegate/route.py      the router: next, report, status, run-claude, capture-limits, doctor, init, set-key, config
+skills/delegate/route.py      the router: run, next, status, report, capture-limits, doctor, set-key, config
 skills/delegate/onboard.py    readiness checks and setup steps
 skills/delegate/agent_runs.py publishes runs and lane limits as agent-runs v1 (a public contract)
 skills/delegate/routing.json  lanes, models, roles, thresholds
@@ -36,8 +36,8 @@ commands/                     /iorlas-delegate:init, /iorlas-delegate:status
 tests/                        python3 -m unittest discover -s tests   (CI: 3 OS x Python 3.8 and 3.12)
 ```
 
-Git stays with the coordinator: workers never create branches or worktrees and never commit, merge or push; a before/after guard exits 78 if one does.
+Git stays with the coordinator: workers never create branches or worktrees and never commit, merge or push; `run` compares HEAD and branch before and after and reports a change in `git_violation`.
 
-Dashboards: each `claude -p` run and the lanes' limits are published as [agent-runs v1](https://github.com/iorlas/iorlas-task-loop/blob/main/docs/contracts/agent-runs-v1.md) records in `~/.config/agent-runs` (`skills/delegate/agent_runs.py` is the only writer). That format is a public contract; everything else here is internal and may change.
+Dashboards: each Codex and `claude -p` run and the lanes' limits are published as [agent-runs v1](https://github.com/iorlas/iorlas-task-loop/blob/main/docs/contracts/agent-runs-v1.md) records in `~/.config/agent-runs` (`skills/delegate/agent_runs.py` is the only writer). That format is a public contract; everything else here is internal and may change.
 
 State, ledger, settings, profile and the key file live in Claude Code's data folder for the plugin (`~/.claude/plugins/data/iorlas-delegate-<marketplace>`), owner-only; from a checkout, in `~/.config/delegate` (`%APPDATA%\delegate`). `DELEGATE_CONFIG_DIR` overrides both. Files from the old location are moved in once. Uninstalling the plugin deletes that folder, key included. Nothing secret is in this repository. Work is tracked with beads (`bd list`).
