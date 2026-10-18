@@ -48,7 +48,16 @@ def config_dir():
         base = os.environ.get("XDG_CONFIG_HOME") or str(Path.home() / ".config")
     p = Path(base) / "delegate"
     p.mkdir(parents=True, exist_ok=True)
+    if os.name != "nt":
+        with contextlib.suppress(OSError):
+            os.chmod(p, 0o700)        # holds the API key file, state and ledger: private to the user
     return p
+
+
+def private(path):
+    if os.name != "nt":
+        with contextlib.suppress(OSError):
+            os.chmod(path, 0o600)
 
 
 def deep_merge(a, b):
@@ -168,6 +177,7 @@ def save_state(st):
     with open(tmp, "w", encoding="utf-8") as f:
         json.dump(st, f)
     os.replace(tmp, p)
+    private(p)
 
 
 def update_state(fn):
@@ -202,6 +212,7 @@ def ledger_add(cost, model, now_t):
     with locked(ledger_path()):
         with open(ledger_path(), "a", encoding="utf-8") as f:
             f.write(json.dumps({"ts": now_t, "model": model, "cost": cost}) + "\n")
+        private(ledger_path())
 
 
 # ----------------------------------------------------------------------------- lane state
@@ -692,6 +703,8 @@ def find_key():
         with contextlib.suppress(OSError):
             k = p.read_text(encoding="utf-8").strip()
             if k:
+                if os.name != "nt" and (p.stat().st_mode & 0o077):
+                    print(f"route.py: warning: {p} is readable by others; run: chmod 600 {p}", file=sys.stderr)
                 return k
     if sys.platform == "darwin" and shutil.which("security"):
         r = subprocess.run(["security", "find-generic-password", "-s", "anthropic-worker-key", "-w"], capture_output=True, text=True)
