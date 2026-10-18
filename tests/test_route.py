@@ -326,7 +326,7 @@ class Onboarding(unittest.TestCase):
             ready.set()
         th = threading.Thread(target=lambda: box.__setitem__("code", self.onboard.set_key_web(route, timeout=20, on_ready=on_ready)))
         th.start()
-        self.assertTrue(ready.wait(5))
+        self.assertTrue(ready.wait(15))
         url = box["url"]
         with self.assertRaises(urllib.error.HTTPError) as ctx:                     # wrong token
             urllib.request.urlopen(url[:-3] + "xxx")

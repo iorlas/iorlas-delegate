@@ -443,8 +443,15 @@ def set_key_web(R, host="127.0.0.1", port=0, timeout=300, force=False, on_ready=
             if ok:
                 result["done"] = True
 
+    import socketserver
+
+    class Srv(HTTPServer):
+        def server_bind(self):          # HTTPServer.server_bind does a reverse-DNS lookup that stalls for seconds on some hosts
+            socketserver.TCPServer.server_bind(self)
+            self.server_name, self.server_port = host, self.socket.getsockname()[1]
+
     try:
-        srv = HTTPServer((host, port), H)
+        srv = Srv((host, port), H)
     except OSError as e:
         print(f"route.py: cannot listen on {host}: {e}", file=sys.stderr)
         return 1
