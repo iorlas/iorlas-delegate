@@ -6,7 +6,7 @@ A Claude Code plugin that tells an orchestrating session how to hand sub-tasks t
 
 - `delegate`: strategy. Lane order, what never gets delegated, the hard-task rule (Opus on short split subtasks), and a limits check (`limits.py`) before each sub-task. A weekly window that is about to reset gets spent first.
 - `codex-worker`: lane 1. Codex (GPT-6.1 Sol on ChatGPT Plus) through the official `codex@openai-codex` plugin, and how to tell the allowance is used up.
-- `claude-credit-worker`: lane 2. `claude -p` on an Anthropic API key (the Max plan's monthly API credit), so it never draws on the Max limits. It sees the project's CLAUDE.md, skills, plugins and MCP like a normal run; profiles (`worker`, `reviewer`, `cheap`, `hard`) set model, effort and per-run cap; a monthly cap (`MONTHLY_CAP`, default $150) guards the credit. Lane 3 is the native Sonnet subagent on Max.
+- `claude-credit-worker`: lane 2. `claude -p` on an Anthropic API key (the Max plan's monthly API credit), so it never draws on the Max limits. It sees the project's CLAUDE.md, skills, plugins and MCP like a normal run; profiles (`worker`, `reviewer`, `cheap`, `hard` = Opus low, `very-hard` = Opus medium, `impossible` = Fable medium) set model, effort and per-run cap; a per-cycle cap (`MONTHLY_CAP`, default $150) and the reset day (`CREDIT_RESET_DAY`) guard the credit. Lane 3 is the native Sonnet subagent on Max.
 
 ## Install
 
@@ -32,7 +32,9 @@ The key comes from a Console workspace linked to the Max plan (claude.ai, Settin
 
 - Codex: asked live from `codex app-server` (`account/rateLimits/read`).
 - Max: Claude Code gives plan limits only to the status line. Call `skills/delegate/capture-limits.sh` from your status line command (`printf '%s' "$input" | bash capture-limits.sh`); it writes `~/.claude/state/max-limits.json`. Without it Max is UNKNOWN. Only an interactive session keeps the file fresh.
-- Credit: not readable; `run.sh` exits 75 when empty.
+- Credit: no balance reading. It shows the reset day, this script's own spend and an out marker that `run.sh` writes on exit 75.
+- Config file `~/.config/claude-credit-worker/config`: `MONTHLY_CAP`, `CREDIT_RESET_DAY`, `MAX_WEEKLY_RESET="Sun 17:00"` (the weekly reset moment, used when the status-line file is missing).
+- Desktop app: `mcp__ccd_session_mgmt__get_usage` gives the Max windows directly; `delegate` prefers it there.
 
 ## Requirements
 

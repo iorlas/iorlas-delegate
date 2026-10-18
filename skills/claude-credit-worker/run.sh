@@ -10,6 +10,8 @@
 #   reviewer                        claude-sonnet-5-5  high    $1
 #   cheap                           claude-haiku-5-5   low     $0.25
 #   hard                            claude-opus-5-5    low     $3
+#   very-hard                       claude-opus-5-5    medium  $5
+#   impossible                      claude-fable-5-1   medium  $6
 #
 # Environment: by default the worker sees what a normal `claude` run sees in --cwd (CLAUDE.md, skills, plugins,
 # MCP servers, hooks, settings). Only the login differs: ANTHROPIC_API_KEY is set, and a bad key fails with
@@ -19,22 +21,51 @@
 # exit:   0 ok | 75 credit exhausted | 76 rate limited or overloaded | 77 own monthly cap reached
 #         2 key missing | 1 other failure
 #
-# Config (optional): ~/.config/claude-credit-worker/config, shell syntax, e.g.  MONTHLY_CAP=150
+# Config (optional): ~/.config/claude-credit-worker/config, shell syntax:
+#   MONTHLY_CAP=150        dollars per credit cycle this script may spend (the credit is $200 on Max 20x)
+#   CREDIT_RESET_DAY=1     day of the month the credit resets (billing cadence)
 set -uo pipefail
 
 CONF_DIR="$HOME/.config/claude-credit-worker"
 KEY_SERVICE="anthropic-worker-key"
 LEDGER="$CONF_DIR/spend.jsonl"
 MONTHLY_CAP="150"   # dollars; the credit is $200/mo on Max 20x, kept below it as a margin
+CREDIT_RESET_DAY="1"
+OUT_MARK="$CONF_DIR/out-until"
 [ -r "$CONF_DIR/config" ] && . "$CONF_DIR/config"
+
+# start of the current credit cycle, as YYYY-MM-DD (CREDIT_RESET_DAY of this or last month)
+cycle_start() {
+  python3 - "$CREDIT_RESET_DAY" <<'PY'
+import sys, datetime as d
+day = min(int(sys.argv[1] or 1), 28)
+t = d.date.today()
+s = t.replace(day=day)
+if s > t:
+    s = (t.replace(day=1) - d.timedelta(days=1)).replace(day=day)
+print(s.isoformat())
+PY
+}
+next_reset() {
+  python3 - "$CREDIT_RESET_DAY" <<'PY'
+import sys, datetime as d
+day = min(int(sys.argv[1] or 1), 28)
+t = d.date.today()
+s = t.replace(day=day)
+if s <= t:
+    s = ((t.replace(day=1) + d.timedelta(days=32)).replace(day=1)).replace(day=day)
+print(s.isoformat())
+PY
+}
 
 month_spend() {
   [ -r "$LEDGER" ] || { echo 0; return; }
-  jq -s --arg m "$(date +%Y-%m)" '[.[] | select(.ts | startswith($m)) | .cost] | add // 0' "$LEDGER" 2>/dev/null || echo 0
+  jq -s --arg c "$(cycle_start)" '[.[] | select(.ts >= $c) | .cost] | add // 0' "$LEDGER" 2>/dev/null || echo 0
 }
 
 if [ "${1:-}" = "--status" ]; then
-  echo "month $(date +%Y-%m): \$$(month_spend) spent by this script of \$$MONTHLY_CAP cap (own ledger; the credit balance itself is not readable)"
+  echo "cycle since $(cycle_start): \$$(month_spend) spent by this script of \$$MONTHLY_CAP cap; credit resets $(next_reset) (own ledger; the credit balance itself is not readable)"
+  [ -r "$OUT_MARK" ] && echo "out marker set: a run saw 'credit balance too low' (cleared by the next successful run, or: rm $OUT_MARK)"
   exit 0
 fi
 
@@ -58,8 +89,10 @@ case "$profile" in
   worker)   p_model="claude-sonnet-5-5"; p_effort="medium"; p_budget="2" ;;
   reviewer) p_model="claude-sonnet-5-5"; p_effort="high";   p_budget="1" ;;
   cheap)    p_model="claude-haiku-5-5";  p_effort="low";    p_budget="0.25" ;;
-  hard)     p_model="claude-opus-5-5";   p_effort="low";    p_budget="3" ;;
-  *) echo "run.sh: unknown profile '$profile' (worker, reviewer, cheap, hard)" >&2; exit 1 ;;
+  hard)       p_model="claude-opus-5-5";  p_effort="low";    p_budget="3" ;;
+  very-hard)  p_model="claude-opus-5-5";  p_effort="medium"; p_budget="5" ;;
+  impossible) p_model="claude-fable-5-1"; p_effort="medium"; p_budget="6" ;;
+  *) echo "run.sh: unknown profile '$profile' (worker, reviewer, cheap, hard, very-hard, impossible)" >&2; exit 1 ;;
 esac
 model="${model:-$p_model}"; effort="${effort:-$p_effort}"; budget="${budget:-$p_budget}"
 
@@ -82,7 +115,7 @@ fi
 
 spent="$(month_spend)"
 if awk -v s="$spent" -v b="$budget" -v c="$MONTHLY_CAP" 'BEGIN{exit !(s+b>c)}'; then
-  echo "run.sh: monthly cap: \$$spent spent + \$$budget this run > \$$MONTHLY_CAP (raise MONTHLY_CAP in $CONF_DIR/config, or treat lane 2 as out)" >&2
+  echo "run.sh: monthly cap: \$$spent spent this cycle + \$$budget this run > \$$MONTHLY_CAP (raise MONTHLY_CAP in $CONF_DIR/config, or treat lane 2 as out)" >&2
   exit 77
 fi
 
@@ -129,7 +162,9 @@ fi
 
 if [ "$rc" -ne 0 ] || [ "$is_err" = "true" ]; then
   if printf '%s' "$text" | grep -qiE 'credit balance (is )?too low'; then
-    echo "$text" >&2; echo "run.sh: credit exhausted" >&2; exit 75
+    mkdir -p "$CONF_DIR"
+    date -j -f %Y-%m-%d "$(next_reset)" +%s > "$OUT_MARK" 2>/dev/null || date -d "$(next_reset)" +%s > "$OUT_MARK" 2>/dev/null || true
+    echo "$text" >&2; echo "run.sh: credit exhausted (back at the $(next_reset) reset)" >&2; exit 75
   fi
   if printf '%s' "$text" | grep -qiE 'rate.?limit|overloaded|\b429\b|\b529\b'; then
     echo "$text" >&2; echo "run.sh: rate limited" >&2; exit 76
@@ -137,6 +172,7 @@ if [ "$rc" -ne 0 ] || [ "$is_err" = "true" ]; then
   echo "$text" >&2; exit 1
 fi
 
+rm -f "$OUT_MARK"
 printf '%s\n' "$text"
 echo "cost=\$$cost turns=$turns month=\$$(month_spend)/\$$MONTHLY_CAP" >&2
 exit 0

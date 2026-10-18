@@ -22,6 +22,8 @@ ${CLAUDE_SKILL_DIR}/run.sh --status        # this script's own spend this month 
 | `reviewer` | Sonnet 5.5 | high | $1 | verification: rerun the checks, read the diff (read-only) |
 | `cheap` | Haiku 5.5 | low | $0.25 | routing, classification, bulk reading, short summaries; keep prompts under 100K tokens |
 | `hard` | Opus 5.5 | low | $3 | one short, split subtask of a hard ticket (see `delegate`); never the whole ticket |
+| `very-hard` | Opus 5.5 | medium | $5 | a subtask that failed at `hard` |
+| `impossible` | Fable 5.1 | medium | $6 | a subtask that failed twice at `very-hard`; Fable costs about 2.5x Opus per token |
 
 Flags override the profile. Raise effort only for a subtask that failed at the profile's level.
 
@@ -37,15 +39,15 @@ Flags override the profile. Raise effort only for a subtask that failed at the p
 ## Spend limits
 
 - Per run: `--max-budget-usd` from the profile.
-- Per month: the script logs each run's cost to `~/.config/claude-credit-worker/spend.jsonl` and refuses (exit 77) when this month's spend plus the run's cap would pass `MONTHLY_CAP` (default $150, set in `~/.config/claude-credit-worker/config`). The ledger counts calendar months and only this script's runs; the real credit resets on the billing cycle, and other uses of the same key are not counted.
-- The credit balance itself is not readable. When it is empty the API says so and the script exits 75.
+- Per credit cycle: the script logs each run's cost to `~/.config/claude-credit-worker/spend.jsonl` and refuses (exit 77) when the cycle's spend plus the run's cap would pass `MONTHLY_CAP` (default $150). The cycle starts on `CREDIT_RESET_DAY` (default 1; set both in `~/.config/claude-credit-worker/config`). The ledger counts only this script's runs; other uses of the same key are not counted.
+- The credit balance itself is not readable. When it is empty the API says so, the script exits 75 and writes an out marker (`~/.config/claude-credit-worker/out-until`, set to the next reset day) that `delegate`'s `limits.py` reads; the next successful run clears it.
 
 ## Exit codes
 
 | code | meaning | next |
 |---|---|---|
 | 0 | done | review the output |
-| 75 | credit exhausted | lane is out until the billing cycle resets; fall to the next lane and tell the user |
+| 75 | credit exhausted | lane is out until the next reset day (`run.sh --status` shows it); fall to the next lane and tell the user |
 | 76 | rate limited or overloaded | retry once after a minute, then next lane |
 | 77 | own monthly cap reached | lane is out; tell the user, who may raise `MONTHLY_CAP` |
 | 2 | API key not stored | tell the user the one-time command printed on stderr |
