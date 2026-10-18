@@ -1,0 +1,10 @@
+{
+  "name": "iorlas-delegate",
+  "description": "Hand sub-tasks to worker models in a fixed lane order (Codex, Claude on the API credit, Sonnet on Max), with plan-limit awareness.",
+  "version": "0.1.0",
+  "author": { "name": "iorlas" },
+  "homepage": "https://github.com/iorlas/iorlas-delegate",
+  "repository": "https://github.com/iorlas/iorlas-delegate",
+  "license": "MIT",
+  "keywords": ["delegation", "codex", "subagents", "skills"]
+}
