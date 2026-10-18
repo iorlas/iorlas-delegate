@@ -35,7 +35,8 @@ https://github.com/iorlas/iorlas-task-loop/blob/main/docs/contracts/worker-run-v
   `transcript`, `retry_after`, `say`, `git_violation`); exit 0 whenever it was printed. Statuses: `done`, `failed`, `timeout`, `lane_out`, `stop`, `error`
   (plus `agent` for interactive callers only).
 - Headless = no `CLAUDE_CODE_ENTRYPOINT` (the engine strips `CLAUDE_*`). Headless never gets `agent`, `ask_user` or `needs_input`; CLAUDE_CREDIT is never
-  picked; CLAUDE_SUBSCRIPTION runs `claude -p` on the logged-in account.
+  picked; CLAUDE_SUBSCRIPTION runs `claude -p` on the logged-in account, and only while a fresh reading of its use exists (`~/.claude/state/max-limits.json`
+  from the status line, or `state.json`, newer than `usage_stale_minutes`); otherwise `stop` with `retry_after`. `orchestrator_reserve` applies.
 - Everything else (`next`, `doctor`, flags not listed above, `state.json`, `routing.json`, mode files) is private and may change in any release. Changing
   the contract above means changing the spec in iorlas-task-loop first.
 

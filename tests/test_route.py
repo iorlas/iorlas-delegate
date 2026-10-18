@@ -482,7 +482,16 @@ printf '{"result":"claude says hi","session_id":"sess-1","total_cost_usd":0.5,"i
             os.environ.pop(k, None)
         self.repo = str(base / "repo")
         self.real = dict(route.READERS)
-        route.READERS.update({k: (lambda lane, S, st_, t, *a: None) for k in self.real})
+        route.READERS.update({k: (lambda lane, S, st_, t, *a: None) for k in ("codex_app_server", "claude_credit")})   # the real subscription reader reads the status-line file
+        self.fresh_usage()
+
+    def fresh_usage(self, age=0):
+        """What the status line writes; a headless call may only spend the shared plan when this is fresh."""
+        f = Path(self.tmp.name) / ".claude" / "state" / "max-limits.json"
+        f.parent.mkdir(parents=True, exist_ok=True)
+        soon = time.time() + 3600
+        f.write_text(json.dumps({"updated": time.time() - age, "rate_limits": {"five_hour": {"used_percentage": 10, "resets_at": soon},
+                                                                              "seven_day": {"used_percentage": 20, "resets_at": soon * 100}}}))
 
     def tearDown(self):
         route.READERS.update(self.real)
@@ -526,6 +535,29 @@ printf '{"result":"claude says hi","session_id":"sess-1","total_cost_usd":0.5,"i
         self.assertIn("--session-id", seen)
         self.assertNotIn("--max-budget-usd", seen)                         # a subscription has no dollar cap
         self.assertNotIn("ANTHROPIC_API_KEY", Path(os.environ["FAKE_ENV"]).read_text())
+
+    def test_headless_stops_when_no_usage_feed_is_fresh(self):
+        route.update_state(lambda s: s.setdefault("out", {}).__setitem__("OPENAI_SUBSCRIPTION", {"until": route.now() + 3600, "why": "t"}))
+        self.fresh_usage(age=3600)                                         # older than the 30-minute window
+        code, r = self.run_it()
+        self.assertEqual((code, r["status"]), (0, "stop"))
+        self.assertGreater(r["retry_after"], time.time())
+        self.fresh_usage()
+        _, r = self.run_it()
+        self.assertEqual((r["status"], r["lane"]), ("done", "CLAUDE_SUBSCRIPTION"))
+
+    def test_headless_keeps_the_orchestrator_reserve(self):
+        route.update_state(lambda s: s.setdefault("out", {}).__setitem__("OPENAI_SUBSCRIPTION", {"until": route.now() + 3600, "why": "t"}))
+        f = Path(self.tmp.name) / ".claude" / "state" / "max-limits.json"
+        d = json.loads(f.read_text())
+        d["rate_limits"]["seven_day"]["used_percentage"] = 93                # above the 90% weekly reserve
+        f.write_text(json.dumps(d))
+        _, r = self.run_it()
+        self.assertEqual(r["status"], "done")                               # the relaxed pass (ceiling 95) may still use it
+        d["rate_limits"]["seven_day"]["used_percentage"] = 97
+        f.write_text(json.dumps(d))
+        _, r = self.run_it()
+        self.assertEqual(r["status"], "stop")
 
     def test_headless_never_picks_the_credit_lane_even_with_a_key(self):
         os.environ["CLAUDE_CREDIT_WORKER_KEY"] = "sk-ant-x"

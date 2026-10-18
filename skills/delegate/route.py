@@ -799,9 +799,13 @@ def decision(a, cfg):
     new_offers = list(OFFERS)
     warnings = drift_warnings(lanes, st, t)
     publish_lanes(lanes, st, t)
+    S = cfg["settings"]
     if headless:        # no one to pay the API credit knowingly: credit lanes are never picked headless
         lanes = {n: l for n, l in lanes.items() if l.kind != "credit"}
-    S = cfg["settings"]
+        for l in lanes.values():     # a shared plan is never spent blind: unknown use could drain the window the user's own sessions need
+            if l.shared and not l.usage_known and not l.out:
+                l.out, l.out_until = True, t + S["usage_stale_minutes"] * 60
+                l.notes.insert(0, "use unknown headless (no fresh status-line reading)")
     ref = getattr(a, "resume", None)
     if ref:             # continue on the lane that made the ref; never switch lanes silently
         rec = (st.get("refs") or {}).get(ref)
