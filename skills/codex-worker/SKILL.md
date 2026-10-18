@@ -1,6 +1,6 @@
 ---
 name: codex-worker
-description: Hand one self-contained coding task to Codex (GPT-6.1 Sol on the ChatGPT Plus plan) through the official codex plugin, and detect when the plan allowance is used up. Use when `delegate` routes a step to the codex lane.
+description: Hand one self-contained coding task to Codex (GPT-6.1 Sol on the ChatGPT Plus plan) through the official codex plugin, and detect when the plan allowance is used up. Use when `delegate` returns a codex step for the OPENAI_SUBSCRIPTION lane.
 ---
 
 # codex-worker
@@ -27,18 +27,19 @@ The plugin has no usage-limit handling of its own, and the wrapper is told to re
 
 1. Probe once, cheaply: `codex exec --skip-git-repo-check "Reply with exactly: ok"` from any directory.
 2. Output `ok` means Codex works; the failure was in the task or the plugin. Retry once with `--fresh`, then report.
-3. A usage-limit, rate-limit or "try again later" message means the plan allowance is used up (5-hour window or weekly cap). Tell the user once, in one line, quote the message, and treat the codex lane as out until its reset time (the message usually says when); then probe again (step 1) and come back (`delegate`, rule 1).
+3. A usage-limit, rate-limit or "try again later" message means the plan allowance is used up (5-hour window or weekly cap). Tell the user once, in one line, quote the message, and treat the OPENAI_SUBSCRIPTION lane as out until its reset time (the message usually says when); then probe again (step 1) and come back (`delegate`, rule 1).
 4. `codex login status` not "Logged in using ChatGPT": tell the user to run `codex login`.
 
 Not yet seen in practice: the exact wording of the usage-limit message. When it first appears, add it here.
 
-## Roles in this lane (see `delegate` for the chains)
+## Uses (the router's `d.use`)
 
-- Worker: Sol medium, write access (the default above).
-- Reviewer of Claude-written work: `/codex:review`, or `/codex:adversarial-review` with a focus line. Read-only. Sol never reviews Sol's own diff.
-- Planner, last resort: Sol high, read-only. `/codex:adversarial-review` on the draft plan file, or `codex-rescue --effort high` with a planning brief that forbids edits.
-- Light work (reading, summarising): GPT-6 Luna, read-only: `codex exec -s read-only -m gpt-6-luna -c model_reasoning_effort=low "<brief>"`. Luna has a very large Plus allowance (350-3,000 messages per 5 hours on OpenAI's page) and is a weak model (13.6% on Terminal-Bench 4.0): never for edits or judgement.
-- Hard rung 1: Sol at `--effort high`, after Sol medium and a Claude worker have both failed.
+- `task`: Sol, write access (the default above).
+- `review`: `/codex:review`, or `/codex:adversarial-review` with a focus line. Read-only. Used for diffs Claude wrote.
+- `adversarial_review_of_plan`: `/codex:adversarial-review` on the draft plan file, or `codex-rescue --effort high` with a planning brief that forbids edits.
+- `read_only_exec`: GPT-6 Luna: `codex exec -s read-only -m gpt-6-luna -c model_reasoning_effort=low "<brief>"`. Very large Plus allowance (350-3,000 messages per 5 hours on OpenAI's page), weak model (13.6% on Terminal-Bench 4.0): reading and summarising only, never edits or judgement.
+
+When Codex refuses for a limit, run `route.py report --lane OPENAI_SUBSCRIPTION --event out --message "<its text>"`; the router reads the real reset time itself and skips the lane until then.
 
 ## Never
 

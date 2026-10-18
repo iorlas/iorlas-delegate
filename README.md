@@ -2,11 +2,14 @@
 
 A Claude Code plugin that tells an orchestrating session how to hand sub-tasks to worker models, in a fixed order, and to check plan limits first.
 
-## Skills
+## How it works
 
-- `delegate`: strategy. Three execution lanes (`codex`, `max`, `credit`), a glossary, a function that picks between the two Claude lanes, and one ordered chain per role (planner, worker, reviewer, hard, light) that lists every lane and ends in STOP, a rule for choosing between Max and the API credit from live limits and reset times, and a limits check (`limits.py`). Fable only when the task names it.
-- `codex-worker`: the `codex` lane. Codex (GPT-6.1 Sol on ChatGPT Plus) through the official `codex@openai-codex` plugin, and how to tell the allowance is used up.
-- `claude-credit-worker`: the `credit` lane. `claude -p` on an Anthropic API key (the Max plan's monthly API credit), so it never draws on the Max limits. It sees the project's CLAUDE.md, skills, plugins and MCP like a normal run; profiles (`worker`, `reviewer`, `cheap`, `hard` = Opus low, `very-hard` = Opus medium, `impossible` = Fable medium) set model, effort and per-run cap; a per-cycle cap (`MONTHLY_CAP`, default $150) and the reset day (`CREDIT_RESET_DAY`) guard the credit. The `max` lane is the native subagent on Max.
+`skills/delegate/route.py` is a deterministic router (Python 3.8+, standard library only; macOS, Linux, Windows, Docker). The model asks it `route.py next ROLE` and gets back which lane, model and effort to run, and the command shape. The script reads plan limits and reset times itself where it can (Codex live from `codex app-server`; the Claude subscription from the status-line file or from what the model passes in; the API credit from its own ledger and an out marker), applies one pick function and the role chains, runs a second pass with relaxed gates before it stops, and records state under `~/.config/delegate` (`%APPDATA%\delegate` on Windows). The model provides only what the script cannot read, executes the answer, and reports refusals.
+
+- `delegate` skill: the loop, the inputs the model supplies, and the rules a script cannot enforce.
+- `codex-worker` skill: how to run the `OPENAI_SUBSCRIPTION` lane (Codex plugin).
+- `claude-credit-worker` skill: the `CLAUDE_CREDIT` lane (`route.py run-claude`), spend caps and key setup.
+- `routing.json`: lanes, models, roles and thresholds as data. Add a lane or role by editing it. Fable only when the task names it.
 
 ## Install
 
@@ -28,14 +31,17 @@ The key comes from a Console workspace linked to the Max plan (claude.ai, Settin
 
 ## Limit awareness
 
-`skills/delegate/limits.py` prints use, reset time and a verdict (OK, BURN, OUT, STALE, UNKNOWN) per lane.
+- Codex: asked live.
+- Claude subscription: Claude Code gives plan limits only to the status line. Call `route.py capture-limits` from your status line (`printf '%s' "$input" | python3 route.py capture-limits`) to save them, or pass the desktop app's `get_usage` windows with `--claude-usage`.
+- Credit: no balance reading; the router counts its own spend per cycle and marks the lane out on "credit balance too low".
+- Settings (reset day, caps, `claude_weekly_reset`) go in `config.json` in the config directory.
 
-- Codex: asked live from `codex app-server` (`account/rateLimits/read`).
-- Max: Claude Code gives plan limits only to the status line. Call `skills/delegate/capture-limits.sh` from your status line command (`printf '%s' "$input" | bash capture-limits.sh`); it writes `~/.claude/state/max-limits.json`. Without it Max is UNKNOWN. Only an interactive session keeps the file fresh.
-- Credit: no balance reading. It shows the reset day, this script's own spend and an out marker that `run.sh` writes on exit 75.
-- Config file `~/.config/claude-credit-worker/config`: `MONTHLY_CAP`, `CREDIT_RESET_DAY`, `MAX_WEEKLY_RESET="Sun 17:00"` (the weekly reset moment, used when the status-line file is missing).
-- Desktop app: `mcp__ccd_session_mgmt__get_usage` gives the Max windows directly; `delegate` prefers it there.
+## Tests
+
+```sh
+python3 -m unittest discover -s tests
+```
 
 ## Requirements
 
-`claude`, `codex`, `jq`, `python3`, Node 18.18+ (for the Codex plugin).
+`claude`, `codex`, `python3`, Node 18.18+ (for the Codex plugin).
