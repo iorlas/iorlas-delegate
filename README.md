@@ -24,7 +24,7 @@ Store the worker key once, in your own terminal (the `-w` flag prompts, so it st
 security add-generic-password -U -a "$USER" -s anthropic-worker-key -w
 ```
 
-The key comes from a Console workspace linked to the Max plan (claude.ai, Settings, Billing, API credits), with a spend limit. macOS keychain only; on Linux set `CLAUDE_CREDIT_WORKER_KEY` in the worker's own environment, never globally.
+The key comes from a Console workspace linked to the Max plan (claude.ai, Settings, Billing, API credits), with a spend limit. Key lookup order: env `CLAUDE_CREDIT_WORKER_KEY` (not an `ANTHROPIC_*` name, so interactive Claude Code ignores it), then the file `~/.config/claude-credit-worker/key` (mode 600; Linux), then the macOS keychain.
 
 ## Limit awareness
 

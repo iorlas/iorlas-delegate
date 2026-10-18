@@ -30,12 +30,16 @@ if [ $# -gt 0 ]; then prompt="$*"; else prompt="$(cat)"; fi
 [ -n "$prompt" ] || { echo "run.sh: empty prompt" >&2; exit 1; }
 
 key="${CLAUDE_CREDIT_WORKER_KEY:-}"
-if [ -z "$key" ]; then
+if [ -z "$key" ] && [ -r "$HOME/.config/claude-credit-worker/key" ]; then
+  key="$(tr -d '[:space:]' < "$HOME/.config/claude-credit-worker/key")"
+fi
+if [ -z "$key" ] && command -v security >/dev/null 2>&1; then
   key="$(security find-generic-password -s "$KEY_SERVICE" -w 2>/dev/null || true)"
 fi
 if [ -z "$key" ]; then
   echo "run.sh: no API key. Store it once, in your own terminal:" >&2
-  echo "  security add-generic-password -U -a \"\$USER\" -s $KEY_SERVICE -w" >&2
+  echo "  macOS: security add-generic-password -U -a \"\$USER\" -s $KEY_SERVICE -w" >&2
+  echo "  Linux: mkdir -p ~/.config/claude-credit-worker && (umask 077; read -rs k && printf %s \"\$k\" > ~/.config/claude-credit-worker/key)" >&2
   exit 2
 fi
 
