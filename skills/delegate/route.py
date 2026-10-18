@@ -34,6 +34,7 @@ import shutil
 import subprocess
 import sys
 import time
+import uuid
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
@@ -850,6 +851,27 @@ def find_key(quiet=False):
     return ""
 
 
+def run_record(run_id, fields):
+    """One file per claude -p run (runs/<id>.json), kept 7 days: what a dashboard needs to link it to its parent."""
+    d = config_dir() / "runs"
+    d.mkdir(parents=True, exist_ok=True)
+    f = d / (run_id + ".json")
+    try:
+        rec = json.loads(f.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        rec = {}
+    rec.update(fields)
+    f.write_text(json.dumps(rec), encoding="utf-8")
+    private(f)
+    cut = now() - 7 * 86400
+    for old in d.glob("*.json"):
+        try:
+            if old.stat().st_mtime < cut:
+                old.unlink()
+        except OSError:
+            pass
+
+
 def cmd_run_claude(a, cfg):
     t = now()
     S = cfg["settings"]
@@ -875,11 +897,12 @@ def cmd_run_claude(a, cfg):
     if not exe:
         print("route.py: claude CLI not found on PATH", file=sys.stderr)
         return 1
+    run_id = str(uuid.uuid4())  # the worker's session id: its transcript is ~/.claude/projects/*/<run_id>.jsonl
     write = bool(a.write)
     tools = ["Read", "Glob", "Grep"] + (["Edit", "Write", "Bash"] if write else []) + list(a.allow or [])
     cmd = [exe] + (["--bare"] if a.bare else []) + [
         "-p", "--output-format", "json", "--model", model["api"], "--effort", a.effort, "--max-budget-usd", str(cap),
-        "--no-session-persistence", "--append-system-prompt", PREAMBLE,
+        "--session-id", run_id, "--append-system-prompt", PREAMBLE,
         "--permission-mode", "acceptEdits" if write else "default",
         "--allowedTools", *tools, "--disallowedTools", *GIT_WRITE_DENY]
     env = dict(os.environ)
@@ -889,7 +912,12 @@ def cmd_run_claude(a, cfg):
     env["DELEGATE_DEPTH"] = "1"
     workdir = os.path.abspath(a.cwd) if a.cwd else os.getcwd()
     git_before = git_state(workdir)
+    run_record(run_id, {"session": run_id, "lane": "CLAUDE_CREDIT", "model": a.model, "cwd": workdir,
+                        "parent": os.environ.get("CLAUDE_CODE_SESSION_ID", ""), "started": t, "status": "running",
+                        "title": prompt.strip().splitlines()[0][:120]})
+    print(f"session={run_id}", file=sys.stderr, flush=True)
     r = subprocess.run(cmd, input=prompt, capture_output=True, text=True, cwd=workdir, env=env)
+    run_record(run_id, {"ended": now(), "status": "failed" if r.returncode else "completed", "exit": r.returncode})
     violations = git_changes(git_before, git_state(workdir))
     out = (r.stdout or "") + (r.stderr or "")
     try:

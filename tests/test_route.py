@@ -320,5 +320,32 @@ class GitOwnership(unittest.TestCase):
             self.assertIn(f"Bash(git {verb}:*)", route.GIT_WRITE_DENY)
 
 
+class RunRecord(unittest.TestCase):
+    """claude -p runs leave a record a dashboard can link to the session that started them."""
+
+    def test_record_merges_and_prunes(self):
+        saved = {k: os.environ.get(k) for k in ("XDG_CONFIG_HOME", "APPDATA")}
+        with tempfile.TemporaryDirectory() as d:
+            os.environ["XDG_CONFIG_HOME"] = d
+            os.environ["APPDATA"] = d
+            try:
+                runs = route.config_dir() / "runs"
+                runs.mkdir(parents=True, exist_ok=True)
+                old = runs / "old.json"
+                old.write_text("{}")
+                os.utime(old, (0, 0))
+                route.run_record("r1", {"status": "running", "parent": "p"})
+                route.run_record("r1", {"status": "completed", "exit": 0})
+                rec = json.loads((runs / "r1.json").read_text())
+                self.assertEqual(rec, {"status": "completed", "parent": "p", "exit": 0})
+                self.assertFalse(old.exists())
+            finally:
+                for k, v in saved.items():
+                    if v is None:
+                        os.environ.pop(k, None)
+                    else:
+                        os.environ[k] = v
+
+
 if __name__ == "__main__":
     unittest.main()
