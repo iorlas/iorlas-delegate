@@ -20,7 +20,7 @@ The model supplies only what the script cannot read itself; the script decides.
 Data: routing.json next to this file (lanes, models, roles, thresholds).
 Per-user settings: <config dir>/config.json (same keys as "settings"); state, ledger and key live in <config dir>:
   $DELEGATE_CONFIG_DIR, else Claude Code's plugin data dir (~/.claude/plugins/data/<plugin>-<marketplace>), else (a checkout) ~/.config/delegate
-  (%APPDATA%\\delegate on Windows). Files from the old location are copied in once.
+  (%APPDATA%\\delegate on Windows). Files from the old location are moved in once.
 
 Exit codes of run-claude: 0 ok | 75 credit exhausted | 76 rate limited | 77 own cap reached | 78 worker changed git state | 2 key missing | 1 other.
 Workers never create branches or worktrees and never commit, merge, push or stash: the coordinator owns git.
@@ -83,7 +83,7 @@ def plugin_data_dir():
 def config_dir():
     """Where settings, profile, state, ledger and the key live. Order: DELEGATE_CONFIG_DIR, the plugin's data dir (installed plugin),
     else ~/.config/delegate (checkout). CLAUDE_PLUGIN_DATA is deliberately not read: it names whichever plugin launched the process.
-    Files from the old location are copied in once."""
+    Files from the old location are moved in once."""
     explicit = os.environ.get("DELEGATE_CONFIG_DIR")
     p = Path(explicit) if explicit else (plugin_data_dir() or legacy_dir())
     fresh = not p.exists()
@@ -98,7 +98,9 @@ def config_dir():
                 src = old / name
                 if src.is_file() and not (p / name).exists():
                     with contextlib.suppress(OSError):
-                        shutil.copy2(src, p / name)
+                        shutil.move(str(src), str(p / name))        # moved, not copied: one copy of the key
+            with contextlib.suppress(OSError):
+                old.rmdir()                                         # only succeeds when empty
     return p
 
 

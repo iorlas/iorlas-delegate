@@ -573,7 +573,7 @@ class ConfigLocation(unittest.TestCase):
         os.environ["DELEGATE_CONFIG_DIR"] = str(Path(self.tmp.name) / "mine")
         self.assertEqual(route.config_dir(), Path(self.tmp.name) / "mine")
 
-    def test_old_files_are_copied_once_and_never_overwritten(self):
+    def test_old_files_are_moved_once_and_never_overwritten(self):
         old = Path(self.tmp.name) / "delegate"
         old.mkdir()
         (old / "config.json").write_text('{"claude_weekly_reset": "Sun 17:00"}')
@@ -581,9 +581,10 @@ class ConfigLocation(unittest.TestCase):
         want = self.installed()
         self.assertEqual(route.config_dir(), want)
         self.assertEqual((want / "claude-credit.key").read_text(), "sk-ant-old\n")
-        self.assertTrue((old / "claude-credit.key").exists())                       # copied, not moved
+        self.assertFalse((old / "claude-credit.key").exists())                      # moved: no second copy of the key
+        self.assertFalse(old.exists())                                              # empty old dir removed
         (want / "config.json").write_text("{}")
-        route.config_dir()                                                          # second call: nothing re-copied
+        route.config_dir()                                                          # second call: nothing re-moved
         self.assertEqual((want / "config.json").read_text(), "{}")
 
 
