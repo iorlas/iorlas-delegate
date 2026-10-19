@@ -202,7 +202,14 @@ def save_state(st):
     tmp = p.with_suffix(f".tmp{os.getpid()}")
     with open(tmp, "w", encoding="utf-8") as f:
         json.dump(st, f)
-    os.replace(tmp, p)
+    for i in range(50):         # Windows refuses to replace a file another process has open for reading
+        try:
+            os.replace(tmp, p)
+            break
+        except PermissionError:
+            if i == 49:
+                raise
+            time.sleep(0.02)
     private(p)
 
 
