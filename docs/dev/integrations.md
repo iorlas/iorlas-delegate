@@ -38,16 +38,24 @@ https://github.com/iorlas/iorlas-task-loop/blob/main/docs/contracts/worker-run-v
 - `--unattended` is how an engine says no Claude session is behind it. Without it the caller is a Claude session and may get `agent`. With it: never `agent`, `ask_user`
   or `needs_input`; CLAUDE_CREDIT is never picked; CLAUDE_SUBSCRIPTION runs `claude -p` on the logged-in account. No time or token limit by default: `--timeout` is
   opt-in and an unknown plan reading does not stop a run. `orchestrator_reserve` still applies when a reading exists.
-- `--no-sandbox` (one boolean, the caller's explicit consent): Codex steps of any mode run with `-s danger-full-access` (resume: `sandbox_mode="danger-full-access"`), so builds that need the network or the host
-  (`dotnet test`, Unity) work. A read-only Claude step gets Bash too (a write step already has it); the brief, not the sandbox, then keeps a reviewer from editing. The run is recorded with `no_sandbox: true` in `history.jsonl`.
-  Delegate adds no tool servers or whitelists; the exposure is the one the caller accepted.
+- `--host` (one boolean, the caller's explicit consent): "this work cannot run in a sandbox" (Unity). Only lanes whose family is in `settings.host_lanes` take it
+  (default `["claude"]`; `["openai","claude"]` lets Codex run it with `-s danger-full-access`, resume: `sandbox_mode="danger-full-access"`). A role with no step on those lanes answers `error`.
+  Claude steps get Bash (a read-only step too) and an interactive caller runs `claude -p` instead of the Agent tool, so the classifier applies. `--resume` must repeat the original run's `--host`, else `error`.
+  Replaces `--no-sandbox` (0.20-0.22): an engine below 0.23 still sends that flag, the engine gates on the installed delegate version.
+- Everything else about access is delegate-internal, set once in delegate's config (never by the caller): Codex always gets `--ignore-user-config --ignore-rules` and explicit
+  `sandbox_workspace_write.network_access` / `writable_roots` (`settings.contained_network`, default false; `settings.cache_roots`, default empty, `~`/`$VAR` expanded, missing folders dropped,
+  used only when `contained_network` is true). Claude always gets `--restricted --tools <list> --strict-mcp-config --permission-mode auto --permission-prompts none` (the repo's and the
+  user's hooks, plugins and settings do not load; subscription login still works; never `--bare`, it disables login). Worker env drops credential-looking variables.
+- `denied: [{tool, input}]` (top level, Claude steps only): commands the auto-mode classifier refused, minus git writes the coordinator forbids anyway. No new status: it rides on `done`/`failed`.
+  The classifier is an accident filter, not a boundary: a brief that explicitly asks for a command can get it approved.
+- `stop` (not `error`) answers a state-lock timeout, with `retry_after`; `error` means permanent.
 - Slots: at most `max_parallel` (setting, default 4; one when the lane's 5-hour use is at `strain`) runs in flight per lane. A full lane is skipped like a refused one; when nothing
   is left the answer is `stop` (or `lane_out`) with a `retry_after` 60-120 s ahead, jittered. `run` never waits for a slot. A run holds a lease in `state.json`
   (`leases`; 120 s, renewed every 30 s, so a killed `route.py` frees its slot by itself). With `--task ID`, a second `run` for the same task while the first is alive answers `stop`.
 - SIGTERM, SIGHUP or Ctrl-C on `route.py run` stops its worker too (workers run in their own process group, so nothing else would). With `--unattended` a changed parent pid
   (the engine was SIGKILLed) does the same. Without this, an orphaned Codex keeps burning the plan.
 - `route.py status --json` (v1, the dashboard's only read): `{v, ts, lanes{name:{family,kind,out,out_until,five,week,pace,burn,spend,cap,notes}}, running[{run_id,lane,role,task,started,age_s}],
-  recent[{run_id,ts,role,task,lane,model,status,secs,cost}] (last `--recent N`, default 20), needs_input[]}`. `five`/`week` are null when unknown. `doctor --json` carries `v: 1`. Dashboards read these, never
+  recent[{run_id,ts,role,task,lane,model,status,host,secs,cost,tokens,denials}] (last `--recent N`, default 20), needs_input[]}`. `five`/`week` are null when unknown. `doctor --json` carries `v: 1`. Dashboards read these, never
   `state.json` or `history.jsonl`.
 - `history.jsonl` (config dir, private; rotated: lines older than 14 days are dropped once it passes 1 MB): one line per finished run: role, task, lane, model, effort, status, secs, cost, tokens, 5-hour and weekly use before and after, ids of runs
   that overlapped it, slots. For calibration; never the brief. Not part of the contract.

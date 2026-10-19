@@ -7,7 +7,7 @@ The model supplies only what the script cannot read itself; the script decides.
   route.py status [--claude-usage JSON|@file|-] [--json]
   route.py next ROLE [--authored-by openai|claude] [--failed 0,1] [--premium [FAMILY]] [--allow-degraded]
                      [--claude-usage JSON|@file|-] [--cwd DIR] [--verbose]
-  route.py run ROLE [--cwd DIR] [--brief FILE] [--schema FILE] [--resume REF] [--cap USD] [--timeout SEC] [--unattended] [--no-sandbox] [--authored-by W] [--failed I,J] [--premium] [--allow-degraded]
+  route.py run ROLE [--cwd DIR] [--brief FILE] [--schema FILE] [--resume REF] [--cap USD] [--timeout SEC] [--unattended] [--host] [--authored-by W] [--failed I,J] [--premium] [--allow-degraded]
                     [--claude-usage JSON] [--parent SESSION] [--task ID] [--title T]    brief on stdin; one JSON object on stdout, exit 0 (see docs/dev/integrations.md)
   route.py report --lane LANE --event out|ok [--until EPOCH|ISO] [--message TEXT]
   route.py capture-limits [--print]  (status line JSON on stdin)
@@ -712,7 +712,7 @@ def decide(role_name, cfg, lanes, st, t, args):
                 return {"action": "run", "role": role_name, "step": step.get("idx"), "pass": "relaxed" if relaxed else "strict",
                         "lane": lane.name, "model": step["model"], "effort": step["effort"], "mode": step.get("mode", "read_only"),
                         "cap": step.get("cap"), "use": step.get("use"), "flag": step.get("flag"),
-                        "how": how(lane, step, cfg, args.get("cwd"), args.get("unattended", False), args.get("no_sandbox")), "trace": trace}
+                        "how": how(lane, step, cfg, args.get("cwd"), args.get("unattended", False), args.get("host")), "trace": trace}
     resets = {l.name: local(l.out_until) for l in lanes.values() if l.out and l.out_until}
     stop = {"action": "stop", "role": role_name, "say": role["stop"], "resets": resets, "trace": trace}
     consent = role.get("degraded_needs_consent")
@@ -723,23 +723,44 @@ def decide(role_name, cfg, lanes, st, t, args):
     return stop
 
 
-def how(lane, step, cfg, cwd=None, unattended=False, no_sandbox=False):
-    """What a step runs on. Unattended callers have no Agent tool, so the subscription lane runs `claude -p` on the logged-in account."""
+def cache_roots(S):
+    """The package-cache folders a contained write step may write (settings.cache_roots): ~ and $VARS expanded, only folders that exist."""
+    out = []
+    for p in S.get("cache_roots") or []:
+        q = os.path.realpath(os.path.expandvars(os.path.expanduser(p)))
+        if os.path.isdir(q) and q not in out:
+            out.append(q)
+    return out
+
+
+def codex_access(sandbox, S):
+    """Every access argument codex gets, for a fresh run and a resume alike: the user's own config never widens or narrows it."""
+    args = ["--ignore-user-config", "--ignore-rules"]
+    if sandbox == "workspace-write":
+        net = bool(S.get("contained_network"))
+        args += ["-c", f"sandbox_workspace_write.network_access={'true' if net else 'false'}",
+                 "-c", "sandbox_workspace_write.writable_roots=" + json.dumps(cache_roots(S) if net else [])]
+    return args
+
+
+def how(lane, step, cfg, cwd=None, unattended=False, host=False):
+    """What a step runs on. Unattended callers have no Agent tool, so the subscription lane runs `claude -p` on the logged-in account; so does --host (the classifier needs it)."""
     m = cfg["models"][step["model"]]
     runner = cfg["lanes"][lane.name]["runner"]
     wd = os.path.abspath(cwd) if cwd else os.getcwd()
     write = step.get("mode") == "write"
-    if runner == "agent_tool" and unattended:
+    if runner == "agent_tool" and (unattended or host):
         runner = "claude_p"
     if runner == "claude_p":
-        return {"kind": "claude_p", "model": m["api"], "write": write, "cap": step.get("cap", 2), "cwd": wd, "bash": write or bool(no_sandbox)}
+        return {"kind": "claude_p", "model": m["api"], "write": write, "cap": step.get("cap", 2), "cwd": wd, "bash": write or bool(host)}
     if runner == "agent_tool":
         return {"kind": "agent_tool", "model": m["agent"], "cwd": wd}
-    sandbox = "danger-full-access" if no_sandbox else "workspace-write" if write else "read-only"
-    cli = ["codex", "exec", "-C", wd, "-s", sandbox, "-m", m["api"], "-c", f"model_reasoning_effort={step['effort']}"]
+    sandbox = "danger-full-access" if host else "workspace-write" if write else "read-only"
+    access = codex_access(sandbox, cfg["settings"])
+    cli = ["codex", "exec", "-C", wd, "-s", sandbox, "-m", m["api"], "-c", f"model_reasoning_effort={step['effort']}"] + access
     if git_state(wd) is None:
         cli.append("--skip-git-repo-check")      # codex refuses a directory that is not a git work tree
-    return {"kind": "codex", "model": m["api"], "cli": cli, "cwd": wd, "sandbox": sandbox}
+    return {"kind": "codex", "model": m["api"], "cli": cli, "cwd": wd, "sandbox": sandbox, "access": access}
 
 
 # ----------------------------------------------------------------------------- commands
@@ -770,7 +791,7 @@ def needs_input(lanes):
 
 def recent_runs(n):
     """The last n finished runs, newest last: the dashboard's view of history.jsonl (the file itself stays private)."""
-    keys = ("run_id", "ts", "role", "task", "lane", "model", "status", "secs", "cost")
+    keys = ("run_id", "ts", "role", "task", "lane", "model", "status", "host", "secs", "cost", "tokens", "denials")
     try:
         lines = history_path().read_text(encoding="utf-8").splitlines()[-n:]
         return [{k: json.loads(ln).get(k) for k in keys} for ln in lines if ln]
@@ -838,6 +859,15 @@ def mark_busy(lanes, st, S, t):
             l.notes.insert(0, f"busy: {running} running, {cap} allowed")
 
 
+def host_error(cfg, role, S):
+    """--host on a role none of whose steps runs on a host lane can never succeed: say so (a permanent error), not stop."""
+    r = cfg["roles"][role]
+    steps = list(r.get("steps", [])) + list(r.get("degraded_needs_consent", [])) + [x for v in (r.get("by_author") or {}).values() for x in v]
+    if not any(x["on"] in S["host_lanes"] for x in steps):
+        return f"--host needs a lane of {S['host_lanes']}; role {role} has none"
+    return None
+
+
 def decision(a, cfg):
     """next and run share this: gather, decide, remember the lane choice. -> (d, lanes, warnings, t)"""
     t = now()
@@ -853,19 +883,27 @@ def decision(a, cfg):
     if unattended:        # no one to pay the API credit knowingly: credit lanes are never picked unattended
         lanes = {n: l for n, l in lanes.items() if l.kind != "credit"}
     ref = getattr(a, "resume", None)
+    host = bool(getattr(a, "host", False))
+    if host:            # work the sandbox cannot hold: only the lanes settings.host_lanes names may take it
+        err = host_error(cfg, a.role, S)
+        if err:
+            return {"action": "error", "error": err}, lanes, warnings, t
+        lanes = {n: l for n, l in lanes.items() if l.family in S["host_lanes"]}
     if ref:             # continue on the lane that made the ref; never switch lanes silently
         rec = (st.get("refs") or {}).get(ref)
         lane = lanes.get(rec["lane"]) if rec else None
         if not rec:
             return {"action": "error", "error": f"unknown --resume ref {ref}"}, lanes, warnings, t
+        if bool(rec.get("host")) != host:
+            return {"action": "error", "error": f"--resume {ref} ran {'with' if rec.get('host') else 'without'} --host; pass the same"}, lanes, warnings, t
         if lane is None or not usable(lane, S, True)[0]:
             return {"action": "lane_out", "lane": rec["lane"], "retry_after": lane.out_until if lane else None,
                     "say": f"{rec['lane']} cannot continue {ref} now"}, lanes, warnings, t
         step = {"model": rec["model"], "effort": rec["effort"], "mode": rec["mode"], "cap": a.cap or rec.get("cap")}
         return {"action": "run", "role": a.role, "step": None, "pass": "resume", "lane": lane.name, "model": rec["model"], "effort": rec["effort"],
-                "mode": rec["mode"], "cap": step["cap"], "how": how(lane, step, cfg, a.cwd, unattended, a.no_sandbox)}, lanes, warnings, t
+                "mode": rec["mode"], "cap": step["cap"], "how": how(lane, step, cfg, a.cwd, unattended, host)}, lanes, warnings, t
     args = {"authored_by": a.authored_by, "failed": [int(x) for x in a.failed.split(",") if x != ""] if a.failed else [],
-            "premium": a.premium, "allow_degraded": a.allow_degraded and not unattended, "cwd": a.cwd, "unattended": unattended, "no_sandbox": a.no_sandbox}
+            "premium": a.premium, "allow_degraded": a.allow_degraded and not unattended, "cwd": a.cwd, "unattended": unattended, "host": host}
     d = decide(a.role, cfg, lanes, st, t, args)
     if d["action"] == "run":
         fam = cfg["lanes"][d["lane"]]["family"]
@@ -973,7 +1011,8 @@ def git_changes(before, after):
 # ----------------------------------------------------------------------------- shared by the claude -p launcher
 
 PREAMBLE = ("You are a delegated worker. Do exactly the task in the brief. Do not delegate further and do not use the delegate skill. "
-            + GIT_RULES + " Finish with a short report: what you changed or found, and the exit code and last lines of any check you ran.")
+            + GIT_RULES + " If a command is denied, that is a decision for the owner: do not retry or reword it; report the exact command in your final message and stop."
+            " Finish with a short report: what you changed or found, and the exit code and last lines of any check you ran.")
 
 
 def find_key(quiet=False):
@@ -1023,9 +1062,12 @@ def kill_tree(p):
         p.kill()
 
 
+CREDENTIAL_RE = re.compile(r"(TOKEN|SECRET|PASSW|CREDENTIAL|API_?KEY|ACCESS_?KEY|PRIVATE_?KEY)|^(AWS_|GH_|GITHUB_|SSH_AUTH_SOCK$)", re.I)
+
+
 def child_env(extra=None):
-    """The worker gets the caller's environment minus Claude, Anthropic and delegate variables, plus DELEGATE_DEPTH=1."""
-    env = {k: v for k, v in os.environ.items() if not k.startswith(("CLAUDE_", "ANTHROPIC_", "DELEGATE_"))}
+    """The worker gets the caller's environment minus Claude, Anthropic, delegate and credential-looking variables (tokens, keys, cloud and git credentials, the ssh agent), plus DELEGATE_DEPTH=1."""
+    env = {k: v for k, v in os.environ.items() if not k.startswith(("CLAUDE_", "ANTHROPIC_", "DELEGATE_")) and not CREDENTIAL_RE.search(k)}
     env["DELEGATE_DEPTH"] = "1"
     env.update(extra or {})
     return env
@@ -1113,7 +1155,7 @@ def launch_codex(d, brief, a, rid, t, meta):
         return {"status": "error", "say": "codex CLI not found on PATH (route.py doctor --lane OPENAI_SUBSCRIPTION)"}
     out_file = config_dir() / f"codex-last-{rid[:8]}.txt"
     if a.resume:
-        cmd = [exe, "exec", "resume", "-m", h["model"], "-c", f"model_reasoning_effort={d['effort']}", "-c", f'sandbox_mode="{h["sandbox"]}"']
+        cmd = [exe, "exec", "resume", "-m", h["model"], "-c", f"model_reasoning_effort={d['effort']}", "-c", f'sandbox_mode="{h["sandbox"]}"'] + h["access"]
         cmd += [x for x in h["cli"] if x == "--skip-git-repo-check"] + ["--json", "-o", str(out_file)]
         cmd += (["--output-schema", a.schema] if a.schema else []) + [a.resume, "-"]
     else:
@@ -1182,8 +1224,8 @@ def launch_claude(d, brief, a, rid, t, cfg, meta):
     cmd = [exe, "-p", "--output-format", "json", "--model", h["model"], "--effort", d["effort"]]
     cmd += ["--max-budget-usd", str(cap)] if credit else []
     cmd += ["--resume", a.resume] if a.resume else ["--session-id", rid]
-    cmd += ["--append-system-prompt", PREAMBLE, "--permission-mode", "acceptEdits" if write else "default",
-            "--allowedTools", *tools, "--disallowedTools", *GIT_WRITE_DENY]
+    cmd += ["--append-system-prompt", PREAMBLE, "--restricted", "--tools", ",".join(tools), "--strict-mcp-config",
+            "--permission-mode", "auto", "--permission-prompts", "none", "--disallowedTools", *GIT_WRITE_DENY]
     if a.schema:
         cmd += ["--json-schema", Path(a.schema).read_text(encoding="utf-8")]
     ref = a.resume or rid
@@ -1201,8 +1243,9 @@ def launch_claude(d, brief, a, rid, t, cfg, meta):
     if credit and cost > 0:
         ledger_add(cost, d["model"], t)
     u = j.get("usage") if isinstance(j.get("usage"), dict) else {}
-    res = {"text": text, "ref": j.get("session_id") or ref, "cost": cost, "stderr": err,
-           "tokens": claude_tokens(u)}
+    res = {"text": text, "ref": j.get("session_id") or ref, "cost": cost, "stderr": err, "tokens": claude_tokens(u),
+           "denied": [{"tool": x.get("tool_name"), "input": x.get("tool_input")} for x in j.get("permission_denials") or []
+                      if isinstance(x, dict) and not policy_denial(x)]}
     if timed_out:
         res.update(status="timeout", say=f"claude did not finish within {a.timeout}s and was killed")
     elif rc != 0 or j.get("is_error"):
@@ -1223,6 +1266,15 @@ def launch_claude(d, brief, a, rid, t, cfg, meta):
     return res
 
 
+GIT_PREFIXES = tuple(g[len("Bash("):-len(":*)")] for g in GIT_WRITE_DENY)
+
+
+def policy_denial(x):
+    """A git write the coordinator forbids is policy, not a decision for the owner."""
+    cmd = ((x.get("tool_input") or {}).get("command") or "").strip()
+    return x.get("tool_name") == "Bash" and cmd.startswith(GIT_PREFIXES)
+
+
 def claude_tokens(u):
     """Claude's input_tokens leaves out cache reads and cache writes; `in` counts all input, as codex's does."""
     if not u:
@@ -1234,7 +1286,7 @@ def claude_tokens(u):
 
 def result(status, **kw):
     r = {"v": 1, "status": status, "data": None, "text": "", "ref": None, "lane": None, "model": None, "effort": None, "family": None,
-         "flag": None, "cost": 0, "tokens": None, "secs": 0, "run_id": None, "transcript": None, "retry_after": None, "say": "", "git_violation": []}
+         "flag": None, "cost": 0, "tokens": None, "denied": [], "secs": 0, "run_id": None, "transcript": None, "retry_after": None, "say": "", "git_violation": []}
     r.update(kw)
     return r
 
@@ -1280,8 +1332,8 @@ def lane_use(cfg, name, t):
 def cmd_run(a, cfg):
     try:
         return run_once(a, cfg)
-    except TimeoutError as e:       # state lock held too long: still one object, exit 0
-        return emit(result("error", say=str(e)))
+    except TimeoutError as e:       # state lock held too long: transient, so stop with a retry time (error means permanent)
+        return emit(result("stop", say=str(e), retry_after=now() + random.randint(60, 120)))
 
 
 def run_once(a, cfg):
@@ -1364,7 +1416,7 @@ def run_once(a, cfg):
     if agent_runs:
         agent_runs.run(rid, ended=now(), status="completed" if res["status"] == "done" else "failed", transcript=find_transcript(res.get("ref"), fam))
     if res.get("ref") and res["status"] == "done":
-        rec = {"lane": d["lane"], "model": d["model"], "effort": d["effort"], "mode": d["mode"], "cap": d.get("cap")}
+        rec = {"lane": d["lane"], "model": d["model"], "effort": d["effort"], "mode": d["mode"], "cap": d.get("cap"), "host": bool(a.host)}
 
         def keep(s):
             refs = s.setdefault("refs", {})
@@ -1375,7 +1427,7 @@ def run_once(a, cfg):
     secs = round(time.time() - t0, 1)
     five_after, week_after = lane_use(cfg, d["lane"], now())
     history_add({"ts": now(), "run_id": rid, "role": a.role, "task": a.task or "", "lane": d["lane"], "model": d["model"], "effort": d["effort"],
-                 "status": res["status"], "no_sandbox": bool(a.no_sandbox), "secs": secs, "cost": res.get("cost", 0), "tokens": res.get("tokens"),
+                 "status": res["status"], "host": bool(a.host), "denials": len(res.get("denied") or []), "secs": secs, "cost": res.get("cost", 0), "tokens": res.get("tokens"),
                  "five_before": lane.five, "week_before": lane.week, "five_after": five_after, "week_after": week_after,
                  "overlap": sorted(set(taken["peers"]) | set(ends.get("peers", []))), "slots": cap})
     res.update(**who, run_id=rid, secs=secs, git_violation=git_changes(git_before, git_state(cwd)),
@@ -1440,7 +1492,7 @@ def main(argv=None):
     ap = argparse.ArgumentParser(prog="route.py", description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = ap.add_subparsers(dest="cmd", required=True)
     s = sub.add_parser("status"); s.add_argument("--claude-usage"); s.add_argument("--json", action="store_true"); s.add_argument("--recent", type=int, default=20)
-    n = sub.add_parser("next"); n.add_argument("role"); n.add_argument("--authored-by"); n.add_argument("--no-sandbox", action="store_true"); n.add_argument("--failed", default="")
+    n = sub.add_parser("next"); n.add_argument("role"); n.add_argument("--authored-by"); n.add_argument("--host", action="store_true"); n.add_argument("--failed", default="")
     n.add_argument("--premium", nargs="?", const="claude", metavar="FAMILY"); n.add_argument("--allow-degraded", action="store_true")
     n.add_argument("--claude-usage"); n.add_argument("--cwd"); n.add_argument("--verbose", action="store_true")
     r = sub.add_parser("report"); r.add_argument("--lane", required=True); r.add_argument("--event", choices=["out", "ok"], required=True)
@@ -1452,7 +1504,7 @@ def main(argv=None):
     sk = sub.add_parser("set-key"); sk.add_argument("--stdin", action="store_true"); sk.add_argument("--force", action="store_true")
     sk.add_argument("--web", action="store_true"); sk.add_argument("--host", default="127.0.0.1"); sk.add_argument("--port", type=int, default=0); sk.add_argument("--timeout", type=int, default=300)
     cf = sub.add_parser("config"); cf.add_argument("action", choices=["set", "show"]); cf.add_argument("key", nargs="?"); cf.add_argument("value", nargs="?")
-    ru = sub.add_parser("run"); ru.add_argument("role"); ru.add_argument("--authored-by"); ru.add_argument("--no-sandbox", action="store_true"); ru.add_argument("--failed", default="")
+    ru = sub.add_parser("run"); ru.add_argument("role"); ru.add_argument("--authored-by"); ru.add_argument("--host", action="store_true"); ru.add_argument("--failed", default="")
     ru.add_argument("--premium", nargs="?", const="claude", metavar="FAMILY"); ru.add_argument("--allow-degraded", action="store_true")
     ru.add_argument("--claude-usage"); ru.add_argument("--cwd"); ru.add_argument("--brief"); ru.add_argument("--timeout", type=int, help="seconds; none by default"); ru.add_argument("--unattended", action="store_true")
     ru.add_argument("--schema"); ru.add_argument("--resume"); ru.add_argument("--cap", type=float); ru.add_argument("--parent"); ru.add_argument("--task"); ru.add_argument("--title")
