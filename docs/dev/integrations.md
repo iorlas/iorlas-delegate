@@ -31,8 +31,9 @@ task-loop's engine calls `route.py run ROLE --unattended --brief FILE --cwd DIR 
 as a script, with no Claude session behind it. The spec belongs to the consumer:
 https://github.com/iorlas/iorlas-task-loop/blob/main/docs/contracts/worker-run-v1.md
 
-- stdout is exactly one JSON object (`v`, `status`, `data`, `text`, `ref`, `lane`, `model`, `effort`, `family`, `flag`, `cost`, `secs`, `run_id`,
-  `transcript`, `retry_after`, `say`, `git_violation`); exit 0 whenever it was printed. Statuses: `done`, `failed`, `timeout`, `lane_out`, `stop`, `error`
+- stdout is exactly one JSON object (`v`, `status`, `data`, `text`, `ref`, `lane`, `model`, `effort`, `family`, `flag`, `cost`, `tokens`, `secs`, `run_id`,
+  `transcript`, `retry_after`, `say`, `git_violation`); `tokens` is `{in, cached, out}` or null, and `in` counts all input including cache reads
+  (and Claude cache writes; before 0.22.0 history recorded Claude's uncached input only); exit 0 whenever it was printed. Statuses: `done`, `failed`, `timeout`, `lane_out`, `stop`, `error`
   (plus `agent` for interactive callers only).
 - `--unattended` is how an engine says no Claude session is behind it. Without it the caller is a Claude session and may get `agent`. With it: never `agent`, `ask_user`
   or `needs_input`; CLAUDE_CREDIT is never picked; CLAUDE_SUBSCRIPTION runs `claude -p` on the logged-in account. No time or token limit by default: `--timeout` is

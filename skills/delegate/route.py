@@ -1202,7 +1202,7 @@ def launch_claude(d, brief, a, rid, t, cfg, meta):
         ledger_add(cost, d["model"], t)
     u = j.get("usage") if isinstance(j.get("usage"), dict) else {}
     res = {"text": text, "ref": j.get("session_id") or ref, "cost": cost, "stderr": err,
-           "tokens": {"in": u.get("input_tokens"), "cached": u.get("cache_read_input_tokens"), "out": u.get("output_tokens")} if u else None}
+           "tokens": claude_tokens(u)}
     if timed_out:
         res.update(status="timeout", say=f"claude did not finish within {a.timeout}s and was killed")
     elif rc != 0 or j.get("is_error"):
@@ -1223,9 +1223,18 @@ def launch_claude(d, brief, a, rid, t, cfg, meta):
     return res
 
 
+def claude_tokens(u):
+    """Claude's input_tokens leaves out cache reads and cache writes; `in` counts all input, as codex's does."""
+    if not u:
+        return None
+    cached = u.get("cache_read_input_tokens") or 0
+    return {"in": (u.get("input_tokens") or 0) + cached + (u.get("cache_creation_input_tokens") or 0),
+            "cached": cached, "out": u.get("output_tokens")}
+
+
 def result(status, **kw):
     r = {"v": 1, "status": status, "data": None, "text": "", "ref": None, "lane": None, "model": None, "effort": None, "family": None,
-         "flag": None, "cost": 0, "secs": 0, "run_id": None, "transcript": None, "retry_after": None, "say": "", "git_violation": []}
+         "flag": None, "cost": 0, "tokens": None, "secs": 0, "run_id": None, "transcript": None, "retry_after": None, "say": "", "git_violation": []}
     r.update(kw)
     return r
 
@@ -1366,7 +1375,7 @@ def run_once(a, cfg):
     secs = round(time.time() - t0, 1)
     five_after, week_after = lane_use(cfg, d["lane"], now())
     history_add({"ts": now(), "run_id": rid, "role": a.role, "task": a.task or "", "lane": d["lane"], "model": d["model"], "effort": d["effort"],
-                 "status": res["status"], "no_sandbox": bool(a.no_sandbox), "secs": secs, "cost": res.get("cost", 0), "tokens": res.pop("tokens", None),
+                 "status": res["status"], "no_sandbox": bool(a.no_sandbox), "secs": secs, "cost": res.get("cost", 0), "tokens": res.get("tokens"),
                  "five_before": lane.five, "week_before": lane.week, "five_after": five_after, "week_after": week_after,
                  "overlap": sorted(set(taken["peers"]) | set(ends.get("peers", []))), "slots": cap})
     res.update(**who, run_id=rid, secs=secs, git_violation=git_changes(git_before, git_state(cwd)),

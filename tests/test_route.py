@@ -487,7 +487,7 @@ esac
     FAKE_CLAUDE = """#!/bin/sh
 echo "$*" >> "$FAKE_ARGS"; env | sort > "$FAKE_ENV"
 cat > /dev/null
-printf '{"result":"claude says hi","session_id":"sess-1","total_cost_usd":0.5,"is_error":false}'
+printf '{"result":"claude says hi","session_id":"sess-1","total_cost_usd":0.5,"is_error":false,"usage":{"input_tokens":3,"cache_read_input_tokens":50,"cache_creation_input_tokens":20,"output_tokens":9}}'
 """
 
     def setUp(self):
@@ -678,6 +678,16 @@ printf '{"result":"claude says hi","session_id":"sess-1","total_cost_usd":0.5,"i
         self.assertEqual(line["tokens"], {"in": 100, "cached": 40, "out": 7})
         self.assertNotIn("brief", json.dumps(line))
         self.assertEqual(line["overlap"], [])
+
+    def test_the_result_carries_tokens_input_counts_cached_reads(self):
+        _, r = self.run_it()
+        self.assertEqual(r["tokens"], {"in": 100, "cached": 40, "out": 7})   # codex input_tokens already includes cached
+        self.run_it(mode="limit")
+        _, r = self.run_it()
+        self.assertEqual(r["lane"], "CLAUDE_SUBSCRIPTION")
+        self.assertEqual(r["tokens"], {"in": 73, "cached": 50, "out": 9})    # claude: uncached + cache reads + cache writes
+        line = json.loads(route.history_path().read_text().splitlines()[-1])
+        self.assertEqual(line["tokens"], r["tokens"])
 
     def test_sigterm_on_route_py_stops_the_worker_too(self):
         import signal
