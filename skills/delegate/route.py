@@ -167,7 +167,7 @@ def locked(path, timeout=10.0):
     while fd is None:
         try:
             fd = os.open(lock, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
-        except FileExistsError:
+        except (FileExistsError, PermissionError):      # Windows answers PermissionError while the previous holder's lock file is being deleted
             try:
                 if time.time() - os.path.getmtime(lock) > 30:
                     os.remove(lock)

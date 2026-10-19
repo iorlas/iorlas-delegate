@@ -460,7 +460,8 @@ class StateLock(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             env = dict(os.environ, DELEGATE_CONFIG_DIR=d)
             ps = [subprocess.Popen([sys.executable, "-c", code], env=env, stderr=subprocess.PIPE) for _ in range(8)]
-            self.assertEqual([p.communicate()[1] for p in ps], [b""] * 8)
+            self.maxDiff = None
+            self.assertEqual([p.communicate()[1].decode()[-1500:] for p in ps], [""] * 8)
             self.assertEqual(json.loads(Path(d, "state.json").read_text())["n"], 200)
 
 
