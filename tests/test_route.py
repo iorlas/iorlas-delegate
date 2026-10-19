@@ -707,8 +707,16 @@ printf '{"result":"claude says hi","session_id":"sess-1","total_cost_usd":0.5,"i
         self.assertIn('sandbox_mode="danger-full-access"', self.args_seen())
         self.assertTrue(json.loads(route.history_path().read_text().splitlines()[-1])["no_sandbox"])
         open(os.environ["FAKE_ARGS"], "w").close()
-        self.run_it("--no-sandbox", "--authored-by", "claude", role="reviewer")           # read-only stays read-only
-        self.assertIn("-s read-only", self.args_seen())
+        self.run_it("--no-sandbox", "--authored-by", "claude", role="reviewer")           # any mode: a read-only step is unsandboxed too
+        self.assertIn("-s danger-full-access", self.args_seen())
+
+    def test_no_sandbox_gives_a_read_only_claude_step_bash(self):
+        route.update_state(lambda s: s.setdefault("out", {}).__setitem__("OPENAI_SUBSCRIPTION", {"until": route.now() + 3600, "why": "t"}))
+        self.run_it(role="reviewer")
+        self.assertIn("--allowedTools Read Glob Grep --disallowedTools", self.args_seen())
+        open(os.environ["FAKE_ARGS"], "w").close()
+        self.run_it("--no-sandbox", role="reviewer")
+        self.assertIn("--allowedTools Read Glob Grep Bash --disallowedTools", self.args_seen())
 
     def test_default_is_the_workspace_write_sandbox(self):
         self.run_it()

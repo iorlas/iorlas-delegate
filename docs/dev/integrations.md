@@ -37,8 +37,8 @@ https://github.com/iorlas/iorlas-task-loop/blob/main/docs/contracts/worker-run-v
 - `--unattended` is how an engine says no Claude session is behind it. Without it the caller is a Claude session and may get `agent`. With it: never `agent`, `ask_user`
   or `needs_input`; CLAUDE_CREDIT is never picked; CLAUDE_SUBSCRIPTION runs `claude -p` on the logged-in account. No time or token limit by default: `--timeout` is
   opt-in and an unknown plan reading does not stop a run. `orchestrator_reserve` still applies when a reading exists.
-- `--no-sandbox` (one boolean, the caller's explicit consent): Codex write steps run with `-s danger-full-access` (resume: `sandbox_mode="danger-full-access"`), so builds that need the network or the host
-  (`dotnet test`, Unity) work. Read-only steps stay read-only; Claude steps are unaffected (their Bash already runs on the host). The run is recorded with `no_sandbox: true` in `history.jsonl`.
+- `--no-sandbox` (one boolean, the caller's explicit consent): Codex steps of any mode run with `-s danger-full-access` (resume: `sandbox_mode="danger-full-access"`), so builds that need the network or the host
+  (`dotnet test`, Unity) work. A read-only Claude step gets Bash too (a write step already has it); the brief, not the sandbox, then keeps a reviewer from editing. The run is recorded with `no_sandbox: true` in `history.jsonl`.
   Delegate adds no tool servers or whitelists; the exposure is the one the caller accepted.
 - Slots: at most `max_parallel` (setting, default 4; one when the lane's 5-hour use is at `strain`) runs in flight per lane. A full lane is skipped like a refused one; when nothing
   is left the answer is `stop` (or `lane_out`) with a `retry_after` 60-120 s ahead, jittered. `run` never waits for a slot. A run holds a lease in `state.json`

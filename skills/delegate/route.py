@@ -732,10 +732,10 @@ def how(lane, step, cfg, cwd=None, unattended=False, no_sandbox=False):
     if runner == "agent_tool" and unattended:
         runner = "claude_p"
     if runner == "claude_p":
-        return {"kind": "claude_p", "model": m["api"], "write": write, "cap": step.get("cap", 2), "cwd": wd}
+        return {"kind": "claude_p", "model": m["api"], "write": write, "cap": step.get("cap", 2), "cwd": wd, "bash": write or bool(no_sandbox)}
     if runner == "agent_tool":
         return {"kind": "agent_tool", "model": m["agent"], "cwd": wd}
-    sandbox = "read-only" if not write else "danger-full-access" if no_sandbox else "workspace-write"     # --no-sandbox only widens write steps; a reviewer stays read-only
+    sandbox = "danger-full-access" if no_sandbox else "workspace-write" if write else "read-only"
     cli = ["codex", "exec", "-C", wd, "-s", sandbox, "-m", m["api"], "-c", f"model_reasoning_effort={step['effort']}"]
     if git_state(wd) is None:
         cli.append("--skip-git-repo-check")      # codex refuses a directory that is not a git work tree
@@ -1178,7 +1178,7 @@ def launch_claude(d, brief, a, rid, t, cfg, meta):
             return {"status": "lane_out", "retry_after": nxt, "say": f"cycle cap: ${ledger_spend(start):.2f} spent + ${cap:.2f} > ${c['monthly_cap']}"}
         extra["ANTHROPIC_API_KEY"] = key
     write = bool(h["write"])
-    tools = ["Read", "Glob", "Grep"] + (["Edit", "Write", "Bash"] if write else [])
+    tools = ["Read", "Glob", "Grep"] + (["Edit", "Write"] if write else []) + (["Bash"] if h["bash"] else [])
     cmd = [exe, "-p", "--output-format", "json", "--model", h["model"], "--effort", d["effort"]]
     cmd += ["--max-budget-usd", str(cap)] if credit else []
     cmd += ["--resume", a.resume] if a.resume else ["--session-id", rid]
