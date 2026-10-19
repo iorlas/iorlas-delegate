@@ -7,7 +7,7 @@ The model supplies only what the script cannot read itself; the script decides.
   route.py status [--claude-usage JSON|@file|-] [--json]
   route.py next ROLE [--authored-by openai|claude] [--failed 0,1] [--premium [FAMILY]] [--allow-degraded]
                      [--claude-usage JSON|@file|-] [--cwd DIR] [--verbose]
-  route.py run ROLE [--cwd DIR] [--brief FILE] [--schema FILE] [--resume REF] [--cap USD] [--timeout SEC] [--headless] [--authored-by W] [--failed I,J] [--premium] [--allow-degraded]
+  route.py run ROLE [--cwd DIR] [--brief FILE] [--schema FILE] [--resume REF] [--cap USD] [--timeout SEC] [--unattended] [--authored-by W] [--failed I,J] [--premium] [--allow-degraded]
                     [--claude-usage JSON] [--parent SESSION] [--task ID] [--title T]    brief on stdin; one JSON object on stdout, exit 0 (see docs/dev/integrations.md)
   route.py report --lane LANE --event out|ok [--until EPOCH|ISO] [--message TEXT]
   route.py capture-limits [--print]  (status line JSON on stdin)
@@ -26,8 +26,10 @@ import copy
 import datetime as dt
 import json
 import os
+import random
 import re
 import shutil
+import signal
 import subprocess
 import sys
 import threading
@@ -158,7 +160,7 @@ def credit_cycle(day, t):
 # ----------------------------------------------------------------------------- state (atomic, locked)
 
 @contextlib.contextmanager
-def locked(path, timeout=5.0):
+def locked(path, timeout=10.0):
     lock = str(path) + ".lock"
     end = time.time() + timeout
     fd = None
@@ -173,15 +175,14 @@ def locked(path, timeout=5.0):
             except OSError:
                 pass
             if time.time() > end:
-                break
+                raise TimeoutError(f"{path} is locked by another route.py for more than {timeout:.0f}s")
             time.sleep(0.05)
     try:
         yield
     finally:
-        if fd is not None:
-            os.close(fd)
-            with contextlib.suppress(OSError):
-                os.remove(lock)
+        os.close(fd)
+        with contextlib.suppress(OSError):
+            os.remove(lock)
 
 
 def state_path():
@@ -283,12 +284,12 @@ def harness():
     return "unknown" if ep else "headless"
 
 
-HEADLESS = False     # set by `run --headless`: the caller is an engine, not a Claude session
+UNATTENDED = False     # set by `run --unattended`: the caller is an engine, not a Claude session
 
 
 def interactive():
-    """A Claude session is behind this process (the Agent tool, get_usage and the user exist) unless the caller said --headless."""
-    return not HEADLESS
+    """A Claude session is behind this process (the Agent tool, get_usage and the user exist) unless the caller said --unattended."""
+    return not UNATTENDED
 
 
 OFFERS = []     # lanes seen for the first time and not usable; reported once, then forgotten
@@ -704,7 +705,7 @@ def decide(role_name, cfg, lanes, st, t, args):
                 return {"action": "run", "role": role_name, "step": step.get("idx"), "pass": "relaxed" if relaxed else "strict",
                         "lane": lane.name, "model": step["model"], "effort": step["effort"], "mode": step.get("mode", "read_only"),
                         "cap": step.get("cap"), "use": step.get("use"), "flag": step.get("flag"),
-                        "how": how(lane, step, cfg, args.get("cwd"), args.get("headless", False)), "trace": trace}
+                        "how": how(lane, step, cfg, args.get("cwd"), args.get("unattended", False)), "trace": trace}
     resets = {l.name: local(l.out_until) for l in lanes.values() if l.out and l.out_until}
     stop = {"action": "stop", "role": role_name, "say": role["stop"], "resets": resets, "trace": trace}
     consent = role.get("degraded_needs_consent")
@@ -715,13 +716,13 @@ def decide(role_name, cfg, lanes, st, t, args):
     return stop
 
 
-def how(lane, step, cfg, cwd=None, headless=False):
-    """What a step runs on. Headless callers have no Agent tool, so the subscription lane runs `claude -p` on the logged-in account."""
+def how(lane, step, cfg, cwd=None, unattended=False):
+    """What a step runs on. Unattended callers have no Agent tool, so the subscription lane runs `claude -p` on the logged-in account."""
     m = cfg["models"][step["model"]]
     runner = cfg["lanes"][lane.name]["runner"]
     wd = os.path.abspath(cwd) if cwd else os.getcwd()
     write = step.get("mode") == "write"
-    if runner == "agent_tool" and headless:
+    if runner == "agent_tool" and unattended:
         runner = "claude_p"
     if runner == "claude_p":
         return {"kind": "claude_p", "model": m["api"], "write": write, "cap": step.get("cap", 2), "cwd": wd}
@@ -771,6 +772,8 @@ def cmd_status(a, cfg):
         return 0
     for n, l in lanes.items():
         print(f"{n:<20} {l.brief(t)}")
+    for k, v in sorted(live_leases(st, t).items(), key=lambda kv: kv[1]["start"]):
+        print(f"running {v['lane']} {v['role']} {int(t - v['start'])}s{' task ' + v['task'] if v.get('task') else ''}  ({k[:8]})")
     for n in needs_input(lanes):
         print(f"needs input: {n['what']}: {n['how']}")
     return 0
@@ -786,18 +789,46 @@ def drift_warnings(lanes, st, t):
     return out
 
 
+LEASE_TTL, LEASE_RENEW = 120, 30      # a running run holds a lease; renewed while it lives, it expires by itself if route.py is killed
+
+
+def live_leases(st, t):
+    return {k: v for k, v in (st.get("leases") or {}).items() if v.get("expires", 0) > t}
+
+
+def slots(lane, S):
+    """How many runs may be in flight on a lane: max_parallel (null = unlimited), one when the lane is strained."""
+    n = S.get("max_parallel")
+    if n is None:
+        return None
+    if lane.five is not None and lane.five >= S["strain"]["five_hour"]:
+        return 1
+    return int(n)
+
+
+def mark_busy(lanes, st, S, t):
+    """A lane with all its slots taken is skipped like a refused lane; the jitter keeps retrying engines from arriving together."""
+    live = live_leases(st, t)
+    for l in lanes.values():
+        cap, running = slots(l, S), sum(1 for v in live.values() if v["lane"] == l.name)
+        if cap is not None and running >= cap and not l.out:
+            l.out, l.out_until = True, t + random.randint(60, 120)
+            l.notes.insert(0, f"busy: {running} running, {cap} allowed")
+
+
 def decision(a, cfg):
     """next and run share this: gather, decide, remember the lane choice. -> (d, lanes, warnings, t)"""
     t = now()
     st = load_state()
-    headless = not interactive()
+    unattended = not interactive()
     del OFFERS[:]
     lanes = gather(cfg, st, t, parse_json_arg(a.claude_usage))
     new_offers = list(OFFERS)
     warnings = drift_warnings(lanes, st, t)
     publish_lanes(lanes, st, t)
     S = cfg["settings"]
-    if headless:        # no one to pay the API credit knowingly: credit lanes are never picked headless
+    mark_busy(lanes, st, S, t)
+    if unattended:        # no one to pay the API credit knowingly: credit lanes are never picked unattended
         lanes = {n: l for n, l in lanes.items() if l.kind != "credit"}
     ref = getattr(a, "resume", None)
     if ref:             # continue on the lane that made the ref; never switch lanes silently
@@ -810,9 +841,9 @@ def decision(a, cfg):
                     "say": f"{rec['lane']} cannot continue {ref} now"}, lanes, warnings, t
         step = {"model": rec["model"], "effort": rec["effort"], "mode": rec["mode"], "cap": a.cap or rec.get("cap")}
         return {"action": "run", "role": a.role, "step": None, "pass": "resume", "lane": lane.name, "model": rec["model"], "effort": rec["effort"],
-                "mode": rec["mode"], "cap": step["cap"], "how": how(lane, step, cfg, a.cwd, headless)}, lanes, warnings, t
+                "mode": rec["mode"], "cap": step["cap"], "how": how(lane, step, cfg, a.cwd, unattended)}, lanes, warnings, t
     args = {"authored_by": a.authored_by, "failed": [int(x) for x in a.failed.split(",") if x != ""] if a.failed else [],
-            "premium": a.premium, "allow_degraded": a.allow_degraded and not headless, "cwd": a.cwd, "headless": headless}
+            "premium": a.premium, "allow_degraded": a.allow_degraded and not unattended, "cwd": a.cwd, "unattended": unattended}
     d = decide(a.role, cfg, lanes, st, t, args)
     if d["action"] == "run":
         fam = cfg["lanes"][d["lane"]]["family"]
@@ -825,7 +856,7 @@ def decision(a, cfg):
                 s["prev"][fam] = {"lane": d["lane"], "since": t}
         if sum(1 for l in lanes.values() if l.family == fam) > 1:
             update_state(mark)
-    if headless and d.get("action") == "stop":
+    if unattended and d.get("action") == "stop":
         d.pop("ask_user", None)
     if new_offers:
         mark_offered(new_offers)
@@ -999,13 +1030,31 @@ def run_proc(cmd, text, cwd, env, timeout, on_line=None):
                threading.Thread(target=pump, args=(p.stderr, err, None), daemon=True), threading.Thread(target=feed, daemon=True)]
     for th in threads:
         th.start()
-    timed_out = False
+    timed_out, ppid, end = False, os.getppid(), time.time() + timeout if timeout else None
+
+    def bye(signum, frame):
+        raise SystemExit(128 + signum)
+    old = {g: signal.signal(g, bye) for g in (getattr(signal, n, None) for n in ("SIGTERM", "SIGHUP")) if g is not None} if os.name != "nt" else {}
     try:
-        p.wait(timeout=timeout)
-    except subprocess.TimeoutExpired:
-        timed_out = True
+        while True:
+            try:
+                p.wait(timeout=2 if end is None else max(0.01, min(2, end - time.time())))
+                break
+            except subprocess.TimeoutExpired:
+                if end is not None and time.time() >= end:
+                    timed_out = True
+                    kill_tree(p)
+                    p.wait()
+                    break
+                if UNATTENDED and os.name != "nt" and os.getppid() != ppid:     # SIGKILL on the engine cannot be caught: the parent changing is the only sign
+                    raise SystemExit(1)
+    except BaseException:       # SIGTERM, SIGHUP, Ctrl-C, parent gone: the worker is in its own process group, so stop it here or it keeps burning the plan
         kill_tree(p)
         p.wait()
+        raise
+    finally:
+        for g, h_ in old.items():
+            signal.signal(g, h_)
     for th in threads:
         th.join(5)
     return p.returncode, "".join(out), "".join(err), timed_out
@@ -1048,7 +1097,7 @@ def launch_codex(d, brief, a, rid, t, meta):
         cmd += (["--output-schema", a.schema] if a.schema else []) + [a.resume, "-"]
     else:
         cmd = [exe] + h["cli"][1:] + ["--json", "-o", str(out_file)] + (["--output-schema", a.schema] if a.schema else []) + ["-"]
-    seen = {"ref": a.resume, "last": ""}
+    seen = {"ref": a.resume, "last": "", "tokens": None}
 
     def on_line(line):
         try:
@@ -1061,6 +1110,9 @@ def launch_codex(d, brief, a, rid, t, meta):
             seen["ref"] = ev["thread_id"]
             if agent_runs:
                 agent_runs.run(rid, thread=seen["ref"])
+        if ev.get("type") == "turn.completed" and isinstance(ev.get("usage"), dict):
+            u = ev["usage"]
+            seen["tokens"] = {"in": u.get("input_tokens"), "cached": u.get("cached_input_tokens"), "out": u.get("output_tokens")}
         item = ev.get("item") or {}
         if ev.get("type") == "item.completed" and item.get("type") == "agent_message":
             seen["last"] = item.get("text", "")
@@ -1072,7 +1124,7 @@ def launch_codex(d, brief, a, rid, t, meta):
         text = out_file.read_text(encoding="utf-8", errors="replace").strip()
         out_file.unlink()
     text = text or seen["last"]
-    res = {"text": text, "ref": seen["ref"], "stderr": err}
+    res = {"text": text, "ref": seen["ref"], "stderr": err, "tokens": seen["tokens"]}
     if timed_out:
         res.update(status="timeout", say=f"codex did not finish within {a.timeout}s and was killed")
     elif rc != 0 and LIMIT_RE.search(text + err):
@@ -1088,7 +1140,7 @@ def launch_codex(d, brief, a, rid, t, meta):
 
 
 def launch_claude(d, brief, a, rid, t, cfg, meta):
-    """claude -p on the credit key (CLAUDE_CREDIT) or the logged-in subscription (CLAUDE_SUBSCRIPTION, headless). -> dict of result fields."""
+    """claude -p on the credit key (CLAUDE_CREDIT) or the logged-in subscription (CLAUDE_SUBSCRIPTION, unattended). -> dict of result fields."""
     h = d["how"]
     credit = cfg["lanes"][d["lane"]]["kind"] == "credit"
     exe = shutil.which("claude")
@@ -1127,7 +1179,9 @@ def launch_claude(d, brief, a, rid, t, cfg, meta):
     cost = float(j.get("total_cost_usd") or 0) if credit else 0.0
     if credit and cost > 0:
         ledger_add(cost, d["model"], t)
-    res = {"text": text, "ref": j.get("session_id") or ref, "cost": cost, "stderr": err}
+    u = j.get("usage") if isinstance(j.get("usage"), dict) else {}
+    res = {"text": text, "ref": j.get("session_id") or ref, "cost": cost, "stderr": err,
+           "tokens": {"in": u.get("input_tokens"), "cached": u.get("cache_read_input_tokens"), "out": u.get("output_tokens")} if u else None}
     if timed_out:
         res.update(status="timeout", say=f"claude did not finish within {a.timeout}s and was killed")
     elif rc != 0 or j.get("is_error"):
@@ -1163,8 +1217,37 @@ def emit(r):
     return 0        # exit 0 whenever the object was printed; non-zero only if route.py itself crashed
 
 
+def history_path():
+    return config_dir() / "history.jsonl"
+
+
+def history_add(rec):
+    """One line per finished run, kept for calibration. Never holds the brief; never fails a run."""
+    with contextlib.suppress(Exception):
+        with locked(history_path()):
+            with open(history_path(), "a", encoding="utf-8") as f:
+                f.write(json.dumps(rec) + "\n")
+            private(history_path())
+
+
+def lane_use(cfg, name, t):
+    """(five_hour %, weekly %) of a lane now; None where unknown."""
+    c = cfg["lanes"][name]
+    lane = Lane(name, c["family"], c["kind"], c.get("shared_with_orchestrator", False))
+    with contextlib.suppress(Exception):
+        READERS[c["reader"]](lane, cfg["settings"], load_state(), t)
+    return lane.five, lane.week
+
+
 def cmd_run(a, cfg):
-    headless = not interactive()
+    try:
+        return run_once(a, cfg)
+    except TimeoutError as e:       # state lock held too long: still one object, exit 0
+        return emit(result("error", say=str(e)))
+
+
+def run_once(a, cfg):
+    unattended = not interactive()
     d, lanes, warnings, t = decision(a, cfg)
     extra = {}
     if warnings:
@@ -1177,13 +1260,13 @@ def cmd_run(a, cfg):
         return emit(result("lane_out", lane=d["lane"], retry_after=d.get("retry_after"), say=d["say"], **extra))
     if d["action"] == "stop":
         retry = min([l.out_until for l in lanes.values() if l.out and l.out_until] or [None], key=lambda x: (x is None, x))
-        if not headless and d.get("ask_user"):
+        if not unattended and d.get("ask_user"):
             extra["ask_user"] = d["ask_user"]
         return emit(result("stop", say=d["say"], retry_after=retry, **extra))
     h = d["how"]
     fam = cfg["lanes"][d["lane"]]["family"]
     who = dict(lane=d["lane"], model=d["model"], effort=d["effort"], family=fam, flag=d.get("flag"))
-    if not headless:
+    if not unattended:
         ni = [n["what"] for n in needs_input(lanes)]
         if ni:
             extra["needs_input"] = ni
@@ -1194,15 +1277,49 @@ def cmd_run(a, cfg):
         return emit(result("error", **who, say="empty brief: pass it on stdin or with --brief FILE", **extra))
     cwd = h["cwd"]
     rid = str(uuid.uuid4())
+    S, lane = cfg["settings"], lanes[d["lane"]]
+    cap, taken = slots(lane, S), {}
+
+    def claim(st):      # the authoritative count: inside the lock, never from the snapshot decision() read
+        live = live_leases(st, now())
+        st["leases"] = live
+        if a.task and any(v.get("task") == a.task for v in live.values()):
+            taken["no"] = ("stop", f"task {a.task} already has a running worker")
+        elif cap is not None and sum(1 for v in live.values() if v["lane"] == d["lane"]) >= cap:
+            taken["no"] = ("lane_out", f"{d['lane']} has all {cap} slots taken")
+        else:
+            taken["peers"] = sorted(live)
+            live[rid] = {"lane": d["lane"], "role": a.role, "pid": os.getpid(), "start": now(), "expires": now() + LEASE_TTL, "task": a.task or ""}
+    update_state(claim)
+    if "no" in taken:
+        return emit(result(taken["no"][0], **who, say=taken["no"][1], retry_after=now() + random.randint(60, 120), **extra))
+    beat = threading.Event()
+
+    def keep_lease():
+        def renew(st):
+            if rid in (st.get("leases") or {}):
+                st["leases"][rid]["expires"] = now() + LEASE_TTL
+        while not beat.wait(LEASE_RENEW):
+            with contextlib.suppress(Exception):
+                update_state(renew)
+    threading.Thread(target=keep_lease, daemon=True).start()
     meta = {"parent_session": a.parent or "", "title": a.title or brief.strip().splitlines()[0][:120]}
     if a.task:
         meta["task"] = a.task
     git_before = git_state(cwd)
-    t0 = time.time()
+    t0, ends = time.time(), {}
     try:
         res = launch_codex(d, brief, a, rid, t, meta) if h["kind"] == "codex" else launch_claude(d, brief, a, rid, t, cfg, meta)
     except Exception as e:      # a launcher bug is an error object, not a stack trace
         res = {"status": "error", "say": f"{type(e).__name__}: {e}"}
+    finally:
+        beat.set()
+
+        def release(st):
+            ends["peers"] = [k for k in live_leases(st, now()) if k != rid]
+            (st.get("leases") or {}).pop(rid, None)
+        with contextlib.suppress(Exception):
+            update_state(release)
     err = res.pop("stderr", "")
     if err:
         print(err[-2000:], file=sys.stderr)
@@ -1217,7 +1334,13 @@ def cmd_run(a, cfg):
             for k in list(refs)[:-200]:
                 refs.pop(k)
         update_state(keep)
-    res.update(**who, run_id=rid, secs=round(time.time() - t0, 1), git_violation=git_changes(git_before, git_state(cwd)),
+    secs = round(time.time() - t0, 1)
+    five_after, week_after = lane_use(cfg, d["lane"], now())
+    history_add({"ts": now(), "run_id": rid, "role": a.role, "task": a.task or "", "lane": d["lane"], "model": d["model"], "effort": d["effort"],
+                 "status": res["status"], "secs": secs, "cost": res.get("cost", 0), "tokens": res.pop("tokens", None),
+                 "five_before": lane.five, "week_before": lane.week, "five_after": five_after, "week_after": week_after,
+                 "overlap": sorted(set(taken["peers"]) | set(ends.get("peers", []))), "slots": cap})
+    res.update(**who, run_id=rid, secs=secs, git_violation=git_changes(git_before, git_state(cwd)),
                transcript=find_transcript(res.get("ref"), fam), **extra)
     return emit(result(res.pop("status"), **res))
 
@@ -1293,11 +1416,11 @@ def main(argv=None):
     cf = sub.add_parser("config"); cf.add_argument("action", choices=["set", "show"]); cf.add_argument("key", nargs="?"); cf.add_argument("value", nargs="?")
     ru = sub.add_parser("run"); ru.add_argument("role"); ru.add_argument("--authored-by"); ru.add_argument("--failed", default="")
     ru.add_argument("--premium", nargs="?", const="claude", metavar="FAMILY"); ru.add_argument("--allow-degraded", action="store_true")
-    ru.add_argument("--claude-usage"); ru.add_argument("--cwd"); ru.add_argument("--brief"); ru.add_argument("--timeout", type=int, help="seconds; none by default"); ru.add_argument("--headless", action="store_true")
+    ru.add_argument("--claude-usage"); ru.add_argument("--cwd"); ru.add_argument("--brief"); ru.add_argument("--timeout", type=int, help="seconds; none by default"); ru.add_argument("--unattended", action="store_true")
     ru.add_argument("--schema"); ru.add_argument("--resume"); ru.add_argument("--cap", type=float); ru.add_argument("--parent"); ru.add_argument("--task"); ru.add_argument("--title")
     a = ap.parse_args(argv)
-    global HEADLESS
-    HEADLESS = getattr(a, "headless", False)
+    global UNATTENDED
+    UNATTENDED = getattr(a, "unattended", False)
     cfg = load_routing()
     return {"status": cmd_status, "next": cmd_next, "report": cmd_report, "capture-limits": cmd_capture,
             "run": cmd_run, "doctor": cmd_doctor, "set-key": cmd_set_key, "config": cmd_config}[a.cmd](a, cfg)

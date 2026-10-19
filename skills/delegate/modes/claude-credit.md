@@ -1,6 +1,6 @@
 # mode: claude-credit (lane CLAUDE_CREDIT)
 
-`claude -p` with an API key from the Console organization linked to the Max plan. `route.py run` launches it; you never build the command. Headless callers (no Claude session behind the process) never get this lane: CLAUDE_SUBSCRIPTION runs `claude -p` on the logged-in account instead, with no API key and no dollar cap. The credit covers the API and Agent SDK, not interactive Claude Code, so only this runner uses the key. A missing or bad key fails loudly, never falls back to the Max login.
+`claude -p` with an API key from the Console organization linked to the Max plan. `route.py run` launches it; you never build the command. Unattended callers (no Claude session behind the process) never get this lane: CLAUDE_SUBSCRIPTION runs `claude -p` on the logged-in account instead, with no API key and no dollar cap. The credit covers the API and Agent SDK, not interactive Claude Code, so only this runner uses the key. A missing or bad key fails loudly, never falls back to the Max login.
 
 - Tools: Read Glob Grep; `--write` adds Edit Write Bash. Every git write command is denied; HEAD and branch are compared before and after (`git_violation`).
 - The worker's Claude session id is `ref`; its transcript is `~/.claude/projects/*/<ref>.jsonl`.

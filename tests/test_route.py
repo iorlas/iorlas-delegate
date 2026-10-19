@@ -447,6 +447,13 @@ class BaseTable(unittest.TestCase):
 
 
 class StateLock(unittest.TestCase):
+    def test_a_lock_that_stays_held_raises_instead_of_running_unlocked(self):
+        with tempfile.TemporaryDirectory() as d:
+            with route.locked(Path(d) / "x", timeout=5):
+                with self.assertRaises(TimeoutError):
+                    with route.locked(Path(d) / "x", timeout=0.2):
+                        pass
+
     def test_parallel_processes_lose_no_update(self):
         code = ("import sys; sys.path.insert(0, %r); import route\n"
                 "for _ in range(25): route.update_state(lambda s: s.__setitem__('n', s.get('n', 0) + 1))" % str(Path(route.__file__).parent))
@@ -462,11 +469,13 @@ class RunCommand(unittest.TestCase):
     """route.py run executes a step against fake `codex` and `claude` on PATH and prints one JSON object (worker-run v1)."""
 
     FAKE_CODEX = """#!/bin/sh
+[ "$1" = app-server ] && exit 1       # the real usage reader runs this in a child route.py
 out=""; args="$*"
 while [ $# -gt 0 ]; do case "$1" in -o) out="$2"; shift;; esac; shift; done
 brief=$(cat)
 echo "$args" >> "$FAKE_ARGS"; env | sort > "$FAKE_ENV"
 echo '{"type":"thread.started","thread_id":"thread-123"}'
+echo '{"type":"turn.completed","usage":{"input_tokens":100,"cached_input_tokens":40,"output_tokens":7}}'
 case "$FAKE_MODE" in
   ok) printf 'done: %s' "$(echo "$brief" | tail -1)" > "$out";;
   json) printf '{"a": 1}' > "$out";;
@@ -509,7 +518,7 @@ printf '{"result":"claude says hi","session_id":"sess-1","total_cost_usd":0.5,"i
         self.fresh_usage()
 
     def fresh_usage(self, age=0):
-        """What the status line writes; a headless call may only spend the shared plan when this is fresh."""
+        """What the status line writes; a unattended call may only spend the shared plan when this is fresh."""
         f = Path(self.tmp.name) / ".claude" / "state" / "max-limits.json"
         f.parent.mkdir(parents=True, exist_ok=True)
         soon = time.time() + 3600
@@ -522,13 +531,13 @@ printf '{"result":"claude says hi","session_id":"sess-1","total_cost_usd":0.5,"i
             os.environ.pop(k, None) if v is None else os.environ.__setitem__(k, v)
         self.tmp.cleanup()
 
-    def run_it(self, *args, mode="ok", brief="do the thing\nthe brief", role="worker", timeout=30, headless=True):
+    def run_it(self, *args, mode="ok", brief="do the thing\nthe brief", role="worker", timeout=30, unattended=True):
         import io
         os.environ["FAKE_MODE"] = mode
         real_in, real_out, real_err = sys.stdin, sys.stdout, sys.stderr
         sys.stdin, sys.stdout, sys.stderr = io.StringIO(brief), io.StringIO(), io.StringIO()
         try:
-            code = route.main(["run", role, "--cwd", self.repo] + (["--timeout", str(timeout)] if timeout else []) + (["--headless"] if headless else []) + list(args))
+            code = route.main(["run", role, "--cwd", self.repo] + (["--timeout", str(timeout)] if timeout else []) + (["--unattended"] if unattended else []) + list(args))
             out = sys.stdout.getvalue()
         finally:
             sys.stdin, sys.stdout, sys.stderr = real_in, real_out, real_err
@@ -559,7 +568,7 @@ printf '{"result":"claude says hi","session_id":"sess-1","total_cost_usd":0.5,"i
         self.assertNotIn("--max-budget-usd", seen)                         # a subscription has no dollar cap
         self.assertNotIn("ANTHROPIC_API_KEY", Path(os.environ["FAKE_ENV"]).read_text())
 
-    def test_headless_runs_when_no_usage_reading_exists(self):
+    def test_unattended_runs_when_no_usage_reading_exists(self):
         route.update_state(lambda s: s.setdefault("out", {}).__setitem__("OPENAI_SUBSCRIPTION", {"until": route.now() + 3600, "why": "t"}))
         Path(self.tmp.name, ".claude", "state", "max-limits.json").unlink()      # an unattended factory: no status line, no get_usage
         code, r = self.run_it()
@@ -569,7 +578,7 @@ printf '{"result":"claude says hi","session_id":"sess-1","total_cost_usd":0.5,"i
         code, r = self.run_it(timeout=None)
         self.assertEqual((code, r["status"]), (0, "done"))
 
-    def test_headless_keeps_the_orchestrator_reserve(self):
+    def test_unattended_keeps_the_orchestrator_reserve(self):
         route.update_state(lambda s: s.setdefault("out", {}).__setitem__("OPENAI_SUBSCRIPTION", {"until": route.now() + 3600, "why": "t"}))
         f = Path(self.tmp.name) / ".claude" / "state" / "max-limits.json"
         d = json.loads(f.read_text())
@@ -582,13 +591,13 @@ printf '{"result":"claude says hi","session_id":"sess-1","total_cost_usd":0.5,"i
         _, r = self.run_it()
         self.assertEqual(r["status"], "stop")
 
-    def test_headless_never_picks_the_credit_lane_even_with_a_key(self):
+    def test_unattended_never_picks_the_credit_lane_even_with_a_key(self):
         os.environ["CLAUDE_CREDIT_WORKER_KEY"] = "sk-ant-x"
         route.update_state(lambda s: s.setdefault("out", {}).__setitem__("OPENAI_SUBSCRIPTION", {"until": route.now() + 3600, "why": "t"}))
         _, r = self.run_it()
         self.assertEqual(r["lane"], "CLAUDE_SUBSCRIPTION")
 
-    def test_headless_never_answers_agent_ask_user_or_needs_input(self):
+    def test_unattended_never_answers_agent_ask_user_or_needs_input(self):
         route.update_state(lambda s: s.setdefault("out", {}).update(
             {n: {"until": route.now() + 3600, "why": "t"} for n in ("OPENAI_SUBSCRIPTION", "CLAUDE_SUBSCRIPTION")}))
         code, r = self.run_it(role="planner")
@@ -601,14 +610,95 @@ printf '{"result":"claude says hi","session_id":"sess-1","total_cost_usd":0.5,"i
         self.assertEqual((r["status"], r["lane"]), ("done", "CLAUDE_SUBSCRIPTION"))
 
     def test_interactive_session_gets_the_agent_step_and_the_consent_question(self):
-        _, r = self.run_it(role="planner", headless=False)
+        _, r = self.run_it(role="planner", unattended=False)
         self.assertEqual((r["status"], r["lane"], r["agent_model"]), ("agent", "CLAUDE_SUBSCRIPTION", "opus"))
         self.assertIn("coordinator", r["brief_prefix"])
         route.update_state(lambda s: s.setdefault("out", {}).update(
             {n: {"until": route.now() + 3600, "why": "t"} for n in ("OPENAI_SUBSCRIPTION", "CLAUDE_SUBSCRIPTION")}))
-        _, r = self.run_it(role="planner", headless=False)
+        _, r = self.run_it(role="planner", unattended=False)
         self.assertEqual(r["status"], "stop")
         self.assertIn("ask_user", r)
+
+    def lease(self, rid, lane, task="", expires=None):
+        route.update_state(lambda s: s.setdefault("leases", {}).__setitem__(rid, {"lane": lane, "role": "worker", "pid": 1, "start": route.now(), "task": task,
+                                                                               "expires": expires if expires is not None else route.now() + 600}))
+
+    def test_full_lane_is_skipped_like_a_refused_one(self):
+        for i in range(4):
+            self.lease(f"r{i}", "OPENAI_SUBSCRIPTION")
+        _, r = self.run_it()
+        self.assertEqual((r["status"], r["lane"]), ("done", "CLAUDE_SUBSCRIPTION"))      # Codex has 4 of 4 slots taken
+
+    def test_three_running_leave_room_for_a_fourth(self):
+        for i in range(3):
+            self.lease(f"r{i}", "OPENAI_SUBSCRIPTION")
+        _, r = self.run_it()
+        self.assertEqual(r["lane"], "OPENAI_SUBSCRIPTION")
+
+    def test_expired_leases_do_not_count(self):
+        for i in range(4):
+            self.lease(f"r{i}", "OPENAI_SUBSCRIPTION", expires=route.now() - 1)
+        _, r = self.run_it()
+        self.assertEqual(r["lane"], "OPENAI_SUBSCRIPTION")
+
+    def test_every_lane_full_stops_with_a_retry_after_in_one_to_two_minutes(self):
+        for i in range(4):
+            self.lease(f"o{i}", "OPENAI_SUBSCRIPTION")
+            self.lease(f"c{i}", "CLAUDE_SUBSCRIPTION")
+        _, r = self.run_it()
+        self.assertEqual(r["status"], "stop")
+        self.assertTrue(55 <= r["retry_after"] - time.time() <= 125, r["retry_after"])
+
+    def test_a_strained_lane_allows_one(self):
+        f = Path(self.tmp.name) / ".claude" / "state" / "max-limits.json"
+        d = json.loads(f.read_text())
+        d["rate_limits"]["five_hour"]["used_percentage"] = 85
+        f.write_text(json.dumps(d))
+        route.update_state(lambda s: s.setdefault("out", {}).__setitem__("OPENAI_SUBSCRIPTION", {"until": route.now() + 3600, "why": "t"}))
+        self.lease("c0", "CLAUDE_SUBSCRIPTION")
+        _, r = self.run_it()
+        self.assertEqual(r["status"], "stop")          # one slot, taken
+
+    def test_the_same_task_never_runs_twice_at_once(self):
+        self.lease("r0", "OPENAI_SUBSCRIPTION", task="T-1")
+        _, r = self.run_it("--task", "T-1")
+        self.assertEqual(r["status"], "stop")
+        self.assertIn("T-1", r["say"])
+        _, r = self.run_it("--task", "T-2")
+        self.assertEqual(r["status"], "done")
+        route.update_state(lambda s: s["leases"].pop("r0"))
+        _, r = self.run_it("--task", "T-1")             # a resume after the first run ended is fine
+        self.assertEqual(r["status"], "done")
+
+    def test_the_lease_is_released_and_a_history_line_is_written(self):
+        _, r = self.run_it("--task", "T-9")
+        self.assertEqual(route.load_state().get("leases"), {})
+        line = json.loads(route.history_path().read_text().splitlines()[-1])
+        self.assertEqual((line["run_id"], line["task"], line["lane"], line["status"]), (r["run_id"], "T-9", "OPENAI_SUBSCRIPTION", "done"))
+        self.assertEqual(line["tokens"], {"in": 100, "cached": 40, "out": 7})
+        self.assertNotIn("brief", json.dumps(line))
+        self.assertEqual(line["overlap"], [])
+
+    def test_sigterm_on_route_py_stops_the_worker_too(self):
+        import signal
+        env = dict(os.environ, FAKE_MODE="hang", PATH=str(self.base / "bin") + os.pathsep + os.environ["PATH"])
+        p = subprocess.Popen([sys.executable, route.__file__, "run", "worker", "--cwd", self.repo, "--unattended"], env=env,
+                             stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        p.stdin.write(b"do it"); p.stdin.close()
+        for _ in range(100):
+            if Path(os.environ["FAKE_PIDFILE"]).exists() and Path(os.environ["FAKE_PIDFILE"]).read_text().strip():
+                break
+            if p.poll() is not None:
+                self.fail(p.stdout.read().decode() + p.stderr.read().decode())
+            time.sleep(0.1)
+        pid = int(Path(os.environ["FAKE_PIDFILE"]).read_text())
+        p.send_signal(signal.SIGTERM)
+        p.wait(timeout=15)
+        time.sleep(0.3)
+        with self.assertRaises(OSError):
+            os.kill(pid, 0)
+        self.assertEqual(route.load_state().get("leases"), {})
+
 
     def test_timeout_kills_the_whole_process_group(self):
         code, r = self.run_it(mode="hang", timeout=2)

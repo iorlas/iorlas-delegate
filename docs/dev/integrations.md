@@ -15,7 +15,7 @@ Delegate writes them from one file, `skills/delegate/agent_runs.py`, the only co
 
 | call site | what it publishes | why the dashboard needs it |
 |---|---|---|
-| `launch_codex` / `launch_claude` (route.py), before the worker starts: `agent_runs.run(id, kind="codex"\|"claude-p", lane, model, cwd, parent_session, title[, task], started, status="running")`; codex adds `thread` as soon as `thread.started` arrives, claude passes `session=ref` | a run record | ties the headless worker to the session (and so the task) that launched it; `session`/`thread` find its live log |
+| `launch_codex` / `launch_claude` (route.py), before the worker starts: `agent_runs.run(id, kind="codex"\|"claude-p", lane, model, cwd, parent_session, title[, task], started, status="running")`; codex adds `thread` as soon as `thread.started` arrives, claude passes `session=ref` | a run record | ties the unattended worker to the session (and so the task) that launched it; `session`/`thread` find its live log |
 | `cmd_run`, after it: `agent_runs.run(id, ended, status, transcript)` | the same record, finished | shows done or failed and how long it ran |
 | `publish_lanes(lanes, st, t)` after `gather()` in `cmd_status` and `cmd_next` | `lanes/delegate.json` | the limits chips (5h and weekly use, a lane that is out and why); a reader ignores it once it is 6 hours old |
 
@@ -27,16 +27,23 @@ state and in Claude Code's own transcripts.
 
 ## 2. `route.py run` is a contract; everything else is not
 
-task-loop's engine calls `route.py run ROLE --headless --brief FILE --cwd DIR [--schema F] [--resume REF] [--cap USD] [--timeout S] [--parent SESSION] [--task ID] [--title T]`
+task-loop's engine calls `route.py run ROLE --unattended --brief FILE --cwd DIR [--schema F] [--resume REF] [--cap USD] [--timeout S] [--parent SESSION] [--task ID] [--title T]`
 as a script, with no Claude session behind it. The spec belongs to the consumer:
 https://github.com/iorlas/iorlas-task-loop/blob/main/docs/contracts/worker-run-v1.md
 
 - stdout is exactly one JSON object (`v`, `status`, `data`, `text`, `ref`, `lane`, `model`, `effort`, `family`, `flag`, `cost`, `secs`, `run_id`,
   `transcript`, `retry_after`, `say`, `git_violation`); exit 0 whenever it was printed. Statuses: `done`, `failed`, `timeout`, `lane_out`, `stop`, `error`
   (plus `agent` for interactive callers only).
-- `--headless` is how an engine says no Claude session is behind it. Without it the caller is a Claude session and may get `agent`. With it: never `agent`, `ask_user`
+- `--unattended` is how an engine says no Claude session is behind it. Without it the caller is a Claude session and may get `agent`. With it: never `agent`, `ask_user`
   or `needs_input`; CLAUDE_CREDIT is never picked; CLAUDE_SUBSCRIPTION runs `claude -p` on the logged-in account. No time or token limit by default: `--timeout` is
   opt-in and an unknown plan reading does not stop a run. `orchestrator_reserve` still applies when a reading exists.
+- Slots: at most `max_parallel` (setting, default 4; one when the lane's 5-hour use is at `strain`) runs in flight per lane. A full lane is skipped like a refused one; when nothing
+  is left the answer is `stop` (or `lane_out`) with a `retry_after` 60-120 s ahead, jittered. `run` never waits for a slot. A run holds a lease in `state.json`
+  (`leases`; 120 s, renewed every 30 s, so a killed `route.py` frees its slot by itself). With `--task ID`, a second `run` for the same task while the first is alive answers `stop`.
+- SIGTERM, SIGHUP or Ctrl-C on `route.py run` stops its worker too (workers run in their own process group, so nothing else would). With `--unattended` a changed parent pid
+  (the engine was SIGKILLed) does the same. Without this, an orphaned Codex keeps burning the plan.
+- `history.jsonl` (config dir, private): one line per finished run: role, task, lane, model, effort, status, secs, cost, tokens, 5-hour and weekly use before and after, ids of runs
+  that overlapped it, slots. For calibration; never the brief. Not part of the contract.
 - `route.py status --claude-usage '<get_usage plan.windows JSON>'` is part of the contract: it stores the reading for later `run`s. Keep that command and input shape, or bump `v`.
 - `reviewer`: `--authored-by openai|claude` is optional (the family that wrote the diff). The other family reviews first; the same family is the last resort
   and comes back with `flag: "same_family"`; with no reviewer at all the answer is `stop`, never an exception.

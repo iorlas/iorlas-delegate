@@ -33,6 +33,7 @@
       "monthly_cap": 150,
       "reset_day": 1
     },
+    "max_parallel": 4,
     "min_dwell_minutes": 30,
     "usage_stale_minutes": 30,
     "claude_weekly_reset": ""
