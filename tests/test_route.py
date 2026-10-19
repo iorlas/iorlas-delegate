@@ -446,7 +446,6 @@ class BaseTable(unittest.TestCase):
         self.assertEqual(table, want)
 
 
-@unittest.skipIf(os.name == "nt", "fake codex/claude are shell scripts; Windows is covered by hand (delegate-5b6)")
 class StateLock(unittest.TestCase):
     def test_parallel_processes_lose_no_update(self):
         code = ("import sys; sys.path.insert(0, %r); import route\n"
@@ -458,6 +457,7 @@ class StateLock(unittest.TestCase):
             self.assertEqual(json.loads(Path(d, "state.json").read_text())["n"], 200)
 
 
+@unittest.skipIf(os.name == "nt", "fake codex/claude are shell scripts; Windows is covered by hand (delegate-5b6)")
 class RunCommand(unittest.TestCase):
     """route.py run executes a step against fake `codex` and `claude` on PATH and prints one JSON object (worker-run v1)."""
 
