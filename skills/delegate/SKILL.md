@@ -1,9 +1,10 @@
 ---
 name: delegate
-description: Delegate a sub-task to a worker model. route.py picks lane, model and effort from plan limits; never pick them yourself. Use before delegating, and for setup.
+description: Delegate a sub-task to another model or subscription, only when the user or a skill asks to delegate. route.py picks lane, model and effort; never pick them yourself.
 ---
 
 `DELEGATE_DEPTH` set = you are a worker: do not delegate.
+Run it with Bash `run_in_background`.
 `python3 ${CLAUDE_SKILL_DIR}/route.py run ROLE [--cwd D] [--authored-by openai|claude] [--failed I,J] [--premium] [--allow-degraded] [--claude-usage JSON] < brief`
 (`py -3` on Windows.) Roles: planner (plan, design) · worker (implement, debug) · reviewer (`--authored-by`: family that wrote it) · hard (after 2 failures; `--failed`) · light (read, summarise).
 

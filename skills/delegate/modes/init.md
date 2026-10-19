@@ -17,4 +17,4 @@ New lanes show up once as `notice` in a `run` answer: tell the user; "no" = `doc
 No terminal (Claude RC, phone): `route.py set-key --web` in Bash `run_in_background`; show only its first line (the link). `--host tailscale` (or a private IP) for another device. Plain HTTP, loopback/private/tailnet only, one use, 5 min.
 Optional: `doctor --fix statusline`; `route.py config set claude_weekly_reset "Sun 17:00"`; `--open-browser` with `--fix codex_login` on a desktop; `doctor --deep` also checks the stored key.
 Container: mount `~/.claude` and `~/.codex` (or the whole home) as volumes.
-Headless (`-p`, RC, containers): plan limits reach only the status line, which does not run there; Claude steps then prefer the credit lane.
+Engines (`run --headless`): Claude steps run `claude -p` on the login; plan limits are read only when a status-line or `status --claude-usage` reading exists, and no reading never stops a run.

@@ -27,18 +27,17 @@ state and in Claude Code's own transcripts.
 
 ## 2. `route.py run` is a contract; everything else is not
 
-task-loop's engine calls `route.py run ROLE --brief FILE --cwd DIR [--schema F] [--resume REF] [--cap USD] [--timeout S] [--parent SESSION] [--task ID] [--title T]`
+task-loop's engine calls `route.py run ROLE --headless --brief FILE --cwd DIR [--schema F] [--resume REF] [--cap USD] [--timeout S] [--parent SESSION] [--task ID] [--title T]`
 as a script, with no Claude session behind it. The spec belongs to the consumer:
 https://github.com/iorlas/iorlas-task-loop/blob/main/docs/contracts/worker-run-v1.md
 
 - stdout is exactly one JSON object (`v`, `status`, `data`, `text`, `ref`, `lane`, `model`, `effort`, `family`, `flag`, `cost`, `secs`, `run_id`,
   `transcript`, `retry_after`, `say`, `git_violation`); exit 0 whenever it was printed. Statuses: `done`, `failed`, `timeout`, `lane_out`, `stop`, `error`
   (plus `agent` for interactive callers only).
-- Headless = no `CLAUDE_CODE_ENTRYPOINT` (the engine strips `CLAUDE_*`). Headless never gets `agent`, `ask_user` or `needs_input`; CLAUDE_CREDIT is never
-  picked; CLAUDE_SUBSCRIPTION runs `claude -p` on the logged-in account, and only while a fresh reading of its use exists (`~/.claude/state/max-limits.json`
-  from the status line, or `state.json`, newer than `usage_stale_minutes`); otherwise `stop` with `retry_after`. `orchestrator_reserve` applies.
-- `route.py status --claude-usage '<get_usage plan.windows JSON>'` is part of the contract: it stores the reading, and a headless `run` uses it for
-  `usage_stale_minutes` (30). Keep that command and input shape, or bump `v`.
+- `--headless` is how an engine says no Claude session is behind it. Without it the caller is a Claude session and may get `agent`. With it: never `agent`, `ask_user`
+  or `needs_input`; CLAUDE_CREDIT is never picked; CLAUDE_SUBSCRIPTION runs `claude -p` on the logged-in account. No time or token limit by default: `--timeout` is
+  opt-in and an unknown plan reading does not stop a run. `orchestrator_reserve` still applies when a reading exists.
+- `route.py status --claude-usage '<get_usage plan.windows JSON>'` is part of the contract: it stores the reading for later `run`s. Keep that command and input shape, or bump `v`.
 - `reviewer`: `--authored-by openai|claude` is optional (the family that wrote the diff). The other family reviews first; the same family is the last resort
   and comes back with `flag: "same_family"`; with no reviewer at all the answer is `stop`, never an exception.
 - Everything else (`next`, `doctor`, flags not listed above, `state.json`, `routing.json`, mode files) is private and may change in any release. Changing

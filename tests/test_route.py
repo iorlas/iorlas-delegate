@@ -4,6 +4,7 @@ import datetime as dt
 import importlib.util
 import json
 import os
+import subprocess
 import sys
 import tempfile
 import time
@@ -446,6 +447,17 @@ class BaseTable(unittest.TestCase):
 
 
 @unittest.skipIf(os.name == "nt", "fake codex/claude are shell scripts; Windows is covered by hand (delegate-5b6)")
+class StateLock(unittest.TestCase):
+    def test_parallel_processes_lose_no_update(self):
+        code = ("import sys; sys.path.insert(0, %r); import route\n"
+                "for _ in range(25): route.update_state(lambda s: s.__setitem__('n', s.get('n', 0) + 1))" % str(Path(route.__file__).parent))
+        with tempfile.TemporaryDirectory() as d:
+            env = dict(os.environ, DELEGATE_CONFIG_DIR=d)
+            ps = [subprocess.Popen([sys.executable, "-c", code], env=env, stderr=subprocess.PIPE) for _ in range(8)]
+            self.assertEqual([p.communicate()[1] for p in ps], [b""] * 8)
+            self.assertEqual(json.loads(Path(d, "state.json").read_text())["n"], 200)
+
+
 class RunCommand(unittest.TestCase):
     """route.py run executes a step against fake `codex` and `claude` on PATH and prints one JSON object (worker-run v1)."""
 
@@ -510,13 +522,13 @@ printf '{"result":"claude says hi","session_id":"sess-1","total_cost_usd":0.5,"i
             os.environ.pop(k, None) if v is None else os.environ.__setitem__(k, v)
         self.tmp.cleanup()
 
-    def run_it(self, *args, mode="ok", brief="do the thing\nthe brief", role="worker", timeout=30):
+    def run_it(self, *args, mode="ok", brief="do the thing\nthe brief", role="worker", timeout=30, headless=True):
         import io
         os.environ["FAKE_MODE"] = mode
         real_in, real_out, real_err = sys.stdin, sys.stdout, sys.stderr
         sys.stdin, sys.stdout, sys.stderr = io.StringIO(brief), io.StringIO(), io.StringIO()
         try:
-            code = route.main(["run", role, "--cwd", self.repo, "--timeout", str(timeout)] + list(args))
+            code = route.main(["run", role, "--cwd", self.repo] + (["--timeout", str(timeout)] if timeout else []) + (["--headless"] if headless else []) + list(args))
             out = sys.stdout.getvalue()
         finally:
             sys.stdin, sys.stdout, sys.stderr = real_in, real_out, real_err
@@ -547,32 +559,15 @@ printf '{"result":"claude says hi","session_id":"sess-1","total_cost_usd":0.5,"i
         self.assertNotIn("--max-budget-usd", seen)                         # a subscription has no dollar cap
         self.assertNotIn("ANTHROPIC_API_KEY", Path(os.environ["FAKE_ENV"]).read_text())
 
-    def test_headless_stops_when_no_usage_feed_is_fresh(self):
+    def test_headless_runs_when_no_usage_reading_exists(self):
         route.update_state(lambda s: s.setdefault("out", {}).__setitem__("OPENAI_SUBSCRIPTION", {"until": route.now() + 3600, "why": "t"}))
-        self.fresh_usage(age=3600)                                         # older than the 30-minute window
+        Path(self.tmp.name, ".claude", "state", "max-limits.json").unlink()      # an unattended factory: no status line, no get_usage
         code, r = self.run_it()
-        self.assertEqual((code, r["status"]), (0, "stop"))
-        self.assertGreater(r["retry_after"], time.time())
-        self.fresh_usage()
-        _, r = self.run_it()
-        self.assertEqual((r["status"], r["lane"]), ("done", "CLAUDE_SUBSCRIPTION"))
+        self.assertEqual((code, r["status"], r["lane"]), (0, "done", "CLAUDE_SUBSCRIPTION"))     # no limit by default
 
-    def test_status_with_get_usage_windows_feeds_the_next_headless_run(self):
-        import io
-        Path(self.tmp.name, ".claude", "state", "max-limits.json").unlink()          # the Desktop app: no status line, no file
-        route.update_state(lambda s: s.setdefault("out", {}).__setitem__("OPENAI_SUBSCRIPTION", {"until": route.now() + 3600, "why": "t"}))
-        _, r = self.run_it()
-        self.assertEqual(r["status"], "stop")                                        # nothing known, nothing spent
-        windows = json.dumps([{"label": "5-hour limit", "percentUsed": 1, "resetsAt": "2099-01-01T00:00:00Z"},
-                              {"label": "Weekly \u00b7 all models", "percentUsed": 3, "resetsAt": "2099-01-01T00:00:00Z"}])
-        real = sys.stdout
-        sys.stdout = io.StringIO()
-        try:
-            route.main(["status", "--claude-usage", windows])
-        finally:
-            sys.stdout = real
-        _, r = self.run_it()
-        self.assertEqual((r["status"], r["lane"]), ("done", "CLAUDE_SUBSCRIPTION"))
+    def test_no_timeout_unless_the_caller_passes_one(self):
+        code, r = self.run_it(timeout=None)
+        self.assertEqual((code, r["status"]), (0, "done"))
 
     def test_headless_keeps_the_orchestrator_reserve(self):
         route.update_state(lambda s: s.setdefault("out", {}).__setitem__("OPENAI_SUBSCRIPTION", {"until": route.now() + 3600, "why": "t"}))
@@ -606,13 +601,12 @@ printf '{"result":"claude says hi","session_id":"sess-1","total_cost_usd":0.5,"i
         self.assertEqual((r["status"], r["lane"]), ("done", "CLAUDE_SUBSCRIPTION"))
 
     def test_interactive_session_gets_the_agent_step_and_the_consent_question(self):
-        os.environ["CLAUDE_CODE_ENTRYPOINT"] = "cli"
-        _, r = self.run_it(role="planner")
+        _, r = self.run_it(role="planner", headless=False)
         self.assertEqual((r["status"], r["lane"], r["agent_model"]), ("agent", "CLAUDE_SUBSCRIPTION", "opus"))
         self.assertIn("coordinator", r["brief_prefix"])
         route.update_state(lambda s: s.setdefault("out", {}).update(
             {n: {"until": route.now() + 3600, "why": "t"} for n in ("OPENAI_SUBSCRIPTION", "CLAUDE_SUBSCRIPTION")}))
-        _, r = self.run_it(role="planner")
+        _, r = self.run_it(role="planner", headless=False)
         self.assertEqual(r["status"], "stop")
         self.assertIn("ask_user", r)
 
@@ -701,7 +695,7 @@ class TokenBudget(unittest.TestCase):
 
     def test_skill_md(self):
         text = (self.ROOT / "SKILL.md").read_text(encoding="utf-8")
-        self.assertLessEqual(len(text), 1800)
+        self.assertLessEqual(len(text), 1900)      # raised from 1800 on 2026-10-19: the run_in_background line
         import re
         desc = re.search(r"^description: (.*)$", text, re.M).group(1)
         self.assertLessEqual(len(desc), 170)

@@ -7,7 +7,7 @@ The model supplies only what the script cannot read itself; the script decides.
   route.py status [--claude-usage JSON|@file|-] [--json]
   route.py next ROLE [--authored-by openai|claude] [--failed 0,1] [--premium [FAMILY]] [--allow-degraded]
                      [--claude-usage JSON|@file|-] [--cwd DIR] [--verbose]
-  route.py run ROLE [--cwd DIR] [--brief FILE] [--schema FILE] [--resume REF] [--cap USD] [--timeout SEC] [--authored-by W] [--failed I,J] [--premium] [--allow-degraded]
+  route.py run ROLE [--cwd DIR] [--brief FILE] [--schema FILE] [--resume REF] [--cap USD] [--timeout SEC] [--headless] [--authored-by W] [--failed I,J] [--premium] [--allow-degraded]
                     [--claude-usage JSON] [--parent SESSION] [--task ID] [--title T]    brief on stdin; one JSON object on stdout, exit 0 (see docs/dev/integrations.md)
   route.py report --lane LANE --event out|ok [--until EPOCH|ISO] [--message TEXT]
   route.py capture-limits [--print]  (status line JSON on stdin)
@@ -283,9 +283,12 @@ def harness():
     return "unknown" if ep else "headless"
 
 
+HEADLESS = False     # set by `run --headless`: the caller is an engine, not a Claude session
+
+
 def interactive():
-    """A Claude session (Desktop or CLI) is behind this process: the Agent tool, get_usage and the user exist. Anything else is headless."""
-    return harness() in ("desktop", "cli")
+    """A Claude session is behind this process (the Agent tool, get_usage and the user exist) unless the caller said --headless."""
+    return not HEADLESS
 
 
 OFFERS = []     # lanes seen for the first time and not usable; reported once, then forgotten
@@ -796,10 +799,6 @@ def decision(a, cfg):
     S = cfg["settings"]
     if headless:        # no one to pay the API credit knowingly: credit lanes are never picked headless
         lanes = {n: l for n, l in lanes.items() if l.kind != "credit"}
-        for l in lanes.values():     # a shared plan is never spent blind: unknown use could drain the window the user's own sessions need
-            if l.shared and not l.usage_known and not l.out:
-                l.out, l.out_until = True, t + S["usage_stale_minutes"] * 60
-                l.notes.insert(0, "use unknown headless (no fresh status-line reading)")
     ref = getattr(a, "resume", None)
     if ref:             # continue on the lane that made the ref; never switch lanes silently
         rec = (st.get("refs") or {}).get(ref)
@@ -1294,9 +1293,11 @@ def main(argv=None):
     cf = sub.add_parser("config"); cf.add_argument("action", choices=["set", "show"]); cf.add_argument("key", nargs="?"); cf.add_argument("value", nargs="?")
     ru = sub.add_parser("run"); ru.add_argument("role"); ru.add_argument("--authored-by"); ru.add_argument("--failed", default="")
     ru.add_argument("--premium", nargs="?", const="claude", metavar="FAMILY"); ru.add_argument("--allow-degraded", action="store_true")
-    ru.add_argument("--claude-usage"); ru.add_argument("--cwd"); ru.add_argument("--brief"); ru.add_argument("--timeout", type=int, default=1800)
+    ru.add_argument("--claude-usage"); ru.add_argument("--cwd"); ru.add_argument("--brief"); ru.add_argument("--timeout", type=int, help="seconds; none by default"); ru.add_argument("--headless", action="store_true")
     ru.add_argument("--schema"); ru.add_argument("--resume"); ru.add_argument("--cap", type=float); ru.add_argument("--parent"); ru.add_argument("--task"); ru.add_argument("--title")
     a = ap.parse_args(argv)
+    global HEADLESS
+    HEADLESS = getattr(a, "headless", False)
     cfg = load_routing()
     return {"status": cmd_status, "next": cmd_next, "report": cmd_report, "capture-limits": cmd_capture,
             "run": cmd_run, "doctor": cmd_doctor, "set-key": cmd_set_key, "config": cmd_config}[a.cmd](a, cfg)
