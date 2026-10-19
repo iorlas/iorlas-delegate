@@ -7,7 +7,7 @@ The model supplies only what the script cannot read itself; the script decides.
   route.py status [--claude-usage JSON|@file|-] [--json]
   route.py next ROLE [--authored-by openai|claude] [--failed 0,1] [--premium [FAMILY]] [--allow-degraded]
                      [--claude-usage JSON|@file|-] [--cwd DIR] [--verbose]
-  route.py run ROLE [--cwd DIR] [--brief FILE] [--schema FILE] [--resume REF] [--cap USD] [--timeout SEC] [--unattended] [--authored-by W] [--failed I,J] [--premium] [--allow-degraded]
+  route.py run ROLE [--cwd DIR] [--brief FILE] [--schema FILE] [--resume REF] [--cap USD] [--timeout SEC] [--unattended] [--no-sandbox] [--authored-by W] [--failed I,J] [--premium] [--allow-degraded]
                     [--claude-usage JSON] [--parent SESSION] [--task ID] [--title T]    brief on stdin; one JSON object on stdout, exit 0 (see docs/dev/integrations.md)
   route.py report --lane LANE --event out|ok [--until EPOCH|ISO] [--message TEXT]
   route.py capture-limits [--print]  (status line JSON on stdin)
@@ -705,7 +705,7 @@ def decide(role_name, cfg, lanes, st, t, args):
                 return {"action": "run", "role": role_name, "step": step.get("idx"), "pass": "relaxed" if relaxed else "strict",
                         "lane": lane.name, "model": step["model"], "effort": step["effort"], "mode": step.get("mode", "read_only"),
                         "cap": step.get("cap"), "use": step.get("use"), "flag": step.get("flag"),
-                        "how": how(lane, step, cfg, args.get("cwd"), args.get("unattended", False)), "trace": trace}
+                        "how": how(lane, step, cfg, args.get("cwd"), args.get("unattended", False), args.get("no_sandbox")), "trace": trace}
     resets = {l.name: local(l.out_until) for l in lanes.values() if l.out and l.out_until}
     stop = {"action": "stop", "role": role_name, "say": role["stop"], "resets": resets, "trace": trace}
     consent = role.get("degraded_needs_consent")
@@ -716,7 +716,7 @@ def decide(role_name, cfg, lanes, st, t, args):
     return stop
 
 
-def how(lane, step, cfg, cwd=None, unattended=False):
+def how(lane, step, cfg, cwd=None, unattended=False, no_sandbox=False):
     """What a step runs on. Unattended callers have no Agent tool, so the subscription lane runs `claude -p` on the logged-in account."""
     m = cfg["models"][step["model"]]
     runner = cfg["lanes"][lane.name]["runner"]
@@ -728,10 +728,11 @@ def how(lane, step, cfg, cwd=None, unattended=False):
         return {"kind": "claude_p", "model": m["api"], "write": write, "cap": step.get("cap", 2), "cwd": wd}
     if runner == "agent_tool":
         return {"kind": "agent_tool", "model": m["agent"], "cwd": wd}
-    cli = ["codex", "exec", "-C", wd, "-s", "workspace-write" if write else "read-only", "-m", m["api"], "-c", f"model_reasoning_effort={step['effort']}"]
+    sandbox = "read-only" if not write else "danger-full-access" if no_sandbox else "workspace-write"     # --no-sandbox only widens write steps; a reviewer stays read-only
+    cli = ["codex", "exec", "-C", wd, "-s", sandbox, "-m", m["api"], "-c", f"model_reasoning_effort={step['effort']}"]
     if git_state(wd) is None:
         cli.append("--skip-git-repo-check")      # codex refuses a directory that is not a git work tree
-    return {"kind": "codex", "model": m["api"], "cli": cli, "cwd": wd}
+    return {"kind": "codex", "model": m["api"], "cli": cli, "cwd": wd, "sandbox": sandbox}
 
 
 # ----------------------------------------------------------------------------- commands
@@ -760,14 +761,28 @@ def needs_input(lanes):
     return need
 
 
+def recent_runs(n):
+    """The last n finished runs, newest last: the dashboard's view of history.jsonl (the file itself stays private)."""
+    keys = ("run_id", "ts", "role", "task", "lane", "model", "status", "secs", "cost")
+    try:
+        lines = history_path().read_text(encoding="utf-8").splitlines()[-n:]
+        return [{k: json.loads(ln).get(k) for k in keys} for ln in lines if ln]
+    except (OSError, ValueError):
+        return []
+
+
 def cmd_status(a, cfg):
     t = now()
     st = load_state()
     lanes = gather(cfg, st, t, parse_json_arg(a.claude_usage))
     publish_lanes(lanes, st, t)
     if a.json:
-        print(json.dumps({"lanes": {n: {"family": l.family, "kind": l.kind, "out": l.out, "out_until": l.out_until, "five": l.five, "week": l.week,
+        print(json.dumps({"v": 1, "ts": t,
+                          "lanes": {n: {"family": l.family, "kind": l.kind, "out": l.out, "out_until": l.out_until, "five": l.five, "week": l.week,
                                         "pace": l.pace, "burn": l.burn, "spend": l.spend, "cap": l.cap, "notes": l.notes} for n, l in lanes.items()},
+                          "running": [{"run_id": k, "lane": v["lane"], "role": v["role"], "task": v.get("task", ""), "started": v["start"], "age_s": int(t - v["start"])}
+                                      for k, v in sorted(live_leases(st, t).items(), key=lambda kv: kv[1]["start"])],
+                          "recent": recent_runs(a.recent),
                           "needs_input": needs_input(lanes)}, indent=1))
         return 0
     for n, l in lanes.items():
@@ -841,9 +856,9 @@ def decision(a, cfg):
                     "say": f"{rec['lane']} cannot continue {ref} now"}, lanes, warnings, t
         step = {"model": rec["model"], "effort": rec["effort"], "mode": rec["mode"], "cap": a.cap or rec.get("cap")}
         return {"action": "run", "role": a.role, "step": None, "pass": "resume", "lane": lane.name, "model": rec["model"], "effort": rec["effort"],
-                "mode": rec["mode"], "cap": step["cap"], "how": how(lane, step, cfg, a.cwd, unattended)}, lanes, warnings, t
+                "mode": rec["mode"], "cap": step["cap"], "how": how(lane, step, cfg, a.cwd, unattended, a.no_sandbox)}, lanes, warnings, t
     args = {"authored_by": a.authored_by, "failed": [int(x) for x in a.failed.split(",") if x != ""] if a.failed else [],
-            "premium": a.premium, "allow_degraded": a.allow_degraded and not unattended, "cwd": a.cwd, "unattended": unattended}
+            "premium": a.premium, "allow_degraded": a.allow_degraded and not unattended, "cwd": a.cwd, "unattended": unattended, "no_sandbox": a.no_sandbox}
     d = decide(a.role, cfg, lanes, st, t, args)
     if d["action"] == "run":
         fam = cfg["lanes"][d["lane"]]["family"]
@@ -1091,8 +1106,7 @@ def launch_codex(d, brief, a, rid, t, meta):
         return {"status": "error", "say": "codex CLI not found on PATH (route.py doctor --lane OPENAI_SUBSCRIPTION)"}
     out_file = config_dir() / f"codex-last-{rid[:8]}.txt"
     if a.resume:
-        sandbox = "workspace-write" if d["mode"] == "write" else "read-only"
-        cmd = [exe, "exec", "resume", "-m", h["model"], "-c", f"model_reasoning_effort={d['effort']}", "-c", f'sandbox_mode="{sandbox}"']
+        cmd = [exe, "exec", "resume", "-m", h["model"], "-c", f"model_reasoning_effort={d['effort']}", "-c", f'sandbox_mode="{h["sandbox"]}"']
         cmd += [x for x in h["cli"] if x == "--skip-git-repo-check"] + ["--json", "-o", str(out_file)]
         cmd += (["--output-schema", a.schema] if a.schema else []) + [a.resume, "-"]
     else:
@@ -1217,6 +1231,9 @@ def emit(r):
     return 0        # exit 0 whenever the object was printed; non-zero only if route.py itself crashed
 
 
+HISTORY_MAX, HISTORY_DAYS = 1_000_000, 14
+
+
 def history_path():
     return config_dir() / "history.jsonl"
 
@@ -1225,9 +1242,14 @@ def history_add(rec):
     """One line per finished run, kept for calibration. Never holds the brief; never fails a run."""
     with contextlib.suppress(Exception):
         with locked(history_path()):
-            with open(history_path(), "a", encoding="utf-8") as f:
+            p = history_path()
+            if p.exists() and p.stat().st_size > HISTORY_MAX:       # rotate: keep the last HISTORY_DAYS days
+                cut = time.time() - HISTORY_DAYS * 86400
+                keep_ = [ln for ln in p.read_text(encoding="utf-8").splitlines() if ln and json.loads(ln).get("ts", 0) >= cut]
+                p.write_text("\n".join(keep_) + ("\n" if keep_ else ""), encoding="utf-8")
+            with open(p, "a", encoding="utf-8") as f:
                 f.write(json.dumps(rec) + "\n")
-            private(history_path())
+            private(p)
 
 
 def lane_use(cfg, name, t):
@@ -1337,7 +1359,7 @@ def run_once(a, cfg):
     secs = round(time.time() - t0, 1)
     five_after, week_after = lane_use(cfg, d["lane"], now())
     history_add({"ts": now(), "run_id": rid, "role": a.role, "task": a.task or "", "lane": d["lane"], "model": d["model"], "effort": d["effort"],
-                 "status": res["status"], "secs": secs, "cost": res.get("cost", 0), "tokens": res.pop("tokens", None),
+                 "status": res["status"], "no_sandbox": bool(a.no_sandbox), "secs": secs, "cost": res.get("cost", 0), "tokens": res.pop("tokens", None),
                  "five_before": lane.five, "week_before": lane.week, "five_after": five_after, "week_after": week_after,
                  "overlap": sorted(set(taken["peers"]) | set(ends.get("peers", []))), "slots": cap})
     res.update(**who, run_id=rid, secs=secs, git_violation=git_changes(git_before, git_state(cwd)),
@@ -1401,8 +1423,8 @@ def cmd_config(a, cfg):
 def main(argv=None):
     ap = argparse.ArgumentParser(prog="route.py", description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = ap.add_subparsers(dest="cmd", required=True)
-    s = sub.add_parser("status"); s.add_argument("--claude-usage"); s.add_argument("--json", action="store_true")
-    n = sub.add_parser("next"); n.add_argument("role"); n.add_argument("--authored-by"); n.add_argument("--failed", default="")
+    s = sub.add_parser("status"); s.add_argument("--claude-usage"); s.add_argument("--json", action="store_true"); s.add_argument("--recent", type=int, default=20)
+    n = sub.add_parser("next"); n.add_argument("role"); n.add_argument("--authored-by"); n.add_argument("--no-sandbox", action="store_true"); n.add_argument("--failed", default="")
     n.add_argument("--premium", nargs="?", const="claude", metavar="FAMILY"); n.add_argument("--allow-degraded", action="store_true")
     n.add_argument("--claude-usage"); n.add_argument("--cwd"); n.add_argument("--verbose", action="store_true")
     r = sub.add_parser("report"); r.add_argument("--lane", required=True); r.add_argument("--event", choices=["out", "ok"], required=True)
@@ -1414,7 +1436,7 @@ def main(argv=None):
     sk = sub.add_parser("set-key"); sk.add_argument("--stdin", action="store_true"); sk.add_argument("--force", action="store_true")
     sk.add_argument("--web", action="store_true"); sk.add_argument("--host", default="127.0.0.1"); sk.add_argument("--port", type=int, default=0); sk.add_argument("--timeout", type=int, default=300)
     cf = sub.add_parser("config"); cf.add_argument("action", choices=["set", "show"]); cf.add_argument("key", nargs="?"); cf.add_argument("value", nargs="?")
-    ru = sub.add_parser("run"); ru.add_argument("role"); ru.add_argument("--authored-by"); ru.add_argument("--failed", default="")
+    ru = sub.add_parser("run"); ru.add_argument("role"); ru.add_argument("--authored-by"); ru.add_argument("--no-sandbox", action="store_true"); ru.add_argument("--failed", default="")
     ru.add_argument("--premium", nargs="?", const="claude", metavar="FAMILY"); ru.add_argument("--allow-degraded", action="store_true")
     ru.add_argument("--claude-usage"); ru.add_argument("--cwd"); ru.add_argument("--brief"); ru.add_argument("--timeout", type=int, help="seconds; none by default"); ru.add_argument("--unattended", action="store_true")
     ru.add_argument("--schema"); ru.add_argument("--resume"); ru.add_argument("--cap", type=float); ru.add_argument("--parent"); ru.add_argument("--task"); ru.add_argument("--title")

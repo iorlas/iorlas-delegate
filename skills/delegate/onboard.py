@@ -177,7 +177,7 @@ def doctor(R, cfg, deep=False, lane=None):
         if not c["ok"] and not c.get("skip") and c["lane"] not in enabled | shared and c["lane"] != lane:
             c["available"] = True
     blocking = [c for c in checks if not c["ok"] and not c.get("optional") and not c.get("skip") and not c.get("available")]
-    return {"ready": not blocking, "lanes": lanes, "declined": sorted(skip), "harness": R.harness(), "checks": checks, "notes": notes}
+    return {"v": 1, "ready": not blocking, "lanes": lanes, "declined": sorted(skip), "harness": R.harness(), "checks": checks, "notes": notes}
 
 
 def validate_key(key):

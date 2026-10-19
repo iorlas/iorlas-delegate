@@ -43,7 +43,7 @@ def decide(role, ls, st=None, **args):
 
 def argparse_ns(role, **kw):
     import argparse
-    base = dict(role=role, authored_by=None, failed="", premium=None, allow_degraded=False, claude_usage=None, cwd=None, resume=None, cap=None)
+    base = dict(role=role, authored_by=None, failed="", premium=None, allow_degraded=False, claude_usage=None, cwd=None, resume=None, cap=None, no_sandbox=False)
     base.update(kw)
     return argparse.Namespace(**base)
 
@@ -698,6 +698,48 @@ printf '{"result":"claude says hi","session_id":"sess-1","total_cost_usd":0.5,"i
         with self.assertRaises(OSError):
             os.kill(pid, 0)
         self.assertEqual(route.load_state().get("leases"), {})
+
+
+    def test_no_sandbox_widens_a_write_step_only_and_resume_keeps_it(self):
+        self.run_it("--no-sandbox")
+        self.assertIn("-s danger-full-access", self.args_seen())
+        self.run_it("--no-sandbox", "--resume", "thread-123")
+        self.assertIn('sandbox_mode="danger-full-access"', self.args_seen())
+        self.assertTrue(json.loads(route.history_path().read_text().splitlines()[-1])["no_sandbox"])
+        open(os.environ["FAKE_ARGS"], "w").close()
+        self.run_it("--no-sandbox", "--authored-by", "claude", role="reviewer")           # read-only stays read-only
+        self.assertIn("-s read-only", self.args_seen())
+
+    def test_default_is_the_workspace_write_sandbox(self):
+        self.run_it()
+        seen = self.args_seen()
+        self.assertIn("-s workspace-write", seen)
+        self.assertNotIn("danger-full-access", seen)
+
+    def test_status_json_v1_shape(self):
+        import io
+        self.lease("run-1", "OPENAI_SUBSCRIPTION", task="T-5")
+        self.run_it()
+        real, sys.stdout = sys.stdout, io.StringIO()
+        try:
+            route.main(["status", "--json", "--recent", "5"])
+            out = json.loads(sys.stdout.getvalue())
+        finally:
+            sys.stdout = real
+        self.assertEqual(out["v"], 1)
+        self.assertEqual([r["run_id"] for r in out["running"]], ["run-1"])
+        self.assertEqual(out["running"][0]["task"], "T-5")
+        self.assertEqual(set(out["recent"][-1]), {"run_id", "ts", "role", "task", "lane", "model", "status", "secs", "cost"})
+        self.assertIn("OPENAI_SUBSCRIPTION", out["lanes"])
+
+    def test_history_rotates_by_age_once_it_is_big(self):
+        p = route.history_path()
+        old = json.dumps({"ts": time.time() - 20 * 86400, "run_id": "old", "pad": "x" * 2000})
+        p.write_text((old + "\n") * 600)                                      # about 1.2 MB, all older than 14 days
+        self.run_it()
+        runs = [json.loads(x)["run_id"] for x in p.read_text().splitlines()]
+        self.assertNotIn("old", runs)
+        self.assertEqual(len(runs), 1)
 
 
     def test_timeout_kills_the_whole_process_group(self):
