@@ -29,6 +29,7 @@ import os
 import random
 import re
 import shutil
+import shlex
 import signal
 import subprocess
 import sys
@@ -951,6 +952,27 @@ def cmd_capture(a, cfg):
 
 # ----------------------------------------------------------------------------- git ownership: the coordinator owns git, workers do not
 
+# Paths a worker must never touch: credentials outside the repo and .env files in it (.env.example and kin are fine). A tripwire for
+# accidents and lazy injections, not a boundary: a determined worker can spell a path so it does not match.
+SECRET_RE = re.compile(r"\.ssh\b|\.gnupg\b|\.aws\b|\.azure\b|\.config/gh\b|\.docker/config\.json|\.netrc\b|\.git-credentials\b|"
+                       r"\.codex/auth\.json|Library/Keychains|(?<![\w.-])\.env(?:\.(?!(?:example|sample|template|dist)\b)[\w-]+)?(?![\w.-])")
+SECRET_RULE = ("Never read, print, copy, search or send files that hold credentials: ~/.ssh, .env files (.env.example is fine), ~/.aws, ~/.azure, "
+               "~/.gnupg, ~/.config/gh, ~/.docker/config.json, ~/.netrc, ~/.git-credentials, keychains. A command that touches them is blocked "
+               "and may end your run. If the task needs a secret, stop and say which one.")
+
+
+def cmd_guard(a, cfg=None):
+    """Claude PreToolUse hook: exit 2 (block, reason on stderr) when a tool call names a secret path. Only the fields that name what is
+    run or opened are checked, not file contents being written (a .gitignore listing .env is fine)."""
+    with contextlib.suppress(ValueError, AttributeError):
+        ti = json.load(sys.stdin).get("tool_input") or {}
+        hit = SECRET_RE.search(" ".join(str(ti.get(k) or "") for k in ("command", "file_path", "path", "pattern", "glob")))
+        if hit:
+            print(f"blocked by delegate: {hit.group()} is a secret path. {SECRET_RULE}", file=sys.stderr)
+            return 2
+    return 0
+
+
 GIT_RULES = ("Git is the coordinator's. Stay in the current directory. Do not create or switch branches or worktrees; "
              "do not commit, amend, merge, rebase, reset, stash, tag or push. Read-only git is fine. Leave changes uncommitted.")
 
@@ -986,8 +1008,11 @@ def git_changes(before, after):
 DENIED_RULE = "If a command is denied, that is a decision for the owner: do not retry or reword it; report the exact command in your final message and stop."
 ESCALATE_RULE = ("You run unattended. If a command fails because of the sandbox (network, files outside this directory, a system resource), "
                  "request escalated permissions for that exact command once, with a one-line justification.")
-PREAMBLE = ("You are a delegated worker. Do exactly the task in the brief. Do not delegate further and do not use the delegate skill. "
+PREAMBLE = (SECRET_RULE + " You are a delegated worker. Do exactly the task in the brief. Do not delegate further and do not use the delegate skill. "
             + GIT_RULES + " " + DENIED_RULE + " Finish with a short report: what you changed or found, and the exit code and last lines of any check you ran.")
+
+
+GUARD_SETTINGS = {"hooks": {"PreToolUse": [{"matcher": "*", "hooks": [{"type": "command", "command": subprocess.list2cmdline([sys.executable, str(Path(__file__).resolve()), "guard"]) if os.name == "nt" else " ".join(shlex.quote(x) for x in (sys.executable, str(Path(__file__).resolve()), "guard"))}]}]}}
 
 
 def find_key(quiet=False):
@@ -1058,8 +1083,8 @@ def run_proc(cmd, text, cwd, env, timeout, on_line=None):
         for raw in iter(stream.readline, b""):
             line = raw.decode("utf-8", "replace")
             sink.append(line)
-            if cb:
-                cb(line)
+            if cb and cb(line):        # the callback asks to stop the worker now
+                kill_tree(p)
 
     def feed():
         with contextlib.suppress(OSError):
@@ -1156,16 +1181,22 @@ def launch_codex(d, brief, a, rid, t, meta):
             seen["last"] = item.get("text", "")
         if ev.get("type") == "item.completed" and item.get("type") == "command_execution" and item.get("status") == "declined":
             seen["denied"].append({"tool": "Bash", "input": {"command": item.get("command")}})     # the reviewer refused an escalation
+        if ev.get("type") == "item.started" and item.get("type") == "command_execution" and SECRET_RE.search(item.get("command") or ""):
+            seen["denied"].append({"tool": "Bash", "input": {"command": item.get("command")}})
+            seen["secret"] = item.get("command")
+            return True             # codex has no hook under exec: stop the worker before it can use what it read
     if agent_runs:
         agent_runs.run(rid, kind="codex", lane=d["lane"], model=d["model"], cwd=h["cwd"], started=t, status="running", **meta)
-    rc, out, err, timed_out = run_proc(cmd, " ".join((GIT_RULES, ESCALATE_RULE, DENIED_RULE)) + "\n\n" + brief, h["cwd"], child_env(), a.timeout, on_line)
+    rc, out, err, timed_out = run_proc(cmd, " ".join((SECRET_RULE, GIT_RULES, ESCALATE_RULE, DENIED_RULE)) + "\n\n" + brief, h["cwd"], child_env(), a.timeout, on_line)
     text = ""
     with contextlib.suppress(OSError):
         text = out_file.read_text(encoding="utf-8", errors="replace").strip()
         out_file.unlink()
     text = text or seen["last"]
     res = {"text": text, "ref": seen["ref"], "stderr": err, "tokens": seen["tokens"], "denied": seen["denied"]}
-    if timed_out:
+    if seen.get("secret"):
+        res.update(status="failed", say=f"stopped: the worker ran a command on a secret path: {seen['secret'][:200]}")
+    elif timed_out:
         res.update(status="timeout", say=f"codex did not finish within {a.timeout}s and was killed")
     elif rc != 0 and LIMIT_RE.search(text + err):
         until = t + 3600
@@ -1202,7 +1233,7 @@ def launch_claude(d, brief, a, rid, t, cfg, meta):
     cmd += ["--max-budget-usd", str(cap)] if credit else []
     cmd += ["--resume", a.resume] if a.resume else ["--session-id", rid]
     cmd += ["--append-system-prompt", PREAMBLE, "--restricted", "--tools", ",".join(tools), "--strict-mcp-config",
-            "--permission-mode", "auto", "--permission-prompts", "none", "--disallowedTools", *GIT_WRITE_DENY]
+            "--permission-mode", "auto", "--permission-prompts", "none", "--settings", json.dumps(GUARD_SETTINGS), "--disallowedTools", *GIT_WRITE_DENY]
     if a.schema:
         cmd += ["--json-schema", Path(a.schema).read_text(encoding="utf-8")]
     ref = a.resume or rid
@@ -1480,6 +1511,7 @@ def main(argv=None):
     dr.add_argument("--ack"); dr.add_argument("--unack"); dr.add_argument("--open-browser", action="store_true")
     sk = sub.add_parser("set-key"); sk.add_argument("--stdin", action="store_true"); sk.add_argument("--force", action="store_true")
     sk.add_argument("--web", action="store_true"); sk.add_argument("--host", default="127.0.0.1"); sk.add_argument("--port", type=int, default=0); sk.add_argument("--timeout", type=int, default=300)
+    sub.add_parser("guard")
     cf = sub.add_parser("config"); cf.add_argument("action", choices=["set", "show"]); cf.add_argument("key", nargs="?"); cf.add_argument("value", nargs="?")
     ru = sub.add_parser("run"); ru.add_argument("role"); ru.add_argument("--authored-by"); ru.add_argument("--host", action="store_true"); ru.add_argument("--failed", default="")
     ru.add_argument("--premium", nargs="?", const="claude", metavar="FAMILY"); ru.add_argument("--allow-degraded", action="store_true")
@@ -1488,6 +1520,8 @@ def main(argv=None):
     a = ap.parse_args(argv)
     global UNATTENDED
     UNATTENDED = getattr(a, "unattended", False)
+    if a.cmd == "guard":        # a hook: no config, no state
+        return cmd_guard(a)
     cfg = load_routing()
     return {"status": cmd_status, "next": cmd_next, "report": cmd_report, "capture-limits": cmd_capture,
             "run": cmd_run, "doctor": cmd_doctor, "set-key": cmd_set_key, "config": cmd_config}[a.cmd](a, cfg)
