@@ -51,13 +51,15 @@ https://github.com/iorlas/iorlas-task-loop/blob/main/docs/contracts/worker-run-v
 - Secrets tripwire (delegate-internal): every worker prompt, and `brief_prefix` for interactive Agent-tool steps, starts with a rule never to touch credential files (~/.ssh, .env but not .env.example, ~/.aws, ~/.azure,
   ~/.gnupg, ~/.config/gh, ~/.docker/config.json, ~/.netrc, ~/.git-credentials, keychains). Claude steps get a PreToolUse hook (`route.py guard`, passed with `--settings`,
   which `--restricted` still loads) that blocks a tool call whose command or path matches; the block shows up in `denied`. Codex under exec has no hook: when a command
-  that matches starts, delegate stops the worker and answers `failed` with the command in `denied`. A regex, so an accident filter: a worker can spell a path around it.
+  that matches starts, delegate stops the worker and answers `failed` with the command in `denied`. Paths a command only excludes (`rg --glob '!**/.env*'`, `grep --exclude`, `find -not -path`, git `':!x'`) do not count.
+  A regex, so an accident filter: a worker can spell a path around it.
 - `denied: [{tool, input}]` (top level): commands the Claude auto-mode classifier refused (minus git writes the coordinator forbids anyway), or escalations Codex's reviewer
   refused (`command_execution` items with status `declined`; `input.command` is Codex's raw shell line). No new status: it rides on `done`/`failed`.
   Both are accident filters, not a boundary: a brief that explicitly asks for a command can get it approved.
 - Codex `tokens` include the automatic reviewer: it runs as child threads of the worker's thread, each in its own rollout file under `$CODEX_HOME/sessions/Y/M/D`
   (`session_meta.payload.parent_thread_id` = the worker's thread; the last `token_count` holds the total); `codex exec --json` never reports them. Since 0.26.0.
-- `stop` (not `error`) answers a state-lock timeout, with `retry_after`; `error` means permanent.
+- `stop` (not `error`) answers a state-lock timeout, with `retry_after`; `error` means permanent. A Codex turn that fails (`turn.failed`/`error` event) before any
+  work answers `stop` with `retry_after` and Codex's own message (network down, the Mac waking from sleep); after work it is `failed`; an HTTP 4xx other than 429 is `error`.
 - Slots: at most `max_parallel` (setting, default 4; one when the lane's 5-hour use is at `strain`) runs in flight per lane. A full lane is skipped like a refused one; when nothing
   is left the answer is `stop` (or `lane_out`) with a `retry_after` 60-120 s ahead, jittered. `run` never waits for a slot. A run holds a lease in `state.json`
   (`leases`; 120 s, renewed every 30 s, so a killed `route.py` frees its slot by itself). With `--task ID`, a second `run` for the same task while the first is alive answers `stop`.

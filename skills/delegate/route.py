@@ -956,6 +956,18 @@ def cmd_capture(a, cfg):
 # accidents and lazy injections, not a boundary: a determined worker can spell a path so it does not match.
 SECRET_RE = re.compile(r"\.ssh\b|\.gnupg\b|\.aws\b|\.azure\b|\.config/gh\b|\.docker/config\.json|\.netrc\b|\.git-credentials\b|"
                        r"\.codex/auth\.json|Library/Keychains|(?<![\w.-])\.env(?:\.(?!(?:example|sample|template|dist)\b)[\w-]+)?(?![\w.-])")
+# Arguments that keep a path OUT of a search or listing (rg --glob '!**/.env*', grep --exclude, find -not -path, git ':!x'): a worker
+# avoiding a secret must not trip the guard.
+EXCLUDED_RE = re.compile(r"""(?:--i?glob|-g)[=\s]+(?:(['"])!.*?\1|!\S+)|--exclude(?:-dir)?[=\s]+(?:(['"]).*?\2|\S+)"""
+                         r"""|(?:-not|!)\s+-i?(?:path|name|wholename|regex)\s+(?:(['"]).*?\3|\S+)|(['"]):(?:!|\(exclude\))[^'"]*\4|(?<!\S):(?:!|\(exclude\))\S+""")
+
+
+def secret_hit(text):
+    """The secret path `text` names, ignoring paths it only excludes; None when there is none."""
+    m = SECRET_RE.search(EXCLUDED_RE.sub(" ", text or ""))
+    return m.group() if m else None
+
+
 SECRET_RULE = "Never touch credential files (~/.ssh, .env, ~/.aws, tokens, keychains): it is blocked. If the task needs one, stop and say so."
 
 
@@ -964,9 +976,9 @@ def cmd_guard(a, cfg=None):
     run or opened are checked, not file contents being written (a .gitignore listing .env is fine)."""
     with contextlib.suppress(ValueError, AttributeError):
         ti = json.load(sys.stdin).get("tool_input") or {}
-        hit = SECRET_RE.search(" ".join(str(ti.get(k) or "") for k in ("command", "file_path", "path", "pattern", "glob")))
+        hit = secret_hit(" ".join(str(ti.get(k) or "") for k in ("command", "file_path", "path", "pattern", "glob")))
         if hit:
-            print(f"blocked by delegate: {hit.group()} is a secret path. {SECRET_RULE}", file=sys.stderr)
+            print(f"blocked by delegate: {hit} is a secret path. {SECRET_RULE}", file=sys.stderr)
             return 2
     return 0
 
@@ -1183,7 +1195,7 @@ def launch_codex(d, brief, a, rid, t, meta):
         cmd += (["--output-schema", a.schema] if a.schema else []) + [a.resume, "-"]
     else:
         cmd = [exe] + h["cli"][1:] + ["--json", "-o", str(out_file)] + (["--output-schema", a.schema] if a.schema else []) + ["-"]
-    seen = {"ref": a.resume, "last": "", "tokens": None, "denied": []}
+    seen = {"ref": a.resume, "last": "", "tokens": None, "denied": [], "error": "", "work": False}
 
     def on_line(line):
         try:
@@ -1199,12 +1211,16 @@ def launch_codex(d, brief, a, rid, t, meta):
         if ev.get("type") == "turn.completed" and isinstance(ev.get("usage"), dict):
             u = ev["usage"]
             seen["tokens"] = {"in": u.get("input_tokens"), "cached": u.get("cached_input_tokens"), "out": u.get("output_tokens")}
+        if ev.get("type") in ("turn.failed", "error"):      # codex's own reason; stderr then holds only transport noise
+            seen["error"] = str((ev.get("error") or {}).get("message") if ev.get("type") == "turn.failed" else ev.get("message") or "")
         item = ev.get("item") or {}
+        if ev.get("type") == "item.completed" and item.get("type") in ("command_execution", "file_change", "agent_message", "mcp_tool_call"):
+            seen["work"] = True
         if ev.get("type") == "item.completed" and item.get("type") == "agent_message":
             seen["last"] = item.get("text", "")
         if ev.get("type") == "item.completed" and item.get("type") == "command_execution" and item.get("status") == "declined":
             seen["denied"].append({"tool": "Bash", "input": {"command": item.get("command")}})     # the reviewer refused an escalation
-        if ev.get("type") == "item.started" and item.get("type") == "command_execution" and SECRET_RE.search(item.get("command") or ""):
+        if ev.get("type") == "item.started" and item.get("type") == "command_execution" and secret_hit(item.get("command")):
             seen["denied"].append({"tool": "Bash", "input": {"command": item.get("command")}})
             seen["secret"] = item.get("command")
             return True             # codex has no hook under exec: stop the worker before it can use what it read
@@ -1227,10 +1243,16 @@ def launch_codex(d, brief, a, rid, t, meta):
         res.update(status="failed", say=f"stopped: the worker ran a command on a secret path: {seen['secret'][:200]}")
     elif timed_out:
         res.update(status="timeout", say=f"codex did not finish within {a.timeout}s and was killed")
-    elif rc != 0 and LIMIT_RE.search(text + err):
+    elif LIMIT_RE.search(seen["error"]) or rc != 0 and LIMIT_RE.search(text + err):
         until = t + 3600
         mark_out(d["lane"], until, "limit refusal: " + (err or text)[:120].replace("\n", " "), t)
         res.update(status="lane_out", retry_after=until, say=f"{d['lane']} hit a limit; out until {local(until)}")
+    elif re.search(r'"status":\s*4(?!29)\d\d', seen["error"]):     # the request itself is wrong (unsupported model): retrying cannot help
+        res.update(status="error", say=f"codex rejected the request: {seen['error'][:300]}")
+    elif seen["error"] and not seen["work"]:    # failed before doing anything (network down, the Mac waking from sleep): try again later
+        res.update(status="stop", retry_after=now() + random.randint(60, 120), say=f"codex failed before any work: {seen['error'][:200]}")
+    elif seen["error"]:
+        res.update(status="failed", say=f"codex: {seen['error'][:300]}")
     elif rc != 0:
         res.update(status="failed", say=(err or text)[-300:].strip())
     else:

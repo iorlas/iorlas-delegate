@@ -478,12 +478,16 @@ class SecretGuard(unittest.TestCase):
 
     def test_blocks_secret_paths_in_what_is_run_or_opened(self):
         for ti in ({"command": "cat ~/.ssh/id_ed25519"}, {"file_path": "/r/.env"}, {"command": "cp app/.env.local /tmp"},
-                   {"path": "/Users/x/.aws"}, {"pattern": "**/.env"}, {"command": "cat ~/.config/gh/hosts.yml"}):
+                   {"path": "/Users/x/.aws"}, {"pattern": "**/.env"}, {"command": "cat ~/.config/gh/hosts.yml"},
+                   {"command": "rg -g '!.git' token .env"}, {"command": "rg --glob '**/.env' token"}):
             self.assertEqual(self.guard(ti), 2, ti)
 
     def test_lets_through_lookalikes_and_written_content(self):
         for ti in ({"command": "cat .env.example"}, {"command": "node -e 'process.env.HOME'"}, {"command": "dotnet test"},
-                   {"file_path": "src/environment.ts"}, {"file_path": ".gitignore", "content": ".env\n.ssh/"}, {"command": "ls .envrc"}):
+                   {"file_path": "src/environment.ts"}, {"file_path": ".gitignore", "content": ".env\n.ssh/"}, {"command": "ls .envrc"},
+                   {"command": "/bin/zsh -lc \"head -45 client/Assets/Tests/Editor/LiveViewTests.cs; rg -n --hidden --glob '!**/.git/**' "
+                               "--glob '!**/.env*' --glob '!**/.aws/**' '^(<<<<<<<|>>>>>>>)( |$)' .\""},      # lifesim-6dq0: excluding is avoiding
+                   {"command": "grep -r --exclude=.env --exclude-dir=.ssh foo ."}, {"command": "find . -not -path '*/.ssh/*'"}, {"command": "git ls-files ':!.env'"}):
             self.assertEqual(self.guard(ti), 0, ti)
 
 
@@ -512,6 +516,11 @@ case "$FAKE_MODE" in
             '{"type":"event_msg","payload":{"type":"token_count","info":{"total_token_usage":{"input_tokens":7000,"cached_input_tokens":6000,"output_tokens":90}}}}' > "$d/rollout-g1.jsonl"
           printf '%s\n' '{"type":"session_meta","payload":{"id":"o1","parent_thread_id":"other"}}' > "$d/rollout-o1.jsonl"
           printf ok > "$out";;
+  early_error) echo '{"type":"turn.failed","error":{"message":"workspace routing discovery failed"}}'
+               echo "rmcp: Transport channel closed" >&2; exit 1;;
+  bad_request) echo '{"type":"turn.failed","error":{"message":"{\\"type\\":\\"error\\",\\"status\\":400,\\"error\\":{\\"message\\":\\"model not supported\\"}}"}}'; exit 1;;
+  late_error) echo '{"type":"item.completed","item":{"id":"i3","type":"command_execution","command":"ls","exit_code":0,"status":"completed"}}'
+              echo '{"type":"turn.failed","error":{"message":"stream disconnected"}}'; echo "rmcp: Transport channel closed" >&2; exit 1;;
   secret) echo '{"type":"item.started","item":{"id":"i2","type":"command_execution","command":"cat ~/.ssh/id_ed25519","status":"in_progress"}}'
           sleep 30; printf 'read it' > "$out";;
 esac
@@ -835,6 +844,23 @@ printf '{"result":"claude says hi","session_id":"sess-1","total_cost_usd":0.5,"i
         _, r = self.run_it(mode="review")
         self.assertEqual(r["tokens"], {"in": 7100, "cached": 6040, "out": 97})
         self.assertEqual(json.loads(route.history_path().read_text().splitlines()[-1])["tokens"], r["tokens"])
+
+    def test_a_codex_turn_that_fails_before_any_work_is_a_stop_with_codexs_reason(self):
+        _, r = self.run_it(mode="early_error")
+        self.assertEqual(r["status"], "stop")
+        self.assertGreater(r["retry_after"], time.time())
+        self.assertIn("workspace routing discovery failed", r["say"])
+
+    def test_a_codex_request_error_is_permanent(self):
+        _, r = self.run_it(mode="bad_request")
+        self.assertEqual(r["status"], "error")
+        self.assertIn("model not supported", r["say"])
+
+    def test_a_codex_turn_that_fails_after_work_is_failed_with_codexs_reason(self):
+        _, r = self.run_it(mode="late_error")
+        self.assertEqual(r["status"], "failed")
+        self.assertIn("stream disconnected", r["say"])
+        self.assertNotIn("Transport", r["say"])
 
     def test_a_codex_command_on_a_secret_path_stops_the_worker(self):
         t = time.time()
