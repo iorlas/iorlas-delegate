@@ -34,9 +34,6 @@
       "reset_day": 1
     },
     "max_parallel": 4,
-    "contained_network": false,
-    "cache_roots": [],
-    "host_lanes": ["claude"],
     "min_dwell_minutes": 30,
     "usage_stale_minutes": 30,
     "claude_weekly_reset": ""

@@ -38,16 +38,19 @@ https://github.com/iorlas/iorlas-task-loop/blob/main/docs/contracts/worker-run-v
 - `--unattended` is how an engine says no Claude session is behind it. Without it the caller is a Claude session and may get `agent`. With it: never `agent`, `ask_user`
   or `needs_input`; CLAUDE_CREDIT is never picked; CLAUDE_SUBSCRIPTION runs `claude -p` on the logged-in account. No time or token limit by default: `--timeout` is
   opt-in and an unknown plan reading does not stop a run. `orchestrator_reserve` still applies when a reading exists.
-- `--host` (one boolean, the caller's explicit consent): "this work cannot run in a sandbox" (Unity). Only lanes whose family is in `settings.host_lanes` take it
-  (default `["claude"]`; `["openai","claude"]` lets Codex run it with `-s danger-full-access`, resume: `sandbox_mode="danger-full-access"`). A role with no step on those lanes answers `error`.
-  Claude steps get Bash (a read-only step too) and an interactive caller runs `claude -p` instead of the Agent tool, so the classifier applies. `--resume` must repeat the original run's `--host`, else `error`.
-  Replaces `--no-sandbox` (0.20-0.22): an engine below 0.23 still sends that flag, the engine gates on the installed delegate version.
-- Everything else about access is delegate-internal, set once in delegate's config (never by the caller): Codex always gets `--ignore-user-config --ignore-rules` and explicit
-  `sandbox_workspace_write.network_access` / `writable_roots` (`settings.contained_network`, default false; `settings.cache_roots`, default empty, `~`/`$VAR` expanded, missing folders dropped,
-  used only when `contained_network` is true). Claude always gets `--restricted --tools <list> --strict-mcp-config --permission-mode auto --permission-prompts none` (the repo's and the
+- `--host` (one boolean, the caller's explicit consent): "this work cannot run in a sandbox" (Unity). Any lane takes it. Claude steps get Bash (a read-only step too) and an
+  interactive caller runs `claude -p` instead of the Agent tool, so the classifier applies. Codex runs the same as without it (below). `--resume` must repeat the original run's
+  `--host`, else `error`. 0.23 sent host work to `settings.host_lanes` (default Claude only); 0.24 drops that setting.
+- Everything else about access is delegate-internal and fixed (never set by the caller or a repo file). Codex, every run and resume: `-s workspace-write` (write steps) or
+  `-s read-only`, no network, no extra writable folders, `--ignore-user-config --ignore-rules`, and `approval_policy=on-request` + `approvals_reviewer=auto_review`: a command
+  the sandbox blocks may ask to run outside it, and Codex's automatic reviewer (a model, no human) approves or refuses that one command. Verified 2026-10-20 (codex-cli 0.162.1):
+  `dotnet test` with a new NuGet package and a Unity 6000.7 batchmode compile were approved and ran; posting a `.env` to an outside host was refused. Codex permission profiles
+  (`default_permissions`) can block reads such as `~/.ssh`, but an approved escalation under a profile stays sandboxed (Unity fails), so delegate does not use them; network off
+  is what keeps a read secret from leaving without review. Claude always gets `--restricted --tools <list> --strict-mcp-config --permission-mode auto --permission-prompts none` (the repo's and the
   user's hooks, plugins and settings do not load; subscription login still works; never `--bare`, it disables login). Worker env drops credential-looking variables.
-- `denied: [{tool, input}]` (top level, Claude steps only): commands the auto-mode classifier refused, minus git writes the coordinator forbids anyway. No new status: it rides on `done`/`failed`.
-  The classifier is an accident filter, not a boundary: a brief that explicitly asks for a command can get it approved.
+- `denied: [{tool, input}]` (top level): commands the Claude auto-mode classifier refused (minus git writes the coordinator forbids anyway), or escalations Codex's reviewer
+  refused (`command_execution` items with status `declined`; `input.command` is Codex's raw shell line). No new status: it rides on `done`/`failed`.
+  Both are accident filters, not a boundary: a brief that explicitly asks for a command can get it approved. Reviewer turns run as separate Codex threads, so `tokens` does not count them.
 - `stop` (not `error`) answers a state-lock timeout, with `retry_after`; `error` means permanent.
 - Slots: at most `max_parallel` (setting, default 4; one when the lane's 5-hour use is at `strain`) runs in flight per lane. A full lane is skipped like a refused one; when nothing
   is left the answer is `stop` (or `lane_out`) with a `retry_after` 60-120 s ahead, jittered. `run` never waits for a slot. A run holds a lease in `state.json`

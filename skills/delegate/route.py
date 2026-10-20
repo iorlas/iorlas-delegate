@@ -723,24 +723,12 @@ def decide(role_name, cfg, lanes, st, t, args):
     return stop
 
 
-def cache_roots(S):
-    """The package-cache folders a contained write step may write (settings.cache_roots): ~ and $VARS expanded, only folders that exist."""
-    out = []
-    for p in S.get("cache_roots") or []:
-        q = os.path.realpath(os.path.expandvars(os.path.expanduser(p)))
-        if os.path.isdir(q) and q not in out:
-            out.append(q)
-    return out
-
-
-def codex_access(sandbox, S):
-    """Every access argument codex gets, for a fresh run and a resume alike: the user's own config never widens or narrows it."""
-    args = ["--ignore-user-config", "--ignore-rules"]
-    if sandbox == "workspace-write":
-        net = bool(S.get("contained_network"))
-        args += ["-c", f"sandbox_workspace_write.network_access={'true' if net else 'false'}",
-                 "-c", "sandbox_workspace_write.writable_roots=" + json.dumps(cache_roots(S) if net else [])]
-    return args
+# Every codex run and resume gets these, so neither the user's config nor a repo file widens or narrows them. The sandbox has no network and
+# writes only the working directory; a command it blocks may ask to run outside it, and Codex's automatic reviewer (a model, no human)
+# approves or refuses that one command. Codex permission profiles would also block reads (~/.ssh), but an approved escalation there
+# stays inside the sandbox, so Unity cannot run (codex-cli 0.162.1).
+CODEX_ACCESS = ["--ignore-user-config", "--ignore-rules", "-c", "sandbox_workspace_write.network_access=false",
+                "-c", "sandbox_workspace_write.writable_roots=[]", "-c", "approval_policy=on-request", "-c", "approvals_reviewer=auto_review"]
 
 
 def how(lane, step, cfg, cwd=None, unattended=False, host=False):
@@ -755,12 +743,11 @@ def how(lane, step, cfg, cwd=None, unattended=False, host=False):
         return {"kind": "claude_p", "model": m["api"], "write": write, "cap": step.get("cap", 2), "cwd": wd, "bash": write or bool(host)}
     if runner == "agent_tool":
         return {"kind": "agent_tool", "model": m["agent"], "cwd": wd}
-    sandbox = "danger-full-access" if host else "workspace-write" if write else "read-only"
-    access = codex_access(sandbox, cfg["settings"])
-    cli = ["codex", "exec", "-C", wd, "-s", sandbox, "-m", m["api"], "-c", f"model_reasoning_effort={step['effort']}"] + access
+    sandbox = "workspace-write" if write else "read-only"
+    cli = ["codex", "exec", "-C", wd, "-s", sandbox, "-m", m["api"], "-c", f"model_reasoning_effort={step['effort']}"] + CODEX_ACCESS
     if git_state(wd) is None:
         cli.append("--skip-git-repo-check")      # codex refuses a directory that is not a git work tree
-    return {"kind": "codex", "model": m["api"], "cli": cli, "cwd": wd, "sandbox": sandbox, "access": access}
+    return {"kind": "codex", "model": m["api"], "cli": cli, "cwd": wd, "sandbox": sandbox}
 
 
 # ----------------------------------------------------------------------------- commands
@@ -859,15 +846,6 @@ def mark_busy(lanes, st, S, t):
             l.notes.insert(0, f"busy: {running} running, {cap} allowed")
 
 
-def host_error(cfg, role, S):
-    """--host on a role none of whose steps runs on a host lane can never succeed: say so (a permanent error), not stop."""
-    r = cfg["roles"][role]
-    steps = list(r.get("steps", [])) + list(r.get("degraded_needs_consent", [])) + [x for v in (r.get("by_author") or {}).values() for x in v]
-    if not any(x["on"] in S["host_lanes"] for x in steps):
-        return f"--host needs a lane of {S['host_lanes']}; role {role} has none"
-    return None
-
-
 def decision(a, cfg):
     """next and run share this: gather, decide, remember the lane choice. -> (d, lanes, warnings, t)"""
     t = now()
@@ -884,11 +862,6 @@ def decision(a, cfg):
         lanes = {n: l for n, l in lanes.items() if l.kind != "credit"}
     ref = getattr(a, "resume", None)
     host = bool(getattr(a, "host", False))
-    if host:            # work the sandbox cannot hold: only the lanes settings.host_lanes names may take it
-        err = host_error(cfg, a.role, S)
-        if err:
-            return {"action": "error", "error": err}, lanes, warnings, t
-        lanes = {n: l for n, l in lanes.items() if l.family in S["host_lanes"]}
     if ref:             # continue on the lane that made the ref; never switch lanes silently
         rec = (st.get("refs") or {}).get(ref)
         lane = lanes.get(rec["lane"]) if rec else None
@@ -1010,9 +983,11 @@ def git_changes(before, after):
 
 # ----------------------------------------------------------------------------- shared by the claude -p launcher
 
+DENIED_RULE = "If a command is denied, that is a decision for the owner: do not retry or reword it; report the exact command in your final message and stop."
+ESCALATE_RULE = ("You run unattended. If a command fails because of the sandbox (network, files outside this directory, a system resource), "
+                 "request escalated permissions for that exact command once, with a one-line justification.")
 PREAMBLE = ("You are a delegated worker. Do exactly the task in the brief. Do not delegate further and do not use the delegate skill. "
-            + GIT_RULES + " If a command is denied, that is a decision for the owner: do not retry or reword it; report the exact command in your final message and stop."
-            " Finish with a short report: what you changed or found, and the exit code and last lines of any check you ran.")
+            + GIT_RULES + " " + DENIED_RULE + " Finish with a short report: what you changed or found, and the exit code and last lines of any check you ran.")
 
 
 def find_key(quiet=False):
@@ -1155,12 +1130,12 @@ def launch_codex(d, brief, a, rid, t, meta):
         return {"status": "error", "say": "codex CLI not found on PATH (route.py doctor --lane OPENAI_SUBSCRIPTION)"}
     out_file = config_dir() / f"codex-last-{rid[:8]}.txt"
     if a.resume:
-        cmd = [exe, "exec", "resume", "-m", h["model"], "-c", f"model_reasoning_effort={d['effort']}", "-c", f'sandbox_mode="{h["sandbox"]}"'] + h["access"]
+        cmd = [exe, "exec", "resume", "-m", h["model"], "-c", f"model_reasoning_effort={d['effort']}", "-c", f'sandbox_mode="{h["sandbox"]}"'] + CODEX_ACCESS
         cmd += [x for x in h["cli"] if x == "--skip-git-repo-check"] + ["--json", "-o", str(out_file)]
         cmd += (["--output-schema", a.schema] if a.schema else []) + [a.resume, "-"]
     else:
         cmd = [exe] + h["cli"][1:] + ["--json", "-o", str(out_file)] + (["--output-schema", a.schema] if a.schema else []) + ["-"]
-    seen = {"ref": a.resume, "last": "", "tokens": None}
+    seen = {"ref": a.resume, "last": "", "tokens": None, "denied": []}
 
     def on_line(line):
         try:
@@ -1179,15 +1154,17 @@ def launch_codex(d, brief, a, rid, t, meta):
         item = ev.get("item") or {}
         if ev.get("type") == "item.completed" and item.get("type") == "agent_message":
             seen["last"] = item.get("text", "")
+        if ev.get("type") == "item.completed" and item.get("type") == "command_execution" and item.get("status") == "declined":
+            seen["denied"].append({"tool": "Bash", "input": {"command": item.get("command")}})     # the reviewer refused an escalation
     if agent_runs:
         agent_runs.run(rid, kind="codex", lane=d["lane"], model=d["model"], cwd=h["cwd"], started=t, status="running", **meta)
-    rc, out, err, timed_out = run_proc(cmd, GIT_RULES + "\n\n" + brief, h["cwd"], child_env(), a.timeout, on_line)
+    rc, out, err, timed_out = run_proc(cmd, " ".join((GIT_RULES, ESCALATE_RULE, DENIED_RULE)) + "\n\n" + brief, h["cwd"], child_env(), a.timeout, on_line)
     text = ""
     with contextlib.suppress(OSError):
         text = out_file.read_text(encoding="utf-8", errors="replace").strip()
         out_file.unlink()
     text = text or seen["last"]
-    res = {"text": text, "ref": seen["ref"], "stderr": err, "tokens": seen["tokens"]}
+    res = {"text": text, "ref": seen["ref"], "stderr": err, "tokens": seen["tokens"], "denied": seen["denied"]}
     if timed_out:
         res.update(status="timeout", say=f"codex did not finish within {a.timeout}s and was killed")
     elif rc != 0 and LIMIT_RE.search(text + err):
