@@ -956,9 +956,7 @@ def cmd_capture(a, cfg):
 # accidents and lazy injections, not a boundary: a determined worker can spell a path so it does not match.
 SECRET_RE = re.compile(r"\.ssh\b|\.gnupg\b|\.aws\b|\.azure\b|\.config/gh\b|\.docker/config\.json|\.netrc\b|\.git-credentials\b|"
                        r"\.codex/auth\.json|Library/Keychains|(?<![\w.-])\.env(?:\.(?!(?:example|sample|template|dist)\b)[\w-]+)?(?![\w.-])")
-SECRET_RULE = ("Never read, print, copy, search or send files that hold credentials: ~/.ssh, .env files (.env.example is fine), ~/.aws, ~/.azure, "
-               "~/.gnupg, ~/.config/gh, ~/.docker/config.json, ~/.netrc, ~/.git-credentials, keychains. A command that touches them is blocked "
-               "and may end your run. If the task needs a secret, stop and say which one.")
+SECRET_RULE = "Never touch credential files (~/.ssh, .env, ~/.aws, tokens, keychains): it is blocked. If the task needs one, stop and say so."
 
 
 def cmd_guard(a, cfg=None):
@@ -1147,6 +1145,31 @@ def mark_out(lane, until, why, t):
     update_state(lambda s: s.setdefault("out", {}).__setitem__(lane, {"until": until, "why": why, "at": t}))
 
 
+def codex_child_tokens(thread, since):
+    """-> (tokens, threads) the child threads of a codex thread spent since `since`: the automatic reviewer runs as one, in its own
+    rollout file under $CODEX_HOME/sessions/Y/M/D (local date), and `codex exec --json` never reports it. Each file's last token_count holds its total."""
+    tot, n = {"in": 0, "cached": 0, "out": 0}, 0
+    root = Path(os.environ.get("CODEX_HOME") or Path.home() / ".codex") / "sessions"
+    for day in sorted({time.strftime("%Y/%m/%d", time.localtime(x)) for x in (since, time.time())}):
+        for f in (root / day).glob("rollout-*.jsonl"):
+            with contextlib.suppress(OSError, ValueError, KeyError, TypeError, AttributeError):
+                if f.stat().st_mtime < since:
+                    continue
+                with f.open(encoding="utf-8", errors="replace") as fh:
+                    if (json.loads(fh.readline()).get("payload") or {}).get("parent_thread_id") != thread:
+                        continue
+                    last = None
+                    for line in fh:
+                        if '"token_count"' in line:
+                            last = line
+                if last:
+                    u = json.loads(last)["payload"]["info"]["total_token_usage"]
+                    tot = {"in": tot["in"] + (u.get("input_tokens") or 0), "cached": tot["cached"] + (u.get("cached_input_tokens") or 0),
+                           "out": tot["out"] + (u.get("output_tokens") or 0)}
+                    n += 1
+    return tot, n
+
+
 def launch_codex(d, brief, a, rid, t, meta):
     """-> dict of result fields."""
     h = d["how"]
@@ -1187,12 +1210,18 @@ def launch_codex(d, brief, a, rid, t, meta):
             return True             # codex has no hook under exec: stop the worker before it can use what it read
     if agent_runs:
         agent_runs.run(rid, kind="codex", lane=d["lane"], model=d["model"], cwd=h["cwd"], started=t, status="running", **meta)
+    started = time.time()       # wall clock, not now(): it is compared with file times
     rc, out, err, timed_out = run_proc(cmd, " ".join((SECRET_RULE, GIT_RULES, ESCALATE_RULE, DENIED_RULE)) + "\n\n" + brief, h["cwd"], child_env(), a.timeout, on_line)
     text = ""
     with contextlib.suppress(OSError):
         text = out_file.read_text(encoding="utf-8", errors="replace").strip()
         out_file.unlink()
     text = text or seen["last"]
+    if seen["ref"]:             # the reviewer's tokens are the run's too
+        extra, n = codex_child_tokens(seen["ref"], started - 1)
+        if n:
+            base = seen["tokens"] or {"in": 0, "cached": 0, "out": 0}
+            seen["tokens"] = {k: (base.get(k) or 0) + extra[k] for k in extra}
     res = {"text": text, "ref": seen["ref"], "stderr": err, "tokens": seen["tokens"], "denied": seen["denied"]}
     if seen.get("secret"):
         res.update(status="failed", say=f"stopped: the worker ran a command on a secret path: {seen['secret'][:200]}")
@@ -1369,7 +1398,7 @@ def run_once(a, cfg):
         if ni:
             extra["needs_input"] = ni
     if h["kind"] == "agent_tool":
-        return emit(result("agent", **who, agent_model=h["model"], brief_prefix=GIT_RULES, cwd=h["cwd"], **extra))
+        return emit(result("agent", **who, agent_model=h["model"], brief_prefix=SECRET_RULE + " " + GIT_RULES, cwd=h["cwd"], **extra))
     brief = Path(a.brief).read_text(encoding="utf-8", errors="replace") if a.brief else sys.stdin.read()
     if not brief.strip():
         return emit(result("error", **who, say="empty brief: pass it on stdin or with --brief FILE", **extra))

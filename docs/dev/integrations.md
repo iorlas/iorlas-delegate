@@ -48,13 +48,15 @@ https://github.com/iorlas/iorlas-task-loop/blob/main/docs/contracts/worker-run-v
   (`default_permissions`) can block reads such as `~/.ssh`, but an approved escalation under a profile stays sandboxed (Unity fails), so delegate does not use them; network off
   is what keeps a read secret from leaving without review. Claude always gets `--restricted --tools <list> --strict-mcp-config --permission-mode auto --permission-prompts none` (the repo's and the
   user's hooks, plugins and settings do not load; subscription login still works; never `--bare`, it disables login). Worker env drops credential-looking variables.
-- Secrets tripwire (delegate-internal): every worker prompt starts with a rule never to touch credential files (~/.ssh, .env but not .env.example, ~/.aws, ~/.azure,
+- Secrets tripwire (delegate-internal): every worker prompt, and `brief_prefix` for interactive Agent-tool steps, starts with a rule never to touch credential files (~/.ssh, .env but not .env.example, ~/.aws, ~/.azure,
   ~/.gnupg, ~/.config/gh, ~/.docker/config.json, ~/.netrc, ~/.git-credentials, keychains). Claude steps get a PreToolUse hook (`route.py guard`, passed with `--settings`,
   which `--restricted` still loads) that blocks a tool call whose command or path matches; the block shows up in `denied`. Codex under exec has no hook: when a command
   that matches starts, delegate stops the worker and answers `failed` with the command in `denied`. A regex, so an accident filter: a worker can spell a path around it.
 - `denied: [{tool, input}]` (top level): commands the Claude auto-mode classifier refused (minus git writes the coordinator forbids anyway), or escalations Codex's reviewer
   refused (`command_execution` items with status `declined`; `input.command` is Codex's raw shell line). No new status: it rides on `done`/`failed`.
-  Both are accident filters, not a boundary: a brief that explicitly asks for a command can get it approved. Reviewer turns run as separate Codex threads, so `tokens` does not count them.
+  Both are accident filters, not a boundary: a brief that explicitly asks for a command can get it approved.
+- Codex `tokens` include the automatic reviewer: it runs as child threads of the worker's thread, each in its own rollout file under `$CODEX_HOME/sessions/Y/M/D`
+  (`session_meta.payload.parent_thread_id` = the worker's thread; the last `token_count` holds the total); `codex exec --json` never reports them. Since 0.26.0.
 - `stop` (not `error`) answers a state-lock timeout, with `retry_after`; `error` means permanent.
 - Slots: at most `max_parallel` (setting, default 4; one when the lane's 5-hour use is at `strain`) runs in flight per lane. A full lane is skipped like a refused one; when nothing
   is left the answer is `stop` (or `lane_out`) with a `retry_after` 60-120 s ahead, jittered. `run` never waits for a slot. A run holds a lease in `state.json`
