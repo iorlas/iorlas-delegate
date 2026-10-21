@@ -1056,6 +1056,37 @@ printf '{"result":"claude says hi","session_id":"sess-1","total_cost_usd":0.5,"i
         self.assertEqual((r["status"], r["data"]), ("done", {"a": 1}))
         self.assertIn("--output-schema", self.args_seen())
 
+    def test_an_orphaned_worker_of_a_dead_route_py_is_killed_before_the_task_runs_again(self):
+        import subprocess as sp
+        dead = sp.Popen(["true"]); dead.wait()
+        orphan = sp.Popen(["sleep", "300"], start_new_session=True)
+        try:
+            start = route.proc_start(orphan.pid)
+            route.update_state(lambda st: st.setdefault("leases", {}).__setitem__("old-run", {
+                "lane": "OPENAI_SUBSCRIPTION", "role": "worker", "pid": dead.pid, "start": route.now() - 300, "expires": route.now() + 60,
+                "task": "T-7", "worker_pid": orphan.pid, "worker_start": start}))
+            _, r = self.run_it("--task", "T-7")
+            self.assertEqual(r["status"], "done")                      # ran after the orphan was stopped
+            self.assertIsNotNone(orphan.poll())
+            rows = [json.loads(x) for x in route.history_path().read_text().splitlines()]
+            self.assertIn(("reaped", "orphan_worker", orphan.pid), [(x["status"], x.get("reason"), x.get("worker_pid")) for x in rows])
+        finally:
+            orphan.kill()
+
+    def test_a_reused_pid_is_not_killed(self):
+        import subprocess as sp
+        dead = sp.Popen(["true"]); dead.wait()
+        other = sp.Popen(["sleep", "300"], start_new_session=True)
+        try:
+            route.update_state(lambda st: st.setdefault("leases", {}).__setitem__("old-run", {
+                "lane": "OPENAI_SUBSCRIPTION", "role": "worker", "pid": dead.pid, "start": route.now() - 300, "expires": route.now() - 1,
+                "task": "T-8", "worker_pid": other.pid, "worker_start": "Mon Jan  1 00:00:00 2001"}))
+            _, r = self.run_it("--task", "T-8")
+            self.assertEqual(r["status"], "done")
+            self.assertIsNone(other.poll())
+        finally:
+            other.kill()
+
     def test_a_resume_on_a_lane_with_all_slots_taken_waits_for_a_slot(self):
         self.run_it()
         for i in range(4):

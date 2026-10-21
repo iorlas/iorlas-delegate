@@ -85,6 +85,9 @@ https://github.com/iorlas/iorlas-task-loop/blob/main/docs/contracts/worker-run-v
 - Stopping: on SIGTERM, SIGHUP or Ctrl-C route.py kills the worker's process group before it exits. A SIGKILL on route.py cannot be caught, so
   the worker (its own process group, pgid = pid) keeps running: route.py prints `delegate: worker pid=N pgid=N run_id=R` on stderr right after
   the worker starts, and the lease shows it (`status --json` running[].worker_pid); a caller that SIGKILLs route.py kills that group too.
+  Each later `run` checks the leases: a worker whose route.py is gone (or whose lease expired) and that is still the same process (pid plus
+  start time) is stopped (SIGTERM, then SIGKILL) and logged in history.jsonl as `reaped`/`orphan_worker` before anything else starts; if it
+  cannot be stopped its lease stays, so the same task answers duplicate_task and the lane counts it. POSIX only.
 - Slots: at most `max_parallel` (setting, default 4; one when the lane's 5-hour use is at `strain`) runs in flight per lane. A full lane is skipped like a refused one; when nothing
   is left the answer is `stop` (or `lane_out`) with a `retry_after` 60-120 s ahead, jittered. `run` never waits for a slot. A run holds a lease in `state.json`
   (`leases`; 120 s, renewed every 30 s, so a killed `route.py` frees its slot by itself). With `--task ID`, a second `run` for the same task while the first is alive answers `stop`.

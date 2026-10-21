@@ -873,6 +873,38 @@ def live_leases(st, t):
     return {k: v for k, v in (st.get("leases") or {}).items() if v.get("expires", 0) > t}
 
 
+def proc_start(pid):
+    """The process's start time as ps prints it, or None when it is gone (POSIX only): with the pid it names one process, not a reused pid."""
+    if os.name == "nt" or not pid:
+        return None
+    with contextlib.suppress(Exception):
+        r = subprocess.run(["ps", "-o", "stat=,lstart=", "-p", str(int(pid))], capture_output=True, text=True, timeout=5)
+        stat, _, start = r.stdout.strip().partition(" ")
+        return None if not stat or stat.startswith("Z") else start.strip() or None      # a zombie has exited
+    return None
+
+
+def orphan(v, t):
+    """True when the lease's route.py is gone (or the lease expired) but its worker is still running: a SIGKILL on route.py leaves the worker,
+    which is its own process group, editing the tree."""
+    stale = v.get("expires", 0) <= t or proc_start(v.get("pid")) is None
+    return stale and bool(v.get("worker_start")) and proc_start(v.get("worker_pid")) == v.get("worker_start")
+
+
+def reap(v):
+    """Stop an orphaned worker's process group: SIGTERM, a short grace, SIGKILL. -> True when it is gone."""
+    pg = int(v["worker_pid"])
+    for sig, grace in ((signal.SIGTERM, 3), (signal.SIGKILL, 2)):
+        with contextlib.suppress(OSError):
+            os.killpg(pg, sig)
+        end = time.time() + grace
+        while time.time() < end:
+            if proc_start(pg) != v.get("worker_start"):
+                return True
+            time.sleep(0.2)
+    return proc_start(pg) != v.get("worker_start")
+
+
 def slots(lane, S):
     """How many runs may be in flight on a lane: max_parallel (null = unlimited), one when the lane is strained."""
     n = S.get("max_parallel")
@@ -1642,6 +1674,15 @@ def run_once(a, cfg):
 
     def claim(st):      # the authoritative count: inside the lock, never from the snapshot decision() read
         live = live_leases(st, now())
+        for k, v in (st.get("leases") or {}).items():
+            if orphan(v, now()):
+                gone = reap(v)
+                history_add({"ts": now(), "run_id": k, "role": v.get("role"), "task": v.get("task", ""), "lane": v.get("lane"), "status": "reaped" if gone else "orphan",
+                             "reason": "orphan_worker", "worker_pid": v.get("worker_pid")})
+                if gone:
+                    live.pop(k, None)
+                else:           # still running: its lease stays, so the same task or a full lane waits
+                    live[k] = dict(v, expires=now() + LEASE_TTL)
         st["leases"] = live
         if a.task and any(v.get("task") == a.task for v in live.values()):
             taken["no"] = ("stop", "duplicate_task", f"task {a.task} already has a running worker")
@@ -1669,9 +1710,11 @@ def run_once(a, cfg):
         work, on stderr and in the lease (status --json `running`), so the caller can kill the group itself."""
         print(f"delegate: worker pid={pid} pgid={pid} run_id={rid}", file=sys.stderr, flush=True)
 
+        started_at = proc_start(pid)
+
         def note(st):
             if rid in (st.get("leases") or {}):
-                st["leases"][rid]["worker_pid"] = pid
+                st["leases"][rid].update(worker_pid=pid, worker_start=started_at)
         update_state(note)
     WORKER_STARTED[:] = [worker_started]
     meta = {"parent_session": a.parent or "", "title": a.title or brief.strip().splitlines()[0][:120]}
