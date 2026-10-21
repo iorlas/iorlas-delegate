@@ -509,6 +509,18 @@ def normalize_usage(raw):
     return out or None
 
 
+def claude_logged_out():
+    """True only when `claude auth status` answers loggedIn false; no CLI or an unreadable answer is not a logout (an Agent-tool host may have no CLI)."""
+    exe = shutil.which("claude")
+    if not exe:
+        return False
+    try:
+        r = subprocess.run([exe, "auth", "status"], capture_output=True, text=True, timeout=15)
+        return json.loads(r.stdout).get("loggedIn") is False
+    except (OSError, subprocess.TimeoutExpired, ValueError, AttributeError):
+        return False
+
+
 def read_claude_subscription(lane, S, st, t, ai_usage=None):
     stale = S["usage_stale_minutes"] * 60
     usage = None
@@ -534,6 +546,9 @@ def read_claude_subscription(lane, S, st, t, ai_usage=None):
                     lane.notes.append("usage from the status-line file")
         except (OSError, ValueError, TypeError):
             pass
+    if claude_logged_out():
+        lane.out = True
+        lane.notes.append("claude is logged out: run `claude auth login`")
     weekly_spec = S.get("claude_weekly_reset", "")
     if usage:
         f5, wk = usage.get("five_hour") or {}, usage.get("weekly") or {}
@@ -1383,6 +1398,9 @@ def parse_data(text, schema):
         return None
 
 
+LOGOUT_OUT = 900     # a lane whose worker found it logged out is skipped this long, then tried again (a login in between is not seen sooner)
+
+
 def mark_out(lane, until, why, t):
     update_state(lambda s: s.setdefault("out", {}).__setitem__(lane, {"until": until, "why": why, "at": t}))
 
@@ -1498,7 +1516,8 @@ def launch_codex(d, brief, a, rid, t, meta):
         mark_out(d["lane"], until, "limit refusal: " + (err or text)[:120].replace("\n", " "), t)
         res.update(status="lane_out", reason="lane_out", retry_after=until, say=f"{d['lane']} hit a limit; out until {local(until)}")
     elif LOGIN_RE.search(seen["error"] + err):
-        res.update(status="error", reason="logged_out", say=f"codex is not logged in: {(seen['error'] or err)[-200:].strip()} (route.py doctor --lane {d['lane']})")
+        mark_out(d["lane"], t + LOGOUT_OUT, "logged out: run `codex login`", t)
+        res.update(status="lane_out", reason="logged_out", retry_after=now() + 60, say=f"codex is not logged in: {(seen['error'] or err)[-200:].strip()} (route.py doctor --lane {d['lane']})")
     elif re.search(r'"status":\s*4(?!29)\d\d', seen["error"]):     # the request itself is wrong (unsupported model): retrying cannot help
         res.update(status="error", reason="bad_request", say=f"codex rejected the request: {seen['error'][:300]}")
     elif seen["error"] and not seen["work"]:    # failed before doing anything (network down, the Mac waking from sleep): try again later
@@ -1585,7 +1604,8 @@ def launch_claude(d, brief, a, rid, t, cfg, meta):
             mark_out(d["lane"], until, "limit refusal: " + blob[:120].replace("\n", " "), t)
             res.update(status="lane_out", reason="lane_out", retry_after=until, say=f"{d['lane']} hit a limit; out until {local(until)}")
         elif LOGIN_RE.search(blob):
-            res.update(status="error", reason="logged_out", say=f"claude is not logged in: {blob[-200:].strip()} (claude auth login)")
+            mark_out(d["lane"], t + LOGOUT_OUT, "logged out: run `claude auth login`", t)
+            res.update(status="lane_out", reason="logged_out", retry_after=now() + 60, say=f"claude is not logged in: {blob[-200:].strip()} (claude auth login)")
         elif NETWORK_RE.search(blob) and (j.get("num_turns") or 0) <= 1:      # failed before any work
             res.update(status="stop", reason="network", retry_after=now() + random.randint(60, 120), say=f"claude could not reach its service: {blob[-200:].strip()}")
         else:
@@ -1615,7 +1635,7 @@ def claude_tokens(u):
 # worker-run v2: every answer that is not done or agent names a reason, and `next` is the caller's whole policy for it:
 # retry (after retry_after), owner (a person must act: log in, set up, verify), fail (this attempt is over; re-plan or give up).
 REASONS = {"lane_out": "retry", "busy": "retry", "duplicate_task": "retry", "lock": "retry", "vendor_prework": "retry", "network": "retry",
-           "no_lane": "retry", "logged_out": "owner", "setup": "owner", "secrets": "owner", "bad_request": "owner", "crash": "owner",
+           "no_lane": "retry", "logged_out": "retry", "setup": "owner", "secrets": "owner", "bad_request": "owner", "crash": "owner",
            "caller": "fail", "timeout": "fail", "worker_failed": "fail", "schema_invalid": "fail"}
 LOGIN_RE = re.compile(r"not logged in|please (run|use) [`'\"]?\S*\s*login|oauth session expired|failed to authenticate|invalid api key|401 unauthorized", re.I)
 NETWORK_RE = re.compile(r"ENOTFOUND|ECONNRESET|ECONNREFUSED|ETIMEDOUT|EAI_AGAIN|getaddrinfo|could not resolve host|network is unreachable", re.I)

@@ -35,7 +35,7 @@ https://github.com/iorlas/iorlas-task-loop/blob/main/docs/contracts/worker-run-v
   requires `worker_run == 2`. `lanes` is the static statement of what a worker sees and what cannot be blocked.
 - Every answer that is not `done` or `agent` carries `reason` and `next`. `next` is the caller's whole policy: `retry` (after `retry_after`),
   `owner` (a person must act: log in, set up, verify a denial), `fail` (this attempt is over). `reason` is for wording and stats, never for branching.
-  Reasons: lane_out, busy, duplicate_task, lock, vendor_prework, network, no_lane -> retry; logged_out, setup, secrets, bad_request, crash -> owner;
+  Reasons: lane_out, busy, duplicate_task, lock, vendor_prework, network, no_lane, logged_out -> retry; setup, secrets, bad_request, crash -> owner;
   caller, timeout, worker_failed, schema_invalid -> fail. A retry reason with no `retry_after` (no lane will come back by itself) answers `owner`.
   `busy` (all of a lane's slots taken, also for a `--resume` on that lane) is `stop` with `retry_after` = when a slot is expected; `lane_out` means the
   lane itself is out (limit refusal, or over its usage ceiling), with `retry_after` = the reset of the window it is over. A limit refusal mid-run marks the

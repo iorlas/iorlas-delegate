@@ -562,6 +562,7 @@ case "$FAKE_MODE" in
 esac
 """
     FAKE_CLAUDE = """#!/bin/sh
+case "$*" in "auth status") [ "$FAKE_MODE" = authout ] && echo '{"loggedIn": false}' || echo '{"loggedIn": true}'; exit 0;; esac
 echo "$*" >> "$FAKE_ARGS"; env | sort > "$FAKE_ENV"
 cat > /dev/null
 if [ "$FAKE_MODE" = logout ]; then echo "Failed to authenticate: OAuth session expired and could not be refreshed" >&2; exit 1; fi
@@ -988,7 +989,7 @@ printf '{"result":"claude says hi","session_id":"sess-1","total_cost_usd":0.5,"i
     def test_v2_every_answer_names_reason_and_next(self):
         cases = {"early_error": ("stop", "vendor_prework", "retry"), "bad_request": ("error", "bad_request", "owner"),
                  "late_error": ("failed", "worker_failed", "fail"), "secret": ("failed", "secrets", "owner"),
-                 "logout": ("error", "logged_out", "owner"), "net": ("stop", "network", "retry"), "ok": ("done", None, None)}
+                 "logout": ("lane_out", "logged_out", "retry"), "net": ("stop", "network", "retry"), "ok": ("done", None, None)}
         for mode, want in cases.items():
             _, r = self.run_it(mode=mode)
             self.assertEqual((r["v"], r["status"], r["reason"], r["next"]), (2,) + want, mode)
@@ -1001,9 +1002,15 @@ printf '{"result":"claude says hi","session_id":"sess-1","total_cost_usd":0.5,"i
     def test_v2_claude_lane_logout_and_network(self):
         self.codex_out()
         _, r = self.run_it(mode="logout")
-        self.assertEqual((r["status"], r["reason"], r["next"]), ("error", "logged_out", "owner"))
+        self.assertEqual((r["status"], r["reason"], r["next"]), ("lane_out", "logged_out", "retry"))
+        self.assertIn("CLAUDE_SUBSCRIPTION", route.load_state()["out"])                  # the next call skips the lane for a while
+        route.update_state(lambda s: s.pop("out", None))
         _, r = self.run_it(mode="net")
         self.assertEqual((r["status"], r["reason"], r["next"]), ("stop", "network", "retry"))
+
+    def test_a_logged_out_claude_sends_the_planner_to_codex(self):
+        _, r = self.run_it(mode="authout", role="planner")
+        self.assertEqual((r["status"], r["lane"], r["fallback"]), ("done", "OPENAI_SUBSCRIPTION", True))
 
     def test_v2_a_retry_with_nothing_to_wait_for_is_for_the_owner(self):
         self.assertEqual(route.result("stop", reason="no_lane")["next"], "owner")

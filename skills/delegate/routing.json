@@ -108,7 +108,7 @@
           "effort": "high",
           "on": "openai",
           "mode": "read_only",
-          "use": "adversarial_review_of_plan"
+          "use": "plan"
         }
       ],
       "degraded_needs_consent": [
