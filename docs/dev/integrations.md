@@ -62,6 +62,10 @@ https://github.com/iorlas/iorlas-task-loop/blob/main/docs/contracts/worker-run-v
   (`default_permissions`) can block reads such as `~/.ssh`, but an approved escalation under a profile stays sandboxed (Unity fails), so delegate does not use them; network off
   is what keeps a read secret from leaving without review. Claude always gets `--restricted --tools <list> --strict-mcp-config --permission-mode auto --permission-prompts none` (the repo's and the
   user's hooks, plugins and settings do not load; subscription login still works; never `--bare`, it disables login). Worker env drops credential-looking variables.
+- Git is the coordinator's on every Claude step: the guard blocks, per piece of a command line, commit, push, checkout, switch, merge,
+  rebase, reset, cherry-pick, revert, am, pull, and stash/branch/tag/worktree except their listing forms (stash list/show, branch -a/--contains/...,
+  tag -l, worktree list). A blocked git write is policy and stays out of `denied`. (Before 0.31.4 Claude's own --disallowedTools patterns also
+  refused `git stash list` and `git branch --contains`, and such a block counted as a denial.)
 - Read-only Claude steps (reviewer, planner, light, not --host) get Bash limited by the guard (`route.py guard --read-only`) to reading commands:
   git diff/log/show/status/blame/grep/ls-files..., rg, grep, cat, head, tail, ls, find (no -exec/-delete), sed (no -i), wc, sort, diff, jq; no `>`, no
   `$(...)`. A blocked write is policy and stays out of `denied` (a secret path stays in). Codex read steps read freely inside their read-only sandbox.

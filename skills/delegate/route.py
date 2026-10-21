@@ -1064,18 +1064,54 @@ READ_ONLY_HELP = ("this step is read-only: Bash allows only reading commands (gi
                   "head, tail, ls, find without -exec/-delete, sed without -i, wc, sort, diff, jq), no '>' and no $(...).")
 
 
-def read_only_problem(cmd):
-    """None when every piece of `cmd` only reads, else what is not allowed."""
-    rest = re.sub(r"\d?>&\d|&?\d?>\s*/dev/null", " ", cmd)
-    if re.search(r"`|\$\(|[<>]\(|>", rest):
-        return "output redirection or command substitution"
-    for seg in re.split(r"\|\||&&|;|\||\n", rest):
+def pieces(cmd):
+    """The command lines in `cmd` (split on | || && ; and newlines), each as words; None when one cannot be parsed."""
+    out = []
+    for seg in re.split(r"\|\||&&|;|\||\n", re.sub(r"\d?>&\d|&?\d?>\s*/dev/null", " ", cmd)):
         try:
             t = shlex.split(seg)
         except ValueError:
-            return "unparsable command"
-        if not t:
+            return None
+        if t:
+            out.append(t)
+    return out
+
+
+def git_args(t):
+    """Words after `git` and its -C/--no-pager/--git-dir options; the first is the subcommand."""
+    args = t[1:]
+    while args and args[0] in ("-C", "--no-pager") or args and args[0].startswith("--git-dir"):
+        args = args[2:] if args[0] == "-C" else args[1:]
+    return args
+
+
+GIT_LISTING = ("--list", "-l", "-a", "-r", "--show-current", "-v", "-vv", "--contains", "--merged", "--no-merged", "--points-at", "--format", "--sort")
+
+
+def git_write(cmd):
+    """The first git command in `cmd` that changes refs, the index's commits, worktrees or remotes (git is the coordinator's), else None.
+    Listing forms pass: stash list/show, branch and tag listings, worktree list."""
+    for t in pieces(cmd) or []:
+        if os.path.basename(t[0]) != "git":
             continue
+        args = git_args(t)
+        sub, rest = (args[0] if args else ""), args[1:]
+        if sub in ("commit", "push", "checkout", "switch", "merge", "rebase", "reset", "cherry-pick", "revert", "am", "pull") \
+                or sub == "stash" and not (rest and rest[0] in ("list", "show")) \
+                or sub == "worktree" and not (rest and rest[0] == "list") \
+                or sub in ("branch", "tag") and (rest and not rest[0].startswith("-") or any(x.startswith("-") and not x.startswith(GIT_LISTING) for x in rest)):
+            return " ".join(t[:3])
+    return None
+
+
+def read_only_problem(cmd):
+    """None when every piece of `cmd` only reads, else what is not allowed."""
+    if re.search(r"`|\$\(|[<>]\(|>", re.sub(r"\d?>&\d|&?\d?>\s*/dev/null", " ", cmd)):
+        return "output redirection or command substitution"
+    ps = pieces(cmd)
+    if ps is None:
+        return "unparsable command"
+    for t in ps:
         name = os.path.basename(t[0])
         if name not in READ_CMDS:
             return f"`{name}` is not a reading command"
@@ -1086,14 +1122,12 @@ def read_only_problem(cmd):
         if name == "rg" and any(x.startswith("--pre") for x in t):
             return "rg --pre runs a program"
         if name == "git":
-            args = t[1:]
-            while args and args[0] in ("-C", "--no-pager") or args and args[0].startswith("--git-dir"):
-                args = args[2:] if args[0] == "-C" else args[1:]
+            args = git_args(t)
             sub = args[0] if args else ""
-            if sub not in READ_GIT:         # also catches `git -c key=value ...`, which can run a program
+            if sub not in READ_GIT | {"stash", "tag", "worktree"}:         # also catches `git -c key=value ...`, which can run a program
                 return f"git {sub} is not a reading command"
-            if sub == "branch" and any(not x.startswith(("--list", "-a", "-r", "--show-current", "-v", "--contains", "--merged")) for x in args[1:]):
-                return "git branch may only list"
+            if git_write(" ".join(shlex.quote(x) for x in t)):
+                return f"git {sub} may only list"
             if any(x.startswith("--output") for x in args):
                 return "--output writes a file"
     return None
@@ -1110,7 +1144,12 @@ def cmd_guard(a, cfg=None):
         if hit:
             print(f"blocked by delegate: {hit} is a secret path. {SECRET_RULE}", file=sys.stderr)
             return 2
-        why = getattr(a, "read_only", False) and j.get("tool_name") == "Bash" and read_only_problem(str(ti.get("command") or ""))
+        cmd = str(ti.get("command") or "") if j.get("tool_name") == "Bash" else ""
+        gw = git_write(cmd)
+        if gw:
+            print(f"blocked by delegate: `{gw}` changes git, which is the coordinator's. {GIT_RULES}", file=sys.stderr)
+            return 2
+        why = getattr(a, "read_only", False) and cmd and read_only_problem(cmd)
         if why:
             print(f"blocked by delegate: {why}; {READ_ONLY_HELP}", file=sys.stderr)
             return 2
@@ -1120,9 +1159,6 @@ def cmd_guard(a, cfg=None):
 GIT_RULES = ("Git is the coordinator's. Stay in the current directory. Do not create or switch branches or worktrees; "
              "do not commit, amend, merge, rebase, reset, stash, tag or push. Read-only git is fine. Leave changes uncommitted.")
 
-GIT_WRITE_DENY = ["Bash(git commit:*)", "Bash(git push:*)", "Bash(git checkout:*)", "Bash(git switch:*)", "Bash(git branch:*)",
-                  "Bash(git worktree:*)", "Bash(git merge:*)", "Bash(git rebase:*)", "Bash(git reset:*)", "Bash(git stash:*)",
-                  "Bash(git cherry-pick:*)", "Bash(git tag:*)", "Bash(git revert:*)", "Bash(git am:*)", "Bash(git pull:*)"]
 
 
 def git_state(cwd):
@@ -1476,7 +1512,7 @@ def launch_claude(d, brief, a, rid, t, cfg, meta):
     cmd += ["--max-budget-usd", str(cap)] if credit else []
     cmd += ["--resume", a.resume] if a.resume else ["--session-id", rid]
     cmd += ["--append-system-prompt", PREAMBLE + repo_instruction_text(h["cwd"]), "--restricted", "--tools", ",".join(tools), "--strict-mcp-config",
-            "--permission-mode", "auto", "--permission-prompts", "none", "--settings", json.dumps(guard_settings(h.get("read_only"))), "--disallowedTools", *GIT_WRITE_DENY]
+            "--permission-mode", "auto", "--permission-prompts", "none", "--settings", json.dumps(guard_settings(h.get("read_only")))]
     if a.schema:
         cmd += ["--json-schema", Path(a.schema).read_text(encoding="utf-8")]
     ref = a.resume or rid
@@ -1521,13 +1557,10 @@ def launch_claude(d, brief, a, rid, t, cfg, meta):
     return res
 
 
-GIT_PREFIXES = tuple(g[len("Bash("):-len(":*)")] for g in GIT_WRITE_DENY)
-
-
 def policy_denial(x, read_only=False):
     """A git write the coordinator forbids, or a write on a read-only step, is delegate's policy, not a decision for the owner (a secret path stays one)."""
     cmd = ((x.get("tool_input") or {}).get("command") or "").strip()
-    return x.get("tool_name") == "Bash" and (cmd.startswith(GIT_PREFIXES) or bool(read_only and read_only_problem(cmd) and not secret_hit(cmd)))
+    return x.get("tool_name") == "Bash" and not secret_hit(cmd) and bool(git_write(cmd) or read_only and read_only_problem(cmd))
 
 
 def claude_tokens(u):

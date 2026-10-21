@@ -504,6 +504,16 @@ class SecretGuard(unittest.TestCase):
             self.assertEqual(self.guard({"command": c}, "--read-only", tool="Bash"), 2, c)
         self.assertEqual(self.guard({"command": "dotnet test"}, tool="Bash"), 0)       # write steps: not limited
 
+    def test_git_writes_are_blocked_for_every_step_and_listings_pass(self):
+        for c in ("grep -n '' justfile | head; git stash list >/dev/null; git diff HEAD --stat -- justfile",       # lifesim-q21f
+                  "git ls-files | grep -i x; git log -1 --format=%h -- a | head -1; git branch --contains 0dedd418 2>&1 | head -3",
+                  "git branch -a", "git tag -l 'v*'", "git worktree list", "git stash show -p"):
+            self.assertEqual(self.guard({"command": c}, tool="Bash"), 0, c)
+            self.assertEqual(self.guard({"command": c}, "--read-only", tool="Bash"), 0, c)
+        for c in ("git stash", "git branch new", "git tag v1", "git checkout -b x", "cd a && git commit -m x", "ls; git push", "git -C /x reset --hard"):
+            self.assertEqual(self.guard({"command": c}, tool="Bash"), 2, c)
+            self.assertTrue(route.policy_denial({"tool_name": "Bash", "tool_input": {"command": c}}), c)
+
     def test_lets_through_lookalikes_and_written_content(self):
         for ti in ({"command": "cat .env.example"}, {"command": "node -e 'process.env.HOME'"}, {"command": "dotnet test"},
                    {"file_path": "src/environment.ts"}, {"file_path": ".gitignore", "content": ".env\n.ssh/"}, {"command": "ls .envrc"},
@@ -1269,9 +1279,10 @@ class GitOwnership(unittest.TestCase):
             self.assertIsNone(route.git_state(d))
             self.assertEqual(route.git_changes(None, None), [])
 
-    def test_deny_list_blocks_every_git_write(self):
-        for verb in ("commit", "push", "checkout", "switch", "branch", "worktree", "merge", "rebase", "reset", "stash"):
-            self.assertIn(f"Bash(git {verb}:*)", route.GIT_WRITE_DENY)
+    def test_the_guard_blocks_every_git_write(self):
+        for c in ("git commit -m x", "git push", "git checkout x", "git switch x", "git branch x", "git worktree add y", "git merge x",
+                  "git rebase x", "git reset --hard", "git stash", "git cherry-pick a", "git tag v", "git revert a", "git am p", "git pull"):
+            self.assertTrue(route.git_write(c), c)
 
 
 class AgentRuns(unittest.TestCase):
