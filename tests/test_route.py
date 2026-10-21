@@ -466,6 +466,19 @@ class StateLock(unittest.TestCase):
             self.assertEqual(json.loads(Path(d, "state.json").read_text())["n"], 200)
 
 
+class OnboardChildEnv(unittest.TestCase):
+    def test_child_clis_run_without_the_claude_app_variables(self):
+        import onboard
+        from unittest import mock
+        seen = {}
+        with mock.patch.dict(os.environ, {"ANTHROPIC_BASE_URL": "http://x", "CLAUDE_CODE_OAUTH_SCOPES": "s", "KEEP_ME": "1"}), \
+                mock.patch.object(onboard.subprocess, "run", side_effect=lambda argv, **kw: seen.update(kw["env"]) or mock.Mock(returncode=0, stdout="", stderr="")):
+            onboard.run_cmd(["claude", "auth", "status"])
+        self.assertNotIn("ANTHROPIC_BASE_URL", seen)
+        self.assertNotIn("CLAUDE_CODE_OAUTH_SCOPES", seen)
+        self.assertEqual(seen["KEEP_ME"], "1")
+
+
 class SecretGuard(unittest.TestCase):
     def guard(self, tool_input):
         import io

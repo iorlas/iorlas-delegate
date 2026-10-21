@@ -229,8 +229,11 @@ def next_step(d):
 
 
 def run_cmd(argv, timeout=300):
+    """A Claude desktop session exports ANTHROPIC_BASE_URL, CLAUDE_CODE_OAUTH_SCOPES and kin; with them a standalone `claude` reports the
+    keychain login as expired. Child CLIs get the environment without them, as workers do."""
+    env = {k: v for k, v in os.environ.items() if not k.startswith(("CLAUDE_", "ANTHROPIC_"))}
     try:
-        r = subprocess.run(argv, capture_output=True, text=True, timeout=timeout)
+        r = subprocess.run(argv, capture_output=True, text=True, timeout=timeout, env=env)
         return r.returncode == 0, (r.stdout + r.stderr).strip()[-600:]
     except (OSError, subprocess.TimeoutExpired) as e:
         return False, str(e)
