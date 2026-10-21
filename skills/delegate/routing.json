@@ -40,22 +40,22 @@
   },
   "models": {
     "opus-5.5": {
-      "family": "claude",
+      "family": "claude", "rank": 3,
       "api": "claude-opus-5-5",
       "agent": "opus"
     },
     "sonnet-5.5": {
-      "family": "claude",
+      "family": "claude", "rank": 2,
       "api": "claude-sonnet-5-5",
       "agent": "sonnet"
     },
     "haiku-5.5": {
-      "family": "claude",
+      "family": "claude", "rank": 1,
       "api": "claude-haiku-5-5",
       "agent": "haiku"
     },
     "fable-5.1": {
-      "family": "claude",
+      "family": "claude", "rank": 4,
       "api": "claude-fable-5-1",
       "agent": "fable"
     },

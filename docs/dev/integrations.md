@@ -45,6 +45,8 @@ https://github.com/iorlas/iorlas-task-loop/blob/main/docs/contracts/worker-run-v
   `fallback_reason` (busy, lane_out, ceiling) and `first_lane` (the first choice's lane, set only on a fallback) on every answer that picked a lane; a resume repeats the original run's. Unattended, a first choice
   that is only busy (slots full, otherwise usable) answers `stop`/`busy`/retry with its retry_after instead of falling to the next rung;
   `--no-wait` falls through. Since 0.32.0.
+- `--claude-model M` (a Claude model name from routing.json): a ceiling for the role's Claude rungs. A rung ranked above M (models[].rank:
+  haiku 1, sonnet 2, opus 3, fable 4) runs on M at its own effort; cheaper Claude rungs and Codex rungs stay. `model` reports what ran. Since 0.33.0.
 - `context` (per run, scripts only; interactive answers leave it out): `{instructions: [repo instruction files given], env_keys: [names passed]}`;
   the credit lane's key is passed but not listed.
 - With `--schema`, delegate checks the answer (type, required, properties, items, enum), re-asks once in the same thread, and answers
