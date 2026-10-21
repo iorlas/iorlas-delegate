@@ -1111,8 +1111,9 @@ CREDENTIAL_RE = re.compile(r"(TOKEN|SECRET|PASSW|CREDENTIAL|API_?KEY|ACCESS_?KEY
 
 
 def child_env(extra=None):
-    """The worker gets the caller's environment minus Claude, Anthropic, delegate and credential-looking variables (tokens, keys, cloud and git credentials, the ssh agent), plus DELEGATE_DEPTH=1."""
-    env = {k: v for k, v in os.environ.items() if not k.startswith(("CLAUDE_", "ANTHROPIC_", "DELEGATE_")) and not CREDENTIAL_RE.search(k)}
+    """The worker gets the caller's environment minus what a Claude session exports (onboard.APP_ENV_RE), delegate's and credential-looking variables (tokens, keys, cloud and git credentials, the ssh agent), plus DELEGATE_DEPTH=1."""
+    from onboard import app_free_env
+    env = {k: v for k, v in app_free_env().items() if not k.startswith("DELEGATE_") and not CREDENTIAL_RE.search(k)}
     env["DELEGATE_DEPTH"] = "1"
     env.update(extra or {})
     return env
@@ -1498,7 +1499,7 @@ LANE_CONTEXT = {
                "sandbox": "none; the auto-mode classifier reviews every tool call; Bash only on write steps or --host",
                "cannot_block": []},
     "both": {"instructions": "in each folder from the repo root down to cwd, AGENTS.md, else CLAUDE.md",
-             "env": "the caller's environment minus CLAUDE_*, ANTHROPIC_*, DELEGATE_* and credential-looking names"}}
+             "env": "the caller's environment minus what a Claude session exports (CLAUDE_*, ANTHROPIC_*, CLAUDECODE, USE_*_OAUTH, MCP_*, OTEL_*, ...), DELEGATE_* and credential-looking names"}}
 
 
 def cmd_contract(a, cfg):

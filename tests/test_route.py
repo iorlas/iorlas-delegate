@@ -831,15 +831,17 @@ printf '{"result":"claude says hi","session_id":"sess-1","total_cost_usd":0.5,"i
 
     def test_child_env_drops_credential_looking_variables_only(self):
         keep = dict(os.environ)
-        os.environ.update(GITHUB_TOKEN="x", AWS_REGION="y", MY_API_KEY="z", SSH_AUTH_SOCK="/s", NUGET_PACKAGES="/p", FOO_PASSWORD="q")
+        os.environ.update(GITHUB_TOKEN="x", AWS_REGION="y", MY_API_KEY="z", SSH_AUTH_SOCK="/s", NUGET_PACKAGES="/p", FOO_PASSWORD="q",
+                          CLAUDECODE="1", USE_STAGING_OAUTH="1", MCP_SERVER_CONNECTION_BATCH_SIZE="2", BAGGAGE="b", CODEX_HOME_KEEP="k")
         try:
             env = route.child_env()
         finally:
-            for k in ("GITHUB_TOKEN", "AWS_REGION", "MY_API_KEY", "SSH_AUTH_SOCK", "NUGET_PACKAGES", "FOO_PASSWORD"):
+            for k in ("GITHUB_TOKEN", "AWS_REGION", "MY_API_KEY", "SSH_AUTH_SOCK", "NUGET_PACKAGES", "FOO_PASSWORD", "CLAUDECODE", "USE_STAGING_OAUTH",
+                      "MCP_SERVER_CONNECTION_BATCH_SIZE", "BAGGAGE", "CODEX_HOME_KEEP"):
                 os.environ.pop(k, None) if k not in keep else os.environ.__setitem__(k, keep[k])
-        for gone in ("GITHUB_TOKEN", "AWS_REGION", "MY_API_KEY", "SSH_AUTH_SOCK", "FOO_PASSWORD"):
+        for gone in ("GITHUB_TOKEN", "AWS_REGION", "MY_API_KEY", "SSH_AUTH_SOCK", "FOO_PASSWORD", "CLAUDECODE", "USE_STAGING_OAUTH", "MCP_SERVER_CONNECTION_BATCH_SIZE", "BAGGAGE"):
             self.assertNotIn(gone, env)
-        self.assertEqual(env["NUGET_PACKAGES"], "/p")
+        self.assertEqual((env["NUGET_PACKAGES"], env["CODEX_HOME_KEEP"]), ("/p", "k"))
         self.assertIn("PATH", env)
 
     def test_codex_runs_sandboxed_with_the_reviewer_on_run_and_resume(self):

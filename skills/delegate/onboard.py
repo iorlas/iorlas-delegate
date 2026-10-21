@@ -228,10 +228,19 @@ def next_step(d):
     return {"optional_only": optional} if optional else None
 
 
+# What a Claude session (the desktop app, the CLI, the Codex plugin) exports to its children. A standalone `claude` or `codex` started with
+# them misbehaves: ANTHROPIC_BASE_URL/CLAUDE_CODE_OAUTH_SCOPES make the keychain login look expired, CLAUDECODE says "nested session",
+# USE_STAGING_OAUTH switches the login server. Every child CLI delegate starts gets the environment without them.
+APP_ENV_RE = re.compile(r"^(CLAUDE_\w*|ANTHROPIC_\w*|CLAUDECODE|AI_AGENT|API_TIMEOUT_MS|BAGGAGE|DISABLE_MICROCOMPACT|DISABLE_AUTOUPDATER|"
+                        r"USE_(LOCAL|STAGING)_OAUTH|MCP_\w+|OTEL_\w+|CODEX_COMPANION_\w+)$")
+
+
+def app_free_env():
+    return {k: v for k, v in os.environ.items() if not APP_ENV_RE.match(k)}
+
+
 def run_cmd(argv, timeout=300):
-    """A Claude desktop session exports ANTHROPIC_BASE_URL, CLAUDE_CODE_OAUTH_SCOPES and kin; with them a standalone `claude` reports the
-    keychain login as expired. Child CLIs get the environment without them, as workers do."""
-    env = {k: v for k, v in os.environ.items() if not k.startswith(("CLAUDE_", "ANTHROPIC_"))}
+    env = app_free_env()
     try:
         r = subprocess.run(argv, capture_output=True, text=True, timeout=timeout, env=env)
         return r.returncode == 0, (r.stdout + r.stderr).strip()[-600:]
