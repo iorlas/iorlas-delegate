@@ -1063,8 +1063,8 @@ printf '{"result":"claude says hi","session_id":"sess-1","total_cost_usd":0.5,"i
         try:
             start = route.proc_start(orphan.pid)
             route.update_state(lambda st: st.setdefault("leases", {}).__setitem__("old-run", {
-                "lane": "OPENAI_SUBSCRIPTION", "role": "worker", "pid": dead.pid, "start": route.now() - 300, "expires": route.now() + 60,
-                "task": "T-7", "worker_pid": orphan.pid, "worker_start": start}))
+                "lane": "OPENAI_SUBSCRIPTION", "role": "worker", "pid": dead.pid, "pid_start": "Mon Jan  1 00:00:00 2001", "start": route.now() - 300,
+                "expires": route.now() + 60, "task": "T-7", "worker_pid": orphan.pid, "worker_start": start}))
             _, r = self.run_it("--task", "T-7")
             self.assertEqual(r["status"], "done")                      # ran after the orphan was stopped
             self.assertIsNotNone(orphan.poll())
@@ -1073,13 +1073,26 @@ printf '{"result":"claude says hi","session_id":"sess-1","total_cost_usd":0.5,"i
         finally:
             orphan.kill()
 
+    def test_a_live_route_py_with_an_expired_lease_keeps_its_worker(self):
+        import subprocess as sp
+        worker = sp.Popen(["sleep", "300"], start_new_session=True)
+        try:
+            route.update_state(lambda st: st.setdefault("leases", {}).__setitem__("old-run", {
+                "lane": "OPENAI_SUBSCRIPTION", "role": "worker", "pid": os.getpid(), "pid_start": route.proc_start(os.getpid()), "start": route.now() - 300,
+                "expires": route.now() - 1, "task": "T-9", "worker_pid": worker.pid, "worker_start": route.proc_start(worker.pid)}))
+            _, r = self.run_it("--task", "T-9")
+            self.assertEqual((r["status"], r["reason"]), ("stop", "duplicate_task"))
+            self.assertIsNone(worker.poll())
+        finally:
+            worker.kill()
+
     def test_a_reused_pid_is_not_killed(self):
         import subprocess as sp
         dead = sp.Popen(["true"]); dead.wait()
         other = sp.Popen(["sleep", "300"], start_new_session=True)
         try:
             route.update_state(lambda st: st.setdefault("leases", {}).__setitem__("old-run", {
-                "lane": "OPENAI_SUBSCRIPTION", "role": "worker", "pid": dead.pid, "start": route.now() - 300, "expires": route.now() - 1,
+                "lane": "OPENAI_SUBSCRIPTION", "role": "worker", "pid": dead.pid, "pid_start": "x", "start": route.now() - 300, "expires": route.now() - 1,
                 "task": "T-8", "worker_pid": other.pid, "worker_start": "Mon Jan  1 00:00:00 2001"}))
             _, r = self.run_it("--task", "T-8")
             self.assertEqual(r["status"], "done")

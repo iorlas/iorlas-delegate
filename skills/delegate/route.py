@@ -884,11 +884,11 @@ def proc_start(pid):
     return None
 
 
-def orphan(v, t):
-    """True when the lease's route.py is gone (or the lease expired) but its worker is still running: a SIGKILL on route.py leaves the worker,
-    which is its own process group, editing the tree."""
-    stale = v.get("expires", 0) <= t or proc_start(v.get("pid")) is None
-    return stale and bool(v.get("worker_start")) and proc_start(v.get("worker_pid")) == v.get("worker_start")
+def orphan(v):
+    """True when the lease's route.py process is gone (pid plus start time: an expired lease alone may be a laptop waking up) but its worker
+    is still running: a SIGKILL on route.py leaves the worker, which is its own process group, editing the tree."""
+    gone = proc_start(v.get("pid")) != v.get("pid_start")
+    return gone and bool(v.get("worker_start")) and proc_start(v.get("worker_pid")) == v.get("worker_start")
 
 
 def reap(v):
@@ -1675,7 +1675,7 @@ def run_once(a, cfg):
     def claim(st):      # the authoritative count: inside the lock, never from the snapshot decision() read
         live = live_leases(st, now())
         for k, v in (st.get("leases") or {}).items():
-            if orphan(v, now()):
+            if orphan(v):
                 gone = reap(v)
                 history_add({"ts": now(), "run_id": k, "role": v.get("role"), "task": v.get("task", ""), "lane": v.get("lane"), "status": "reaped" if gone else "orphan",
                              "reason": "orphan_worker", "worker_pid": v.get("worker_pid")})
@@ -1683,6 +1683,8 @@ def run_once(a, cfg):
                     live.pop(k, None)
                 else:           # still running: its lease stays, so the same task or a full lane waits
                     live[k] = dict(v, expires=now() + LEASE_TTL)
+            elif k not in live and v.get("pid_start") and proc_start(v.get("pid")) == v["pid_start"]:
+                live[k] = v     # expired only because route.py could not renew it (the laptop slept): it is still running
         st["leases"] = live
         if a.task and any(v.get("task") == a.task for v in live.values()):
             taken["no"] = ("stop", "duplicate_task", f"task {a.task} already has a running worker")
@@ -1690,7 +1692,8 @@ def run_once(a, cfg):
             taken["no"] = ("stop", "busy", f"{d['lane']} has all {cap} slots taken")
         else:
             taken["peers"] = sorted(live)
-            live[rid] = {"lane": d["lane"], "role": a.role, "pid": os.getpid(), "start": now(), "expires": now() + LEASE_TTL, "task": a.task or ""}
+            live[rid] = {"lane": d["lane"], "role": a.role, "pid": os.getpid(), "pid_start": me_start, "start": now(), "expires": now() + LEASE_TTL, "task": a.task or ""}
+    me_start = proc_start(os.getpid())
     update_state(claim)
     if "no" in taken:
         return refuse(a, taken["no"][0], taken["no"][1], taken["no"][2], now() + random.randint(60, 120), extra, **who)
