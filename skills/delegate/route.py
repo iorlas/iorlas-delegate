@@ -732,6 +732,39 @@ CODEX_ACCESS = ["--ignore-user-config", "--ignore-rules", "-c", "sandbox_workspa
                 "-c", "sandbox_workspace_write.writable_roots=[]", "-c", "approval_policy=on-request", "-c", "approvals_reviewer=auto_review"]
 
 
+def repo_dirs(cwd):
+    """The folders from the repo root (or cwd outside a repo) down to cwd."""
+    wd = Path(cwd).resolve()
+    top = subprocess.run(["git", "-C", str(wd), "rev-parse", "--show-toplevel"], capture_output=True, text=True) if shutil.which("git") else None
+    root = Path(top.stdout.strip()).resolve() if top is not None and top.returncode == 0 and top.stdout.strip() else wd
+    out = [wd]
+    while out[-1] != root and out[-1].parent != out[-1] and root in out[-1].parents:
+        out.append(out[-1].parent)
+    return out[::-1]
+
+
+def repo_instructions(cwd):
+    """The repo's instruction files, the same for both lanes (Codex's own rule): in each folder from the root down to cwd, AGENTS.md, else CLAUDE.md."""
+    found = []
+    for d in repo_dirs(cwd):
+        f = next((d / n for n in ("AGENTS.md", "CLAUDE.md") if (d / n).is_file()), None)
+        if f:
+            found.append(f)
+    return found
+
+
+def codex_isolation(cwd):
+    """Codex sees only what delegate sends plus the repo's instruction files: every skill it would list (its own system skills, the user's,
+    the repo's .agents/skills) is turned off by path, and a repo with only CLAUDE.md is read as Claude would. Sub-agents cannot be turned off
+    (codex 0.162.1: features.multi_agent=false and agents.max_depth=0 still let a brief that asks spawn one); NO_SUBAGENTS_RULE asks, and their
+    tokens are counted as child threads."""
+    home = Path(os.environ.get("CODEX_HOME") or Path.home() / ".codex")
+    roots = [home / "skills", Path.home() / ".agents" / "skills"] + [d / x / "skills" for d in repo_dirs(cwd) for x in (".agents", ".codex")]
+    paths = sorted({str(f.resolve()) for r in roots if r.is_dir() for f in r.rglob("SKILL.md")})
+    return ["-c", "skills.config=[" + ",".join("{path=%s,enabled=false}" % json.dumps(x) for x in paths) + "]",
+            "-c", 'project_doc_fallback_filenames=["CLAUDE.md"]']
+
+
 def how(lane, step, cfg, cwd=None, unattended=False, host=False):
     """What a step runs on. Unattended callers have no Agent tool, so the subscription lane runs `claude -p` on the logged-in account; so does --host (the classifier needs it)."""
     m = cfg["models"][step["model"]]
@@ -745,10 +778,11 @@ def how(lane, step, cfg, cwd=None, unattended=False, host=False):
     if runner == "agent_tool":
         return {"kind": "agent_tool", "model": m["agent"], "cwd": wd}
     sandbox = "workspace-write" if write else "read-only"
-    cli = ["codex", "exec", "-C", wd, "-s", sandbox, "-m", m["api"], "-c", f"model_reasoning_effort={step['effort']}"] + CODEX_ACCESS
+    iso = codex_isolation(wd)
+    cli = ["codex", "exec", "-C", wd, "-s", sandbox, "-m", m["api"], "-c", f"model_reasoning_effort={step['effort']}"] + CODEX_ACCESS + iso
     if git_state(wd) is None:
         cli.append("--skip-git-repo-check")      # codex refuses a directory that is not a git work tree
-    return {"kind": "codex", "model": m["api"], "cli": cli, "cwd": wd, "sandbox": sandbox}
+    return {"kind": "codex", "model": m["api"], "cli": cli, "cwd": wd, "sandbox": sandbox, "isolation": iso}
 
 
 # ----------------------------------------------------------------------------- commands
@@ -1016,6 +1050,7 @@ def git_changes(before, after):
 # ----------------------------------------------------------------------------- shared by the claude -p launcher
 
 DENIED_RULE = "If a command is denied, that is a decision for the owner: do not retry or reword it; report the exact command in your final message and stop."
+NO_SUBAGENTS_RULE = "Do not spawn sub-agents; do the work yourself."
 ESCALATE_RULE = ("You run unattended. If a command fails because of the sandbox (network, files outside this directory, a system resource), "
                  "request escalated permissions for that exact command once, with a one-line justification.")
 PREAMBLE = (SECRET_RULE + " You are a delegated worker. Do exactly the task in the brief. Do not delegate further and do not use the delegate skill. "
@@ -1190,7 +1225,7 @@ def launch_codex(d, brief, a, rid, t, meta):
         return {"status": "error", "say": "codex CLI not found on PATH (route.py doctor --lane OPENAI_SUBSCRIPTION)"}
     out_file = config_dir() / f"codex-last-{rid[:8]}.txt"
     if a.resume:
-        cmd = [exe, "exec", "resume", "-m", h["model"], "-c", f"model_reasoning_effort={d['effort']}", "-c", f'sandbox_mode="{h["sandbox"]}"'] + CODEX_ACCESS
+        cmd = [exe, "exec", "resume", "-m", h["model"], "-c", f"model_reasoning_effort={d['effort']}", "-c", f'sandbox_mode="{h["sandbox"]}"'] + CODEX_ACCESS + h["isolation"]
         cmd += [x for x in h["cli"] if x == "--skip-git-repo-check"] + ["--json", "-o", str(out_file)]
         cmd += (["--output-schema", a.schema] if a.schema else []) + [a.resume, "-"]
     else:
@@ -1227,7 +1262,7 @@ def launch_codex(d, brief, a, rid, t, meta):
     if agent_runs:
         agent_runs.run(rid, kind="codex", lane=d["lane"], model=d["model"], cwd=h["cwd"], started=t, status="running", **meta)
     started = time.time()       # wall clock, not now(): it is compared with file times
-    rc, out, err, timed_out = run_proc(cmd, " ".join((SECRET_RULE, GIT_RULES, ESCALATE_RULE, DENIED_RULE)) + "\n\n" + brief, h["cwd"], child_env(), a.timeout, on_line)
+    rc, out, err, timed_out = run_proc(cmd, " ".join((SECRET_RULE, GIT_RULES, NO_SUBAGENTS_RULE, ESCALATE_RULE, DENIED_RULE)) + "\n\n" + brief, h["cwd"], child_env(), a.timeout, on_line)
     text = ""
     with contextlib.suppress(OSError):
         text = out_file.read_text(encoding="utf-8", errors="replace").strip()
@@ -1261,6 +1296,20 @@ def launch_codex(d, brief, a, rid, t, meta):
     return res
 
 
+def repo_instruction_text(cwd, cap=32768):
+    """--restricted keeps Claude from loading the repo's CLAUDE.md; Codex reads AGENTS.md. Both lanes get the same files (repo_instructions),
+    capped like Codex's project_doc_max_bytes."""
+    out, left = "", cap
+    for f in repo_instructions(cwd):
+        with contextlib.suppress(OSError):
+            body = f.read_text(encoding="utf-8", errors="replace")[:left]
+            left -= len(body)
+            out += f"\n\nRepository instructions ({f.name} in {f.parent}):\n{body}"
+        if left <= 0:
+            break
+    return out
+
+
 def launch_claude(d, brief, a, rid, t, cfg, meta):
     """claude -p on the credit key (CLAUDE_CREDIT) or the logged-in subscription (CLAUDE_SUBSCRIPTION, unattended). -> dict of result fields."""
     h = d["how"]
@@ -1283,7 +1332,7 @@ def launch_claude(d, brief, a, rid, t, cfg, meta):
     cmd = [exe, "-p", "--output-format", "json", "--model", h["model"], "--effort", d["effort"]]
     cmd += ["--max-budget-usd", str(cap)] if credit else []
     cmd += ["--resume", a.resume] if a.resume else ["--session-id", rid]
-    cmd += ["--append-system-prompt", PREAMBLE, "--restricted", "--tools", ",".join(tools), "--strict-mcp-config",
+    cmd += ["--append-system-prompt", PREAMBLE + repo_instruction_text(h["cwd"]), "--restricted", "--tools", ",".join(tools), "--strict-mcp-config",
             "--permission-mode", "auto", "--permission-prompts", "none", "--settings", json.dumps(GUARD_SETTINGS), "--disallowedTools", *GIT_WRITE_DENY]
     if a.schema:
         cmd += ["--json-schema", Path(a.schema).read_text(encoding="utf-8")]

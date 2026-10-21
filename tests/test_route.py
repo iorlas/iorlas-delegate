@@ -898,6 +898,29 @@ printf '{"result":"claude says hi","session_id":"sess-1","total_cost_usd":0.5,"i
         self.assertEqual(r["status"], "agent")
         self.assertTrue(r["brief_prefix"].startswith(route.SECRET_RULE))
 
+    def test_codex_turns_off_every_skill_it_would_list(self):
+        sysk = Path(os.environ["CODEX_HOME"]) / "skills" / ".system" / "imagegen"
+        repok = Path(self.repo) / ".agents" / "skills" / "beads"
+        for d in (sysk, repok):
+            d.mkdir(parents=True)
+            (d / "SKILL.md").write_text("---\nname: x\n---\n")
+        self.run_it()
+        self.run_it("--resume", "thread-123")
+        for line in self.args_seen().splitlines()[-2:]:
+            for d in (sysk, repok):
+                self.assertIn('{path=%s,enabled=false}' % json.dumps(str((d / "SKILL.md").resolve())), line)
+        self.assertIn(route.NO_SUBAGENTS_RULE, Path(os.environ["FAKE_ARGS"] + ".brief").read_text())
+
+    def test_claude_workers_get_the_repo_instruction_files_codex_reads(self):
+        (Path(self.repo) / "AGENTS.md").write_text("ROOT-RULES use tabs")
+        sub = Path(self.repo) / "client"
+        sub.mkdir()
+        (sub / "CLAUDE.md").write_text("CLIENT-RULES only")
+        self.assertEqual([f.name for f in route.repo_instructions(str(sub))], ["AGENTS.md", "CLAUDE.md"])
+        self.codex_out()
+        self.run_it()
+        self.assertIn("ROOT-RULES use tabs", self.args_seen())
+
     def test_status_json_v1_shape(self):
         import io
         self.lease("run-1", "OPENAI_SUBSCRIPTION", task="T-5")

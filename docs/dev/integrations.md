@@ -56,6 +56,11 @@ https://github.com/iorlas/iorlas-task-loop/blob/main/docs/contracts/worker-run-v
 - `denied: [{tool, input}]` (top level): commands the Claude auto-mode classifier refused (minus git writes the coordinator forbids anyway), or escalations Codex's reviewer
   refused (`command_execution` items with status `declined`; `input.command` is Codex's raw shell line). No new status: it rides on `done`/`failed`.
   Both are accident filters, not a boundary: a brief that explicitly asks for a command can get it approved.
+- What a worker sees, both lanes: delegate's rules (secrets, git, escalation), the brief, and the repo's instruction files (in each folder from the
+  repo root down to cwd, AGENTS.md, else CLAUDE.md; Claude gets them appended because --restricted would drop them). Codex: every skill it would
+  list (its system skills, ~/.codex/skills, ~/.agents/skills, the repo's .agents/.codex skills) is turned off by path with `skills.config`; no user
+  config, rules, MCP or hooks. Claude: no user or repo settings, hooks, plugins, skills or MCP. Codex sub-agents cannot be turned off (a brief that
+  asks gets one; verified 2026-10-21); the prompt asks not to, and their tokens count as child threads.
 - Codex `tokens` include the automatic reviewer: it runs as child threads of the worker's thread, each in its own rollout file under `$CODEX_HOME/sessions/Y/M/D`
   (`session_meta.payload.parent_thread_id` = the worker's thread; the last `token_count` holds the total); `codex exec --json` never reports them. Since 0.26.0.
 - `stop` (not `error`) answers a state-lock timeout, with `retry_after`; `error` means permanent. A Codex turn that fails (`turn.failed`/`error` event) before any
