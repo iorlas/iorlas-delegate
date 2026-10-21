@@ -699,7 +699,7 @@ def build_tiers(role, cfg, args):
     if flagged:
         tiers.append(flagged)
     if args.get("allow_degraded") and role.get("degraded_needs_consent"):
-        tiers.append([dict(s, flag="degraded_with_consent") for s in role["degraded_needs_consent"]])
+        tiers.append([dict(s, flag="degraded_with_consent", idx=len(steps) + i) for i, s in enumerate(role["degraded_needs_consent"])])
     return tiers
 
 
@@ -715,13 +715,30 @@ def decide(role_name, cfg, lanes, st, t, args):
             return {"action": "error", "error": f"no premium model configured for family {args['premium']}; premium: {[k for k, v in (cfg.get('premium') or {}).items() if v and k != 'about']}"}
         return {"action": "error", "error": f"--authored-by must be {' or '.join(k for k in role['by_author'] if k != 'unknown')} (or omitted)"}
     trace = []
+    first = tiers[0][0] if tiers and tiers[0] else None
+    mine = [l for l in lanes.values() if first and l.family == first["on"]]
+
+    def free_ok(l):         # usable if its slots were free
+        o, l.out = l.out, False
+        try:
+            return usable(l, S, True)[0]
+        finally:
+            l.out = o
+    busy = [l for l in mine if l.busy and free_ok(l)]
+    if busy and args.get("wait_busy") and not any(usable(l, S, True)[0] for l in mine):
+        until = min(l.out_until for l in busy)      # the first choice is only waiting for a slot: a minute beats a round on the next rung
+        return {"action": "stop", "reason": "busy", "lane": busy[0].name, "retry_after": until,
+                "say": f"{busy[0].name} (the role's first choice) has no free slot: {busy[0].notes[0]}", "trace": trace}
+    why_not_first = "busy" if busy else "lane_out" if any(l.out for l in mine) else "ceiling"
     for tier in tiers:
         for relaxed in (False, True):
             for step in tier:
                 lane = pick_lane(step["on"], lanes, S, st, t, relaxed, trace)
                 if lane is None:
                     continue
+                fb = step is not first
                 return {"action": "run", "role": role_name, "step": step.get("idx"), "pass": "relaxed" if relaxed else "strict",
+                        "rung": step.get("idx"), "fallback": fb, "fallback_reason": why_not_first if fb else None,
                         "lane": lane.name, "model": step["model"], "effort": step["effort"], "mode": step.get("mode", "read_only"),
                         "cap": step.get("cap"), "use": step.get("use"), "flag": step.get("flag"),
                         "how": how(lane, step, cfg, args.get("cwd"), args.get("unattended", False), args.get("host")), "trace": trace}
@@ -956,10 +973,12 @@ def decision(a, cfg):
             return {"action": "lane_out", "lane": rec["lane"], "retry_after": back_at(lane, S) if lane else None,
                     "say": f"{rec['lane']} cannot continue {ref} now: {why}"}, lanes, warnings, t
         step = {"model": rec["model"], "effort": rec["effort"], "mode": rec["mode"], "cap": a.cap or rec.get("cap")}
-        return {"action": "run", "role": a.role, "step": None, "pass": "resume", "lane": lane.name, "model": rec["model"], "effort": rec["effort"],
+        return {"action": "run", "role": a.role, "step": None, "pass": "resume", "rung": rec.get("rung"), "fallback": rec.get("fallback"),
+                "fallback_reason": rec.get("fallback_reason"), "lane": lane.name, "model": rec["model"], "effort": rec["effort"],
                 "mode": rec["mode"], "cap": step["cap"], "how": how(lane, step, cfg, a.cwd, unattended, host)}, lanes, warnings, t
     args = {"authored_by": a.authored_by, "failed": [int(x) for x in a.failed.split(",") if x != ""] if a.failed else [],
-            "premium": a.premium, "allow_degraded": a.allow_degraded and not unattended, "cwd": a.cwd, "unattended": unattended, "host": host}
+            "premium": a.premium, "allow_degraded": a.allow_degraded and not unattended, "cwd": a.cwd, "unattended": unattended, "host": host,
+            "wait_busy": unattended and not getattr(a, "no_wait", False)}
     d = decide(a.role, cfg, lanes, st, t, args)
     if d["action"] == "run":
         fam = cfg["lanes"][d["lane"]]["family"]
@@ -1667,7 +1686,7 @@ LANE_CONTEXT = {
 
 def cmd_contract(a, cfg):
     """What a caller may rely on, for a handshake: the worker-run version, its features, every reason with its `next`, and what workers see."""
-    print(json.dumps({"worker_run": 2, "features": ["reason", "next", "context", "schema_reask", "denied", "tokens_include_child_threads", "secrets_guard"],
+    print(json.dumps({"worker_run": 2, "features": ["reason", "next", "context", "schema_reask", "denied", "tokens_include_child_threads", "secrets_guard", "rung", "fallback", "busy_wait"],
                       "reasons": REASONS, "lanes": LANE_CONTEXT}))
     return 0
 
@@ -1707,7 +1726,8 @@ def run_once(a, cfg):
         return refuse(a, "stop", "no_lane", d["say"], retry, extra)
     h = d["how"]
     fam = cfg["lanes"][d["lane"]]["family"]
-    who = dict(lane=d["lane"], model=d["model"], effort=d["effort"], family=fam, flag=d.get("flag"))
+    who = dict(lane=d["lane"], model=d["model"], effort=d["effort"], family=fam, flag=d.get("flag"),
+               rung=d.get("rung"), fallback=d.get("fallback"), fallback_reason=d.get("fallback_reason"))
     if not unattended:
         ni = [n["what"] for n in needs_input(lanes)]
         if ni:
@@ -1810,7 +1830,8 @@ def run_once(a, cfg):
     if agent_runs:
         agent_runs.run(rid, ended=now(), status="completed" if res["status"] == "done" else "failed", transcript=find_transcript(res.get("ref"), fam))
     if res.get("ref") and res["status"] == "done":
-        rec = {"lane": d["lane"], "model": d["model"], "effort": d["effort"], "mode": d["mode"], "cap": d.get("cap"), "host": bool(a.host)}
+        rec = {"lane": d["lane"], "model": d["model"], "effort": d["effort"], "mode": d["mode"], "cap": d.get("cap"), "host": bool(a.host),
+               "rung": d.get("rung"), "fallback": d.get("fallback"), "fallback_reason": d.get("fallback_reason")}
 
         def keep(s):
             refs = s.setdefault("refs", {})
@@ -1901,7 +1922,7 @@ def main(argv=None):
     sub.add_parser("guard").add_argument("--read-only", action="store_true")
     sub.add_parser("contract").add_argument("--json", action="store_true")
     cf = sub.add_parser("config"); cf.add_argument("action", choices=["set", "show"]); cf.add_argument("key", nargs="?"); cf.add_argument("value", nargs="?")
-    ru = sub.add_parser("run"); ru.add_argument("role"); ru.add_argument("--authored-by"); ru.add_argument("--host", action="store_true"); ru.add_argument("--failed", default="")
+    ru = sub.add_parser("run"); ru.add_argument("role"); ru.add_argument("--authored-by"); ru.add_argument("--host", action="store_true"); ru.add_argument("--no-wait", action="store_true"); ru.add_argument("--failed", default="")
     ru.add_argument("--premium", nargs="?", const="claude", metavar="FAMILY"); ru.add_argument("--allow-degraded", action="store_true")
     ru.add_argument("--claude-usage"); ru.add_argument("--cwd"); ru.add_argument("--brief"); ru.add_argument("--timeout", type=int, help="seconds; none by default"); ru.add_argument("--unattended", action="store_true")
     ru.add_argument("--schema"); ru.add_argument("--resume"); ru.add_argument("--cap", type=float); ru.add_argument("--parent"); ru.add_argument("--task"); ru.add_argument("--title")

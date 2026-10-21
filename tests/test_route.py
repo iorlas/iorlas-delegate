@@ -706,11 +706,24 @@ printf '{"result":"claude says hi","session_id":"sess-1","total_cost_usd":0.5,"i
         route.update_state(lambda s: s.setdefault("leases", {}).__setitem__(rid, {"lane": lane, "role": "worker", "pid": 1, "start": route.now(), "task": task,
                                                                                "expires": expires if expires is not None else route.now() + 600}))
 
-    def test_full_lane_is_skipped_like_a_refused_one(self):
+    def test_a_busy_first_choice_waits_unless_told_not_to(self):
         for i in range(4):
-            self.lease(f"r{i}", "OPENAI_SUBSCRIPTION")
+            self.lease(f"r{i}", "OPENAI_SUBSCRIPTION")              # Codex, the worker's first choice, has 4 of 4 slots taken
         _, r = self.run_it()
-        self.assertEqual((r["status"], r["lane"]), ("done", "CLAUDE_SUBSCRIPTION"))      # Codex has 4 of 4 slots taken
+        self.assertEqual((r["status"], r["reason"], r["next"], r["lane"]), ("stop", "busy", "retry", "OPENAI_SUBSCRIPTION"))
+        self.assertTrue(time.time() + 50 < r["retry_after"] < time.time() + 130)
+        _, r = self.run_it("--no-wait")
+        self.assertEqual((r["status"], r["lane"], r["fallback"], r["fallback_reason"]), ("done", "CLAUDE_SUBSCRIPTION", True, "busy"))
+        self.assertGreater(r["rung"], 0)
+
+    def test_the_first_choice_is_rung_0_and_no_fallback(self):
+        _, r = self.run_it()
+        self.assertEqual((r["lane"], r["rung"], r["fallback"], r["fallback_reason"]), ("OPENAI_SUBSCRIPTION", 0, False, None))
+        _, r = self.run_it("--resume", "thread-123")
+        self.assertEqual((r["rung"], r["fallback"]), (0, False))
+        self.codex_out()
+        _, r = self.run_it()
+        self.assertEqual((r["lane"], r["fallback"], r["fallback_reason"]), ("CLAUDE_SUBSCRIPTION", True, "lane_out"))
 
     def test_three_running_leave_room_for_a_fourth(self):
         for i in range(3):

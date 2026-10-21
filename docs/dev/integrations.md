@@ -41,6 +41,10 @@ https://github.com/iorlas/iorlas-task-loop/blob/main/docs/contracts/worker-run-v
   lane itself is out (limit refusal, or over its usage ceiling), with `retry_after` = the reset of the window it is over. A limit refusal mid-run marks the
   lane out until that reset when the reading has one, else an hour. Every answer given without launching a worker is a history.jsonl line too
   (`run_id` null, `reason`, `retry_after`, `resume`).
+- `rung` (the chosen step's place in the role's chain, 0 = first choice), `fallback` (true when it is not the first choice) and
+  `fallback_reason` (busy, lane_out, ceiling) on every answer that picked a lane; a resume repeats the original run's. Unattended, a first choice
+  that is only busy (slots full, otherwise usable) answers `stop`/`busy`/retry with its retry_after instead of falling to the next rung;
+  `--no-wait` falls through. Since 0.32.0.
 - `context` (per run, scripts only; interactive answers leave it out): `{instructions: [repo instruction files given], env_keys: [names passed]}`;
   the credit lane's key is passed but not listed.
 - With `--schema`, delegate checks the answer (type, required, properties, items, enum), re-asks once in the same thread, and answers
