@@ -1392,6 +1392,23 @@ def codex_child_tokens(thread, since):
     return tot, n
 
 
+def codex_thread_total(thread):
+    """-> {in, cached, out} a codex thread has spent so far, or None: its rollout file (any day) ends with a token_count holding the
+    thread's total. `turn.completed` on `exec resume` reports that running total too, so a resumed run subtracts what came before."""
+    root = Path(os.environ.get("CODEX_HOME") or Path.home() / ".codex") / "sessions"
+    for f in root.glob(f"*/*/*/rollout-*{thread}.jsonl"):
+        with contextlib.suppress(OSError, ValueError, KeyError, TypeError, AttributeError):
+            last = None
+            with f.open(encoding="utf-8", errors="replace") as fh:
+                for line in fh:
+                    if '"token_count"' in line:
+                        last = line
+            if last:
+                u = json.loads(last)["payload"]["info"]["total_token_usage"]
+                return {"in": u.get("input_tokens") or 0, "cached": u.get("cached_input_tokens") or 0, "out": u.get("output_tokens") or 0}
+    return None
+
+
 def launch_codex(d, brief, a, rid, t, meta):
     """-> dict of result fields."""
     h = d["how"]
@@ -1437,12 +1454,15 @@ def launch_codex(d, brief, a, rid, t, meta):
     if agent_runs:
         agent_runs.run(rid, kind="codex", lane=d["lane"], model=d["model"], cwd=h["cwd"], started=t, status="running", **meta)
     started = time.time()       # wall clock, not now(): it is compared with file times
+    before = codex_thread_total(a.resume) if a.resume else None
     rc, out, err, timed_out = run_proc(cmd, " ".join((SECRET_RULE, GIT_RULES, NO_SUBAGENTS_RULE, ESCALATE_RULE, DENIED_RULE)) + "\n\n" + brief, h["cwd"], child_env(), a.timeout, on_line)
     text = ""
     with contextlib.suppress(OSError):
         text = out_file.read_text(encoding="utf-8", errors="replace").strip()
         out_file.unlink()
     text = text or seen["last"]
+    if before and seen["tokens"] and (seen["tokens"].get("in") or 0) >= before["in"]:      # a running total: keep this run's part
+        seen["tokens"] = {k: max(0, (seen["tokens"].get(k) or 0) - before[k]) for k in before}
     if seen["ref"]:             # the reviewer's tokens are the run's too
         extra, n = codex_child_tokens(seen["ref"], started - 1)
         if n:

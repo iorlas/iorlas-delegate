@@ -888,6 +888,17 @@ printf '{"result":"claude says hi","session_id":"sess-1","total_cost_usd":0.5,"i
         self.assertEqual(r["tokens"], {"in": 7100, "cached": 6040, "out": 97})
         self.assertEqual(json.loads(route.history_path().read_text().splitlines()[-1])["tokens"], r["tokens"])
 
+    def test_a_resumed_codex_thread_counts_only_this_runs_tokens(self):
+        self.run_it()
+        _, r = self.run_it("--resume", "thread-123")
+        self.assertEqual(r["tokens"], {"in": 100, "cached": 40, "out": 7})        # no rollout found: the reported usage stands
+        d = Path(os.environ["CODEX_HOME"]) / "sessions" / "2026" / "10" / "21"      # lifesim-fld.27.10: five resumes summed to 43M, the thread spent 16M
+        d.mkdir(parents=True)
+        (d / "rollout-2026-10-21T19-45-28-thread-123.jsonl").write_text(
+            '{"type":"event_msg","payload":{"type":"token_count","info":{"total_token_usage":{"input_tokens":60,"cached_input_tokens":30,"output_tokens":4}}}}\n')
+        _, r = self.run_it("--resume", "thread-123")
+        self.assertEqual(r["tokens"], {"in": 40, "cached": 10, "out": 3})
+
     def test_a_codex_turn_that_fails_before_any_work_is_a_stop_with_codexs_reason(self):
         _, r = self.run_it(mode="early_error")
         self.assertEqual(r["status"], "stop")

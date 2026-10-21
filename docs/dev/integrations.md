@@ -84,6 +84,8 @@ https://github.com/iorlas/iorlas-task-loop/blob/main/docs/contracts/worker-run-v
   asks gets one; verified 2026-10-21); the prompt asks not to, and their tokens count as child threads.
 - Codex `tokens` include the automatic reviewer: it runs as child threads of the worker's thread, each in its own rollout file under `$CODEX_HOME/sessions/Y/M/D`
   (`session_meta.payload.parent_thread_id` = the worker's thread; the last `token_count` holds the total); `codex exec --json` never reports them. Since 0.26.0.
+- A resumed Codex thread's `turn.completed` usage is the thread's running total; `exec resume` subtracts the total its rollout file held before
+  the run, so each run counts only its own tokens (lifesim-fld.27.10: five resumes logged 43M for a 16M thread).
 - `stop` (not `error`) answers a state-lock timeout, with `retry_after`; `error` means permanent. A Codex turn that fails (`turn.failed`/`error` event) before any
   work answers `stop` with `retry_after` and Codex's own message (network down, the Mac waking from sleep); after work it is `failed`; an HTTP 4xx other than 429 is `error`.
 - Stopping: on SIGTERM, SIGHUP or Ctrl-C route.py kills the worker's process group before it exits. A SIGKILL on route.py cannot be caught, so
