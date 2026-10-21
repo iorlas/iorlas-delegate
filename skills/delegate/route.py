@@ -841,7 +841,8 @@ def cmd_status(a, cfg):
         print(json.dumps({"v": 1, "ts": t,
                           "lanes": {n: {"family": l.family, "kind": l.kind, "out": l.out, "out_until": l.out_until, "five": l.five, "week": l.week,
                                         "pace": l.pace, "burn": l.burn, "spend": l.spend, "cap": l.cap, "notes": l.notes} for n, l in lanes.items()},
-                          "running": [{"run_id": k, "lane": v["lane"], "role": v["role"], "task": v.get("task", ""), "started": v["start"], "age_s": int(t - v["start"])}
+                          "running": [{"run_id": k, "lane": v["lane"], "role": v["role"], "task": v.get("task", ""), "started": v["start"], "age_s": int(t - v["start"]),
+                                       "pid": v.get("pid"), "worker_pid": v.get("worker_pid")}
                                       for k, v in sorted(live_leases(st, t).items(), key=lambda kv: kv[1]["start"])],
                           "recent": recent_runs(a.recent),
                           "needs_input": needs_input(lanes)}))
@@ -1190,10 +1191,16 @@ def child_env(extra=None):
     return env
 
 
+WORKER_STARTED = []        # callbacks run with the worker's pid right after it starts (run_once registers one per run)
+
+
 def run_proc(cmd, text, cwd, env, timeout, on_line=None):
     """-> (returncode, stdout, stderr, timed_out). Own process group; the timeout kills the group; stdin carries `text` then closes; UTF-8, errors replaced."""
     kw = {"start_new_session": True} if os.name != "nt" else {"creationflags": 0x00000200}
     p = subprocess.Popen(cmd, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=cwd, env=env, **kw)
+    for cb in WORKER_STARTED:
+        with contextlib.suppress(Exception):
+            cb(p.pid)
     out, err = [], []
 
     def pump(stream, sink, cb):
@@ -1656,6 +1663,17 @@ def run_once(a, cfg):
             with contextlib.suppress(Exception):
                 update_state(renew)
     threading.Thread(target=keep_lease, daemon=True).start()
+
+    def worker_started(pid):
+        """The worker runs in its own process group (pgid = pid), so a SIGKILL on route.py leaves it running: say where it is, before any
+        work, on stderr and in the lease (status --json `running`), so the caller can kill the group itself."""
+        print(f"delegate: worker pid={pid} pgid={pid} run_id={rid}", file=sys.stderr, flush=True)
+
+        def note(st):
+            if rid in (st.get("leases") or {}):
+                st["leases"][rid]["worker_pid"] = pid
+        update_state(note)
+    WORKER_STARTED[:] = [worker_started]
     meta = {"parent_session": a.parent or "", "title": a.title or brief.strip().splitlines()[0][:120]}
     if a.task:
         meta["task"] = a.task

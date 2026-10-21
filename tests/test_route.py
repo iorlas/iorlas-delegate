@@ -775,8 +775,11 @@ printf '{"result":"claude says hi","session_id":"sess-1","total_cost_usd":0.5,"i
                 self.fail(p.stdout.read().decode() + p.stderr.read().decode())
             time.sleep(0.1)
         pid = int(Path(os.environ["FAKE_PIDFILE"]).read_text())
+        wp = [v.get("worker_pid") for v in (route.load_state().get("leases") or {}).values()]
+        self.assertTrue(wp and wp[0], "the lease names the worker before it does any work")
         p.send_signal(signal.SIGTERM)
         p.wait(timeout=15)
+        self.assertIn(f"delegate: worker pid={wp[0]} pgid={wp[0]}", p.stderr.read().decode())
         time.sleep(0.3)
         with self.assertRaises(OSError):
             os.kill(pid, 0)

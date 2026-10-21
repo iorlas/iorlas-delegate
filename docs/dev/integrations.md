@@ -82,6 +82,9 @@ https://github.com/iorlas/iorlas-task-loop/blob/main/docs/contracts/worker-run-v
   (`session_meta.payload.parent_thread_id` = the worker's thread; the last `token_count` holds the total); `codex exec --json` never reports them. Since 0.26.0.
 - `stop` (not `error`) answers a state-lock timeout, with `retry_after`; `error` means permanent. A Codex turn that fails (`turn.failed`/`error` event) before any
   work answers `stop` with `retry_after` and Codex's own message (network down, the Mac waking from sleep); after work it is `failed`; an HTTP 4xx other than 429 is `error`.
+- Stopping: on SIGTERM, SIGHUP or Ctrl-C route.py kills the worker's process group before it exits. A SIGKILL on route.py cannot be caught, so
+  the worker (its own process group, pgid = pid) keeps running: route.py prints `delegate: worker pid=N pgid=N run_id=R` on stderr right after
+  the worker starts, and the lease shows it (`status --json` running[].worker_pid); a caller that SIGKILLs route.py kills that group too.
 - Slots: at most `max_parallel` (setting, default 4; one when the lane's 5-hour use is at `strain`) runs in flight per lane. A full lane is skipped like a refused one; when nothing
   is left the answer is `stop` (or `lane_out`) with a `retry_after` 60-120 s ahead, jittered. `run` never waits for a slot. A run holds a lease in `state.json`
   (`leases`; 120 s, renewed every 30 s, so a killed `route.py` frees its slot by itself). With `--task ID`, a second `run` for the same task while the first is alive answers `stop`.
