@@ -29,9 +29,19 @@ state and in Claude Code's own transcripts.
 
 task-loop's engine calls `route.py run ROLE --unattended --brief FILE --cwd DIR [--schema F] [--resume REF] [--cap USD] [--timeout S] [--parent SESSION] [--task ID] [--title T]`
 as a script, with no Claude session behind it. The spec belongs to the consumer:
-https://github.com/iorlas/iorlas-task-loop/blob/main/docs/contracts/worker-run-v1.md
+https://github.com/iorlas/iorlas-task-loop/blob/main/docs/contracts/worker-run-v2.md (v2 since 0.29.0; v1 is gone, no shim)
 
-- stdout is exactly one JSON object (`v`, `status`, `data`, `text`, `ref`, `lane`, `model`, `effort`, `family`, `flag`, `cost`, `tokens`, `secs`, `run_id`,
+- Handshake: `route.py contract --json` prints one line `{worker_run: 2, features, reasons{reason: next}, lanes{codex, claude, both}}`; a caller
+  requires `worker_run == 2`. `lanes` is the static statement of what a worker sees and what cannot be blocked.
+- Every answer that is not `done` or `agent` carries `reason` and `next`. `next` is the caller's whole policy: `retry` (after `retry_after`),
+  `owner` (a person must act: log in, set up, verify a denial), `fail` (this attempt is over). `reason` is for wording and stats, never for branching.
+  Reasons: lane_out, busy, duplicate_task, lock, vendor_prework, network, no_lane -> retry; logged_out, setup, secrets, bad_request, crash -> owner;
+  caller, timeout, worker_failed, schema_invalid -> fail. A retry reason with no `retry_after` (no lane will come back by itself) answers `owner`.
+- `context` (per run, scripts only; interactive answers leave it out): `{instructions: [repo instruction files given], env_keys: [names passed]}`;
+  the credit lane's key is passed but not listed.
+- With `--schema`, delegate checks the answer (type, required, properties, items, enum), re-asks once in the same thread, and answers
+  `failed`/`schema_invalid` when it still does not fit; tokens and denials of both turns add up.
+- stdout is exactly one JSON object (`v` = 2, `status`, `reason`, `next`, `context`, `data`, `text`, `ref`, `lane`, `model`, `effort`, `family`, `flag`, `cost`, `tokens`, `secs`, `run_id`,
   `transcript`, `retry_after`, `say`, `git_violation`); `tokens` is `{in, cached, out}` or null, and `in` counts all input including cache reads
   (and Claude cache writes; before 0.22.0 history recorded Claude's uncached input only); exit 0 whenever it was printed. Statuses: `done`, `failed`, `timeout`, `lane_out`, `stop`, `error`
   (plus `agent` for interactive callers only).
@@ -70,7 +80,7 @@ https://github.com/iorlas/iorlas-task-loop/blob/main/docs/contracts/worker-run-v
   (`leases`; 120 s, renewed every 30 s, so a killed `route.py` frees its slot by itself). With `--task ID`, a second `run` for the same task while the first is alive answers `stop`.
 - SIGTERM, SIGHUP or Ctrl-C on `route.py run` stops its worker too (workers run in their own process group, so nothing else would). With `--unattended` a changed parent pid
   (the engine was SIGKILLed) does the same. Without this, an orphaned Codex keeps burning the plan.
-- `route.py status --json` (v1, the dashboard's only read): `{v, ts, lanes{name:{family,kind,out,out_until,five,week,pace,burn,spend,cap,notes}}, running[{run_id,lane,role,task,started,age_s}],
+- `route.py status --json` (v1, one line since 0.29.0, the dashboard's only read; `recent` rows carry `reason`): `{v, ts, lanes{name:{family,kind,out,out_until,five,week,pace,burn,spend,cap,notes}}, running[{run_id,lane,role,task,started,age_s}],
   recent[{run_id,ts,role,task,lane,model,status,host,secs,cost,tokens,denials}] (last `--recent N`, default 20), needs_input[]}`. `five`/`week` are null when unknown. `doctor --json` carries `v: 1`. Dashboards read these, never
   `state.json` or `history.jsonl`.
 - `history.jsonl` (config dir, private; rotated: lines older than 14 days are dropped once it passes 1 MB): one line per finished run: role, task, lane, model, effort, status, secs, cost, tokens, 5-hour and weekly use before and after, ids of runs

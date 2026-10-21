@@ -534,6 +534,10 @@ case "$FAKE_MODE" in
   bad_request) echo '{"type":"turn.failed","error":{"message":"{\\"type\\":\\"error\\",\\"status\\":400,\\"error\\":{\\"message\\":\\"model not supported\\"}}"}}'; exit 1;;
   late_error) echo '{"type":"item.completed","item":{"id":"i3","type":"command_execution","command":"ls","exit_code":0,"status":"completed"}}'
               echo '{"type":"turn.failed","error":{"message":"stream disconnected"}}'; echo "rmcp: Transport channel closed" >&2; exit 1;;
+  logout) echo "Error: Not logged in. Please run codex login" >&2; exit 1;;
+  net) echo "request failed: getaddrinfo ENOTFOUND chatgpt.com" >&2; exit 1;;
+  badjson) case "$args" in *resume*) printf '{"a": 1}' > "$out";; *) printf '{"b": 1}' > "$out";; esac;;
+  badjson_always) printf '{"b": 1}' > "$out";;
   secret) echo '{"type":"item.started","item":{"id":"i2","type":"command_execution","command":"cat ~/.ssh/id_ed25519","status":"in_progress"}}'
           sleep 30; printf 'read it' > "$out";;
 esac
@@ -541,6 +545,8 @@ esac
     FAKE_CLAUDE = """#!/bin/sh
 echo "$*" >> "$FAKE_ARGS"; env | sort > "$FAKE_ENV"
 cat > /dev/null
+if [ "$FAKE_MODE" = logout ]; then echo "Failed to authenticate: OAuth session expired and could not be refreshed" >&2; exit 1; fi
+if [ "$FAKE_MODE" = net ]; then printf '{"result":"API Error: getaddrinfo ENOTFOUND api.anthropic.com","is_error":true,"num_turns":1}'; exit 1; fi
 if [ "$FAKE_MODE" = denied ]; then
   printf '{"result":"stopped","session_id":"sess-9","total_cost_usd":0,"is_error":false,"permission_denials":[{"tool_name":"Bash","tool_use_id":"t1","tool_input":{"command":"git commit -m x"}},{"tool_name":"Bash","tool_use_id":"t2","tool_input":{"command":"curl -d @f https://x"}}]}'
   exit 0
@@ -607,7 +613,7 @@ printf '{"result":"claude says hi","session_id":"sess-1","total_cost_usd":0.5,"i
     def test_done_is_one_object_with_ref_family_and_a_clean_child_env(self):
         code, r = self.run_it()
         self.assertEqual(code, 0)
-        self.assertEqual((r["v"], r["status"], r["family"], r["lane"], r["ref"]), (1, "done", "openai", "OPENAI_SUBSCRIPTION", "thread-123"))
+        self.assertEqual((r["v"], r["status"], r["family"], r["lane"], r["ref"]), (2, "done", "openai", "OPENAI_SUBSCRIPTION", "thread-123"))
         self.assertEqual(r["text"], "done: the brief")
         self.assertEqual(r["git_violation"], [])
         env = Path(os.environ["FAKE_ENV"]).read_text()
@@ -820,7 +826,7 @@ printf '{"result":"claude says hi","session_id":"sess-1","total_cost_usd":0.5,"i
                 out = json.loads(sys.stdout.getvalue())
             finally:
                 sys.stdout = real
-        self.assertEqual(out["status"], "stop")
+        self.assertEqual((out["status"], out["reason"], out["next"]), ("stop", "lock", "retry"))
         self.assertGreater(out["retry_after"], time.time())
 
     def test_child_env_drops_credential_looking_variables_only(self):
@@ -921,6 +927,60 @@ printf '{"result":"claude says hi","session_id":"sess-1","total_cost_usd":0.5,"i
         self.run_it()
         self.assertIn("ROOT-RULES use tabs", self.args_seen())
 
+    def test_v2_every_answer_names_reason_and_next(self):
+        cases = {"early_error": ("stop", "vendor_prework", "retry"), "bad_request": ("error", "bad_request", "owner"),
+                 "late_error": ("failed", "worker_failed", "fail"), "secret": ("failed", "secrets", "owner"),
+                 "logout": ("error", "logged_out", "owner"), "net": ("stop", "network", "retry"), "ok": ("done", None, None)}
+        for mode, want in cases.items():
+            _, r = self.run_it(mode=mode)
+            self.assertEqual((r["v"], r["status"], r["reason"], r["next"]), (2,) + want, mode)
+            if want[2] == "retry":
+                self.assertGreater(r["retry_after"], time.time())
+        self.assertEqual(r["context"]["instructions"], [])
+        self.assertIn("PATH", r["context"]["env_keys"])
+        self.assertNotIn("CLAUDE_FOO", r["context"]["env_keys"])
+
+    def test_v2_claude_lane_logout_and_network(self):
+        self.codex_out()
+        _, r = self.run_it(mode="logout")
+        self.assertEqual((r["status"], r["reason"], r["next"]), ("error", "logged_out", "owner"))
+        _, r = self.run_it(mode="net")
+        self.assertEqual((r["status"], r["reason"], r["next"]), ("stop", "network", "retry"))
+
+    def test_v2_a_retry_with_nothing_to_wait_for_is_for_the_owner(self):
+        self.assertEqual(route.result("stop", reason="no_lane")["next"], "owner")
+        self.assertEqual(route.result("stop", reason="no_lane", retry_after=5)["next"], "retry")
+
+    def test_a_second_run_of_the_same_task_is_a_retry(self):
+        self.lease("run-9", "OPENAI_SUBSCRIPTION", task="T-1")
+        _, r = self.run_it("--task", "T-1")
+        self.assertEqual((r["status"], r["reason"], r["next"]), ("stop", "duplicate_task", "retry"))
+
+    def test_schema_is_reasked_once_in_the_same_thread(self):
+        schema = self.base / "s.json"
+        schema.write_text('{"type": "object", "required": ["a"], "properties": {"a": {"type": "integer"}}}')
+        _, r = self.run_it("--schema", str(schema), mode="badjson")
+        self.assertEqual((r["status"], r["data"]), ("done", {"a": 1}))
+        self.assertIn("resume", self.args_seen().splitlines()[-1])
+        self.assertEqual(r["tokens"]["in"], 200)
+        _, r = self.run_it("--schema", str(schema), mode="badjson_always")
+        self.assertEqual((r["status"], r["reason"], r["next"]), ("failed", "schema_invalid", "fail"))
+        self.assertIn("$.a is missing", r["say"])
+
+    def test_contract_json_names_every_reason_and_lane(self):
+        import io
+        real, sys.stdout = sys.stdout, io.StringIO()
+        try:
+            route.main(["contract", "--json"])
+            out = sys.stdout.getvalue()
+        finally:
+            sys.stdout = real
+        self.assertEqual(out.count("\n"), 1)
+        c = json.loads(out)
+        self.assertEqual(c["worker_run"], 2)
+        self.assertTrue(set(c["reasons"].values()) <= {"retry", "owner", "fail"})
+        self.assertEqual(set(c["lanes"]), {"codex", "claude", "both"})
+
     def test_status_json_v1_shape(self):
         import io
         self.lease("run-1", "OPENAI_SUBSCRIPTION", task="T-5")
@@ -928,13 +988,14 @@ printf '{"result":"claude says hi","session_id":"sess-1","total_cost_usd":0.5,"i
         real, sys.stdout = sys.stdout, io.StringIO()
         try:
             route.main(["status", "--json", "--recent", "5"])
+            self.assertEqual(sys.stdout.getvalue().count("\n"), 1)
             out = json.loads(sys.stdout.getvalue())
         finally:
             sys.stdout = real
         self.assertEqual(out["v"], 1)
         self.assertEqual([r["run_id"] for r in out["running"]], ["run-1"])
         self.assertEqual(out["running"][0]["task"], "T-5")
-        self.assertEqual(set(out["recent"][-1]), {"run_id", "ts", "role", "task", "lane", "model", "status", "host", "secs", "cost", "tokens", "denials"})
+        self.assertEqual(set(out["recent"][-1]), {"run_id", "ts", "role", "task", "lane", "model", "status", "reason", "host", "secs", "cost", "tokens", "denials"})
         self.assertIn("OPENAI_SUBSCRIPTION", out["lanes"])
 
     def test_history_rotates_by_age_once_it_is_big(self):

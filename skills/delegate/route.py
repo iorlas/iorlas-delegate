@@ -813,7 +813,7 @@ def needs_input(lanes):
 
 def recent_runs(n):
     """The last n finished runs, newest last: the dashboard's view of history.jsonl (the file itself stays private)."""
-    keys = ("run_id", "ts", "role", "task", "lane", "model", "status", "host", "secs", "cost", "tokens", "denials")
+    keys = ("run_id", "ts", "role", "task", "lane", "model", "status", "reason", "host", "secs", "cost", "tokens", "denials")
     try:
         lines = history_path().read_text(encoding="utf-8").splitlines()[-n:]
         return [{k: json.loads(ln).get(k) for k in keys} for ln in lines if ln]
@@ -833,7 +833,7 @@ def cmd_status(a, cfg):
                           "running": [{"run_id": k, "lane": v["lane"], "role": v["role"], "task": v.get("task", ""), "started": v["start"], "age_s": int(t - v["start"])}
                                       for k, v in sorted(live_leases(st, t).items(), key=lambda kv: kv[1]["start"])],
                           "recent": recent_runs(a.recent),
-                          "needs_input": needs_input(lanes)}, indent=1))
+                          "needs_input": needs_input(lanes)}))
         return 0
     for n, l in lanes.items():
         print(f"{n:<20} {l.brief(t)}")
@@ -1179,6 +1179,34 @@ def find_transcript(ref, family):
     return hits[0] if hits else None
 
 
+def schema_problem(data, schema, at="$"):
+    """None when `data` fits the JSON schema subset delegate checks (type, required, properties, items, enum), else what is wrong."""
+    if not isinstance(schema, dict):
+        return None
+    kinds = {"object": dict, "array": list, "string": str, "boolean": bool, "null": type(None), "number": (int, float), "integer": int}
+    want = schema.get("type")
+    want = want if isinstance(want, list) else [want] if want else []
+    if want and not any(isinstance(data, kinds.get(w, object)) and not (w in ("number", "integer") and isinstance(data, bool)) for w in want):
+        return f"{at} is not {'/'.join(want)}"
+    if "enum" in schema and data not in schema["enum"]:
+        return f"{at} is not one of {schema['enum']}"
+    if isinstance(data, dict):
+        for k in schema.get("required") or []:
+            if k not in data:
+                return f"{at}.{k} is missing"
+        for k, sub in (schema.get("properties") or {}).items():
+            if k in data:
+                why = schema_problem(data[k], sub, f"{at}.{k}")
+                if why:
+                    return why
+    if isinstance(data, list) and isinstance(schema.get("items"), dict):
+        for i, x in enumerate(data):
+            why = schema_problem(x, schema["items"], f"{at}[{i}]")
+            if why:
+                return why
+    return None
+
+
 def parse_data(text, schema):
     if not schema or not text:
         return None
@@ -1222,7 +1250,7 @@ def launch_codex(d, brief, a, rid, t, meta):
     h = d["how"]
     exe = shutil.which("codex")
     if not exe:
-        return {"status": "error", "say": "codex CLI not found on PATH (route.py doctor --lane OPENAI_SUBSCRIPTION)"}
+        return {"status": "error", "reason": "setup", "say": "codex CLI not found on PATH (route.py doctor --lane OPENAI_SUBSCRIPTION)"}
     out_file = config_dir() / f"codex-last-{rid[:8]}.txt"
     if a.resume:
         cmd = [exe, "exec", "resume", "-m", h["model"], "-c", f"model_reasoning_effort={d['effort']}", "-c", f'sandbox_mode="{h["sandbox"]}"'] + CODEX_ACCESS + h["isolation"]
@@ -1275,21 +1303,25 @@ def launch_codex(d, brief, a, rid, t, meta):
             seen["tokens"] = {k: (base.get(k) or 0) + extra[k] for k in extra}
     res = {"text": text, "ref": seen["ref"], "stderr": err, "tokens": seen["tokens"], "denied": seen["denied"]}
     if seen.get("secret"):
-        res.update(status="failed", say=f"stopped: the worker ran a command on a secret path: {seen['secret'][:200]}")
+        res.update(status="failed", reason="secrets", say=f"stopped: the worker ran a command on a secret path: {seen['secret'][:200]}")
     elif timed_out:
-        res.update(status="timeout", say=f"codex did not finish within {a.timeout}s and was killed")
+        res.update(status="timeout", reason="timeout", say=f"codex did not finish within {a.timeout}s and was killed")
     elif LIMIT_RE.search(seen["error"]) or rc != 0 and LIMIT_RE.search(text + err):
         until = t + 3600
         mark_out(d["lane"], until, "limit refusal: " + (err or text)[:120].replace("\n", " "), t)
-        res.update(status="lane_out", retry_after=until, say=f"{d['lane']} hit a limit; out until {local(until)}")
+        res.update(status="lane_out", reason="lane_out", retry_after=until, say=f"{d['lane']} hit a limit; out until {local(until)}")
+    elif LOGIN_RE.search(seen["error"] + err):
+        res.update(status="error", reason="logged_out", say=f"codex is not logged in: {(seen['error'] or err)[-200:].strip()} (route.py doctor --lane {d['lane']})")
     elif re.search(r'"status":\s*4(?!29)\d\d', seen["error"]):     # the request itself is wrong (unsupported model): retrying cannot help
-        res.update(status="error", say=f"codex rejected the request: {seen['error'][:300]}")
+        res.update(status="error", reason="bad_request", say=f"codex rejected the request: {seen['error'][:300]}")
     elif seen["error"] and not seen["work"]:    # failed before doing anything (network down, the Mac waking from sleep): try again later
-        res.update(status="stop", retry_after=now() + random.randint(60, 120), say=f"codex failed before any work: {seen['error'][:200]}")
+        res.update(status="stop", reason="vendor_prework", retry_after=now() + random.randint(60, 120), say=f"codex failed before any work: {seen['error'][:200]}")
     elif seen["error"]:
-        res.update(status="failed", say=f"codex: {seen['error'][:300]}")
+        res.update(status="failed", reason="worker_failed", say=f"codex: {seen['error'][:300]}")
+    elif rc != 0 and NETWORK_RE.search(err) and not seen["work"]:
+        res.update(status="stop", reason="network", retry_after=now() + random.randint(60, 120), say=f"codex could not reach its service: {err[-200:].strip()}")
     elif rc != 0:
-        res.update(status="failed", say=(err or text)[-300:].strip())
+        res.update(status="failed", reason="worker_failed", say=(err or text)[-300:].strip())
     else:
         update_state(lambda s: s.setdefault("out", {}).pop(d["lane"], None))
         res.update(status="done", data=parse_data(text, a.schema))
@@ -1316,16 +1348,16 @@ def launch_claude(d, brief, a, rid, t, cfg, meta):
     credit = cfg["lanes"][d["lane"]]["kind"] == "credit"
     exe = shutil.which("claude")
     if not exe:
-        return {"status": "error", "say": "claude CLI not found on PATH"}
+        return {"status": "error", "reason": "setup", "say": "claude CLI not found on PATH"}
     extra, cap, nxt = {}, float(h.get("cap") or 2), None
     if credit:
         key = find_key()
         if not key:
-            return {"status": "error", "say": "no API key for the credit lane: route.py doctor --lane CLAUDE_CREDIT (never paste the key in chat)"}
+            return {"status": "error", "reason": "setup", "say": "no API key for the credit lane: route.py doctor --lane CLAUDE_CREDIT (never paste the key in chat)"}
         c = cfg["settings"]["credit"]
         start, nxt = credit_cycle(c["reset_day"], t)
         if ledger_spend(start) + cap > float(c["monthly_cap"]):
-            return {"status": "lane_out", "retry_after": nxt, "say": f"cycle cap: ${ledger_spend(start):.2f} spent + ${cap:.2f} > ${c['monthly_cap']}"}
+            return {"status": "lane_out", "reason": "lane_out", "retry_after": nxt, "say": f"cycle cap: ${ledger_spend(start):.2f} spent + ${cap:.2f} > ${c['monthly_cap']}"}
         extra["ANTHROPIC_API_KEY"] = key
     write = bool(h["write"])
     tools = ["Read", "Glob", "Grep"] + (["Edit", "Write"] if write else []) + (["Bash"] if h["bash"] else [])
@@ -1355,18 +1387,22 @@ def launch_claude(d, brief, a, rid, t, cfg, meta):
            "denied": [{"tool": x.get("tool_name"), "input": x.get("tool_input")} for x in j.get("permission_denials") or []
                       if isinstance(x, dict) and not policy_denial(x)]}
     if timed_out:
-        res.update(status="timeout", say=f"claude did not finish within {a.timeout}s and was killed")
+        res.update(status="timeout", reason="timeout", say=f"claude did not finish within {a.timeout}s and was killed")
     elif rc != 0 or j.get("is_error"):
         blob = text + err
         if credit and re.search(r"credit balance (is )?too low", blob, re.I):
             mark_out(d["lane"], nxt, "credit balance too low", t)
-            res.update(status="lane_out", retry_after=nxt, say=f"credit exhausted; out until {local(nxt)}")
+            res.update(status="lane_out", reason="lane_out", retry_after=nxt, say=f"credit exhausted; out until {local(nxt)}")
         elif LIMIT_RE.search(blob):
             until = t + 3600
             mark_out(d["lane"], until, "limit refusal: " + blob[:120].replace("\n", " "), t)
-            res.update(status="lane_out", retry_after=until, say=f"{d['lane']} hit a limit; out until {local(until)}")
+            res.update(status="lane_out", reason="lane_out", retry_after=until, say=f"{d['lane']} hit a limit; out until {local(until)}")
+        elif LOGIN_RE.search(blob):
+            res.update(status="error", reason="logged_out", say=f"claude is not logged in: {blob[-200:].strip()} (claude auth login)")
+        elif NETWORK_RE.search(blob) and (j.get("num_turns") or 0) <= 1:      # failed before any work
+            res.update(status="stop", reason="network", retry_after=now() + random.randint(60, 120), say=f"claude could not reach its service: {blob[-200:].strip()}")
         else:
-            res.update(status="failed", say=blob[-300:].strip())
+            res.update(status="failed", reason="worker_failed", say=blob[-300:].strip())
     else:
         update_state(lambda s: s.setdefault("out", {}).pop(d["lane"], None))
         data = j.get("structured_output") if isinstance(j.get("structured_output"), (dict, list)) else parse_data(text, a.schema)
@@ -1392,8 +1428,23 @@ def claude_tokens(u):
             "cached": cached, "out": u.get("output_tokens")}
 
 
-def result(status, **kw):
-    r = {"v": 1, "status": status, "data": None, "text": "", "ref": None, "lane": None, "model": None, "effort": None, "family": None,
+# worker-run v2: every answer that is not done or agent names a reason, and `next` is the caller's whole policy for it:
+# retry (after retry_after), owner (a person must act: log in, set up, verify), fail (this attempt is over; re-plan or give up).
+REASONS = {"lane_out": "retry", "busy": "retry", "duplicate_task": "retry", "lock": "retry", "vendor_prework": "retry", "network": "retry",
+           "no_lane": "retry", "logged_out": "owner", "setup": "owner", "secrets": "owner", "bad_request": "owner", "crash": "owner",
+           "caller": "fail", "timeout": "fail", "worker_failed": "fail", "schema_invalid": "fail"}
+LOGIN_RE = re.compile(r"not logged in|please (run|use) [`'\"]?\S*\s*login|oauth session expired|failed to authenticate|invalid api key|401 unauthorized", re.I)
+NETWORK_RE = re.compile(r"ENOTFOUND|ECONNRESET|ECONNREFUSED|ETIMEDOUT|EAI_AGAIN|getaddrinfo|could not resolve host|network is unreachable", re.I)
+
+
+def result(status, reason=None, **kw):
+    nxt = None
+    if status not in ("done", "agent"):
+        reason = reason or {"timeout": "timeout", "lane_out": "lane_out", "stop": "no_lane", "error": "crash"}.get(status, "worker_failed")
+        nxt = REASONS[reason]
+        if nxt == "retry" and not kw.get("retry_after"):     # nothing to wait for (no lane will come back by itself): a person must act
+            nxt = "owner"
+    r = {"v": 2, "status": status, "reason": reason, "next": nxt, "data": None, "text": "", "ref": None, "lane": None, "model": None, "effort": None, "family": None,
          "flag": None, "cost": 0, "tokens": None, "denied": [], "secs": 0, "run_id": None, "transcript": None, "retry_after": None, "say": "", "git_violation": []}
     r.update(kw)
     return r
@@ -1402,7 +1453,7 @@ def result(status, **kw):
 def emit(r):
     """One object on stdout. A model reads it when a Claude session is behind us, so empty fields are dropped there; scripts get every field."""
     if interactive():
-        r = {k: v for k, v in r.items() if k in ("v", "status") or v not in (None, "", [], 0)}
+        r = {k: v for k, v in r.items() if k in ("v", "status") or v not in (None, "", [], 0) and k != "context"}     # context is for scripts
     print(json.dumps(r))
     return 0        # exit 0 whenever the object was printed; non-zero only if route.py itself crashed
 
@@ -1437,11 +1488,31 @@ def lane_use(cfg, name, t):
     return lane.five, lane.week
 
 
+LANE_CONTEXT = {
+    "codex": {"sees": ["delegate rules (secrets, git, sub-agents, escalation, denial)", "the brief", "repo instruction files"],
+              "hidden": ["user config and rules", "every skill (system, ~/.codex/skills, ~/.agents/skills, repo .agents/.codex skills)", "MCP servers", "hooks"],
+              "sandbox": "workspace-write (write steps) or read-only, no network; the automatic reviewer may let one command out",
+              "cannot_block": ["sub-agents: a brief that asks gets one; their tokens count"]},
+    "claude": {"sees": ["delegate rules (secrets, git, denial)", "the brief", "repo instruction files (appended)"],
+               "hidden": ["user and repo settings", "hooks except delegate's secrets guard", "plugins", "skills", "MCP servers"],
+               "sandbox": "none; the auto-mode classifier reviews every tool call; Bash only on write steps or --host",
+               "cannot_block": []},
+    "both": {"instructions": "in each folder from the repo root down to cwd, AGENTS.md, else CLAUDE.md",
+             "env": "the caller's environment minus CLAUDE_*, ANTHROPIC_*, DELEGATE_* and credential-looking names"}}
+
+
+def cmd_contract(a, cfg):
+    """What a caller may rely on, for a handshake: the worker-run version, its features, every reason with its `next`, and what workers see."""
+    print(json.dumps({"worker_run": 2, "features": ["reason", "next", "context", "schema_reask", "denied", "tokens_include_child_threads", "secrets_guard"],
+                      "reasons": REASONS, "lanes": LANE_CONTEXT}))
+    return 0
+
+
 def cmd_run(a, cfg):
     try:
         return run_once(a, cfg)
     except TimeoutError as e:       # state lock held too long: transient, so stop with a retry time (error means permanent)
-        return emit(result("stop", say=str(e), retry_after=now() + random.randint(60, 120)))
+        return emit(result("stop", reason="lock", say=str(e), retry_after=now() + random.randint(60, 120)))
 
 
 def run_once(a, cfg):
@@ -1453,14 +1524,14 @@ def run_once(a, cfg):
     if d.get("notice"):
         extra["notice"] = d["notice"]
     if d["action"] == "error":
-        return emit(result("error", say=d["error"], **extra))
+        return emit(result("error", reason="caller", say=d["error"], **extra))
     if d["action"] == "lane_out":
-        return emit(result("lane_out", lane=d["lane"], retry_after=d.get("retry_after"), say=d["say"], **extra))
+        return emit(result("lane_out", reason="lane_out", lane=d["lane"], retry_after=d.get("retry_after"), say=d["say"], **extra))
     if d["action"] == "stop":
         retry = min([l.out_until for l in lanes.values() if l.out and l.out_until] or [None], key=lambda x: (x is None, x))
         if not unattended and d.get("ask_user"):
             extra["ask_user"] = d["ask_user"]
-        return emit(result("stop", say=d["say"], retry_after=retry, **extra))
+        return emit(result("stop", reason="no_lane", say=d["say"], retry_after=retry, **extra))
     h = d["how"]
     fam = cfg["lanes"][d["lane"]]["family"]
     who = dict(lane=d["lane"], model=d["model"], effort=d["effort"], family=fam, flag=d.get("flag"))
@@ -1472,7 +1543,7 @@ def run_once(a, cfg):
         return emit(result("agent", **who, agent_model=h["model"], brief_prefix=SECRET_RULE + " " + GIT_RULES, cwd=h["cwd"], **extra))
     brief = Path(a.brief).read_text(encoding="utf-8", errors="replace") if a.brief else sys.stdin.read()
     if not brief.strip():
-        return emit(result("error", **who, say="empty brief: pass it on stdin or with --brief FILE", **extra))
+        return emit(result("error", reason="caller", **who, say="empty brief: pass it on stdin or with --brief FILE", **extra))
     cwd = h["cwd"]
     rid = str(uuid.uuid4())
     S, lane = cfg["settings"], lanes[d["lane"]]
@@ -1482,15 +1553,15 @@ def run_once(a, cfg):
         live = live_leases(st, now())
         st["leases"] = live
         if a.task and any(v.get("task") == a.task for v in live.values()):
-            taken["no"] = ("stop", f"task {a.task} already has a running worker")
+            taken["no"] = ("stop", "duplicate_task", f"task {a.task} already has a running worker")
         elif cap is not None and sum(1 for v in live.values() if v["lane"] == d["lane"]) >= cap:
-            taken["no"] = ("lane_out", f"{d['lane']} has all {cap} slots taken")
+            taken["no"] = ("lane_out", "busy", f"{d['lane']} has all {cap} slots taken")
         else:
             taken["peers"] = sorted(live)
             live[rid] = {"lane": d["lane"], "role": a.role, "pid": os.getpid(), "start": now(), "expires": now() + LEASE_TTL, "task": a.task or ""}
     update_state(claim)
     if "no" in taken:
-        return emit(result(taken["no"][0], **who, say=taken["no"][1], retry_after=now() + random.randint(60, 120), **extra))
+        return emit(result(taken["no"][0], reason=taken["no"][1], **who, say=taken["no"][2], retry_after=now() + random.randint(60, 120), **extra))
     beat = threading.Event()
 
     def keep_lease():
@@ -1506,10 +1577,24 @@ def run_once(a, cfg):
         meta["task"] = a.task
     git_before = git_state(cwd)
     t0, ends = time.time(), {}
+    launch = (lambda b, a_: launch_codex(d, b, a_, rid, t, meta)) if h["kind"] == "codex" else (lambda b, a_: launch_claude(d, b, a_, rid, t, cfg, meta))
     try:
-        res = launch_codex(d, brief, a, rid, t, meta) if h["kind"] == "codex" else launch_claude(d, brief, a, rid, t, cfg, meta)
+        res = launch(brief, a)
+        if res["status"] == "done" and a.schema:     # delegate enforces the schema: one re-ask in the same thread, then schema_invalid
+            schema = json.loads(Path(a.schema).read_text(encoding="utf-8"))
+            why = "the answer is not JSON" if res.get("data") is None else schema_problem(res["data"], schema)
+            if why and res.get("ref"):
+                again = launch(f"Your final answer does not match the required JSON schema: {why}. Reply again with only the JSON object.",
+                               argparse.Namespace(**dict(vars(a), resume=res["ref"])))
+                tok = [x for x in (res.get("tokens"), again.get("tokens")) if x]
+                again["tokens"] = {k: sum(x.get(k) or 0 for x in tok) for k in ("in", "cached", "out")} if tok else None
+                again["denied"] = (res.get("denied") or []) + (again.get("denied") or [])
+                res = again
+                why = None if res["status"] != "done" else "the answer is not JSON" if res.get("data") is None else schema_problem(res["data"], schema)
+            if why and res["status"] == "done":
+                res.update(status="failed", reason="schema_invalid", say=f"the answer does not match the schema: {why}")
     except Exception as e:      # a launcher bug is an error object, not a stack trace
-        res = {"status": "error", "say": f"{type(e).__name__}: {e}"}
+        res = {"status": "error", "reason": "crash", "say": f"{type(e).__name__}: {e}"}
     finally:
         beat.set()
 
@@ -1535,10 +1620,11 @@ def run_once(a, cfg):
     secs = round(time.time() - t0, 1)
     five_after, week_after = lane_use(cfg, d["lane"], now())
     history_add({"ts": now(), "run_id": rid, "role": a.role, "task": a.task or "", "lane": d["lane"], "model": d["model"], "effort": d["effort"],
-                 "status": res["status"], "host": bool(a.host), "denials": len(res.get("denied") or []), "secs": secs, "cost": res.get("cost", 0), "tokens": res.get("tokens"),
+                 "status": res["status"], "reason": res.get("reason"), "host": bool(a.host), "denials": len(res.get("denied") or []), "secs": secs, "cost": res.get("cost", 0), "tokens": res.get("tokens"),
                  "five_before": lane.five, "week_before": lane.week, "five_after": five_after, "week_after": week_after,
                  "overlap": sorted(set(taken["peers"]) | set(ends.get("peers", []))), "slots": cap})
     res.update(**who, run_id=rid, secs=secs, git_violation=git_changes(git_before, git_state(cwd)),
+               context={"instructions": [str(f) for f in repo_instructions(cwd)], "env_keys": sorted(child_env().keys())},
                transcript=find_transcript(res.get("ref"), fam), **extra)
     return emit(result(res.pop("status"), **res))
 
@@ -1612,6 +1698,7 @@ def main(argv=None):
     sk = sub.add_parser("set-key"); sk.add_argument("--stdin", action="store_true"); sk.add_argument("--force", action="store_true")
     sk.add_argument("--web", action="store_true"); sk.add_argument("--host", default="127.0.0.1"); sk.add_argument("--port", type=int, default=0); sk.add_argument("--timeout", type=int, default=300)
     sub.add_parser("guard")
+    sub.add_parser("contract").add_argument("--json", action="store_true")
     cf = sub.add_parser("config"); cf.add_argument("action", choices=["set", "show"]); cf.add_argument("key", nargs="?"); cf.add_argument("value", nargs="?")
     ru = sub.add_parser("run"); ru.add_argument("role"); ru.add_argument("--authored-by"); ru.add_argument("--host", action="store_true"); ru.add_argument("--failed", default="")
     ru.add_argument("--premium", nargs="?", const="claude", metavar="FAMILY"); ru.add_argument("--allow-degraded", action="store_true")
@@ -1624,7 +1711,7 @@ def main(argv=None):
         return cmd_guard(a)
     cfg = load_routing()
     return {"status": cmd_status, "next": cmd_next, "report": cmd_report, "capture-limits": cmd_capture,
-            "run": cmd_run, "doctor": cmd_doctor, "set-key": cmd_set_key, "config": cmd_config}[a.cmd](a, cfg)
+            "run": cmd_run, "contract": cmd_contract, "doctor": cmd_doctor, "set-key": cmd_set_key, "config": cmd_config}[a.cmd](a, cfg)
 
 
 if __name__ == "__main__":
