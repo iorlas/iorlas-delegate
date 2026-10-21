@@ -713,12 +713,12 @@ printf '{"result":"claude says hi","session_id":"sess-1","total_cost_usd":0.5,"i
         self.assertEqual((r["status"], r["reason"], r["next"], r["lane"]), ("stop", "busy", "retry", "OPENAI_SUBSCRIPTION"))
         self.assertTrue(time.time() + 50 < r["retry_after"] < time.time() + 130)
         _, r = self.run_it("--no-wait")
-        self.assertEqual((r["status"], r["lane"], r["fallback"], r["fallback_reason"]), ("done", "CLAUDE_SUBSCRIPTION", True, "busy"))
+        self.assertEqual((r["status"], r["lane"], r["fallback"], r["fallback_reason"], r["first_lane"]), ("done", "CLAUDE_SUBSCRIPTION", True, "busy", "OPENAI_SUBSCRIPTION"))
         self.assertGreater(r["rung"], 0)
 
     def test_the_first_choice_is_rung_0_and_no_fallback(self):
         _, r = self.run_it()
-        self.assertEqual((r["lane"], r["rung"], r["fallback"], r["fallback_reason"]), ("OPENAI_SUBSCRIPTION", 0, False, None))
+        self.assertEqual((r["lane"], r["rung"], r["fallback"], r["fallback_reason"], r["first_lane"]), ("OPENAI_SUBSCRIPTION", 0, False, None, None))
         _, r = self.run_it("--resume", "thread-123")
         self.assertEqual((r["rung"], r["fallback"]), (0, False))
         self.codex_out()

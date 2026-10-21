@@ -730,6 +730,7 @@ def decide(role_name, cfg, lanes, st, t, args):
         return {"action": "stop", "reason": "busy", "lane": busy[0].name, "retry_after": until,
                 "say": f"{busy[0].name} (the role's first choice) has no free slot: {busy[0].notes[0]}", "trace": trace}
     why_not_first = "busy" if busy else "lane_out" if any(l.out for l in mine) else "ceiling"
+    first_lane = next((l.name for l in mine if l.kind == "subscription"), mine[0].name if mine else None)
     for tier in tiers:
         for relaxed in (False, True):
             for step in tier:
@@ -738,7 +739,7 @@ def decide(role_name, cfg, lanes, st, t, args):
                     continue
                 fb = step is not first
                 return {"action": "run", "role": role_name, "step": step.get("idx"), "pass": "relaxed" if relaxed else "strict",
-                        "rung": step.get("idx"), "fallback": fb, "fallback_reason": why_not_first if fb else None,
+                        "rung": step.get("idx"), "fallback": fb, "fallback_reason": why_not_first if fb else None, "first_lane": first_lane if fb else None,
                         "lane": lane.name, "model": step["model"], "effort": step["effort"], "mode": step.get("mode", "read_only"),
                         "cap": step.get("cap"), "use": step.get("use"), "flag": step.get("flag"),
                         "how": how(lane, step, cfg, args.get("cwd"), args.get("unattended", False), args.get("host")), "trace": trace}
@@ -974,7 +975,7 @@ def decision(a, cfg):
                     "say": f"{rec['lane']} cannot continue {ref} now: {why}"}, lanes, warnings, t
         step = {"model": rec["model"], "effort": rec["effort"], "mode": rec["mode"], "cap": a.cap or rec.get("cap")}
         return {"action": "run", "role": a.role, "step": None, "pass": "resume", "rung": rec.get("rung"), "fallback": rec.get("fallback"),
-                "fallback_reason": rec.get("fallback_reason"), "lane": lane.name, "model": rec["model"], "effort": rec["effort"],
+                "fallback_reason": rec.get("fallback_reason"), "first_lane": rec.get("first_lane"), "lane": lane.name, "model": rec["model"], "effort": rec["effort"],
                 "mode": rec["mode"], "cap": step["cap"], "how": how(lane, step, cfg, a.cwd, unattended, host)}, lanes, warnings, t
     args = {"authored_by": a.authored_by, "failed": [int(x) for x in a.failed.split(",") if x != ""] if a.failed else [],
             "premium": a.premium, "allow_degraded": a.allow_degraded and not unattended, "cwd": a.cwd, "unattended": unattended, "host": host,
@@ -1727,7 +1728,7 @@ def run_once(a, cfg):
     h = d["how"]
     fam = cfg["lanes"][d["lane"]]["family"]
     who = dict(lane=d["lane"], model=d["model"], effort=d["effort"], family=fam, flag=d.get("flag"),
-               rung=d.get("rung"), fallback=d.get("fallback"), fallback_reason=d.get("fallback_reason"))
+               rung=d.get("rung"), fallback=d.get("fallback"), fallback_reason=d.get("fallback_reason"), first_lane=d.get("first_lane"))
     if not unattended:
         ni = [n["what"] for n in needs_input(lanes)]
         if ni:
@@ -1831,7 +1832,7 @@ def run_once(a, cfg):
         agent_runs.run(rid, ended=now(), status="completed" if res["status"] == "done" else "failed", transcript=find_transcript(res.get("ref"), fam))
     if res.get("ref") and res["status"] == "done":
         rec = {"lane": d["lane"], "model": d["model"], "effort": d["effort"], "mode": d["mode"], "cap": d.get("cap"), "host": bool(a.host),
-               "rung": d.get("rung"), "fallback": d.get("fallback"), "fallback_reason": d.get("fallback_reason")}
+               "rung": d.get("rung"), "fallback": d.get("fallback"), "fallback_reason": d.get("fallback_reason"), "first_lane": d.get("first_lane")}
 
         def keep(s):
             refs = s.setdefault("refs", {})

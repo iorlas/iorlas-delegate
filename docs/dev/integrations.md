@@ -42,7 +42,7 @@ https://github.com/iorlas/iorlas-task-loop/blob/main/docs/contracts/worker-run-v
   lane out until that reset when the reading has one, else an hour. Every answer given without launching a worker is a history.jsonl line too
   (`run_id` null, `reason`, `retry_after`, `resume`).
 - `rung` (the chosen step's place in the role's chain, 0 = first choice), `fallback` (true when it is not the first choice) and
-  `fallback_reason` (busy, lane_out, ceiling) on every answer that picked a lane; a resume repeats the original run's. Unattended, a first choice
+  `fallback_reason` (busy, lane_out, ceiling) and `first_lane` (the first choice's lane, set only on a fallback) on every answer that picked a lane; a resume repeats the original run's. Unattended, a first choice
   that is only busy (slots full, otherwise usable) answers `stop`/`busy`/retry with its retry_after instead of falling to the next rung;
   `--no-wait` falls through. Since 0.32.0.
 - `context` (per run, scripts only; interactive answers leave it out): `{instructions: [repo instruction files given], env_keys: [names passed]}`;
