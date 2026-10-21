@@ -113,7 +113,7 @@ class SecondPass(unittest.TestCase):
     def test_normal_relaxed_beats_degraded_strict(self):
         ls = lanes(openai={"out": True, "out_until": T + 1}, credit={"out": True, "out_until": T + 99}, sub={"week": 92})
         d = decide("reviewer", ls, authored_by="openai")
-        self.assertEqual((d["model"], d["effort"], d["pass"]), ("opus-5.5", "medium", "relaxed"))
+        self.assertEqual((d["model"], d["effort"], d["pass"]), ("sonnet-5.5", "medium", "relaxed"))
 
 
 class Roles(unittest.TestCase):
@@ -140,7 +140,7 @@ class Roles(unittest.TestCase):
         self.assertEqual(decide("hard", ls, failed=[0, 1, 2])["action"], "stop")
 
     def test_reviewer_prefers_the_other_family_and_authored_by_is_optional(self):
-        self.assertEqual(decide("reviewer", lanes())["model"], "opus-5.5")                  # no author given: Claude first, no claim of independence
+        self.assertEqual(decide("reviewer", lanes())["model"], "sonnet-5.5")                  # no author given: Claude first, no claim of independence
         self.assertEqual(decide("reviewer", lanes(), authored_by="openai")["lane"], "CLAUDE_SUBSCRIPTION")
         self.assertEqual(decide("reviewer", lanes(), authored_by="claude")["lane"], "OPENAI_SUBSCRIPTION")
         self.assertEqual(decide("reviewer", lanes(), authored_by="gemini")["action"], "error")
@@ -715,19 +715,6 @@ printf '{"result":"claude says hi","session_id":"sess-1","total_cost_usd":0.5,"i
         _, r = self.run_it("--no-wait")
         self.assertEqual((r["status"], r["lane"], r["fallback"], r["fallback_reason"], r["first_lane"]), ("done", "CLAUDE_SUBSCRIPTION", True, "busy", "OPENAI_SUBSCRIPTION"))
         self.assertGreater(r["rung"], 0)
-
-    def test_claude_model_caps_claude_rungs_only(self):
-        self.codex_out()
-        _, r = self.run_it("--claude-model", "sonnet-5.5", role="planner")         # planner's first rung is opus
-        self.assertEqual((r["status"], r["lane"], r["model"]), ("done", "CLAUDE_SUBSCRIPTION", "sonnet-5.5"))
-        self.assertIn("claude-sonnet-5-5", self.args_seen().splitlines()[-1])
-        cfg = route.load_routing()
-        tiers = route.build_tiers(cfg["roles"]["light"], cfg, {"claude_model": "sonnet-5.5"})
-        self.assertIn("haiku-5.5", [st["model"] for st in tiers[0]])             # cheaper rungs stay
-        tiers = route.build_tiers(cfg["roles"]["planner"], cfg, {"claude_model": "sonnet-5.5"})
-        self.assertIn("gpt-6.1-sol", [st["model"] for st in tiers[0]])            # codex rungs stay
-        _, r = self.run_it("--claude-model", "gpt-6.1-sol")
-        self.assertEqual((r["status"], r["reason"]), ("error", "caller"))
 
     def test_the_first_choice_is_rung_0_and_no_fallback(self):
         _, r = self.run_it()

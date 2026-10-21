@@ -689,10 +689,6 @@ def build_tiers(role, cfg, args):
             return None
         steps = [dict(step)] + steps
     steps = [dict(s, idx=i) for i, s in enumerate(steps)]
-    cap = args.get("claude_model")
-    if cap:         # the caller's ceiling for Claude rungs (e.g. task-loop: sonnet); cheaper rungs and Codex rungs stay as they are
-        top = cfg["models"][cap]["rank"]
-        steps = [dict(s, model=cap) if cfg["models"][s["model"]]["family"] == "claude" and cfg["models"][s["model"]].get("rank", 0) > top else s for s in steps]
     if role["advance"] == "on_failure":
         failed = args.get("failed") or []
         start = (max(failed) + 1) if failed else 0
@@ -713,9 +709,6 @@ def decide(role_name, cfg, lanes, st, t, args):
     role = cfg["roles"].get(role_name)
     if role is None:
         return {"action": "error", "error": f"unknown role {role_name}; roles: {', '.join(cfg['roles'])}"}
-    cm = args.get("claude_model")
-    if cm and (cfg["models"].get(cm) or {}).get("family") != "claude":
-        return {"action": "error", "error": f"--claude-model must be one of {[k for k, v in cfg['models'].items() if v['family'] == 'claude']}"}
     tiers = build_tiers(role, cfg, args)
     if tiers is None:
         if args.get("premium") and not (cfg.get("premium") or {}).get(args["premium"]):
@@ -986,7 +979,7 @@ def decision(a, cfg):
                 "mode": rec["mode"], "cap": step["cap"], "how": how(lane, step, cfg, a.cwd, unattended, host)}, lanes, warnings, t
     args = {"authored_by": a.authored_by, "failed": [int(x) for x in a.failed.split(",") if x != ""] if a.failed else [],
             "premium": a.premium, "allow_degraded": a.allow_degraded and not unattended, "cwd": a.cwd, "unattended": unattended, "host": host,
-            "wait_busy": unattended and not getattr(a, "no_wait", False), "claude_model": getattr(a, "claude_model", None)}
+            "wait_busy": unattended and not getattr(a, "no_wait", False)}
     d = decide(a.role, cfg, lanes, st, t, args)
     if d["action"] == "run":
         fam = cfg["lanes"][d["lane"]]["family"]
@@ -1694,7 +1687,7 @@ LANE_CONTEXT = {
 
 def cmd_contract(a, cfg):
     """What a caller may rely on, for a handshake: the worker-run version, its features, every reason with its `next`, and what workers see."""
-    print(json.dumps({"worker_run": 2, "features": ["reason", "next", "context", "schema_reask", "denied", "tokens_include_child_threads", "secrets_guard", "rung", "fallback", "busy_wait", "claude_model"],
+    print(json.dumps({"worker_run": 2, "features": ["reason", "next", "context", "schema_reask", "denied", "tokens_include_child_threads", "secrets_guard", "rung", "fallback", "busy_wait"],
                       "reasons": REASONS, "lanes": LANE_CONTEXT}))
     return 0
 
@@ -1916,7 +1909,7 @@ def main(argv=None):
     ap = argparse.ArgumentParser(prog="route.py", description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = ap.add_subparsers(dest="cmd", required=True)
     s = sub.add_parser("status"); s.add_argument("--claude-usage"); s.add_argument("--json", action="store_true"); s.add_argument("--recent", type=int, default=20)
-    n = sub.add_parser("next"); n.add_argument("role"); n.add_argument("--authored-by"); n.add_argument("--host", action="store_true"); n.add_argument("--claude-model"); n.add_argument("--failed", default="")
+    n = sub.add_parser("next"); n.add_argument("role"); n.add_argument("--authored-by"); n.add_argument("--host", action="store_true"); n.add_argument("--failed", default="")
     n.add_argument("--premium", nargs="?", const="claude", metavar="FAMILY"); n.add_argument("--allow-degraded", action="store_true")
     n.add_argument("--claude-usage"); n.add_argument("--cwd"); n.add_argument("--verbose", action="store_true")
     r = sub.add_parser("report"); r.add_argument("--lane", required=True); r.add_argument("--event", choices=["out", "ok"], required=True)
@@ -1930,7 +1923,7 @@ def main(argv=None):
     sub.add_parser("guard").add_argument("--read-only", action="store_true")
     sub.add_parser("contract").add_argument("--json", action="store_true")
     cf = sub.add_parser("config"); cf.add_argument("action", choices=["set", "show"]); cf.add_argument("key", nargs="?"); cf.add_argument("value", nargs="?")
-    ru = sub.add_parser("run"); ru.add_argument("role"); ru.add_argument("--authored-by"); ru.add_argument("--host", action="store_true"); ru.add_argument("--no-wait", action="store_true"); ru.add_argument("--claude-model"); ru.add_argument("--failed", default="")
+    ru = sub.add_parser("run"); ru.add_argument("role"); ru.add_argument("--authored-by"); ru.add_argument("--host", action="store_true"); ru.add_argument("--no-wait", action="store_true"); ru.add_argument("--failed", default="")
     ru.add_argument("--premium", nargs="?", const="claude", metavar="FAMILY"); ru.add_argument("--allow-degraded", action="store_true")
     ru.add_argument("--claude-usage"); ru.add_argument("--cwd"); ru.add_argument("--brief"); ru.add_argument("--timeout", type=int, help="seconds; none by default"); ru.add_argument("--unattended", action="store_true")
     ru.add_argument("--schema"); ru.add_argument("--resume"); ru.add_argument("--cap", type=float); ru.add_argument("--parent"); ru.add_argument("--task"); ru.add_argument("--title")

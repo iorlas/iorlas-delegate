@@ -26,7 +26,7 @@ No Python 3.8+: Agent tool only, no worktree, effort in the brief.
 |---|---|
 | planner | opus medium |
 | worker | sonnet medium |
-| reviewer | opus medium |
+| reviewer | sonnet medium |
 | hard | opus low > opus medium |
 | light | haiku low > sonnet low |
 <!-- /base-table -->

@@ -40,22 +40,22 @@
   },
   "models": {
     "opus-5.5": {
-      "family": "claude", "rank": 3,
+      "family": "claude",
       "api": "claude-opus-5-5",
       "agent": "opus"
     },
     "sonnet-5.5": {
-      "family": "claude", "rank": 2,
+      "family": "claude",
       "api": "claude-sonnet-5-5",
       "agent": "sonnet"
     },
     "haiku-5.5": {
-      "family": "claude", "rank": 1,
+      "family": "claude",
       "api": "claude-haiku-5-5",
       "agent": "haiku"
     },
     "fable-5.1": {
-      "family": "claude", "rank": 4,
+      "family": "claude",
       "api": "claude-fable-5-1",
       "agent": "fable"
     },
@@ -154,14 +154,14 @@
       "by_author": {
         "openai": [
           {
-            "model": "opus-5.5",
+            "model": "sonnet-5.5",
             "effort": "medium",
             "on": "claude",
             "mode": "read_only",
             "cap": 2
           },
           {
-            "model": "opus-5.5",
+            "model": "sonnet-5.5",
             "effort": "low",
             "on": "claude",
             "mode": "read_only",
@@ -186,7 +186,7 @@
             "use": "review"
           },
           {
-            "model": "opus-5.5",
+            "model": "sonnet-5.5",
             "effort": "medium",
             "on": "claude",
             "mode": "read_only",
@@ -194,7 +194,7 @@
             "flag": "same_family"
           },
           {
-            "model": "opus-5.5",
+            "model": "sonnet-5.5",
             "effort": "low",
             "on": "claude",
             "mode": "read_only",
@@ -204,7 +204,7 @@
         ],
         "unknown": [
           {
-            "model": "opus-5.5",
+            "model": "sonnet-5.5",
             "effort": "medium",
             "on": "claude",
             "mode": "read_only",
@@ -218,7 +218,7 @@
             "use": "review"
           },
           {
-            "model": "opus-5.5",
+            "model": "sonnet-5.5",
             "effort": "low",
             "on": "claude",
             "mode": "read_only",
