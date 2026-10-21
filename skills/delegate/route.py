@@ -620,6 +620,16 @@ def usable(lane, S, relaxed):
     return True, "ok"
 
 
+def back_at(lane, S):
+    """When an unusable lane is expected back: its out-until, else the reset of the window it is over; None when usable or unknown."""
+    ok, why = usable(lane, S, True)
+    if ok:
+        return None
+    if lane.out:
+        return lane.out_until
+    return lane.week_reset if why.startswith("weekly") else lane.five_reset if why.startswith("5h") else None
+
+
 def pick_lane(family, lanes, S, st, t, relaxed, trace):
     """Lane of `family` to use now, or None. Appends the reasoning to `trace`."""
     mine = [l for l in lanes.values() if l.family == family]
@@ -905,8 +915,9 @@ def decision(a, cfg):
         if bool(rec.get("host")) != host:
             return {"action": "error", "error": f"--resume {ref} ran {'with' if rec.get('host') else 'without'} --host; pass the same"}, lanes, warnings, t
         if lane is None or not usable(lane, S, True)[0]:
-            return {"action": "lane_out", "lane": rec["lane"], "retry_after": lane.out_until if lane else None,
-                    "say": f"{rec['lane']} cannot continue {ref} now"}, lanes, warnings, t
+            why = usable(lane, S, True)[1] if lane else "not usable by this caller"
+            return {"action": "lane_out", "lane": rec["lane"], "retry_after": back_at(lane, S) if lane else None,
+                    "say": f"{rec['lane']} cannot continue {ref} now: {why}"}, lanes, warnings, t
         step = {"model": rec["model"], "effort": rec["effort"], "mode": rec["mode"], "cap": a.cap or rec.get("cap")}
         return {"action": "run", "role": a.role, "step": None, "pass": "resume", "lane": lane.name, "model": rec["model"], "effort": rec["effort"],
                 "mode": rec["mode"], "cap": step["cap"], "how": how(lane, step, cfg, a.cwd, unattended, host)}, lanes, warnings, t
@@ -1585,7 +1596,7 @@ def run_once(a, cfg):
     if d["action"] == "lane_out":
         return emit(result("lane_out", reason="lane_out", lane=d["lane"], retry_after=d.get("retry_after"), say=d["say"], **extra))
     if d["action"] == "stop":
-        retry = min([l.out_until for l in lanes.values() if l.out and l.out_until] or [None], key=lambda x: (x is None, x))
+        retry = min([x for x in (back_at(l, cfg["settings"]) for l in lanes.values()) if x] or [None])
         if not unattended and d.get("ask_user"):
             extra["ask_user"] = d["ask_user"]
         return emit(result("stop", reason="no_lane", say=d["say"], retry_after=retry, **extra))

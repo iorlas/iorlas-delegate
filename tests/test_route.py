@@ -1063,10 +1063,26 @@ printf '{"result":"claude says hi","session_id":"sess-1","total_cost_usd":0.5,"i
         route.update_state(lambda s: s.setdefault("out", {}).__setitem__("OPENAI_SUBSCRIPTION", {"until": route.now() + 3600, "why": "t"}))
         n = len(self.args_seen().splitlines())
         _, r = self.run_it("--resume", "thread-123")
-        self.assertEqual((r["status"], r["lane"]), ("lane_out", "OPENAI_SUBSCRIPTION"))
+        self.assertEqual((r["status"], r["lane"], r["next"]), ("lane_out", "OPENAI_SUBSCRIPTION", "retry"))
+        self.assertGreater(r["retry_after"], time.time())
+        self.assertIn("out until", r["say"])
         self.assertEqual(len(self.args_seen().splitlines()), n)            # nothing was launched
         _, r = self.run_it("--resume", "nope")
         self.assertEqual(r["status"], "error")
+
+
+class BackAt(unittest.TestCase):
+    def test_a_lane_over_its_ceiling_is_back_at_that_windows_reset(self):
+        S = route.load_routing()["settings"]
+        l = route.Lane("OPENAI_SUBSCRIPTION", "openai", "subscription")
+        l.five, l.five_reset, l.week, l.week_reset = 99, 1000.0, 10, 9000.0
+        self.assertEqual(route.back_at(l, S), 1000.0)
+        l.five, l.week = 10, 99
+        self.assertEqual(route.back_at(l, S), 9000.0)
+        l.week = 10
+        self.assertIsNone(route.back_at(l, S))
+        l.out, l.out_until = True, 500.0
+        self.assertEqual(route.back_at(l, S), 500.0)
 
 
 class ConfigLocation(unittest.TestCase):
