@@ -1053,6 +1053,26 @@ printf '{"result":"claude says hi","session_id":"sess-1","total_cost_usd":0.5,"i
         self.assertEqual((r["status"], r["data"]), ("done", {"a": 1}))
         self.assertIn("--output-schema", self.args_seen())
 
+    def test_a_resume_on_a_lane_with_all_slots_taken_waits_for_a_slot(self):
+        self.run_it()
+        for i in range(4):
+            self.lease(f"run-{i}", "OPENAI_SUBSCRIPTION")
+        _, r = self.run_it("--resume", "thread-123")
+        self.assertEqual((r["status"], r["reason"], r["next"], r["lane"]), ("stop", "busy", "retry", "OPENAI_SUBSCRIPTION"))
+        self.assertTrue(time.time() + 50 < r["retry_after"] < time.time() + 130)
+        last = json.loads(route.history_path().read_text().splitlines()[-1])           # refusals are in history too
+        self.assertEqual((last["status"], last["reason"], last["resume"], last["run_id"]), ("stop", "busy", True, None))
+
+    def test_a_limit_refusal_lasts_until_the_known_reset(self):
+        soon = route.now() + 500
+
+        def reading(lane, S, st, t, *a):
+            if lane.family == "openai":
+                lane.five, lane.five_reset, lane.week, lane.week_reset = 50, soon, 10, soon + 99999
+        route.READERS["codex_app_server"] = reading
+        self.run_it(mode="limit")
+        self.assertAlmostEqual(route.load_state()["out"]["OPENAI_SUBSCRIPTION"]["until"], soon, delta=1)
+
     def test_resume_continues_on_the_same_lane_and_never_switches(self):
         _, first = self.run_it()
         self.assertEqual(first["ref"], "thread-123")

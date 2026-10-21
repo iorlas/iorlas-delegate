@@ -368,6 +368,7 @@ class Lane:
         self.name, self.family, self.kind, self.shared = name, family, kind, shared
         self.out = False
         self.out_until = None
+        self.busy = False         # out only because its slots are taken (mark_busy): it frees up by itself in minutes
         self.five = None          # percent of the 5-hour window used, None = unknown
         self.week = None          # percent of the weekly window used
         self.week_reset = None    # epoch
@@ -887,7 +888,7 @@ def mark_busy(lanes, st, S, t):
     for l in lanes.values():
         cap, running = slots(l, S), sum(1 for v in live.values() if v["lane"] == l.name)
         if cap is not None and running >= cap and not l.out:
-            l.out, l.out_until = True, t + random.randint(60, 120)
+            l.out, l.out_until, l.busy = True, t + random.randint(60, 120), True
             l.notes.insert(0, f"busy: {running} running, {cap} allowed")
 
 
@@ -916,6 +917,9 @@ def decision(a, cfg):
             return {"action": "error", "error": f"--resume {ref} ran {'with' if rec.get('host') else 'without'} --host; pass the same"}, lanes, warnings, t
         if lane is None or not usable(lane, S, True)[0]:
             why = usable(lane, S, True)[1] if lane else "not usable by this caller"
+            if lane is not None and lane.busy:       # its slots are taken: wait for one, the thread stays on its lane
+                return {"action": "stop", "reason": "busy", "lane": rec["lane"], "retry_after": lane.out_until,
+                        "say": f"{rec['lane']} has no free slot to continue {ref}: {lane.notes[0]}"}, lanes, warnings, t
             return {"action": "lane_out", "lane": rec["lane"], "retry_after": back_at(lane, S) if lane else None,
                     "say": f"{rec['lane']} cannot continue {ref} now: {why}"}, lanes, warnings, t
         step = {"model": rec["model"], "effort": rec["effort"], "mode": rec["mode"], "cap": a.cap or rec.get("cap")}
@@ -1375,7 +1379,7 @@ def launch_codex(d, brief, a, rid, t, meta):
     elif timed_out:
         res.update(status="timeout", reason="timeout", say=f"codex did not finish within {a.timeout}s and was killed")
     elif LIMIT_RE.search(seen["error"]) or rc != 0 and LIMIT_RE.search(text + err):
-        until = t + 3600
+        until = d.get("limit_reset") or t + 3600
         mark_out(d["lane"], until, "limit refusal: " + (err or text)[:120].replace("\n", " "), t)
         res.update(status="lane_out", reason="lane_out", retry_after=until, say=f"{d['lane']} hit a limit; out until {local(until)}")
     elif LOGIN_RE.search(seen["error"] + err):
@@ -1462,7 +1466,7 @@ def launch_claude(d, brief, a, rid, t, cfg, meta):
             mark_out(d["lane"], nxt, "credit balance too low", t)
             res.update(status="lane_out", reason="lane_out", retry_after=nxt, say=f"credit exhausted; out until {local(nxt)}")
         elif LIMIT_RE.search(blob):
-            until = t + 3600
+            until = d.get("limit_reset") or t + 3600
             mark_out(d["lane"], until, "limit refusal: " + blob[:120].replace("\n", " "), t)
             res.update(status="lane_out", reason="lane_out", retry_after=until, say=f"{d['lane']} hit a limit; out until {local(until)}")
         elif LOGIN_RE.search(blob):
@@ -1576,11 +1580,18 @@ def cmd_contract(a, cfg):
     return 0
 
 
+def refuse(a, status, reason, say, retry_after, extra, **who):
+    """An answer given without launching a worker; history keeps it too, so refusals are countable."""
+    history_add({"ts": now(), "run_id": None, "role": a.role, "task": getattr(a, "task", None) or "", "lane": who.get("lane"), "model": who.get("model"),
+                 "status": status, "reason": reason, "retry_after": retry_after, "resume": bool(getattr(a, "resume", None)), "host": bool(getattr(a, "host", False))})
+    return emit(result(status, reason=reason, say=say, retry_after=retry_after, **who, **extra))
+
+
 def cmd_run(a, cfg):
     try:
         return run_once(a, cfg)
     except TimeoutError as e:       # state lock held too long: transient, so stop with a retry time (error means permanent)
-        return emit(result("stop", reason="lock", say=str(e), retry_after=now() + random.randint(60, 120)))
+        return refuse(a, "stop", "lock", str(e), now() + random.randint(60, 120), {})
 
 
 def run_once(a, cfg):
@@ -1592,14 +1603,16 @@ def run_once(a, cfg):
     if d.get("notice"):
         extra["notice"] = d["notice"]
     if d["action"] == "error":
-        return emit(result("error", reason="caller", say=d["error"], **extra))
+        return refuse(a, "error", "caller", d["error"], None, extra)
     if d["action"] == "lane_out":
-        return emit(result("lane_out", reason="lane_out", lane=d["lane"], retry_after=d.get("retry_after"), say=d["say"], **extra))
+        return refuse(a, "lane_out", "lane_out", d["say"], d.get("retry_after"), extra, lane=d["lane"])
     if d["action"] == "stop":
         retry = min([x for x in (back_at(l, cfg["settings"]) for l in lanes.values()) if x] or [None])
         if not unattended and d.get("ask_user"):
             extra["ask_user"] = d["ask_user"]
-        return emit(result("stop", reason="no_lane", say=d["say"], retry_after=retry, **extra))
+        if d.get("reason") == "busy":
+            return refuse(a, "stop", "busy", d["say"], d["retry_after"], extra, lane=d.get("lane"))
+        return refuse(a, "stop", "no_lane", d["say"], retry, extra)
     h = d["how"]
     fam = cfg["lanes"][d["lane"]]["family"]
     who = dict(lane=d["lane"], model=d["model"], effort=d["effort"], family=fam, flag=d.get("flag"))
@@ -1615,6 +1628,9 @@ def run_once(a, cfg):
     cwd = h["cwd"]
     rid = str(uuid.uuid4())
     S, lane = cfg["settings"], lanes[d["lane"]]
+    # A limit refusal mid-run lasts until the window the lane is closest to filling resets, when the reading has one (else an hour).
+    resets = [(lane.week or 0, lane.week_reset), (lane.five or 0, lane.five_reset)]
+    d["limit_reset"] = next((r for _, r in sorted(resets, key=lambda x: -x[0]) if r and r > t), None)
     cap, taken = slots(lane, S), {}
 
     def claim(st):      # the authoritative count: inside the lock, never from the snapshot decision() read
@@ -1623,13 +1639,13 @@ def run_once(a, cfg):
         if a.task and any(v.get("task") == a.task for v in live.values()):
             taken["no"] = ("stop", "duplicate_task", f"task {a.task} already has a running worker")
         elif cap is not None and sum(1 for v in live.values() if v["lane"] == d["lane"]) >= cap:
-            taken["no"] = ("lane_out", "busy", f"{d['lane']} has all {cap} slots taken")
+            taken["no"] = ("stop", "busy", f"{d['lane']} has all {cap} slots taken")
         else:
             taken["peers"] = sorted(live)
             live[rid] = {"lane": d["lane"], "role": a.role, "pid": os.getpid(), "start": now(), "expires": now() + LEASE_TTL, "task": a.task or ""}
     update_state(claim)
     if "no" in taken:
-        return emit(result(taken["no"][0], reason=taken["no"][1], **who, say=taken["no"][2], retry_after=now() + random.randint(60, 120), **extra))
+        return refuse(a, taken["no"][0], taken["no"][1], taken["no"][2], now() + random.randint(60, 120), extra, **who)
     beat = threading.Event()
 
     def keep_lease():
