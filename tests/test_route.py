@@ -480,12 +480,12 @@ class OnboardChildEnv(unittest.TestCase):
 
 
 class SecretGuard(unittest.TestCase):
-    def guard(self, tool_input):
+    def guard(self, tool_input, *flags, tool="X"):
         import io
         real = sys.stdin, sys.stderr
-        sys.stdin, sys.stderr = io.StringIO(json.dumps({"tool_name": "X", "tool_input": tool_input})), io.StringIO()
+        sys.stdin, sys.stderr = io.StringIO(json.dumps({"tool_name": tool, "tool_input": tool_input})), io.StringIO()
         try:
-            return route.main(["guard"])
+            return route.main(["guard"] + list(flags))
         finally:
             sys.stdin, sys.stderr = real
 
@@ -494,6 +494,15 @@ class SecretGuard(unittest.TestCase):
                    {"path": "/Users/x/.aws"}, {"pattern": "**/.env"}, {"command": "cat ~/.config/gh/hosts.yml"},
                    {"command": "rg -g '!.git' token .env"}, {"command": "rg --glob '**/.env' token"}):
             self.assertEqual(self.guard(ti), 2, ti)
+
+    def test_read_only_steps_may_run_reading_commands_only(self):
+        for c in ("cd /s && git diff 53cc344 -- client; git log --oneline -5", "git diff origin/main...HEAD | head -200", "rg -n Foo src 2>/dev/null",
+                  "find . -name '*.cs'", "sed -n '1,40p' a.cs", "git branch --show-current"):
+            self.assertEqual(self.guard({"command": c}, "--read-only", tool="Bash"), 0, c)
+        for c in ("echo x > f", "git checkout x", "rm -rf a", "find . -delete", "sed -i s/a/b/ f", "git -c core.pager=sh log", "cat $(ls)",
+                  "git diff --output=f", "dotnet test", "git branch new", "rg --pre sh x"):
+            self.assertEqual(self.guard({"command": c}, "--read-only", tool="Bash"), 2, c)
+        self.assertEqual(self.guard({"command": "dotnet test"}, tool="Bash"), 0)       # write steps: not limited
 
     def test_lets_through_lookalikes_and_written_content(self):
         for ti in ({"command": "cat .env.example"}, {"command": "node -e 'process.env.HOME'"}, {"command": "dotnet test"},
@@ -891,6 +900,16 @@ printf '{"result":"claude says hi","session_id":"sess-1","total_cost_usd":0.5,"i
         self.assertIn("secret path", r["say"])
         self.assertEqual(r["denied"], [{"tool": "Bash", "input": {"command": "cat ~/.ssh/id_ed25519"}}])
         self.assertTrue(Path(os.environ["FAKE_ARGS"] + ".brief").read_text().startswith(route.SECRET_RULE))
+
+    def test_a_claude_reviewer_gets_bash_limited_to_reading(self):
+        self.codex_out()
+        self.run_it("--authored-by", "openai", role="reviewer")
+        line = self.args_seen().splitlines()[-1]
+        self.assertIn("--tools Read,Glob,Grep,Bash", line)
+        self.assertIn("guard --read-only", line)
+        self.assertTrue(route.policy_denial({"tool_name": "Bash", "tool_input": {"command": "touch x"}}, read_only=True))
+        self.assertFalse(route.policy_denial({"tool_name": "Bash", "tool_input": {"command": "cat .env > x"}}, read_only=True))
+        self.assertFalse(route.policy_denial({"tool_name": "Bash", "tool_input": {"command": "touch x"}}))
 
     def test_claude_steps_get_the_secret_guard_hook_and_the_rule_first(self):
         self.codex_out()

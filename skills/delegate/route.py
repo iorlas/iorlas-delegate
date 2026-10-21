@@ -774,7 +774,7 @@ def how(lane, step, cfg, cwd=None, unattended=False, host=False):
     if runner == "agent_tool" and (unattended or host):
         runner = "claude_p"
     if runner == "claude_p":
-        return {"kind": "claude_p", "model": m["api"], "write": write, "cap": step.get("cap", 2), "cwd": wd, "bash": write or bool(host)}
+        return {"kind": "claude_p", "model": m["api"], "write": write, "cap": step.get("cap", 2), "cwd": wd, "read_only": not write and not host}
     if runner == "agent_tool":
         return {"kind": "agent_tool", "model": m["agent"], "cwd": wd}
     sandbox = "workspace-write" if write else "read-only"
@@ -1005,14 +1005,66 @@ def secret_hit(text):
 SECRET_RULE = "Never touch credential files (~/.ssh, .env, ~/.aws, tokens, keychains): it is blocked. If the task needs one, stop and say so."
 
 
+# A read-only Claude step (reviewer, planner, light) gets Bash for reading only: every piece of the command line must start with one of
+# these, with no output redirection or command substitution. Codex read steps get the same from their read-only sandbox, enforced by the OS;
+# this is a filter on the command text, not a boundary.
+READ_CMDS = {"cat", "head", "tail", "wc", "ls", "rg", "grep", "egrep", "fgrep", "find", "sed", "sort", "uniq", "cut", "tr", "diff", "nl",
+             "file", "stat", "pwd", "echo", "jq", "tree", "du", "basename", "dirname", "realpath", "which", "true", "test", "cd", "git"}
+READ_GIT = {"diff", "log", "show", "status", "blame", "ls-files", "ls-tree", "rev-parse", "grep", "merge-base", "cat-file", "describe",
+            "shortlog", "rev-list", "branch"}
+READ_ONLY_HELP = ("this step is read-only: Bash allows only reading commands (git diff/log/show/status/blame/grep/ls-files, rg, grep, cat, "
+                  "head, tail, ls, find without -exec/-delete, sed without -i, wc, sort, diff, jq), no '>' and no $(...).")
+
+
+def read_only_problem(cmd):
+    """None when every piece of `cmd` only reads, else what is not allowed."""
+    rest = re.sub(r"\d?>&\d|&?\d?>\s*/dev/null", " ", cmd)
+    if re.search(r"`|\$\(|[<>]\(|>", rest):
+        return "output redirection or command substitution"
+    for seg in re.split(r"\|\||&&|;|\||\n", rest):
+        try:
+            t = shlex.split(seg)
+        except ValueError:
+            return "unparsable command"
+        if not t:
+            continue
+        name = os.path.basename(t[0])
+        if name not in READ_CMDS:
+            return f"`{name}` is not a reading command"
+        if name == "find" and set(t) & {"-exec", "-execdir", "-ok", "-okdir", "-delete", "-fprint", "-fprintf", "-fls"}:
+            return "find may not run or delete"
+        if name == "sed" and any(x.startswith(("-i", "--in-place")) for x in t):
+            return "sed -i writes"
+        if name == "rg" and any(x.startswith("--pre") for x in t):
+            return "rg --pre runs a program"
+        if name == "git":
+            args = t[1:]
+            while args and args[0] in ("-C", "--no-pager") or args and args[0].startswith("--git-dir"):
+                args = args[2:] if args[0] == "-C" else args[1:]
+            sub = args[0] if args else ""
+            if sub not in READ_GIT:         # also catches `git -c key=value ...`, which can run a program
+                return f"git {sub} is not a reading command"
+            if sub == "branch" and any(not x.startswith(("--list", "-a", "-r", "--show-current", "-v", "--contains", "--merged")) for x in args[1:]):
+                return "git branch may only list"
+            if any(x.startswith("--output") for x in args):
+                return "--output writes a file"
+    return None
+
+
 def cmd_guard(a, cfg=None):
-    """Claude PreToolUse hook: exit 2 (block, reason on stderr) when a tool call names a secret path. Only the fields that name what is
-    run or opened are checked, not file contents being written (a .gitignore listing .env is fine)."""
+    """Claude PreToolUse hook: exit 2 (block, reason on stderr) when a tool call names a secret path, or, with --read-only, when a Bash
+    command does more than read. Only the fields that name what is run or opened are checked, not file contents being written (a .gitignore
+    listing .env is fine)."""
     with contextlib.suppress(ValueError, AttributeError):
-        ti = json.load(sys.stdin).get("tool_input") or {}
+        j = json.load(sys.stdin)
+        ti = j.get("tool_input") or {}
         hit = secret_hit(" ".join(str(ti.get(k) or "") for k in ("command", "file_path", "path", "pattern", "glob")))
         if hit:
             print(f"blocked by delegate: {hit} is a secret path. {SECRET_RULE}", file=sys.stderr)
+            return 2
+        why = getattr(a, "read_only", False) and j.get("tool_name") == "Bash" and read_only_problem(str(ti.get("command") or ""))
+        if why:
+            print(f"blocked by delegate: {why}; {READ_ONLY_HELP}", file=sys.stderr)
             return 2
     return 0
 
@@ -1057,7 +1109,11 @@ PREAMBLE = (SECRET_RULE + " You are a delegated worker. Do exactly the task in t
             + GIT_RULES + " " + DENIED_RULE + " Finish with a short report: what you changed or found, and the exit code and last lines of any check you ran.")
 
 
-GUARD_SETTINGS = {"hooks": {"PreToolUse": [{"matcher": "*", "hooks": [{"type": "command", "command": subprocess.list2cmdline([sys.executable, str(Path(__file__).resolve()), "guard"]) if os.name == "nt" else " ".join(shlex.quote(x) for x in (sys.executable, str(Path(__file__).resolve()), "guard"))}]}]}}
+def guard_settings(read_only):
+    """--settings for claude -p: delegate's PreToolUse hook (route.py guard), read-only for steps that may not write."""
+    argv = [sys.executable, str(Path(__file__).resolve()), "guard"] + (["--read-only"] if read_only else [])
+    cmd = subprocess.list2cmdline(argv) if os.name == "nt" else " ".join(shlex.quote(x) for x in argv)
+    return {"hooks": {"PreToolUse": [{"matcher": "*", "hooks": [{"type": "command", "command": cmd}]}]}}
 
 
 def find_key(quiet=False):
@@ -1361,12 +1417,12 @@ def launch_claude(d, brief, a, rid, t, cfg, meta):
             return {"status": "lane_out", "reason": "lane_out", "retry_after": nxt, "say": f"cycle cap: ${ledger_spend(start):.2f} spent + ${cap:.2f} > ${c['monthly_cap']}"}
         extra["ANTHROPIC_API_KEY"] = key
     write = bool(h["write"])
-    tools = ["Read", "Glob", "Grep"] + (["Edit", "Write"] if write else []) + (["Bash"] if h["bash"] else [])
+    tools = ["Read", "Glob", "Grep"] + (["Edit", "Write"] if write else []) + ["Bash"]       # read-only steps: Bash limited by the guard
     cmd = [exe, "-p", "--output-format", "json", "--model", h["model"], "--effort", d["effort"]]
     cmd += ["--max-budget-usd", str(cap)] if credit else []
     cmd += ["--resume", a.resume] if a.resume else ["--session-id", rid]
     cmd += ["--append-system-prompt", PREAMBLE + repo_instruction_text(h["cwd"]), "--restricted", "--tools", ",".join(tools), "--strict-mcp-config",
-            "--permission-mode", "auto", "--permission-prompts", "none", "--settings", json.dumps(GUARD_SETTINGS), "--disallowedTools", *GIT_WRITE_DENY]
+            "--permission-mode", "auto", "--permission-prompts", "none", "--settings", json.dumps(guard_settings(h.get("read_only"))), "--disallowedTools", *GIT_WRITE_DENY]
     if a.schema:
         cmd += ["--json-schema", Path(a.schema).read_text(encoding="utf-8")]
     ref = a.resume or rid
@@ -1386,7 +1442,7 @@ def launch_claude(d, brief, a, rid, t, cfg, meta):
     u = j.get("usage") if isinstance(j.get("usage"), dict) else {}
     res = {"text": text, "ref": j.get("session_id") or ref, "cost": cost, "stderr": err, "tokens": claude_tokens(u),
            "denied": [{"tool": x.get("tool_name"), "input": x.get("tool_input")} for x in j.get("permission_denials") or []
-                      if isinstance(x, dict) and not policy_denial(x)]}
+                      if isinstance(x, dict) and not policy_denial(x, h.get("read_only"))]}
     if timed_out:
         res.update(status="timeout", reason="timeout", say=f"claude did not finish within {a.timeout}s and was killed")
     elif rc != 0 or j.get("is_error"):
@@ -1414,10 +1470,10 @@ def launch_claude(d, brief, a, rid, t, cfg, meta):
 GIT_PREFIXES = tuple(g[len("Bash("):-len(":*)")] for g in GIT_WRITE_DENY)
 
 
-def policy_denial(x):
-    """A git write the coordinator forbids is policy, not a decision for the owner."""
+def policy_denial(x, read_only=False):
+    """A git write the coordinator forbids, or a write on a read-only step, is delegate's policy, not a decision for the owner (a secret path stays one)."""
     cmd = ((x.get("tool_input") or {}).get("command") or "").strip()
-    return x.get("tool_name") == "Bash" and cmd.startswith(GIT_PREFIXES)
+    return x.get("tool_name") == "Bash" and (cmd.startswith(GIT_PREFIXES) or bool(read_only and read_only_problem(cmd) and not secret_hit(cmd)))
 
 
 def claude_tokens(u):
@@ -1496,7 +1552,7 @@ LANE_CONTEXT = {
               "cannot_block": ["sub-agents: a brief that asks gets one; their tokens count"]},
     "claude": {"sees": ["delegate rules (secrets, git, denial)", "the brief", "repo instruction files (appended)"],
                "hidden": ["user and repo settings", "hooks except delegate's secrets guard", "plugins", "skills", "MCP servers"],
-               "sandbox": "none; the auto-mode classifier reviews every tool call; Bash only on write steps or --host",
+               "sandbox": "none; the auto-mode classifier reviews every tool call; read-only steps get Bash for reading commands only",
                "cannot_block": []},
     "both": {"instructions": "in each folder from the repo root down to cwd, AGENTS.md, else CLAUDE.md",
              "env": "the caller's environment minus what a Claude session exports (CLAUDE_*, ANTHROPIC_*, CLAUDECODE, USE_*_OAUTH, MCP_*, OTEL_*, ...), DELEGATE_* and credential-looking names"}}
@@ -1698,7 +1754,7 @@ def main(argv=None):
     dr.add_argument("--ack"); dr.add_argument("--unack"); dr.add_argument("--open-browser", action="store_true")
     sk = sub.add_parser("set-key"); sk.add_argument("--stdin", action="store_true"); sk.add_argument("--force", action="store_true")
     sk.add_argument("--web", action="store_true"); sk.add_argument("--host", default="127.0.0.1"); sk.add_argument("--port", type=int, default=0); sk.add_argument("--timeout", type=int, default=300)
-    sub.add_parser("guard")
+    sub.add_parser("guard").add_argument("--read-only", action="store_true")
     sub.add_parser("contract").add_argument("--json", action="store_true")
     cf = sub.add_parser("config"); cf.add_argument("action", choices=["set", "show"]); cf.add_argument("key", nargs="?"); cf.add_argument("value", nargs="?")
     ru = sub.add_parser("run"); ru.add_argument("role"); ru.add_argument("--authored-by"); ru.add_argument("--host", action="store_true"); ru.add_argument("--failed", default="")
