@@ -1271,14 +1271,39 @@ def publish_lanes(lanes, st, t):
 LIMIT_RE = re.compile(r"usage limit|rate.?limit|quota|too many requests|\b429\b|try again (later|in)|credit balance", re.I)
 
 
+def descendants(pid):
+    """Every live process below `pid` (POSIX), by parent links."""
+    with contextlib.suppress(Exception):
+        r = subprocess.run(["ps", "-A", "-o", "pid=,ppid="], capture_output=True, text=True, timeout=5)
+        kids = {}
+        for ln in r.stdout.splitlines():
+            c, _, par = ln.strip().partition(" ")
+            kids.setdefault(int(par), []).append(int(c))
+        out, todo = [], [pid]
+        while todo:
+            for c in kids.get(todo.pop(), []):
+                out.append(c)
+                todo.append(c)
+        return out
+    return []
+
+
 def kill_tree(p):
-    """Kill the worker and everything it started. Killing only the codex wrapper leaves the vendor binary running."""
+    """Kill the worker and everything it started. Killing only the codex wrapper leaves the vendor binary running; Claude starts its
+    background shells (run_in_background: Unity, a server) in groups of their own, so every descendant's group goes too."""
     with contextlib.suppress(Exception):
         if os.name == "nt":
             subprocess.run(["taskkill", "/F", "/T", "/PID", str(p.pid)], capture_output=True)
         else:
             import signal
-            os.killpg(p.pid, signal.SIGKILL)
+            groups = {p.pid}
+            for c in descendants(p.pid):
+                with contextlib.suppress(OSError):
+                    groups.add(os.getpgid(c))
+            groups.discard(os.getpgrp())
+            for g in groups:
+                with contextlib.suppress(OSError):
+                    os.killpg(g, signal.SIGKILL)
     with contextlib.suppress(Exception):
         p.kill()
 
@@ -1299,20 +1324,24 @@ WORKER_STARTED = []        # callbacks run with the worker's pid right after it 
 
 
 def run_proc(cmd, text, cwd, env, timeout, on_line=None):
-    """-> (returncode, stdout, stderr, timed_out). Own process group; the timeout kills the group; stdin carries `text` then closes; UTF-8, errors replaced."""
+    """-> (returncode, stdout, stderr, timed_out). Own process group; the timeout kills the group; stdin carries `text` then closes; UTF-8, errors replaced.
+    `on_line(line)` returning True stops the worker now; a number stops it that many seconds later unless it exits first."""
     kw = {"start_new_session": True} if os.name != "nt" else {"creationflags": 0x00000200}
     p = subprocess.Popen(cmd, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=cwd, env=env, **kw)
     for cb in WORKER_STARTED:
         with contextlib.suppress(Exception):
             cb(p.pid)
-    out, err = [], []
+    out, err, stop_at = [], [], []
 
     def pump(stream, sink, cb):
         for raw in iter(stream.readline, b""):
             line = raw.decode("utf-8", "replace")
             sink.append(line)
-            if cb and cb(line):        # the callback asks to stop the worker now
+            ask = cb(line) if cb else None
+            if ask is True:        # the callback asks to stop the worker now
                 kill_tree(p)
+            elif ask and not stop_at:
+                stop_at.append(time.time() + ask)
 
     def feed():
         with contextlib.suppress(OSError):
@@ -1335,6 +1364,10 @@ def run_proc(cmd, text, cwd, env, timeout, on_line=None):
             except subprocess.TimeoutExpired:
                 if end is not None and time.time() >= end:
                     timed_out = True
+                    kill_tree(p)
+                    p.wait()
+                    break
+                if stop_at and time.time() >= stop_at[0]:
                     kill_tree(p)
                     p.wait()
                     break
@@ -1549,6 +1582,9 @@ def repo_instruction_text(cwd, cap=32768):
     return out
 
 
+RESULT_GRACE = 5     # seconds a claude worker may take to exit after its result before it is stopped
+
+
 def launch_claude(d, brief, a, rid, t, cfg, meta):
     """claude -p on the credit key (CLAUDE_CREDIT) or the logged-in subscription (CLAUDE_SUBSCRIPTION, unattended). -> dict of result fields."""
     h = d["how"]
@@ -1568,7 +1604,7 @@ def launch_claude(d, brief, a, rid, t, cfg, meta):
         extra["ANTHROPIC_API_KEY"] = key
     write = bool(h["write"])
     tools = ["Read", "Glob", "Grep"] + (["Edit", "Write"] if write else []) + ["Bash"]       # read-only steps: Bash limited by the guard
-    cmd = [exe, "-p", "--output-format", "json", "--model", h["model"], "--effort", d["effort"]]
+    cmd = [exe, "-p", "--output-format", "stream-json", "--verbose", "--model", h["model"], "--effort", d["effort"]]
     cmd += ["--max-budget-usd", str(cap)] if credit else []
     cmd += ["--resume", a.resume] if a.resume else ["--session-id", rid]
     cmd += ["--append-system-prompt", PREAMBLE + repo_instruction_text(h["cwd"]), "--restricted", "--tools", ",".join(tools), "--strict-mcp-config",
@@ -1578,14 +1614,20 @@ def launch_claude(d, brief, a, rid, t, cfg, meta):
     ref = a.resume or rid
     if agent_runs:
         agent_runs.run(rid, kind="claude-p", session=ref, lane=d["lane"], model=d["model"], cwd=h["cwd"], started=t, status="running", **meta)
-    rc, out, err, timed_out = run_proc(cmd, brief, h["cwd"], child_env(extra), a.timeout)
-    try:
-        j = json.loads(out)
-    except ValueError:
-        j = {}
-    if not isinstance(j, dict):
-        j = {}
-    text = j.get("result") if isinstance(j.get("result"), str) else out.strip()
+    final = []
+
+    def on_line(line):      # the first result is the answer: claude -p then waits for background tasks and takes another turn on their exit
+        with contextlib.suppress(ValueError):
+            e = json.loads(line)
+            if isinstance(e, dict) and e.get("type") == "result" and not final:
+                final.append(e)
+                return RESULT_GRACE
+        return None
+    rc, out, err, timed_out = run_proc(cmd, brief, h["cwd"], child_env(extra), a.timeout, on_line)
+    j = final[0] if final else {}
+    if final and not j.get("is_error"):
+        rc = 0          # stopped by us after answering
+    text = j.get("result") if isinstance(j.get("result"), str) else out.strip()[-2000:]
     cost = float(j.get("total_cost_usd") or 0) if credit else 0.0
     if credit and cost > 0:
         ledger_add(cost, d["model"], t)

@@ -96,6 +96,9 @@ https://github.com/iorlas/iorlas-task-loop/blob/main/docs/contracts/worker-run-v
 - Stopping: on SIGTERM, SIGHUP or Ctrl-C route.py kills the worker's process group before it exits. A SIGKILL on route.py cannot be caught, so
   the worker (its own process group, pgid = pid) keeps running: route.py prints `delegate: worker pid=N pgid=N run_id=R` on stderr right after
   the worker starts, and the lease shows it (`status --json` running[].worker_pid); a caller that SIGKILLs route.py kills that group too.
+  Claude starts run_in_background shells in groups of their own: route.py's stop kills every descendant's group, a caller killing only
+  the worker's group misses them (SIGTERM route.py instead). A Claude worker is stopped 5 s after its first `result` (stream-json): claude -p
+  otherwise waits for its background tasks and takes another turn when they exit. Since 0.35.2.
   Each later `run` checks the leases: a worker whose route.py process is gone (pid plus start time; an expired lease of a living route.py,
   e.g. after the laptop slept, stays taken) and that is still the same process (pid plus start time) is stopped (SIGTERM, then SIGKILL) and logged in history.jsonl as `reaped`/`orphan_worker` before anything else starts; if it
   cannot be stopped its lease stays, so the same task answers duplicate_task and the lane counts it. POSIX only.

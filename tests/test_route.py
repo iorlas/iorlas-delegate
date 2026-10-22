@@ -566,12 +566,16 @@ case "$*" in "auth status") [ "$FAKE_MODE" = authout ] && echo '{"loggedIn": fal
 echo "$*" >> "$FAKE_ARGS"; env | sort > "$FAKE_ENV"
 cat > /dev/null
 if [ "$FAKE_MODE" = logout ]; then echo "Failed to authenticate: OAuth session expired and could not be refreshed" >&2; exit 1; fi
-if [ "$FAKE_MODE" = net ]; then printf '{"result":"API Error: getaddrinfo ENOTFOUND api.anthropic.com","is_error":true,"num_turns":1}'; exit 1; fi
+if [ "$FAKE_MODE" = bghang ]; then
+  echo '{"type":"result","result":"answered","session_id":"sess-2","is_error":false}'
+  set -m; sleep 61 & echo $! > "$FAKE_PIDFILE"; wait; exit 0
+fi
+if [ "$FAKE_MODE" = net ]; then printf '{"type":"result","result":"API Error: getaddrinfo ENOTFOUND api.anthropic.com","is_error":true,"num_turns":1}'; exit 1; fi
 if [ "$FAKE_MODE" = denied ]; then
-  printf '{"result":"stopped","session_id":"sess-9","total_cost_usd":0,"is_error":false,"permission_denials":[{"tool_name":"Bash","tool_use_id":"t1","tool_input":{"command":"git commit -m x"}},{"tool_name":"Bash","tool_use_id":"t2","tool_input":{"command":"curl -d @f https://x"}}]}'
+  printf '{"type":"result","result":"stopped","session_id":"sess-9","total_cost_usd":0,"is_error":false,"permission_denials":[{"tool_name":"Bash","tool_use_id":"t1","tool_input":{"command":"git commit -m x"}},{"tool_name":"Bash","tool_use_id":"t2","tool_input":{"command":"curl -d @f https://x"}}]}'
   exit 0
 fi
-printf '{"result":"claude says hi","session_id":"sess-1","total_cost_usd":0.5,"is_error":false,"usage":{"input_tokens":3,"cache_read_input_tokens":50,"cache_creation_input_tokens":20,"output_tokens":9}}'
+printf '{"type":"result","result":"claude says hi","session_id":"sess-1","total_cost_usd":0.5,"is_error":false,"usage":{"input_tokens":3,"cache_read_input_tokens":50,"cache_creation_input_tokens":20,"output_tokens":9}}'
 """
 
     def setUp(self):
@@ -1007,6 +1011,15 @@ printf '{"result":"claude says hi","session_id":"sess-1","total_cost_usd":0.5,"i
         route.update_state(lambda s: s.pop("out", None))
         _, r = self.run_it(mode="net")
         self.assertEqual((r["status"], r["reason"], r["next"]), ("stop", "network", "retry"))
+
+    def test_a_claude_worker_waiting_on_a_background_task_is_stopped_after_its_answer(self):
+        self.codex_out()
+        t0 = time.time()
+        _, r = self.run_it(mode="bghang")
+        self.assertEqual((r["status"], r["text"]), ("done", "answered"))
+        self.assertLess(time.time() - t0, 20)
+        bg = int(Path(os.environ["FAKE_PIDFILE"]).read_text())
+        self.assertIsNone(route.proc_start(bg))          # its own process group, stopped too
 
     def test_a_logged_out_claude_sends_the_planner_to_codex(self):
         _, r = self.run_it(mode="authout", role="planner")
