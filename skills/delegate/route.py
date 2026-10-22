@@ -928,9 +928,15 @@ def orphan(v):
 def reap(v):
     """Stop an orphaned worker's process group: SIGTERM, a short grace, SIGKILL. -> True when it is gone."""
     pg = int(v["worker_pid"])
-    for sig, grace in ((signal.SIGTERM, 3), (signal.SIGKILL, 2)):
+    groups = {pg}
+    for c in descendants(pg):       # Claude's background shells run in groups of their own
         with contextlib.suppress(OSError):
-            os.killpg(pg, sig)
+            groups.add(os.getpgid(c))
+    groups.discard(os.getpgrp())
+    for sig, grace in ((signal.SIGTERM, 3), (signal.SIGKILL, 2)):
+        for g in groups:
+            with contextlib.suppress(OSError):
+                os.killpg(g, sig)
         end = time.time() + grace
         while time.time() < end:
             if proc_start(pg) != v.get("worker_start"):
