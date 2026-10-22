@@ -38,8 +38,10 @@ https://github.com/iorlas/iorlas-task-loop/blob/main/docs/contracts/worker-run-v
   Reasons: lane_out, busy, duplicate_task, lock, vendor_prework, network, no_lane, logged_out -> retry; setup, secrets, bad_request, crash -> owner;
   caller, timeout, worker_failed, schema_invalid -> fail. A retry reason with no `retry_after` (no lane will come back by itself) answers `owner`.
   `busy` (all of a lane's slots taken, also for a `--resume` on that lane) is `stop` with `retry_after` = when a slot is expected; `lane_out` means the
-  lane itself is out (limit refusal, or over its usage ceiling), with `retry_after` = the reset of the window it is over. A limit refusal mid-run marks the
-  lane out until that reset when the reading has one, else an hour. Every answer given without launching a worker is a history.jsonl line too
+  lane itself is out (limit refusal, or over its usage ceiling), with `retry_after` = the reset of the window it is over. A limit refusal mid-run (matched on Codex's
+  error event or stderr, never the model's answer) marks the lane out until the time the message names ("try again at 5:50 AM"), else the
+  window a fresh reading shows full, else the soonest window reset, else an hour. A Codex reading taken after the refusal that shows room
+  (both windows under 95%) drops it. Since 0.35.4. Every answer given without launching a worker is a history.jsonl line too
   (`run_id` null, `reason`, `retry_after`, `resume`).
 - `rung` (the chosen step's place in the role's chain, 0 = first choice), `fallback` (true when it is not the first choice) and
   `fallback_reason` (busy, lane_out, ceiling) and `first_lane` (the first choice's lane, set only on a fallback) on every answer that picked a lane; a resume repeats the original run's. Unattended, a first choice

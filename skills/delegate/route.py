@@ -369,6 +369,7 @@ class Lane:
         self.out = False
         self.out_until = None
         self.out_reason = None    # why it is out, for scripts: limit, logged_out, busy, error
+        self.read_at = None       # when the usage reading was taken (Codex only)
         self.busy = False         # out only because its slots are taken (mark_busy): it frees up by itself in minutes
         self.five = None          # percent of the 5-hour window used, None = unknown
         self.week = None          # percent of the weekly window used
@@ -481,6 +482,7 @@ def read_codex(lane, S, st, t):
     if res is None:
         lane.notes.append(err)
         return
+    lane.read_at = cached["at"] if cached and res is cached["res"] else t
     rl = res.get("rateLimits") or {}
     pr, se = rl.get("primary") or {}, rl.get("secondary") or {}
     lane.five_reset, lane.week_reset = pr.get("resetsAt"), se.get("resetsAt")
@@ -604,6 +606,10 @@ def gather(cfg, st, t, ai_usage=None, check_config=True):
         else:
             reader(lane, S, st, t)
         o = (st.get("out") or {}).get(name)
+        if o and o.get("reason", "limit") == "limit" and lane.read_at and lane.read_at > o.get("at", 0) and not lane.out \
+                and (lane.five or 0) < 95 and (lane.week or 0) < 95:       # a reading after the refusal shows room: the out was wrong or is over
+            update_state(lambda s_: s_.get("out", {}).pop(name, None))
+            o = None
         if o and o.get("until", 0) > t and not lane.out:      # an out reported by the model or by a launcher
             lane.out, lane.out_until, lane.out_reason = True, o["until"], o.get("reason", "error")
             lane.notes.append(o.get("why", "reported out"))
@@ -1441,6 +1447,28 @@ def parse_data(text, schema):
 LOGOUT_OUT = 900     # a lane whose worker found it logged out is skipped this long, then tried again (a login in between is not seen sooner)
 
 
+def limit_until(msg, t, d):
+    """When a limit refusal ends: the time the message names ("try again at 5:50 AM", local, the next such time), else the lane's
+    soonest window reset, else None."""
+    m = re.search(r"try again at (\d{1,2}):(\d{2})\s*([AP]M)?", msg or "", re.I)
+    if m:
+        h, mi = int(m.group(1)) % 12 if m.group(3) else int(m.group(1)), int(m.group(2))
+        h += 12 if (m.group(3) or "").upper() == "PM" else 0
+        at = dt.datetime.fromtimestamp(t).replace(hour=h, minute=mi, second=0, microsecond=0)
+        if at.timestamp() <= t:
+            at += dt.timedelta(days=1)
+        return at.timestamp()
+    return d.get("limit_reset")
+
+
+def codex_reset_now(t):
+    """The reset of the Codex window a fresh reading shows full (>= 95%), else None."""
+    res, _ = fetch_codex_limits()
+    rl = (res or {}).get("rateLimits") or {}
+    full = [w.get("resetsAt") for w in (rl.get("primary") or {}, rl.get("secondary") or {}) if (w.get("usedPercent") or 0) >= 95 and (w.get("resetsAt") or 0) > t]
+    return min(full) if full else None
+
+
 def mark_out(lane, until, why, t, reason="limit"):
     update_state(lambda s: s.setdefault("out", {}).__setitem__(lane, {"until": until, "why": why, "at": t, "reason": reason}))
 
@@ -1551,9 +1579,10 @@ def launch_codex(d, brief, a, rid, t, meta):
         res.update(status="failed", reason="secrets", say=f"stopped: the worker ran a command on a secret path: {seen['secret'][:200]}")
     elif timed_out:
         res.update(status="timeout", reason="timeout", say=f"codex did not finish within {a.timeout}s and was killed")
-    elif LIMIT_RE.search(seen["error"]) or rc != 0 and LIMIT_RE.search(text + err):
-        until = d.get("limit_reset") or t + 3600
-        mark_out(d["lane"], until, "limit refusal: " + (err or text)[:120].replace("\n", " "), t)
+    elif LIMIT_RE.search(seen["error"]) or rc != 0 and LIMIT_RE.search(err):     # codex's error or stderr, never the model's answer
+        why = seen["error"] or err
+        until = limit_until(why, t, d) or codex_reset_now(t) or t + 3600
+        mark_out(d["lane"], until, "limit refusal: " + why[:120].replace("\n", " "), t)
         res.update(status="lane_out", reason="lane_out", retry_after=until, say=f"{d['lane']} hit a limit; out until {local(until)}")
     elif LOGIN_RE.search(seen["error"] + err):
         mark_out(d["lane"], t + LOGOUT_OUT, "logged out: run `codex login`", t, "logged_out")
@@ -1649,7 +1678,7 @@ def launch_claude(d, brief, a, rid, t, cfg, meta):
             mark_out(d["lane"], nxt, "credit balance too low", t)
             res.update(status="lane_out", reason="lane_out", retry_after=nxt, say=f"credit exhausted; out until {local(nxt)}")
         elif LIMIT_RE.search(blob):
-            until = d.get("limit_reset") or t + 3600
+            until = limit_until(blob, t, d) or t + 3600
             mark_out(d["lane"], until, "limit refusal: " + blob[:120].replace("\n", " "), t)
             res.update(status="lane_out", reason="lane_out", retry_after=until, say=f"{d['lane']} hit a limit; out until {local(until)}")
         elif LOGIN_RE.search(blob):
@@ -1810,9 +1839,9 @@ def run_once(a, cfg):
     cwd = h["cwd"]
     rid = str(uuid.uuid4())
     S, lane = cfg["settings"], lanes[d["lane"]]
-    # A limit refusal mid-run lasts until the window the lane is closest to filling resets, when the reading has one (else an hour).
+    # A limit refusal mid-run lasts until the time its message names, else the soonest window reset (else an hour).
     resets = [(lane.week or 0, lane.week_reset), (lane.five or 0, lane.five_reset)]
-    d["limit_reset"] = next((r for _, r in sorted(resets, key=lambda x: -x[0]) if r and r > t), None)
+    d["limit_reset"] = min((r for _, r in resets if r and r > t), default=None)     # a guess: the soonest reset (too early costs one refused call, too late days)
     cap, taken = slots(lane, S), {}
 
     def claim(st):      # the authoritative count: inside the lock, never from the snapshot decision() read
