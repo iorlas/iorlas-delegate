@@ -1011,6 +1011,14 @@ printf '{"result":"claude says hi","session_id":"sess-1","total_cost_usd":0.5,"i
     def test_a_logged_out_claude_sends_the_planner_to_codex(self):
         _, r = self.run_it(mode="authout", role="planner")
         self.assertEqual((r["status"], r["lane"], r["fallback"]), ("done", "OPENAI_SUBSCRIPTION", True))
+        import io
+        real, sys.stdout = sys.stdout, io.StringIO()
+        try:
+            route.main(["status", "--json"])
+            st = json.loads(sys.stdout.getvalue())["lanes"]["CLAUDE_SUBSCRIPTION"]
+        finally:
+            sys.stdout = real
+        self.assertEqual((st["out"], st["reason"]), (True, "logged_out"))
 
     def test_v2_a_retry_with_nothing_to_wait_for_is_for_the_owner(self):
         self.assertEqual(route.result("stop", reason="no_lane")["next"], "owner")

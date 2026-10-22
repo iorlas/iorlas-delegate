@@ -368,6 +368,7 @@ class Lane:
         self.name, self.family, self.kind, self.shared = name, family, kind, shared
         self.out = False
         self.out_until = None
+        self.out_reason = None    # why it is out, for scripts: limit, logged_out, busy, error
         self.busy = False         # out only because its slots are taken (mark_busy): it frees up by itself in minutes
         self.five = None          # percent of the 5-hour window used, None = unknown
         self.week = None          # percent of the weekly window used
@@ -487,7 +488,7 @@ def read_codex(lane, S, st, t):
     lane.week, wmins, lane.pace = window(se.get("usedPercent"), lane.week_reset, se.get("windowDurationMins") or WEEK_MIN, t)
     apply_burn(lane, S, wmins)
     if rl.get("rateLimitReachedType") or res.get("ordinaryUsageAllowed") is False or (lane.five or 0) >= 98 or (lane.week or 0) >= 98:
-        lane.out = True
+        lane.out, lane.out_reason = True, "limit"
         resets = [x for x, u in ((lane.five_reset, lane.five), (lane.week_reset, lane.week)) if x and u is not None and u >= 95]
         lane.out_until = max(resets) if resets else t + 3600
 
@@ -547,7 +548,7 @@ def read_claude_subscription(lane, S, st, t, ai_usage=None):
         except (OSError, ValueError, TypeError):
             pass
     if claude_logged_out():
-        lane.out = True
+        lane.out, lane.out_reason = True, "logged_out"
         lane.notes.append("claude is logged out: run `claude auth login`")
     weekly_spec = S.get("claude_weekly_reset", "")
     if usage:
@@ -557,7 +558,7 @@ def read_claude_subscription(lane, S, st, t, ai_usage=None):
         lane.week, wmins, lane.pace = window(wk.get("used"), lane.week_reset, WEEK_MIN, t)
         apply_burn(lane, S, wmins)
         if (lane.five or 0) >= 98 or (lane.week or 0) >= 98:
-            lane.out = True
+            lane.out, lane.out_reason = True, "limit"
             lane.out_until = (lane.week_reset if (lane.week or 0) >= 98 else lane.five_reset) or t + 3600
     elif weekly_spec:
         nxt = next_weekly(weekly_spec, t)
@@ -575,10 +576,10 @@ def read_claude_credit(lane, S, st, t):
     lane.week_reset = nxt
     out = (st.get("out") or {}).get(lane.name)
     if out and out.get("until", 0) > t:
-        lane.out, lane.out_until = True, out["until"]
+        lane.out, lane.out_until, lane.out_reason = True, out["until"], out.get("reason", "error")
         lane.notes.append(out.get("why", "reported out"))
     elif lane.spend >= lane.cap:
-        lane.out, lane.out_until = True, nxt
+        lane.out, lane.out_until, lane.out_reason = True, nxt, "limit"
         lane.notes.append("own cycle cap reached")
 
 
@@ -604,10 +605,10 @@ def gather(cfg, st, t, ai_usage=None, check_config=True):
             reader(lane, S, st, t)
         o = (st.get("out") or {}).get(name)
         if o and o.get("until", 0) > t and not lane.out:      # an out reported by the model or by a launcher
-            lane.out, lane.out_until = True, o["until"]
+            lane.out, lane.out_until, lane.out_reason = True, o["until"], o.get("reason", "error")
             lane.notes.append(o.get("why", "reported out"))
         if mode == "drift":
-            lane.out, lane.out_until = True, None
+            lane.out, lane.out_until, lane.out_reason = True, None, "logged_out"
             lane.notes.insert(0, "enabled but not ready (login or key gone?)")
         lanes[name] = lane
     return lanes
@@ -872,7 +873,7 @@ def cmd_status(a, cfg):
     publish_lanes(lanes, st, t)
     if a.json:
         print(json.dumps({"v": 1, "ts": t,
-                          "lanes": {n: {"family": l.family, "kind": l.kind, "out": l.out, "out_until": l.out_until, "five": l.five, "week": l.week,
+                          "lanes": {n: {"family": l.family, "kind": l.kind, "out": l.out, "out_until": l.out_until, "reason": l.out_reason if l.out else None, "five": l.five, "week": l.week,
                                         "pace": l.pace, "burn": l.burn, "spend": l.spend, "cap": l.cap, "notes": l.notes} for n, l in lanes.items()},
                           "running": [{"run_id": k, "lane": v["lane"], "role": v["role"], "task": v.get("task", ""), "started": v["start"], "age_s": int(t - v["start"]),
                                        "pid": v.get("pid"), "worker_pid": v.get("worker_pid")}
@@ -954,7 +955,7 @@ def mark_busy(lanes, st, S, t):
     for l in lanes.values():
         cap, running = slots(l, S), sum(1 for v in live.values() if v["lane"] == l.name)
         if cap is not None and running >= cap and not l.out:
-            l.out, l.out_until, l.busy = True, t + random.randint(60, 120), True
+            l.out, l.out_until, l.busy, l.out_reason = True, t + random.randint(60, 120), True, "busy"
             l.notes.insert(0, f"busy: {running} running, {cap} allowed")
 
 
@@ -1401,8 +1402,8 @@ def parse_data(text, schema):
 LOGOUT_OUT = 900     # a lane whose worker found it logged out is skipped this long, then tried again (a login in between is not seen sooner)
 
 
-def mark_out(lane, until, why, t):
-    update_state(lambda s: s.setdefault("out", {}).__setitem__(lane, {"until": until, "why": why, "at": t}))
+def mark_out(lane, until, why, t, reason="limit"):
+    update_state(lambda s: s.setdefault("out", {}).__setitem__(lane, {"until": until, "why": why, "at": t, "reason": reason}))
 
 
 def codex_child_tokens(thread, since):
@@ -1516,7 +1517,7 @@ def launch_codex(d, brief, a, rid, t, meta):
         mark_out(d["lane"], until, "limit refusal: " + (err or text)[:120].replace("\n", " "), t)
         res.update(status="lane_out", reason="lane_out", retry_after=until, say=f"{d['lane']} hit a limit; out until {local(until)}")
     elif LOGIN_RE.search(seen["error"] + err):
-        mark_out(d["lane"], t + LOGOUT_OUT, "logged out: run `codex login`", t)
+        mark_out(d["lane"], t + LOGOUT_OUT, "logged out: run `codex login`", t, "logged_out")
         res.update(status="lane_out", reason="logged_out", retry_after=now() + 60, say=f"codex is not logged in: {(seen['error'] or err)[-200:].strip()} (route.py doctor --lane {d['lane']})")
     elif re.search(r'"status":\s*4(?!29)\d\d', seen["error"]):     # the request itself is wrong (unsupported model): retrying cannot help
         res.update(status="error", reason="bad_request", say=f"codex rejected the request: {seen['error'][:300]}")
@@ -1604,7 +1605,7 @@ def launch_claude(d, brief, a, rid, t, cfg, meta):
             mark_out(d["lane"], until, "limit refusal: " + blob[:120].replace("\n", " "), t)
             res.update(status="lane_out", reason="lane_out", retry_after=until, say=f"{d['lane']} hit a limit; out until {local(until)}")
         elif LOGIN_RE.search(blob):
-            mark_out(d["lane"], t + LOGOUT_OUT, "logged out: run `claude auth login`", t)
+            mark_out(d["lane"], t + LOGOUT_OUT, "logged out: run `claude auth login`", t, "logged_out")
             res.update(status="lane_out", reason="logged_out", retry_after=now() + 60, say=f"claude is not logged in: {blob[-200:].strip()} (claude auth login)")
         elif NETWORK_RE.search(blob) and (j.get("num_turns") or 0) <= 1:      # failed before any work
             res.update(status="stop", reason="network", retry_after=now() + random.randint(60, 120), say=f"claude could not reach its service: {blob[-200:].strip()}")

@@ -104,9 +104,10 @@ https://github.com/iorlas/iorlas-task-loop/blob/main/docs/contracts/worker-run-v
   (`leases`; 120 s, renewed every 30 s, so a killed `route.py` frees its slot by itself). With `--task ID`, a second `run` for the same task while the first is alive answers `stop`.
 - SIGTERM, SIGHUP or Ctrl-C on `route.py run` stops its worker too (workers run in their own process group, so nothing else would). With `--unattended` a changed parent pid
   (the engine was SIGKILLed) does the same. Without this, an orphaned Codex keeps burning the plan.
-- `route.py status --json` (v1, one line since 0.29.0, the dashboard's only read; `recent` rows carry `reason`): `{v, ts, lanes{name:{family,kind,out,out_until,five,week,pace,burn,spend,cap,notes}}, running[{run_id,lane,role,task,started,age_s}],
+- `route.py status --json` (v1, one line since 0.29.0, the dashboard's only read; `recent` rows carry `reason`): `{v, ts, lanes{name:{family,kind,out,out_until,reason,five,week,pace,burn,spend,cap,notes}}, running[{run_id,lane,role,task,started,age_s}],
   recent[{run_id,ts,role,task,lane,model,status,host,secs,cost,tokens,denials}] (last `--recent N`, default 20), needs_input[]}`. `five`/`week` are null when unknown. `doctor --json` carries `v: 1`. Dashboards read these, never
   `state.json` or `history.jsonl`.
+  A lane's `reason` (when `out`): limit, logged_out, busy or error. Since 0.35.1.
 - `history.jsonl` (config dir, private; rotated: lines older than 14 days are dropped once it passes 1 MB): one line per finished run: role, task, lane, model, effort, status, secs, cost, tokens, 5-hour and weekly use before and after, ids of runs
   that overlapped it, slots. For calibration; never the brief. Not part of the contract.
 - `route.py status --claude-usage '<get_usage plan.windows JSON>'` is part of the contract: it stores the reading for later `run`s. Keep that command and input shape, or bump `v`.
