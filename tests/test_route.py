@@ -1306,7 +1306,7 @@ class TokenBudget(unittest.TestCase):
                 route.READERS.update(real)
                 for k, v in saved.items():
                     os.environ.pop(k, None) if v is None else os.environ.__setitem__(k, v)
-        self.assertLessEqual(len(answer), 700, answer)      # raised from 600 on 2026-10-20: the secrets rule in brief_prefix
+        self.assertLessEqual(len(answer.replace(os.getcwd(), "")), 700, answer)      # raised from 600 on 2026-10-20: the secrets rule in brief_prefix; the checkout's path is not ours to budget
 
 
 class GitOwnership(unittest.TestCase):
