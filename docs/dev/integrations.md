@@ -89,6 +89,14 @@ https://github.com/iorlas/iorlas-task-loop/blob/main/docs/contracts/worker-run-v
   list (its system skills, ~/.codex/skills, ~/.agents/skills, the repo's .agents/.codex skills) is turned off by path with `skills.config`; no user
   config, rules, MCP or hooks. Claude: no user or repo settings, hooks, plugins, skills or MCP. Codex sub-agents cannot be turned off (a brief that
   asks gets one; verified 2026-10-21); the prompt asks not to, and their tokens count as child threads.
+- The Grok lane (GROK_SUBSCRIPTION, family `xai`, agent_runs kind `opencode`, macOS only, since 0.36.0) runs `opencode run --pure` with grok-4.7 on the
+  SuperGrok login. OpenCode gets an empty config root (XDG_CONFIG_HOME under delegate's folder: the user's MCP servers, providers and permissions stay
+  out), no project config, external or Claude Code skills. Its $SHELL is a script that runs every command under sandbox-exec: no network, no secret
+  paths, no .env files (.env.example and friends stay readable), writes only in cwd and temp (none in cwd on read-only steps). OpenCode itself runs
+  outside the sandbox, because it needs the network for the model and macOS cannot nest sandboxes; its own tools are limited by permissions (no web,
+  no .env reads, nothing outside cwd, no sub-agents, no edits on read-only steps). setuid tools (ps) and localhost sockets fail inside the sandbox.
+  No usage reading: only a refusal marks it out. `--schema` goes into the prompt and the usual re-ask checks it. Repo AGENTS.md is read by OpenCode;
+  a repo with only CLAUDE.md gets it appended to the prompt.
 - Codex `tokens` include the automatic reviewer: it runs as child threads of the worker's thread, each in its own rollout file under `$CODEX_HOME/sessions/Y/M/D`
   (`session_meta.payload.parent_thread_id` = the worker's thread; the last `token_count` holds the total); `codex exec --json` never reports them. Since 0.26.0.
 - A resumed Codex thread's `turn.completed` usage is the thread's running total; `exec resume` subtracts the total its rollout file held before
@@ -116,7 +124,7 @@ https://github.com/iorlas/iorlas-task-loop/blob/main/docs/contracts/worker-run-v
 - `history.jsonl` (config dir, private; rotated: lines older than 14 days are dropped once it passes 1 MB): one line per finished run: role, task, lane, model, effort, status, secs, cost, tokens, 5-hour and weekly use before and after, ids of runs
   that overlapped it, slots. For calibration; never the brief. Not part of the contract.
 - `route.py status --claude-usage '<get_usage plan.windows JSON>'` is part of the contract: it stores the reading for later `run`s. Keep that command and input shape, or bump `v`.
-- `reviewer`: `--authored-by openai|claude` is optional (the family that wrote the diff). The other family reviews first; the same family is the last resort
+- `reviewer`: `--authored-by openai|claude|xai` is optional (the family that wrote the diff; `xai` since 0.36.0). Another family reviews first (Grok wherever it is another family); the same family is the last resort
   and comes back with `flag: "same_family"`; with no reviewer at all the answer is `stop`, never an exception.
 - Everything else (`next`, `doctor`, flags not listed above, `state.json`, `routing.json`, mode files) is private and may change in any release. Changing
   the contract above means changing the spec in iorlas-task-loop first.

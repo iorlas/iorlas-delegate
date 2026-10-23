@@ -821,6 +821,74 @@ printf '{"type":"result","result":"claude says hi","session_id":"sess-1","total_
     def codex_out(self):
         route.update_state(lambda s: s.setdefault("out", {}).__setitem__("OPENAI_SUBSCRIPTION", {"until": route.now() + 3600, "why": "t"}))
 
+    FAKE_OPENCODE = """#!/bin/sh
+echo "$*" >> "$FAKE_ARGS"; env | sort > "$FAKE_ENV"; cat > "$FAKE_ARGS.brief"
+echo '{"type":"step_start","sessionID":"ses_1","part":{"type":"step-start"}}'
+case "$FAKE_MODE" in
+  limit) echo '{"type":"error","sessionID":"ses_1","error":{"name":"APIError","data":{"message":"You have hit your usage limit, try again at 5:50 AM"}}}'; exit 1;;
+  secret) echo '{"type":"tool_use","sessionID":"ses_1","part":{"type":"tool","tool":"bash","state":{"status":"completed","input":{"command":"cat ~/.ssh/id_ed25519"},"output":"cat: Operation not permitted"}}}'
+          sleep 30;;
+esac
+echo '{"type":"text","sessionID":"ses_1","part":{"type":"text","text":"grok did it"}}'
+echo '{"type":"step_finish","sessionID":"ses_1","part":{"type":"step-finish","tokens":{"input":10,"output":3,"reasoning":2,"cache":{"read":40,"write":0}}}}'
+"""
+
+    def grok_ready(self):
+        (self.base / "bin" / "opencode").write_text(self.FAKE_OPENCODE)
+        (self.base / "bin" / "opencode").chmod(0o755)
+        auth = Path(self.tmp.name) / ".local" / "share" / "opencode"
+        auth.mkdir(parents=True, exist_ok=True)
+        (auth / "auth.json").write_text('{"xai": {"type": "oauth"}}')
+
+    @unittest.skipIf(sys.platform != "darwin", "the Grok lane runs commands under sandbox-exec: macOS only")
+    def test_grok_is_the_worker_after_codex_in_a_sandboxed_shell_without_user_config(self):
+        self.grok_ready()
+        self.codex_out()
+        _, r = self.run_it()
+        self.assertEqual((r["status"], r["lane"], r["family"], r["text"], r["ref"]), ("done", "GROK_SUBSCRIPTION", "xai", "grok did it", "ses_1"))
+        self.assertEqual(r["tokens"], {"in": 50, "cached": 40, "out": 5})
+        args, env = self.args_seen().splitlines()[-1], Path(os.environ["FAKE_ENV"]).read_text()
+        self.assertIn("run --pure --format json -m xai/grok-4.7 --variant medium", args)
+        self.assertIn("OPENCODE_DISABLE_PROJECT_CONFIG=1", env)
+        self.assertNotIn(f"XDG_CONFIG_HOME={self.tmp.name}\n", env)         # the user's ~/.config/opencode stays out
+        perm = json.loads(next(l for l in env.splitlines() if l.startswith("OPENCODE_CONFIG_CONTENT="))[len("OPENCODE_CONFIG_CONTENT="):])["permission"]
+        self.assertEqual((perm["webfetch"], perm["task"], perm["read"]["*.env"], "edit" in perm), ("deny", "deny", "deny", False))
+        self.assertIn("Every command runs in a sandbox", Path(os.environ["FAKE_ARGS"] + ".brief").read_text())
+        _, r = self.run_it("--authored-by", "openai", role="reviewer")
+        self.assertEqual(r["lane"], "GROK_SUBSCRIPTION")
+        env = Path(os.environ["FAKE_ENV"]).read_text()
+        self.assertIn('"edit": "deny"', env)
+        _, r = self.run_it("--authored-by", "xai", role="reviewer")
+        self.assertNotEqual(r["lane"], "GROK_SUBSCRIPTION")                 # another family reviews Grok's work
+
+    @unittest.skipIf(sys.platform != "darwin", "macOS only")
+    def test_the_grok_shell_has_no_network_secrets_or_writes_outside_cwd(self):
+        import subprocess as sp
+        repo = Path(self.repo)
+        (repo / ".env").write_text("FAKE=1")
+        (repo / ".env.example").write_text("EX=1")
+        sh = self.base / "sh"
+        for write in (True, False):
+            route.opencode_shell(self.repo, write, sh)
+            run = lambda c: sp.run([str(sh), "-c", c], cwd=self.repo, capture_output=True, text=True)
+            self.assertNotEqual(run("cat .env").returncode, 0)
+            self.assertEqual(run("cat .env.example").stdout, "EX=1")
+            self.assertEqual(run("touch made").returncode == 0, write)
+            self.assertNotEqual(run("touch /Users/Shared/delegate-probe-x").returncode, 0)        # writable by everyone, outside the sandbox's list
+
+    @unittest.skipIf(sys.platform != "darwin", "macOS only")
+    def test_grok_limit_and_secret_answers(self):
+        self.grok_ready()
+        self.codex_out()
+        _, r = self.run_it(mode="limit")
+        self.assertEqual((r["status"], r["reason"], r["lane"]), ("lane_out", "lane_out", "GROK_SUBSCRIPTION"))
+        self.assertEqual(time.strftime("%H:%M", time.localtime(route.load_state()["out"]["GROK_SUBSCRIPTION"]["until"])), "05:50")
+        route.update_state(lambda s: s["out"].pop("GROK_SUBSCRIPTION"))
+        t0 = time.time()
+        _, r = self.run_it(mode="secret")
+        self.assertEqual((r["status"], r["reason"]), ("failed", "secrets"))
+        self.assertLess(time.time() - t0, 20)
+
     def test_host_on_the_claude_lane_runs_the_restricted_classifier_substrate(self):
         self.codex_out()
         _, r = self.run_it("--host")
@@ -1066,7 +1134,7 @@ printf '{"type":"result","result":"claude says hi","session_id":"sess-1","total_
         c = json.loads(out)
         self.assertEqual(c["worker_run"], 2)
         self.assertTrue(set(c["reasons"].values()) <= {"retry", "owner", "fail"})
-        self.assertEqual(set(c["lanes"]), {"codex", "claude", "both"})
+        self.assertEqual(set(c["lanes"]), {"codex", "claude", "opencode", "both"})
 
     def test_status_json_v1_shape(self):
         import io

@@ -20,6 +20,7 @@ Requirements: Claude Code. Base mode (Claude sub-agents only) needs nothing else
 | `CLAUDE_SUBSCRIPTION` | the Claude Max plan, shared with the orchestrator | none |
 | `CLAUDE_CREDIT` | the Max plan's monthly API credit | an API key, stored by you with `route.py set-key` |
 | `OPENAI_SUBSCRIPTION` | the ChatGPT Plus plan, through Codex | `codex login` |
+| `GROK_SUBSCRIPTION` | the SuperGrok plan, through OpenCode (macOS) | `opencode auth login`, xAI, SuperGrok Subscription |
 
 Roles: `planner`, `worker`, `reviewer`, `hard`, `light`. Chains, models and thresholds are data in `skills/delegate/routing.json`. The premium tier (Fable for claude) runs only when the user asks for it by name (`--premium`).
 

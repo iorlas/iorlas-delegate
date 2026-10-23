@@ -66,6 +66,10 @@
     "gpt-6-luna": {
       "family": "openai",
       "api": "gpt-6-luna"
+    },
+    "grok-4.7": {
+      "family": "xai",
+      "api": "xai/grok-4.7"
     }
   },
   "lanes": {
@@ -90,6 +94,13 @@
       "reader": "codex_app_server",
       "runner": "codex",
       "ready": "codex"
+    },
+    "GROK_SUBSCRIPTION": {
+      "family": "xai",
+      "kind": "subscription",
+      "reader": "none",
+      "runner": "opencode",
+      "ready": "opencode_xai"
     }
   },
   "roles": {
@@ -139,6 +150,12 @@
           "use": "task"
         },
         {
+          "model": "grok-4.7",
+          "effort": "medium",
+          "on": "xai",
+          "mode": "write"
+        },
+        {
           "model": "sonnet-5.5",
           "effort": "medium",
           "on": "claude",
@@ -149,10 +166,16 @@
       "stop": "No worker lane is available. Hold the task; a few lines the orchestrator may write itself."
     },
     "reviewer": {
-      "about": "verify, review a diff. Prefer a different family than the author (--authored-by openai|claude, optional); the same family is the last resort and is flagged same_family. Always rerun the acceptance check.",
+      "about": "verify, review a diff. Prefer a different family than the author (--authored-by openai|claude|xai, optional); the same family is the last resort and is flagged same_family. Grok goes first wherever it is another family: it saves Codex capacity and the Claude limit (it found every planted bug at half Codex's tokens, 2026-10-23). Always rerun the acceptance check.",
       "advance": "on_unavailable",
       "by_author": {
         "openai": [
+          {
+            "model": "grok-4.7",
+            "effort": "medium",
+            "on": "xai",
+            "mode": "read_only"
+          },
           {
             "model": "sonnet-5.5",
             "effort": "medium",
@@ -179,6 +202,12 @@
         ],
         "claude": [
           {
+            "model": "grok-4.7",
+            "effort": "medium",
+            "on": "xai",
+            "mode": "read_only"
+          },
+          {
             "model": "gpt-6.1-sol",
             "effort": "high",
             "on": "openai",
@@ -202,7 +231,44 @@
             "flag": "same_family"
           }
         ],
+        "xai": [
+          {
+            "model": "gpt-6.1-sol",
+            "effort": "high",
+            "on": "openai",
+            "mode": "read_only",
+            "use": "review"
+          },
+          {
+            "model": "sonnet-5.5",
+            "effort": "medium",
+            "on": "claude",
+            "mode": "read_only",
+            "cap": 2
+          },
+          {
+            "model": "sonnet-5.5",
+            "effort": "low",
+            "on": "claude",
+            "mode": "read_only",
+            "cap": 2,
+            "flag": "degraded"
+          },
+          {
+            "model": "grok-4.7",
+            "effort": "medium",
+            "on": "xai",
+            "mode": "read_only",
+            "flag": "same_family"
+          }
+        ],
         "unknown": [
+          {
+            "model": "grok-4.7",
+            "effort": "medium",
+            "on": "xai",
+            "mode": "read_only"
+          },
           {
             "model": "sonnet-5.5",
             "effort": "medium",

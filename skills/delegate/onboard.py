@@ -96,7 +96,19 @@ def statusline_state():
     return "custom"
 
 
+def check_opencode_xai(R):
+    """macOS (commands run under sandbox-exec), the opencode CLI, and an xAI login in its auth file (the key's presence only)."""
+    if sys.platform != "darwin" or not R.opencode_exe():
+        return False
+    f = Path(os.environ.get("XDG_DATA_HOME") or Path.home() / ".local" / "share") / "opencode" / "auth.json"
+    try:
+        return "xai" in json.loads(f.read_text(encoding="utf-8"))
+    except (OSError, ValueError, TypeError):
+        return False
+
+
 READY_CHECKS = {
+    "opencode_xai": check_opencode_xai,
     "codex": lambda R: check_codex_cli(R) and check_codex_login(R),
     "claude_credit": lambda R: check_claude_cli(R) and check_credit_key(R),
     "always": lambda R: True,
@@ -138,6 +150,8 @@ def build_checks(R, cfg, st):
                  f"(3) no terminal: tell the agent to run `{py} \"{rp}\" set-key --web` (add `--host tailscale` to open the link from another device) and open the link it shows; "
                  f"(4) skip the lane: `{py} \"{rp}\" doctor --decline CLAUDE_CREDIT`."),
          "url": "https://platform.claude.com"},
+        {"id": "opencode_xai", "lane": "GROK_SUBSCRIPTION", "ok": check_opencode_xai(R), "skip": "GROK_SUBSCRIPTION" in skip, "who": "user", "optional": True,
+         "say": "Optional Grok lane (macOS): install OpenCode (https://opencode.ai) and sign in with SuperGrok: `opencode auth login`, pick xAI, then SuperGrok Subscription."},
         {"id": "claude_login", "lane": "CLAUDE_SUBSCRIPTION", "ok": check_claude_login(R), "who": "user", "optional": True,
          "say": "Unattended callers (task-loop, cron) run `claude -p` on your Claude login, and it is not signed in. Run `claude auth login`."},
         {"id": "weekly_reset", "lane": "CLAUDE_SUBSCRIPTION", "ok": bool(S.get("claude_weekly_reset")), "who": "user", "optional": True,

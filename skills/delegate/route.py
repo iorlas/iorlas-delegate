@@ -585,7 +585,8 @@ def read_claude_credit(lane, S, st, t):
         lane.notes.append("own cycle cap reached")
 
 
-READERS = {"codex_app_server": read_codex, "claude_subscription": read_claude_subscription, "claude_credit": read_claude_credit}
+READERS = {"codex_app_server": read_codex, "claude_subscription": read_claude_subscription, "claude_credit": read_claude_credit,
+           "none": lambda lane, S, st, t: None}      # no usage reading (Grok): only refusals mark it out
 
 
 def gather(cfg, st, t, ai_usage=None, check_config=True):
@@ -828,6 +829,8 @@ def how(lane, step, cfg, cwd=None, unattended=False, host=False):
         return {"kind": "claude_p", "model": m["api"], "write": write, "cap": step.get("cap", 2), "cwd": wd, "read_only": not write and not host}
     if runner == "agent_tool":
         return {"kind": "agent_tool", "model": m["agent"], "cwd": wd}
+    if runner == "opencode":
+        return {"kind": "opencode", "model": m["api"], "write": write, "cwd": wd}
     sandbox = "workspace-write" if write else "read-only"
     iso = codex_isolation(wd)
     cli = ["codex", "exec", "-C", wd, "-s", sandbox, "-m", m["api"], "-c", f"model_reasoning_effort={step['effort']}"] + CODEX_ACCESS + iso
@@ -1401,6 +1404,8 @@ def find_transcript(ref, family):
     if not ref:
         return None
     import glob
+    if family not in ("claude", "openai"):
+        return None         # opencode keeps sessions in its database
     pattern = (str(Path.home() / ".claude" / "projects" / "*" / (ref + ".jsonl")) if family == "claude"
                else str(Path.home() / ".codex" / "sessions" / "**" / ("*" + ref + ".jsonl")))
     hits = glob.glob(pattern, recursive=True)
@@ -1603,6 +1608,126 @@ def launch_codex(d, brief, a, rid, t, meta):
     return res
 
 
+OC_SECRETS = (".ssh", ".aws", ".gnupg", ".azure", ".config/gh", ".docker", ".netrc", ".git-credentials", ".codex", ".grok", ".claude", ".claude.json",
+              ".local/share/opencode", "Library/Keychains")
+OC_RULE = ("You run unattended. Every command runs in a sandbox: no network, no credential files, no writes outside this directory. If a command "
+           "fails because of it, do not work around it or change code to avoid it: say which command and why in your final message, and go on without it.")
+
+
+def opencode_exe():
+    return shutil.which("opencode") or next((str(p) for p in [Path.home() / ".opencode" / "bin" / "opencode"] if p.is_file()), None)
+
+
+def opencode_shell(cwd, write, path):
+    """The $SHELL OpenCode runs commands with: each one under sandbox-exec (no network, no secret paths or .env files, writes only in cwd and temp).
+    OpenCode itself stays outside: it needs the network for its model, and macOS cannot nest a sandbox inside another."""
+    H = Path.home()
+    q = lambda x: json.dumps(os.path.realpath(str(x)))
+    secrets = " ".join(f"(subpath {q(H / x)})" for x in OC_SECRETS)
+    writable = ([cwd] if write else []) + ["/private/tmp", "/private/var/folders", H / "Library" / "Caches", H / ".cache"]
+    keep = " ".join(f"(require-not (subpath {q(x)}))" for x in writable)
+    prof = ('(version 1)(allow default)(deny network-outbound (remote ip))'
+            f'(deny file-read* file-write* {secrets} (regex #"/\\.env$") (regex #"/\\.env\\.[^/]*$"))'
+            '(allow file-read* (regex #"/\\.env\\.(example|sample|template|dist)$"))'
+            f'(deny file-write* (require-all {keep} (require-not (regex #"^/dev/"))))' + ("" if write else f"(deny file-write* (subpath {q(cwd)}))"))
+    xdg = os.environ.get("XDG_CONFIG_HOME")
+    head = f"export XDG_CONFIG_HOME={shlex.quote(xdg)}" if xdg else "unset XDG_CONFIG_HOME"      # commands get the user's config root back
+    path.write_text(f"#!/bin/sh\n{head}\nexport SHELL=/bin/zsh\nexec /usr/bin/sandbox-exec -p {shlex.quote(prof)} /bin/zsh \"$@\"\n", encoding="utf-8")
+    path.chmod(0o700)
+
+
+def opencode_permissions(write):
+    reads = {"*": "allow", ".env": "deny", "*.env": "deny", "*.env.*": "deny", "*.env.example": "allow", "*.env.sample": "allow", "*.env.template": "allow"}
+    reads.update({str(Path.home() / x) + "/*": "deny" for x in OC_SECRETS})
+    return {"*": "allow", "read": reads, "webfetch": "deny", "websearch": "deny", "external_directory": "deny", "task": "deny", **({} if write else {"edit": "deny"})}
+
+
+def launch_opencode(d, brief, a, rid, t, meta):
+    """opencode run (Grok on the xAI subscription login). -> dict of result fields."""
+    h = d["how"]
+    exe = opencode_exe()
+    if not exe or sys.platform != "darwin":
+        return {"status": "error", "reason": "setup", "say": "the Grok lane needs macOS and the opencode CLI (route.py doctor --lane GROK_SUBSCRIPTION)"}
+    home = config_dir() / "opencode-home"       # an empty config root: the user's ~/.config/opencode (MCP servers, providers, permissions) stays out
+    home.mkdir(parents=True, exist_ok=True)
+    shell = config_dir() / f"opencode-shell-{rid[:8]}.sh"
+    opencode_shell(h["cwd"], h["write"], shell)
+    env = child_env({"SHELL": str(shell), "XDG_CONFIG_HOME": str(home), "OPENCODE_CONFIG_CONTENT": json.dumps({"permission": opencode_permissions(h["write"])}),
+                     "OPENCODE_DISABLE_PROJECT_CONFIG": "1", "OPENCODE_DISABLE_CLAUDE_CODE": "1", "OPENCODE_DISABLE_EXTERNAL_SKILLS": "1",
+                     "OPENCODE_DISABLE_AUTOUPDATE": "1", "OPENCODE_DISABLE_SHARE": "1", "OPENCODE_DISABLE_LSP_DOWNLOAD": "1"})
+    cmd = [exe, "run", "--pure", "--format", "json", "-m", h["model"], "--variant", d["effort"], "--dir", h["cwd"]] + (["--session", a.resume] if a.resume else [])
+    rules = " ".join((SECRET_RULE, GIT_RULES, NO_SUBAGENTS_RULE, OC_RULE, DENIED_RULE))
+    if not any((x / "AGENTS.md").is_file() for x in repo_dirs(h["cwd"])):
+        rules += "\n\n" + repo_instruction_text(h["cwd"])         # opencode reads AGENTS.md itself; CLAUDE.md only through what is turned off
+    if a.schema:
+        rules += "\n\nYour final message must be only a JSON object matching this JSON Schema:\n" + Path(a.schema).read_text(encoding="utf-8")
+    seen = {"ref": a.resume, "last": "", "tokens": None, "denied": [], "error": "", "work": False}
+
+    def on_line(line):
+        try:
+            ev = json.loads(line)
+        except ValueError:
+            return None
+        if not isinstance(ev, dict):
+            return None
+        if ev.get("sessionID") and not seen["ref"]:
+            seen["ref"] = ev["sessionID"]
+            if agent_runs:
+                agent_runs.run(rid, thread=seen["ref"])
+        p = ev.get("part") or {}
+        if ev.get("type") == "step_finish" and isinstance(p.get("tokens"), dict):
+            u, c = p["tokens"], p["tokens"].get("cache") or {}
+            tk = seen["tokens"] or {"in": 0, "cached": 0, "out": 0}
+            seen["tokens"] = {"in": tk["in"] + (u.get("input") or 0) + (c.get("read") or 0) + (c.get("write") or 0), "cached": tk["cached"] + (c.get("read") or 0),
+                              "out": tk["out"] + (u.get("output") or 0) + (u.get("reasoning") or 0)}
+        if ev.get("type") == "text":
+            seen["last"] = p.get("text", "")
+            seen["work"] = True
+        if ev.get("type") == "error":
+            e = ev.get("error") or {}
+            seen["error"] = str((e.get("data") or {}).get("message") or e.get("name") or e)
+        if ev.get("type") == "tool_use":
+            seen["work"] = True
+            st = p.get("state") or {}
+            inp, outp = st.get("input") or {}, str(st.get("output") or st.get("error") or "")
+            if "Operation not permitted" in outp or "prevents you from using this specific tool call" in outp:
+                seen["denied"].append({"tool": p.get("tool"), "input": inp})
+            if p.get("tool") == "bash" and secret_hit(inp.get("command")):      # reported after it ran: the sandbox already refused the read
+                seen["denied"].append({"tool": "bash", "input": inp})
+                seen["secret"] = inp.get("command")
+                return True
+        return None
+    if agent_runs:
+        agent_runs.run(rid, kind="opencode", lane=d["lane"], model=d["model"], cwd=h["cwd"], started=t, status="running", **meta)
+    try:
+        rc, out, err, timed_out = run_proc(cmd, rules + "\n\n" + brief, h["cwd"], env, a.timeout, on_line)
+    finally:
+        with contextlib.suppress(OSError):
+            shell.unlink()
+    text = seen["last"].strip()
+    res = {"text": text, "ref": seen["ref"], "stderr": err, "tokens": seen["tokens"], "denied": seen["denied"]}
+    why = seen["error"] or (err if rc != 0 else "")
+    if seen.get("secret"):
+        res.update(status="failed", reason="secrets", say=f"stopped: the worker ran a command on a secret path: {seen['secret'][:200]}")
+    elif timed_out:
+        res.update(status="timeout", reason="timeout", say=f"opencode did not finish within {a.timeout}s and was killed")
+    elif LIMIT_RE.search(why):          # opencode's error event or stderr, never the model's answer
+        until = limit_until(why, t, d) or t + 3600
+        mark_out(d["lane"], until, "limit refusal: " + why[:120].replace("\n", " "), t)
+        res.update(status="lane_out", reason="lane_out", retry_after=until, say=f"{d['lane']} hit a limit; out until {local(until)}")
+    elif LOGIN_RE.search(why):
+        mark_out(d["lane"], t + LOGOUT_OUT, "logged out: run `opencode auth login` (xAI, SuperGrok Subscription)", t, "logged_out")
+        res.update(status="lane_out", reason="logged_out", retry_after=now() + 60, say=f"opencode is not signed in to xAI: {why[-200:].strip()}")
+    elif why and not seen["work"]:      # failed before doing anything (network down, the service erroring): try again later
+        res.update(status="stop", reason="vendor_prework", retry_after=now() + random.randint(60, 120), say=f"opencode failed before any work: {why[:200]}")
+    elif why:
+        res.update(status="failed", reason="worker_failed", say=f"opencode: {why[:300]}")
+    else:
+        update_state(lambda s_: s_.setdefault("out", {}).pop(d["lane"], None))
+        res.update(status="done", data=parse_data(text, a.schema))
+    return res
+
+
 def repo_instruction_text(cwd, cap=32768):
     """--restricted keeps Claude from loading the repo's CLAUDE.md; Codex reads AGENTS.md. Both lanes get the same files (repo_instructions),
     capped like Codex's project_doc_max_bytes."""
@@ -1779,6 +1904,11 @@ LANE_CONTEXT = {
                "hidden": ["user and repo settings", "hooks except delegate's secrets guard", "plugins", "skills", "MCP servers"],
                "sandbox": "none; the auto-mode classifier reviews every tool call; read-only steps get Bash for reading commands only",
                "cannot_block": []},
+    "opencode": {"sees": ["delegate rules (secrets, git, sub-agents, sandbox, denial)", "the brief", "repo AGENTS.md (CLAUDE.md appended when a repo has no AGENTS.md)"],
+                 "hidden": ["user config (~/.config/opencode: MCP servers, providers, permissions)", "repo .opencode config", "external and Claude Code skills", "plugins"],
+                 "sandbox": "every command under sandbox-exec: no network, no secret paths or .env files, writes only in cwd (none on read-only steps) and temp; "
+                            "OpenCode's own tools: no web, no .env reads, nothing outside cwd, no sub-agents. macOS only",
+                 "cannot_block": ["setuid tools (ps) and localhost sockets fail inside the sandbox"]},
     "both": {"instructions": "in each folder from the repo root down to cwd, AGENTS.md, else CLAUDE.md",
              "env": "the caller's environment minus what a Claude session exports (CLAUDE_*, ANTHROPIC_*, CLAUDECODE, USE_*_OAUTH, MCP_*, OTEL_*, ...), DELEGATE_* and credential-looking names"}}
 
@@ -1897,7 +2027,8 @@ def run_once(a, cfg):
         meta["task"] = a.task
     git_before = git_state(cwd)
     t0, ends = time.time(), {}
-    launch = (lambda b, a_: launch_codex(d, b, a_, rid, t, meta)) if h["kind"] == "codex" else (lambda b, a_: launch_claude(d, b, a_, rid, t, cfg, meta))
+    launch = {"codex": lambda b, a_: launch_codex(d, b, a_, rid, t, meta), "opencode": lambda b, a_: launch_opencode(d, b, a_, rid, t, meta)}.get(
+        h["kind"], lambda b, a_: launch_claude(d, b, a_, rid, t, cfg, meta))
     try:
         res = launch(brief, a)
         if res["status"] == "done" and a.schema:     # delegate enforces the schema: one re-ask in the same thread, then schema_invalid
