@@ -826,6 +826,7 @@ echo "$*" >> "$FAKE_ARGS"; env | sort > "$FAKE_ENV"; cat > "$FAKE_ARGS.brief"
 echo '{"type":"step_start","sessionID":"ses_1","part":{"type":"step-start"}}'
 case "$FAKE_MODE" in
   limit) echo '{"type":"error","sessionID":"ses_1","error":{"name":"APIError","data":{"message":"You have hit your usage limit, try again at 5:50 AM"}}}'; exit 1;;
+  silent) exit 1;;
   secret) echo '{"type":"tool_use","sessionID":"ses_1","part":{"type":"tool","tool":"bash","state":{"status":"completed","input":{"command":"cat ~/.ssh/id_ed25519"},"output":"cat: Operation not permitted"}}}'
           sleep 30;;
 esac
@@ -884,6 +885,8 @@ echo '{"type":"step_finish","sessionID":"ses_1","part":{"type":"step-finish","to
         self.assertEqual((r["status"], r["reason"], r["lane"]), ("lane_out", "lane_out", "GROK_SUBSCRIPTION"))
         self.assertEqual(time.strftime("%H:%M", time.localtime(route.load_state()["out"]["GROK_SUBSCRIPTION"]["until"])), "05:50")
         route.update_state(lambda s: s["out"].pop("GROK_SUBSCRIPTION"))
+        _, r = self.run_it(mode="silent")
+        self.assertEqual((r["status"], r["reason"]), ("failed", "worker_failed"))
         t0 = time.time()
         _, r = self.run_it(mode="secret")
         self.assertEqual((r["status"], r["reason"]), ("failed", "secrets"))

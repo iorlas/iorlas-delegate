@@ -5,7 +5,7 @@ Python 3.8+, standard library only. Windows, macOS, Linux, Docker.
 The model supplies only what the script cannot read itself; the script decides.
 
   route.py status [--claude-usage JSON|@file|-] [--json]
-  route.py next ROLE [--authored-by openai|claude] [--failed 0,1] [--premium [FAMILY]] [--allow-degraded]
+  route.py next ROLE [--authored-by openai|claude|xai] [--failed 0,1] [--premium [FAMILY]] [--allow-degraded]
                      [--claude-usage JSON|@file|-] [--cwd DIR] [--verbose]
   route.py run ROLE [--cwd DIR] [--brief FILE] [--schema FILE] [--resume REF] [--cap USD] [--timeout SEC] [--unattended] [--host] [--authored-by W] [--failed I,J] [--premium] [--allow-degraded]
                     [--claude-usage JSON] [--parent SESSION] [--task ID] [--title T]    brief on stdin; one JSON object on stdout, exit 0 (see docs/dev/integrations.md)
@@ -1638,7 +1638,8 @@ def opencode_shell(cwd, write, path):
 
 def opencode_permissions(write):
     reads = {"*": "allow", ".env": "deny", "*.env": "deny", "*.env.*": "deny", "*.env.example": "allow", "*.env.sample": "allow", "*.env.template": "allow"}
-    reads.update({str(Path.home() / x) + "/*": "deny" for x in OC_SECRETS})
+    for x in OC_SECRETS:
+        reads[str(Path.home() / x)] = reads[str(Path.home() / x) + "/*"] = "deny"
     return {"*": "allow", "read": reads, "webfetch": "deny", "websearch": "deny", "external_directory": "deny", "task": "deny", **({} if write else {"edit": "deny"})}
 
 
@@ -1722,6 +1723,8 @@ def launch_opencode(d, brief, a, rid, t, meta):
         res.update(status="stop", reason="vendor_prework", retry_after=now() + random.randint(60, 120), say=f"opencode failed before any work: {why[:200]}")
     elif why:
         res.update(status="failed", reason="worker_failed", say=f"opencode: {why[:300]}")
+    elif rc != 0:
+        res.update(status="failed", reason="worker_failed", say=f"opencode exited {rc} without an error: {(err or text)[-300:].strip()}")
     else:
         update_state(lambda s_: s_.setdefault("out", {}).pop(d["lane"], None))
         res.update(status="done", data=parse_data(text, a.schema))
