@@ -166,7 +166,7 @@
       "stop": "No worker lane is available. Hold the task; a few lines the orchestrator may write itself."
     },
     "reviewer": {
-      "about": "verify, review a diff. Prefer a different family than the author (--authored-by openai|claude|xai, optional); the same family is the last resort and is flagged same_family. Grok goes first wherever it is another family: it saves Codex capacity and the Claude limit (it found every planted bug at half Codex's tokens, 2026-10-23). Always rerun the acceptance check.",
+      "about": "verify, review a diff. Prefer a different family than the author (--authored-by openai|claude|xai, optional); the same family is the last resort and is flagged same_family. Codex reviews first wherever it is another family (the Pro Lite plan since 2026-10-23 has the room, and it saves the Claude limit); Grok reviews Codex's work. Always rerun the acceptance check.",
       "advance": "on_unavailable",
       "by_author": {
         "openai": [
@@ -202,17 +202,17 @@
         ],
         "claude": [
           {
-            "model": "grok-4.7",
-            "effort": "medium",
-            "on": "xai",
-            "mode": "read_only"
-          },
-          {
             "model": "gpt-6.1-sol",
             "effort": "high",
             "on": "openai",
             "mode": "read_only",
             "use": "review"
+          },
+          {
+            "model": "grok-4.7",
+            "effort": "medium",
+            "on": "xai",
+            "mode": "read_only"
           },
           {
             "model": "sonnet-5.5",
@@ -264,6 +264,13 @@
         ],
         "unknown": [
           {
+            "model": "gpt-6.1-sol",
+            "effort": "high",
+            "on": "openai",
+            "mode": "read_only",
+            "use": "review"
+          },
+          {
             "model": "grok-4.7",
             "effort": "medium",
             "on": "xai",
@@ -275,13 +282,6 @@
             "on": "claude",
             "mode": "read_only",
             "cap": 2
-          },
-          {
-            "model": "gpt-6.1-sol",
-            "effort": "high",
-            "on": "openai",
-            "mode": "read_only",
-            "use": "review"
           },
           {
             "model": "sonnet-5.5",

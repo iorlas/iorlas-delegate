@@ -484,7 +484,9 @@ def read_codex(lane, S, st, t):
         return
     lane.read_at = cached["at"] if cached and res is cached["res"] else t
     rl = res.get("rateLimits") or {}
-    pr, se = rl.get("primary") or {}, rl.get("secondary") or {}
+    ws = [w for w in (rl.get("primary"), rl.get("secondary")) if w]       # by length, not by slot: Pro Lite has only a weekly window, sent as primary
+    pr = next((w for w in ws if (w.get("windowDurationMins") or 300) <= 1440), {})
+    se = next((w for w in ws if (w.get("windowDurationMins") or 300) > 1440), {})
     lane.five_reset, lane.week_reset = pr.get("resetsAt"), se.get("resetsAt")
     lane.five, _, _ = window(pr.get("usedPercent"), lane.five_reset, pr.get("windowDurationMins") or 300, t)
     lane.week, wmins, lane.pace = window(se.get("usedPercent"), lane.week_reset, se.get("windowDurationMins") or WEEK_MIN, t)

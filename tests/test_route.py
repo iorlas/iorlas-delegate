@@ -140,7 +140,7 @@ class Roles(unittest.TestCase):
         self.assertEqual(decide("hard", ls, failed=[0, 1, 2])["action"], "stop")
 
     def test_reviewer_prefers_the_other_family_and_authored_by_is_optional(self):
-        self.assertEqual(decide("reviewer", lanes())["model"], "sonnet-5.5")                  # no author given: Claude first, no claim of independence
+        self.assertEqual(decide("reviewer", lanes())["model"], "gpt-6.1-sol")                 # no author given: Codex first (the most room), no claim of independence
         self.assertEqual(decide("reviewer", lanes(), authored_by="openai")["lane"], "CLAUDE_SUBSCRIPTION")
         self.assertEqual(decide("reviewer", lanes(), authored_by="claude")["lane"], "OPENAI_SUBSCRIPTION")
         self.assertEqual(decide("reviewer", lanes(), authored_by="gemini")["action"], "error")
@@ -1259,6 +1259,15 @@ echo '{"type":"step_finish","sessionID":"ses_1","part":{"type":"step-finish","to
         self.assertEqual(time.strftime("%H:%M", time.localtime(when)), "05:50")
         self.assertTrue(route.now() < when <= route.now() + 86400)
         self.assertIsNone(route.limit_until("the batch run is queued behind a rate limit", route.now(), {}))
+
+    def test_a_plan_with_only_a_weekly_window_reads_it_as_the_week(self):
+        res = {"ordinaryUsageAllowed": True, "rateLimits": {"primary": {"usedPercent": 40, "windowDurationMins": 10080, "resetsAt": route.now() + 3 * 86400},
+                                                            "secondary": None, "rateLimitReachedType": None}}
+        route.update_state(lambda s: s.__setitem__("codex_limits", {"at": route.now(), "res": res}))
+        lane = route.Lane("OPENAI_SUBSCRIPTION", "openai", "subscription")
+        self.real["codex_app_server"](lane, route.load_routing()["settings"], route.load_state(), route.now())
+        self.assertEqual((lane.five, lane.week), (None, 40.0))
+        self.assertIsNotNone(lane.pace)
 
     def test_a_reading_with_room_after_the_refusal_clears_the_out(self):
         route.update_state(lambda s: s.setdefault("out", {}).__setitem__("OPENAI_SUBSCRIPTION", {"until": route.now() + 5 * 86400, "why": "limit refusal: x", "at": route.now() - 60}))
