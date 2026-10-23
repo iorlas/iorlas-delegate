@@ -822,6 +822,7 @@ printf '{"type":"result","result":"claude says hi","session_id":"sess-1","total_
         route.update_state(lambda s: s.setdefault("out", {}).__setitem__("OPENAI_SUBSCRIPTION", {"until": route.now() + 3600, "why": "t"}))
 
     FAKE_OPENCODE = """#!/bin/sh
+[ "$1" = export ] && { echo '{"info":{"id":"'"$2"'"},"messages":[]}'; exit 0; }
 echo "$*" >> "$FAKE_ARGS"; env | sort > "$FAKE_ENV"; cat > "$FAKE_ARGS.brief"
 echo '{"type":"step_start","sessionID":"ses_1","part":{"type":"step-start"}}'
 case "$FAKE_MODE" in
@@ -848,6 +849,7 @@ echo '{"type":"step_finish","sessionID":"ses_1","part":{"type":"step-finish","to
         _, r = self.run_it()
         self.assertEqual((r["status"], r["lane"], r["family"], r["text"], r["ref"]), ("done", "GROK_SUBSCRIPTION", "xai", "grok did it", "ses_1"))
         self.assertEqual(r["tokens"], {"in": 50, "cached": 40, "out": 5})
+        self.assertTrue(r["transcript"].endswith("opencode-sessions/ses_1.json") and Path(r["transcript"]).is_file())
         args, env = self.args_seen().splitlines()[-1], Path(os.environ["FAKE_ENV"]).read_text()
         self.assertIn("run --pure --format json -m xai/grok-4.7 --variant medium", args)
         self.assertIn("OPENCODE_DISABLE_PROJECT_CONFIG=1", env)

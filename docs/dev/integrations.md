@@ -97,6 +97,8 @@ https://github.com/iorlas/iorlas-task-loop/blob/main/docs/contracts/worker-run-v
   no .env reads, nothing outside cwd, no sub-agents, no edits on read-only steps). setuid tools (ps) and localhost sockets fail inside the sandbox.
   No usage reading: only a refusal marks it out. `--schema` goes into the prompt and the usual re-ask checks it. Repo AGENTS.md is read by OpenCode;
   a repo with only CLAUDE.md gets it appended to the prompt.
+  `transcript` is the session exported after the run (`opencode export`) to `opencode-sessions/<ses_id>.json` in delegate's folder; the agent_runs
+  record carries it and no session or thread. History rows carry `transcript` for every lane since 0.36.2.
 - Codex `tokens` include the automatic reviewer: it runs as child threads of the worker's thread, each in its own rollout file under `$CODEX_HOME/sessions/Y/M/D`
   (`session_meta.payload.parent_thread_id` = the worker's thread; the last `token_count` holds the total); `codex exec --json` never reports them. Since 0.26.0.
 - A resumed Codex thread's `turn.completed` usage is the thread's running total; `exec resume` subtracts the total its rollout file held before

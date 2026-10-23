@@ -1405,7 +1405,8 @@ def find_transcript(ref, family):
         return None
     import glob
     if family not in ("claude", "openai"):
-        return None         # opencode keeps sessions in its database
+        f = opencode_transcript(ref)        # exported after the run
+        return str(f) if f.is_file() else None
     pattern = (str(Path.home() / ".claude" / "projects" / "*" / (ref + ".jsonl")) if family == "claude"
                else str(Path.home() / ".codex" / "sessions" / "**" / ("*" + ref + ".jsonl")))
     hits = glob.glob(pattern, recursive=True)
@@ -1614,6 +1615,10 @@ OC_RULE = ("You run unattended. Every command runs in a sandbox: no network, no 
            "fails because of it, do not work around it or change code to avoid it: say which command and why in your final message, and go on without it.")
 
 
+def opencode_transcript(ref):
+    return config_dir() / "opencode-sessions" / (ref + ".json")
+
+
 def opencode_exe():
     return shutil.which("opencode") or next((str(p) for p in [Path.home() / ".opencode" / "bin" / "opencode"] if p.is_file()), None)
 
@@ -1673,8 +1678,6 @@ def launch_opencode(d, brief, a, rid, t, meta):
             return None
         if ev.get("sessionID") and not seen["ref"]:
             seen["ref"] = ev["sessionID"]
-            if agent_runs:
-                agent_runs.run(rid, thread=seen["ref"])
         p = ev.get("part") or {}
         if ev.get("type") == "step_finish" and isinstance(p.get("tokens"), dict):
             u, c = p["tokens"], p["tokens"].get("cache") or {}
@@ -1705,6 +1708,14 @@ def launch_opencode(d, brief, a, rid, t, meta):
     finally:
         with contextlib.suppress(OSError):
             shell.unlink()
+    if seen["ref"]:     # opencode keeps sessions in its database: export one to a file, so `transcript` is a path like the other lanes'
+        with contextlib.suppress(OSError, subprocess.TimeoutExpired):
+            x = subprocess.run([exe, "export", seen["ref"]], capture_output=True, text=True, timeout=60, env=env)
+            if x.returncode == 0 and x.stdout.strip():
+                f = opencode_transcript(seen["ref"])
+                f.parent.mkdir(parents=True, exist_ok=True)
+                f.write_text(x.stdout, encoding="utf-8")
+                private(f)
     text = seen["last"].strip()
     res = {"text": text, "ref": seen["ref"], "stderr": err, "tokens": seen["tokens"], "denied": seen["denied"]}
     why = seen["error"] or (err if rc != 0 else "")
@@ -2074,13 +2085,14 @@ def run_once(a, cfg):
         update_state(keep)
     secs = round(time.time() - t0, 1)
     five_after, week_after = lane_use(cfg, d["lane"], now())
+    transcript = find_transcript(res.get("ref"), fam)
     history_add({"ts": now(), "run_id": rid, "role": a.role, "task": a.task or "", "lane": d["lane"], "model": d["model"], "effort": d["effort"],
                  "status": res["status"], "reason": res.get("reason"), "host": bool(a.host), "denials": len(res.get("denied") or []), "secs": secs, "cost": res.get("cost", 0), "tokens": res.get("tokens"),
                  "five_before": lane.five, "week_before": lane.week, "five_after": five_after, "week_after": week_after,
-                 "overlap": sorted(set(taken["peers"]) | set(ends.get("peers", []))), "slots": cap})
+                 "overlap": sorted(set(taken["peers"]) | set(ends.get("peers", []))), "slots": cap, "transcript": transcript})
     res.update(**who, run_id=rid, secs=secs, git_violation=git_changes(git_before, git_state(cwd)),
                context={"instructions": [str(f) for f in repo_instructions(cwd)], "env_keys": sorted(child_env().keys())},
-               transcript=find_transcript(res.get("ref"), fam), **extra)
+               transcript=transcript, **extra)
     return emit(result(res.pop("status"), **res))
 
 
