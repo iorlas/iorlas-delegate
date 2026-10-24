@@ -31,5 +31,7 @@ No Python 3.8+: Agent tool only, no worktree, effort in the brief.
 | light | haiku low > sonnet low |
 <!-- /base-table -->
 
+Review never blocks on family: when every other family is out, the reviewer may be the author's own family (`flag` same_family, printed as `warning`, no consent needed, also `--unattended`). Owner rule: "if all lanes are out except on a single one, it is totally allowed to review itself, with a warning, but it should not block us."
+
 Brief: goal, files, constraints, acceptance check, "no commits". You own git; parallel writers: one directory each. `--premium` only if the user names it. Never delegate scope, design, plan, acceptance.
 `modes/`: init codex claude-credit extend

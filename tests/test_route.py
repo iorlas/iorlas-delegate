@@ -154,6 +154,44 @@ class Roles(unittest.TestCase):
         d = decide("reviewer", lanes(openai=out, sub=out, credit=out), authored_by="claude")
         self.assertEqual(d["action"], "stop")                                                # nobody left: stop, not an exception
 
+    def test_every_reviewer_list_reaches_every_family(self):
+        for who, steps in CFG["roles"]["reviewer"]["by_author"].items():
+            self.assertEqual({s["on"] for s in steps}, {"openai", "claude", "xai"}, who)
+            if who != "unknown":
+                fam = {"openai": "openai", "claude": "claude", "xai": "xai"}[who]
+                self.assertEqual(steps[-1]["flag"], "same_family", who)
+                self.assertEqual(steps[-1]["on"], fam, who)
+
+    def test_only_one_family_up_never_stops_and_warns(self):
+        out = {"out": True, "out_until": T + 3600}
+        grok = route.Lane("GROK_SUBSCRIPTION", "xai", "subscription")
+        cases = {"openai": lambda: lanes(sub=out, credit=out), "claude": lambda: lanes(openai=out),
+                 "xai": lambda: lanes(openai=out, sub=out, credit=out)}
+        for who, mk in cases.items():
+            ls = mk()
+            if who != "xai":
+                grok.out, grok.out_until, grok.out_reason = True, T + 7200, "limit"
+            ls["GROK_SUBSCRIPTION"] = grok if who != "xai" else route.Lane("GROK_SUBSCRIPTION", "xai", "subscription")
+            if who != "xai":
+                ls["GROK_SUBSCRIPTION"] = grok
+            d = decide("reviewer", ls, authored_by=who)
+            self.assertEqual((d["action"], d["flag"]), ("run", "same_family"), who)
+            self.assertEqual(d["lane"].split("_")[0], {"openai": "OPENAI", "claude": "CLAUDE", "xai": "GROK"}[who], who)
+            self.assertIn(f"reviewing {who}'s work with {who}: no other family is up", d["warning"], who)
+            ud = decide("reviewer", ls, authored_by=who, unattended=True, allow_degraded=True)      # no consent step exists for review
+            self.assertEqual((ud["action"], ud["flag"]), ("run", "same_family"), who)
+
+    def test_warning_names_why_other_families_are_down(self):
+        out = {"out": True, "out_until": T + 3600, "out_reason": "logged_out"}
+        ls = lanes(sub=out, credit=out)
+        g = route.Lane("GROK_SUBSCRIPTION", "xai", "subscription")
+        g.out, g.out_until = True, T + 7200
+        ls["GROK_SUBSCRIPTION"] = g
+        w = decide("reviewer", ls, authored_by="openai")["warning"]
+        self.assertIn("xai out until", w)
+        self.assertIn("claude logged out", w)
+        self.assertNotIn("warning", decide("reviewer", lanes(), authored_by="openai"))
+
     def test_premium_only_when_requested(self):
         self.assertNotEqual(decide("hard", lanes())["model"], "fable-5.1")
         d = decide("worker", lanes(), premium="claude")

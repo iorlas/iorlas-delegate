@@ -728,6 +728,31 @@ def build_tiers(role, cfg, args):
     return tiers
 
 
+def family_state(fam, lanes, S):
+    """Why no lane of `fam` is usable, in a few words: 'xai out until Sat 24 Oct 18:00', 'claude logged out', 'claude over its limit', 'claude not set up'."""
+    mine = [l for l in lanes.values() if l.family == fam]
+    if not mine:
+        return f"{fam} not set up"
+    l = mine[0]
+    if l.out:
+        if l.out_reason == "logged_out":
+            return f"{fam} logged out"
+        return f"{fam} out" + (f" until {local(l.out_until)}" if l.out_until else "")
+    return f"{fam} over its limit"
+
+
+def review_warning(flag, step, author, lanes, S, cfg):
+    """One line for a same_family or degraded step; None for any other step."""
+    if flag not in LATE_FLAGS:
+        return None
+    fam = step["on"]
+    others = [f for f in dict.fromkeys(c["family"] for c in cfg["lanes"].values()) if f != fam]
+    down = "; ".join(family_state(f, lanes, S) for f in others if not any(usable(l, S, True)[0] for l in lanes.values() if l.family == f))
+    if flag == "same_family":
+        return f"reviewing {author or 'unknown'}'s work with {fam}: no other family is up" + (f" ({down})" if down else "")
+    return f"degraded: {step['model']} {step['effort']} on {fam} because the better options are down" + (f" ({down})" if down else "")
+
+
 def decide(role_name, cfg, lanes, st, t, args):
     """Pure: no I/O. Returns the decision dict."""
     S = cfg["settings"]
@@ -763,11 +788,13 @@ def decide(role_name, cfg, lanes, st, t, args):
                 if lane is None:
                     continue
                 fb = step is not first
+                warn = review_warning(step.get("flag"), step, args.get("authored_by"), lanes, S, cfg)
                 return {"action": "run", "role": role_name, "step": step.get("idx"), "pass": "relaxed" if relaxed else "strict",
                         "rung": step.get("idx"), "fallback": fb, "fallback_reason": why_not_first if fb else None, "first_lane": first_lane if fb else None,
                         "lane": lane.name, "model": step["model"], "effort": step["effort"], "mode": step.get("mode", "read_only"),
                         "cap": step.get("cap"), "use": step.get("use"), "flag": step.get("flag"),
-                        "how": how(lane, step, cfg, args.get("cwd"), args.get("unattended", False), args.get("host")), "trace": trace}
+                        "how": how(lane, step, cfg, args.get("cwd"), args.get("unattended", False), args.get("host")), "trace": trace,
+                        **({"warning": warn} if warn else {})}
     resets = {l.name: local(l.out_until) for l in lanes.values() if l.out and l.out_until}
     stop = {"action": "stop", "role": role_name, "say": role["stop"], "resets": resets, "trace": trace}
     consent = role.get("degraded_needs_consent")
@@ -1042,6 +1069,8 @@ def cmd_next(a, cfg):
         d.pop("trace", None)
     else:
         d["lanes"] = {n: l.brief(t) for n, l in lanes.items()}
+    if d.get("warning"):
+        print("warning: " + d["warning"], file=sys.stderr)
     print(json.dumps(d, indent=1))
     return 0 if d["action"] != "error" else 1
 
@@ -1958,6 +1987,9 @@ def run_once(a, cfg):
         extra["warnings"] = warnings
     if d.get("notice"):
         extra["notice"] = d["notice"]
+    if d.get("warning"):
+        extra["warning"] = d["warning"]
+        print("warning: " + d["warning"], file=sys.stderr)
     if d["action"] == "error":
         return refuse(a, "error", "caller", d["error"], None, extra)
     if d["action"] == "lane_out":
