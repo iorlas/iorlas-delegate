@@ -552,6 +552,20 @@ class SecretGuard(unittest.TestCase):
             self.assertEqual(self.guard({"command": c}, tool="Bash"), 2, c)
             self.assertTrue(route.policy_denial({"tool_name": "Bash", "tool_input": {"command": c}}), c)
 
+    def test_excluding_secret_paths_in_quoted_and_wrapped_searches_is_not_touching_them(self):
+        real = ("/bin/zsh -lc \"rg --files --hidden -g '*SKILL.md' -g '\"'!'\"\\\\.git' -g '\"'!'\"\\\\.beads/**' -g '\"'!'\"\\\\.task/**' "
+                "-g '\"'!'\"\\\\.env*' -g '\"'!**/node_modules/**'\"' -g '\"'!**/.venv/**'\"'\"")
+        for c in (real, "rg -n --hidden -g '!config' -g '!.git/**' -g '!.beads/**' -g '!.env*' foo",
+                  "rg --files --hidden -g AGENTS.md -g '!.git' -g '!.beads' -g '!.env*'", "bash -c \"zsh -c 'rg x --glob=!.env'\"",
+                  "find . -not -path './.env*'", "find . ! -path '*/.ssh/*'"):
+            self.assertIsNone(route.secret_hit(c), c)
+            self.assertIsNone(route.read_only_problem(c), c)
+            self.assertEqual(self.guard({"command": c}, "--read-only", tool="Bash"), 0, c)
+        for c in ("cat .env", "rg foo .env", "rg -g '.env*' foo", "cat ~/.ssh/id_rsa", "bash -lc \"cat .env\"", "rg -g '!x' foo .env"):
+            self.assertTrue(route.secret_hit(c), c)
+            self.assertEqual(self.guard({"command": c}, tool="Bash"), 2, c)
+        self.assertEqual(route.read_only_problem("bash -lc 'rm x'"), "`rm` is not a reading command")
+
     def test_lets_through_lookalikes_and_written_content(self):
         for ti in ({"command": "cat .env.example"}, {"command": "node -e 'process.env.HOME'"}, {"command": "dotnet test"},
                    {"file_path": "src/environment.ts"}, {"file_path": ".gitignore", "content": ".env\n.ssh/"}, {"command": "ls .envrc"},

@@ -1126,9 +1126,47 @@ EXCLUDED_RE = re.compile(r"""(?:--i?glob|-g)[=\s]+(?:(['"])!.*?\1|!\S+)|--exclud
                          r"""|(?:-not|!)\s+-i?(?:path|name|wholename|regex)\s+(?:(['"]).*?\3|\S+)|(['"]):(?:!|\(exclude\))[^'"]*\4|(?<!\S):(?:!|\(exclude\))\S+""")
 
 
+SHELLS = {"sh", "bash", "zsh", "dash"}
+EXCL_OPTS = {"-g", "--glob", "--iglob", "--exclude", "--exclude-dir", "--exclude-from"}
+EXCL_PATH_OPTS = {"-path", "-ipath", "-name", "-iname", "-wholename", "-iwholename", "-regex", "-iregex"}
+
+
+def unwrap(cmd, depth=3):
+    """The script inside `sh|bash|zsh -c/-lc "<script>"` (nested up to `depth` times), else `cmd` unchanged."""
+    for _ in range(depth):
+        try:
+            t = shlex.split(cmd)
+        except ValueError:
+            return cmd
+        i = next((k for k, x in enumerate(t[1:], 1) if re.fullmatch(r"-[a-z]*c[a-z]*", x)), 0)
+        if not (t and os.path.basename(t[0]) in SHELLS and i and all(x.startswith("-") for x in t[1:i]) and i + 1 < len(t)):
+            return cmd
+        cmd = t[i + 1]
+    return cmd
+
+
+def without_excluded(text):
+    """`text` as shell words with the arguments that keep a path OUT of a search removed (quote splicing collapsed); None if unparsable."""
+    try:
+        t = shlex.split(unwrap(text))
+    except ValueError:
+        return None
+    out, prev, prev2 = [], "", ""
+    for x in t:
+        glob_excl = prev in EXCL_OPTS and (x.startswith("!") or prev.startswith("--exclude"))
+        path_excl = prev in EXCL_PATH_OPTS and prev2 in ("-not", "!")
+        inline = re.match(r"--exclude(?:-dir|-from)?=|(?:--i?glob=|-g)!", x)
+        if not (glob_excl or path_excl or inline or x in EXCL_OPTS or re.match(r":(?:!|\(exclude\))", x) or x in ("-not", "!") or x in EXCL_PATH_OPTS and prev in ("-not", "!")):
+            out.append(x)
+        prev2, prev = prev, x
+    return " ".join(out)
+
+
 def secret_hit(text):
     """The secret path `text` names, ignoring paths it only excludes; None when there is none."""
-    m = SECRET_RE.search(EXCLUDED_RE.sub(" ", text or ""))
+    text = text or ""
+    stripped = without_excluded(text)
+    m = SECRET_RE.search(stripped if stripped is not None else EXCLUDED_RE.sub(" ", text))
     return m.group() if m else None
 
 
@@ -1149,7 +1187,7 @@ READ_ONLY_HELP = ("this step is read-only: Bash allows only reading commands (gi
 def pieces(cmd):
     """The command lines in `cmd` (split on | || && ; and newlines), each as words; None when one cannot be parsed."""
     out = []
-    for seg in re.split(r"\|\||&&|;|\||\n", re.sub(r"\d?>&\d|&?\d?>\s*/dev/null", " ", cmd)):
+    for seg in re.split(r"\|\||&&|;|\||\n", re.sub(r"\d?>&\d|&?\d?>\s*/dev/null", " ", unwrap(cmd))):
         try:
             t = shlex.split(seg)
         except ValueError:
@@ -1188,6 +1226,7 @@ def git_write(cmd):
 
 def read_only_problem(cmd):
     """None when every piece of `cmd` only reads, else what is not allowed."""
+    cmd = unwrap(cmd)
     if re.search(r"`|\$\(|[<>]\(|>", re.sub(r"\d?>&\d|&?\d?>\s*/dev/null", " ", cmd)):
         return "output redirection or command substitution"
     ps = pieces(cmd)
