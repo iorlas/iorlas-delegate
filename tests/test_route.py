@@ -566,6 +566,25 @@ class SecretGuard(unittest.TestCase):
             self.assertEqual(self.guard({"command": c}, tool="Bash"), 2, c)
         self.assertEqual(route.read_only_problem("bash -lc 'rm x'"), "`rm` is not a reading command")
 
+    def test_heredoc_body_secret_name_gets_an_apply_patch_hint_and_real_reads_do_not(self):
+        hd = "zsh -lc \"python - <<'EOF'\nif path.name == '.env':\n    pass\nEOF\""
+        self.assertTrue(route.heredoc_only_hit(hd))
+        self.assertTrue(route.secret_hit(hd))                       # still blocked
+        for c in ("python -c \"open('.env')\"", "cat .env", "cat .env <<'EOF'\nx\nEOF"):
+            self.assertFalse(route.heredoc_only_hit(c), c)
+            self.assertTrue(route.secret_hit(c), c)
+        r = subprocess.run([sys.executable, str(ROOT / "skills" / "delegate" / "route.py"), "guard"], capture_output=True, text=True,
+                           input=json.dumps({"tool_name": "Bash", "tool_input": {"command": hd}}))
+        self.assertEqual(r.returncode, 2)
+        self.assertIn("apply_patch", r.stderr)
+        r = subprocess.run([sys.executable, str(ROOT / "skills" / "delegate" / "route.py"), "guard"], capture_output=True, text=True,
+                           input=json.dumps({"tool_name": "Bash", "tool_input": {"command": "cat .env"}}))
+        self.assertNotIn("apply_patch", r.stderr)
+
+    def test_writer_briefs_say_to_edit_with_apply_patch(self):
+        self.assertIn("apply_patch", route.EDIT_RULE)
+        self.assertIn(route.EDIT_RULE, route.PREAMBLE)
+
     def test_lets_through_lookalikes_and_written_content(self):
         for ti in ({"command": "cat .env.example"}, {"command": "node -e 'process.env.HOME'"}, {"command": "dotnet test"},
                    {"file_path": "src/environment.ts"}, {"file_path": ".gitignore", "content": ".env\n.ssh/"}, {"command": "ls .envrc"},

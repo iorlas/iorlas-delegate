@@ -1170,6 +1170,17 @@ def secret_hit(text):
     return m.group() if m else None
 
 
+HEREDOC_RE = re.compile(r"<<-?[ \t]*(['\"]?)(\w+)\1[^\n]*\n.*?(?:\n[ \t]*\2\b|\Z)", re.S)
+EDIT_RULE = "Edit files with the patch/edit tool (apply_patch), never with shell heredocs or `python -c` file rewrites."
+APPLY_PATCH_HINT = "rewrite this edit with apply_patch (the secret name is only inside a heredoc body; heredoc and `python -c` rewrites are blocked)"
+
+
+def heredoc_only_hit(cmd):
+    """True when `cmd` names a secret path only inside a heredoc body (code being written), not in the command itself."""
+    cmd = unwrap(cmd or "")
+    return bool(secret_hit(cmd) and not secret_hit(HEREDOC_RE.sub(lambda m: m.group().split("\n", 1)[0] + "\n", cmd)))
+
+
 SECRET_RULE = "Never touch credential files (~/.ssh, .env, ~/.aws, tokens, keychains): it is blocked. If the task needs one, stop and say so."
 
 
@@ -1263,7 +1274,8 @@ def cmd_guard(a, cfg=None):
         ti = j.get("tool_input") or {}
         hit = secret_hit(" ".join(str(ti.get(k) or "") for k in ("command", "file_path", "path", "pattern", "glob")))
         if hit:
-            print(f"blocked by delegate: {hit} is a secret path. {SECRET_RULE}", file=sys.stderr)
+            hint = f" {APPLY_PATCH_HINT}." if heredoc_only_hit(str(ti.get("command") or "")) else ""
+            print(f"blocked by delegate: {hit} is a secret path.{hint} {SECRET_RULE}", file=sys.stderr)
             return 2
         cmd = str(ti.get("command") or "") if j.get("tool_name") == "Bash" else ""
         gw = git_write(cmd)
@@ -1311,7 +1323,7 @@ NO_SUBAGENTS_RULE = "Do not spawn sub-agents; do the work yourself."
 ESCALATE_RULE = ("You run unattended. If a command fails because of the sandbox (network, files outside this directory, a system resource), "
                  "request escalated permissions for that exact command once, with a one-line justification.")
 PREAMBLE = (SECRET_RULE + " You are a delegated worker. Do exactly the task in the brief. Do not delegate further and do not use the delegate skill. "
-            + GIT_RULES + " " + DENIED_RULE + " Finish with a short report: what you changed or found, and the exit code and last lines of any check you ran.")
+            + GIT_RULES + " " + EDIT_RULE + " " + DENIED_RULE + " Finish with a short report: what you changed or found, and the exit code and last lines of any check you ran.")
 
 
 def guard_settings(read_only):
@@ -1637,7 +1649,7 @@ def launch_codex(d, brief, a, rid, t, meta):
         agent_runs.run(rid, kind="codex", lane=d["lane"], model=d["model"], cwd=h["cwd"], started=t, status="running", **meta)
     started = time.time()       # wall clock, not now(): it is compared with file times
     before = codex_thread_total(a.resume) if a.resume else None
-    rc, out, err, timed_out = run_proc(cmd, " ".join((SECRET_RULE, GIT_RULES, NO_SUBAGENTS_RULE, ESCALATE_RULE, DENIED_RULE)) + "\n\n" + brief, h["cwd"], child_env(), a.timeout, on_line)
+    rc, out, err, timed_out = run_proc(cmd, " ".join((SECRET_RULE, GIT_RULES, EDIT_RULE, NO_SUBAGENTS_RULE, ESCALATE_RULE, DENIED_RULE)) + "\n\n" + brief, h["cwd"], child_env(), a.timeout, on_line)
     text = ""
     with contextlib.suppress(OSError):
         text = out_file.read_text(encoding="utf-8", errors="replace").strip()
@@ -1652,7 +1664,7 @@ def launch_codex(d, brief, a, rid, t, meta):
             seen["tokens"] = {k: (base.get(k) or 0) + extra[k] for k in extra}
     res = {"text": text, "ref": seen["ref"], "stderr": err, "tokens": seen["tokens"], "denied": seen["denied"]}
     if seen.get("secret"):
-        res.update(status="failed", reason="secrets", say=f"stopped: the worker ran a command on a secret path: {seen['secret'][:200]}")
+        res.update(status="failed", reason="secrets", say=f"stopped: the worker ran a command on a secret path: {seen['secret'][:200]}" + (f"; {APPLY_PATCH_HINT}" if heredoc_only_hit(seen["secret"]) else ""))
     elif timed_out:
         res.update(status="timeout", reason="timeout", say=f"codex did not finish within {a.timeout}s and was killed")
     elif LIMIT_RE.search(seen["error"]) or rc != 0 and LIMIT_RE.search(err):     # codex's error or stderr, never the model's answer
@@ -1732,7 +1744,7 @@ def launch_opencode(d, brief, a, rid, t, meta):
                      "OPENCODE_DISABLE_PROJECT_CONFIG": "1", "OPENCODE_DISABLE_CLAUDE_CODE": "1", "OPENCODE_DISABLE_EXTERNAL_SKILLS": "1",
                      "OPENCODE_DISABLE_AUTOUPDATE": "1", "OPENCODE_DISABLE_SHARE": "1", "OPENCODE_DISABLE_LSP_DOWNLOAD": "1"})
     cmd = [exe, "run", "--pure", "--format", "json", "-m", h["model"], "--variant", d["effort"], "--dir", h["cwd"]] + (["--session", a.resume] if a.resume else [])
-    rules = " ".join((SECRET_RULE, GIT_RULES, NO_SUBAGENTS_RULE, OC_RULE, DENIED_RULE))
+    rules = " ".join((SECRET_RULE, GIT_RULES, EDIT_RULE, NO_SUBAGENTS_RULE, OC_RULE, DENIED_RULE))
     if not any((x / "AGENTS.md").is_file() for x in repo_dirs(h["cwd"])):
         rules += "\n\n" + repo_instruction_text(h["cwd"])         # opencode reads AGENTS.md itself; CLAUDE.md only through what is turned off
     if a.schema:
@@ -1790,7 +1802,7 @@ def launch_opencode(d, brief, a, rid, t, meta):
     res = {"text": text, "ref": seen["ref"], "stderr": err, "tokens": seen["tokens"], "denied": seen["denied"]}
     why = seen["error"] or (err if rc != 0 else "")
     if seen.get("secret"):
-        res.update(status="failed", reason="secrets", say=f"stopped: the worker ran a command on a secret path: {seen['secret'][:200]}")
+        res.update(status="failed", reason="secrets", say=f"stopped: the worker ran a command on a secret path: {seen['secret'][:200]}" + (f"; {APPLY_PATCH_HINT}" if heredoc_only_hit(seen["secret"]) else ""))
     elif timed_out:
         res.update(status="timeout", reason="timeout", say=f"opencode did not finish within {a.timeout}s and was killed")
     elif LIMIT_RE.search(why):          # opencode's error event or stderr, never the model's answer
