@@ -6,12 +6,12 @@ description: Delegate a sub-task to another model or subscription, only when the
 `DELEGATE_DEPTH` set = you are a worker: do not delegate.
 Run it with Bash `run_in_background`.
 `python3 ${CLAUDE_SKILL_DIR}/route.py run ROLE [--cwd D] [--authored-by openai|claude] [--failed I,J] [--premium] [--allow-degraded] [--claude-usage JSON] < brief`
-(`py -3` on Windows.) Roles: planner (plan, design) · worker (implement, debug) · reviewer (`--authored-by`: family that wrote it) · hard (after 2 failures; `--failed`) · light (read, summarise).
+(`py -3` on Windows.) Roles: planner (plan) · worker (implement) · reviewer (`--authored-by`: family that wrote it) · hard (after 2 failures) · light (read).
 
 | `status` | do |
 |---|---|
 | `agent` | Agent call: `agent_model`, `brief_prefix` + brief, in `cwd`, no worktree, effort in the brief |
-| `done` | `text` is the answer; rerun the acceptance check. `git_violation`: show it, check `git reflog`, never auto-revert. `flag` same_family: say so |
+| `done` | `text` is the answer; rerun the acceptance check. `git_violation`: show it, check `git reflog`, never auto-revert. |
 | `stop` | tell the user `say`. `ask_user`: ask; yes = `--allow-degraded` |
 | `lane_out` | rerun; it advances |
 | `timeout` | shrink the task |
@@ -31,7 +31,7 @@ No Python 3.8+: Agent tool only, no worktree, effort in the brief.
 | light | haiku low > sonnet low |
 <!-- /base-table -->
 
-Review never blocks on family: when every other family is out, the reviewer may be the author's own family (`flag` same_family, printed as `warning`, no consent needed, also `--unattended`). Owner rule: "if all lanes are out except on a single one, it is totally allowed to review itself, with a warning, but it should not block us."
+Review never blocks: if only the author's family is up, it reviews itself (`flag` same_family: say so; no consent).
 
 Brief: goal, files, constraints, acceptance check, "no commits". You own git; parallel writers: one directory each. `--premium` only if the user names it. Never delegate scope, design, plan, acceptance.
 `modes/`: init codex claude-credit extend
