@@ -127,7 +127,7 @@ https://github.com/iorlas/iorlas-task-loop/blob/main/docs/contracts/worker-run-v
   that overlapped it, slots. For calibration; never the brief. Not part of the contract.
 - `route.py status --claude-usage '<get_usage plan.windows JSON>'` is part of the contract: it stores the reading for later `run`s. Keep that command and input shape, or bump `v`.
 - `reviewer`: `--authored-by openai|claude|xai` is optional (the family that wrote the diff; `xai` since 0.36.0). Another family reviews first (Codex wherever it is another family and for unknown authors, Grok for Codex's work, since 0.37.0); the same family is the last resort
-  and comes back with `flag: "same_family"`; with no reviewer at all the answer is `stop`, never an exception.
+  and comes back with `flag: "same_family"` and a one-line `warning` (stderr, and in the `run` result; since 0.38.0), never needing consent; with no reviewer at all the answer is `stop`, never an exception.
 - Everything else (`next`, `doctor`, flags not listed above, `state.json`, `routing.json`, mode files) is private and may change in any release. Changing
   the contract above means changing the spec in iorlas-task-loop first.
 
