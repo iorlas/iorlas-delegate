@@ -1539,6 +1539,23 @@ class Holds(unittest.TestCase):
             self.assertEqual(self.main("hold", "OPENAI_SUBSCRIPTION", "--until", bad)[0], 1)
         self.assertEqual(self.main("hold", "NOPE", "--until", "+2h")[0], 1)
         self.assertEqual(route.load_state().get("holds"), None)
+        code, out = self.main("hold", "OPENAI_SUBSCRIPTION", "--until", str(int(time.time()) + 3600), "--reason", "epoch as the command line gives it")
+        self.assertEqual((code, out["ok"]), (0, True))
+        self.assertEqual(self.main("hold", "OPENAI_SUBSCRIPTION", "--until", "2099-01-01T00:00:00+00:00")[0], 0)
+        self.assertEqual(len(route.load_state()["holds"]), 2)
+
+    def test_a_refusal_says_why_there_is_no_transcript_and_what_held_the_lane(self):
+        route.add_hold("OPENAI_SUBSCRIPTION", "+1h", "x")
+        a = argparse_ns("worker", call_id="c#9", task=None, parent=None, title=None, brief=None, timeout=5, unattended=True, schema=None, no_wait=False, resume="old")
+        st = {"refs": {"old": {"lane": "OPENAI_SUBSCRIPTION", "model": "gpt-6.1-sol", "mode": "write", "effort": "medium", "host": False}}}
+        import io
+        with mock.patch.object(route, "gather", return_value=lanes()), mock.patch.object(route, "publish_lanes"), mock.patch.object(route, "mark_busy"), \
+                mock.patch.object(route, "interactive", return_value=False), mock.patch("sys.stdout", io.StringIO()) as out:
+            route.update_state(lambda s: s.setdefault("refs", {}).update(st["refs"]))
+            route.run_once(a, copy.deepcopy(CFG))
+        r = json.loads(out.getvalue())
+        self.assertEqual((r["status"], r["transcript_status"], r["call_id"], r["stop"]["reason"]), ("lane_out", "not_launched", "c#9", "held"))
+        self.assertIsNone(route.schema_problem(r, route.classify.CONTRACT["answer_schema"]))
 
     def test_a_hold_stops_its_roles_until_it_ends_and_the_trace_says_who(self):
         h = route.add_hold("OPENAI_SUBSCRIPTION", "+2h", "weekly budget", ["worker", "hard"], t=T)

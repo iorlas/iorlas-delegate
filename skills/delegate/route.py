@@ -820,6 +820,8 @@ def parse_until(v, t):
     m = re.fullmatch(r"\+(\d+)([mhd])", str(v or "").strip())
     if m:
         return t + int(m.group(1)) * {"m": 60, "h": 3600, "d": 86400}[m.group(2)]
+    with contextlib.suppress(TypeError, ValueError):
+        v = float(v)      # the command line hands over a string
     return to_epoch(v)
 
 
@@ -1632,6 +1634,7 @@ def decision(a, cfg):
                 return {"action": "stop", "reason": "busy", "lane": rec["lane"], "retry_after": lane.out_until,
                         "say": f"{rec['lane']} has no free slot to continue {ref}: {lane.notes[0]}"}, lanes, warnings, t
             return {"action": "lane_out", "lane": rec["lane"], "retry_after": back_at(lane, S) if lane else None,
+                    "outcome": "held" if lane and lane.held else {"logged_out": "logged_out", "hung": "hung", "credit": "credit_exhausted"}.get(lane.out_reason, "rate_limited") if lane else None,
                     "say": f"{rec['lane']} cannot continue {ref} now: {why}"}, lanes, warnings, t
         step = {"model": rec["model"], "effort": rec["effort"], "mode": rec["mode"], "cap": a.cap or rec.get("cap")}
         return {"action": "run", "role": a.role, "step": None, "pass": "resume", "rung": rec.get("rung"), "fallback": rec.get("fallback"),
@@ -2846,7 +2849,7 @@ def refuse(a, status, reason, say, retry_after, extra, outcome=None, **who):
     call_id = getattr(a, "call_id", None)
     history_add({"ts": now(), "run_id": None, "call_id": call_id, "role": a.role, "task": getattr(a, "task", None) or "", "lane": who.get("lane"), "model": who.get("model"),
                  "status": status, "reason": reason, "retry_after": retry_after, "resume": bool(getattr(a, "resume", None)), "host": bool(getattr(a, "host", False))})
-    return emit(result(status, reason=reason, outcome=outcome, say=say, retry_after=retry_after, call_id=call_id, **who, **extra))
+    return emit(result(status, reason=reason, outcome=outcome, say=say, retry_after=retry_after, call_id=call_id, transcript_status="not_launched", **who, **extra))
 
 
 def cmd_run(a, cfg):
@@ -2890,7 +2893,7 @@ def run_once(a, cfg):
     if runner is None and h["kind"] != "agent_tool":
         return refuse(a, "error", "setup", f"no launcher for runner kind {h['kind']!r}: route.py has codex, opencode and claude_p", None, extra, **who)
     if h["kind"] == "agent_tool":
-        return emit(result("agent", **who, call_id=getattr(a, "call_id", None), agent_model=h["model"], brief_prefix=SECRET_RULE + " " + GIT_RULES, cwd=h["cwd"], **extra))
+        return emit(result("agent", **who, call_id=getattr(a, "call_id", None), transcript_status="unsupported", agent_model=h["model"], brief_prefix=SECRET_RULE + " " + GIT_RULES, cwd=h["cwd"], **extra))
     brief = Path(a.brief).read_text(encoding="utf-8", errors="replace") if a.brief else sys.stdin.read()
     if not brief.strip():
         return emit(result("error", reason="caller", **who, call_id=getattr(a, "call_id", None), say="empty brief: pass it on stdin or with --brief FILE", **extra))
@@ -3002,7 +3005,7 @@ def run_once(a, cfg):
     secs = round(time.time() - t0, 1)
     five_after, week_after = lane_use(cfg, d["lane"], now())
     transcript = find_transcript(res.get("ref"), fam)
-    history_add({"ts": now(), "run_id": rid, "call_id": getattr(a, "call_id", None), "role": a.role, "task": a.task or "", "lane": d["lane"], "model": d["model"], "effort": d["effort"],
+    history_add({"ts": now(), "run_id": rid, "call_id": getattr(a, "call_id", None), "outcome": res.get("outcome"), "role": a.role, "task": a.task or "", "lane": d["lane"], "model": d["model"], "effort": d["effort"],
                  "status": res["status"], "reason": res.get("reason"), "host": bool(a.host), "denials": len(res.get("denied") or []), "secs": secs, "cost": res.get("cost", 0), "tokens": res.get("tokens"),
                  "five_before": lane.five, "week_before": lane.week, "five_after": five_after, "week_after": week_after,
                  "overlap": sorted(set(taken["peers"]) | set(ends.get("peers", []))), "slots": cap, "transcript": transcript})
