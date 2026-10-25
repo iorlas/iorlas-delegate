@@ -208,7 +208,7 @@
       "stop": "No worker lane is available. Hold the task; a few lines the orchestrator may write itself."
     },
     "reviewer": {
-      "about": "verify, review a diff. Prefer a different family than the author (--authored-by openai|claude|xai|deepseek|zai, optional); the same family is the last resort and is flagged same_family. Codex reviews first wherever it is another family (the Pro Lite plan since 2026-10-23 has the room, and it saves the Claude limit); Grok reviews Codex's work. Always rerun the acceptance check.",
+      "about": "verify, review a diff. Prefer a different family than the author (--authored-by openai|claude|xai|deepseek|zai, optional); order: another non-Claude family, then the author's own non-Claude family (flagged same_family, never blocks), then Claude last. Codex reviews first wherever it is another family (the Pro Lite plan since 2026-10-23 has the room, and it saves the Claude limit); Grok reviews Codex's work. Always rerun the acceptance check.",
       "advance": "on_unavailable",
       "by_author": {
         "openai": [
