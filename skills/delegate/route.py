@@ -4,7 +4,7 @@
 Python 3.8+, standard library only. Windows, macOS, Linux, Docker.
 The model supplies only what the script cannot read itself; the script decides.
 
-  route.py status [--claude-usage JSON|@file|-] [--json]
+  route.py status [--claude-usage JSON|@file|-] [--json] [--cheap]
   route.py next ROLE [--authored-by openai|claude|xai] [--failed 0,1] [--premium [FAMILY]] [--allow-degraded]
                      [--claude-usage JSON|@file|-] [--cwd DIR] [--verbose]
   route.py run ROLE [--cwd DIR] [--brief FILE] [--schema FILE] [--resume REF] [--cap USD] [--timeout SEC] [--unattended] [--host] [--authored-by W] [--failed I,J] [--premium] [--allow-degraded]
@@ -472,7 +472,7 @@ def fetch_codex_limits():
         send({"id": 2, "method": "account/rateLimits/read"})
         r = read(2, 8)
     finally:
-        p.kill()
+        kill_tree(p)
         p.wait()
         for f in (p.stdin, p.stdout):
             with contextlib.suppress(OSError):
@@ -555,14 +555,20 @@ def normalize_usage(raw):
 
 def claude_logged_out():
     """True only when `claude auth status` answers loggedIn false; no CLI or an unreadable answer is not a logout (an Agent-tool host may have no CLI)."""
+    c = cached_auth("CLAUDE_SUBSCRIPTION", now())
+    if c:
+        return c["ok"] is False
     exe = shutil.which("claude")
     if not exe:
         return False
     try:
-        r = subprocess.run([exe, "auth", "status"], capture_output=True, text=True, timeout=15)
-        return json.loads(r.stdout).get("loggedIn") is False
+        r = run_tree([exe, "auth", "status"], 15)
+        v = json.loads(r.stdout).get("loggedIn")
     except (OSError, subprocess.TimeoutExpired, ValueError, AttributeError):
         return False
+    if isinstance(v, bool):
+        write_auth("CLAUDE_SUBSCRIPTION", v, "claude auth status", now())
+    return v is False
 
 
 def read_claude_subscription(lane, S, st, t, ai_usage=None):
@@ -1039,6 +1045,43 @@ LOGIN_CMD = {"OPENAI_SUBSCRIPTION": "codex login", "CLAUDE_SUBSCRIPTION": "claud
 SPEND_RE = re.compile(r"spend(ing)?[- ]?(limit|control)|out of credits|credit balance|top[- ]?up|billing|insufficient (funds|credit)|credits? (exhausted|too low)|cycle cap|cap reached", re.I)
 AUTH_TTL = 300          # a login check answers for this long: it spawns a CLI, cheap but not free
 AUTH_TIMEOUT = 10
+AUTH_FILE_TTL = 600     # auth-cache.json: written by a non-cheap status, doctor, a login probe and a successful run; read by next and status --cheap
+
+
+def auth_cache_path():
+    return config_dir() / "auth-cache.json"
+
+
+def read_auth_cache():
+    """-> {lane: {at, ok, why}}; empty when the file is missing or unreadable."""
+    try:
+        d = json.loads(auth_cache_path().read_text(encoding="utf-8"))
+        return d if isinstance(d, dict) else {}
+    except (OSError, ValueError, SystemExit):
+        return {}
+
+
+def write_auth(name, ok, why, t):
+    """Remember a login answer for AUTH_FILE_TTL. Never fails the caller."""
+    if ok is None:
+        return
+    with contextlib.suppress(Exception):
+        p = auth_cache_path()
+        with locked(p):
+            d = read_auth_cache()
+            d[name] = {"at": t, "ok": bool(ok), "why": str(why)[:120]}
+            tmp = p.with_suffix(f".tmp{os.getpid()}")
+            tmp.write_text(json.dumps(d), encoding="utf-8")
+            os.replace(tmp, p)
+            private(p)
+
+
+def cached_auth(name, t):
+    """-> the fresh {at, ok, why} entry for a lane, or None (stale, missing, or DELEGATE_NOCACHE set)."""
+    c = read_auth_cache().get(name)
+    if isinstance(c, dict) and 0 <= t - c.get("at", 0) <= AUTH_FILE_TTL and "ok" in c and not os.environ.get("DELEGATE_NOCACHE"):
+        return c
+    return None
 SLOW_WINDOW = 2 * 3600  # a hang or timeout this recent, with no good run on the lane since, keeps it marked slow
 SLOW_KINDS = ("hung", "timeout")
 
@@ -1064,7 +1107,7 @@ def cli_login(exe_name, args, ok_if):
     if not exe:
         return None, f"{exe_name} CLI not installed"
     try:
-        r = subprocess.run([exe] + args, capture_output=True, text=True, timeout=AUTH_TIMEOUT)
+        r = run_tree([exe] + args, AUTH_TIMEOUT)
     except (OSError, subprocess.TimeoutExpired) as e:
         return None, f"{exe_name} login check failed: {type(e).__name__}"
     return ok_if(r), (r.stdout + r.stderr).strip()[:120]
@@ -1118,6 +1161,7 @@ def login_state(name, st, t):
     ok, why = probe_login(name)
     if ok is not None:
         update_state(lambda s_: s_.setdefault("auth", {}).__setitem__(name, {"at": t, "ok": ok, "why": why}))
+        write_auth(name, ok, why, t)
     return ok, why, t
 
 
@@ -1313,23 +1357,69 @@ def cockpit_text(ck):
     return out
 
 
+SNAPSHOT_TTL = 6 * 3600
+
+
+def snapshot_path():
+    return config_dir() / "status-snapshot.json"
+
+
+def status_payload(cfg, lanes, ck, st, t, recent):
+    return {"v": 1, "ts": t,
+            "lanes": {n: {"family": l.family, "kind": l.kind, "out": l.out, "out_until": l.out_until, "reason": l.out_reason if l.out else None, "five": l.five, "week": l.week,
+                          "pace": l.pace, "burn": l.burn, "spend": l.spend, "cap": l.cap, "notes": l.notes} for n, l in lanes.items()},
+            "cockpit": ck,
+            "running": running_rows(st, t),
+            "routing": routing_snapshot(cfg, lanes, st, t),
+            "recent": recent_runs(recent),
+            "needs_input": needs_input(lanes)}
+
+
+def running_rows(st, t):
+    return [{"run_id": k, "lane": v["lane"], "role": v["role"], "task": v.get("task", ""), "started": v["start"], "age_s": int(t - v["start"]),
+             "pid": v.get("pid"), "worker_pid": v.get("worker_pid")}
+            for k, v in sorted(live_leases(st, t).items(), key=lambda kv: kv[1]["start"])]
+
+
+def write_snapshot(payload):
+    with contextlib.suppress(Exception):
+        p = snapshot_path()
+        tmp = p.with_suffix(f".tmp{os.getpid()}")
+        tmp.write_text(json.dumps(payload), encoding="utf-8")
+        os.replace(tmp, p)
+        private(p)
+
+
+def cmd_status_cheap(a, cfg):
+    """Zero process spawns and no network: the last full status (status-snapshot.json) with `running` read fresh from the leases and the
+    cached logins from auth-cache.json. `age_s` = seconds since the snapshot was taken (null when no status has run yet)."""
+    t = now()
+    st = load_state()
+    snap = {}
+    with contextlib.suppress(OSError, ValueError):
+        d = json.loads(snapshot_path().read_text(encoding="utf-8"))
+        snap = d if isinstance(d, dict) else {}
+    at = snap.get("ts")
+    out = {k: v for k, v in snap.items() if k not in ("ts", "running")}
+    out.update(v=1, cheap=True, ts=t, age_s=int(t - at) if isinstance(at, (int, float)) else None, running=running_rows(st, t),
+               auth={n: {"ok": c.get("ok"), "why": c.get("why"), "age_s": int(t - c.get("at", 0))} for n, c in read_auth_cache().items() if isinstance(c, dict)})
+    out.setdefault("lanes", {})
+    print(json.dumps(out) if a.json else "\n".join(f"{n}: {c['ok']} ({c['age_s']}s old)" for n, c in out["auth"].items()) + f"\nrunning: {len(out['running'])}  snapshot age: {out['age_s']}s")
+    return 0
+
+
 def cmd_status(a, cfg):
+    if a.cheap:
+        return cmd_status_cheap(a, cfg)
     t = now()
     st = load_state()
     lanes = gather(cfg, st, t, parse_json_arg(a.claude_usage))
     publish_lanes(lanes, st, t)
     ck = cockpit(cfg, lanes, st, t)
+    payload = status_payload(cfg, lanes, ck, st, t, a.recent)
+    write_snapshot(payload)
     if a.json:
-        print(json.dumps({"v": 1, "ts": t,
-                          "lanes": {n: {"family": l.family, "kind": l.kind, "out": l.out, "out_until": l.out_until, "reason": l.out_reason if l.out else None, "five": l.five, "week": l.week,
-                                        "pace": l.pace, "burn": l.burn, "spend": l.spend, "cap": l.cap, "notes": l.notes} for n, l in lanes.items()},
-                          "cockpit": ck,
-                          "running": [{"run_id": k, "lane": v["lane"], "role": v["role"], "task": v.get("task", ""), "started": v["start"], "age_s": int(t - v["start"]),
-                                       "pid": v.get("pid"), "worker_pid": v.get("worker_pid")}
-                                      for k, v in sorted(live_leases(st, t).items(), key=lambda kv: kv[1]["start"])],
-                          "routing": routing_snapshot(cfg, lanes, st, t),
-                          "recent": recent_runs(a.recent),
-                          "needs_input": needs_input(lanes)}))
+        print(json.dumps(payload))
         return 0
     print("\n".join(cockpit_text(ck)))
     for n in needs_input(lanes):
@@ -1373,22 +1463,9 @@ def orphan(v):
 
 
 def reap(v):
-    """Stop an orphaned worker's process group: SIGTERM, a short grace, SIGKILL. -> True when it is gone."""
+    """Stop an orphaned worker's whole tree: SIGTERM, a short grace, SIGKILL (stop_tree). -> True when the worker is gone."""
     pg = int(v["worker_pid"])
-    groups = {pg}
-    for c in descendants(pg):       # Claude's background shells run in groups of their own
-        with contextlib.suppress(OSError):
-            groups.add(os.getpgid(c))
-    groups.discard(os.getpgrp())
-    for sig, grace in ((signal.SIGTERM, 3), (signal.SIGKILL, 2)):
-        for g in groups:
-            with contextlib.suppress(OSError):
-                os.killpg(g, sig)
-        end = time.time() + grace
-        while time.time() < end:
-            if proc_start(pg) != v.get("worker_start"):
-                return True
-            time.sleep(0.2)
+    stop_tree(pg, grace=3, done=lambda: proc_start(pg) != v.get("worker_start"))
     return proc_start(pg) != v.get("worker_start")
 
 
@@ -1798,24 +1875,87 @@ def descendants(pid):
     return []
 
 
-def kill_tree(p):
-    """Kill the worker and everything it started. Killing only the codex wrapper leaves the vendor binary running; Claude starts its
-    background shells (run_in_background: Unity, a server) in groups of their own, so every descendant's group goes too."""
+def pid_alive(pid):
+    """True while the pid is a live, non-zombie process (POSIX; Windows answers False: taskkill /T does the whole job there)."""
+    if os.name == "nt":
+        return False
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    except OSError:
+        return True
+    st = ""
     with contextlib.suppress(Exception):
-        if os.name == "nt":
-            subprocess.run(["taskkill", "/F", "/T", "/PID", str(p.pid)], capture_output=True)
-        else:
-            import signal
-            groups = {p.pid}
-            for c in descendants(p.pid):
-                with contextlib.suppress(OSError):
-                    groups.add(os.getpgid(c))
-            groups.discard(os.getpgrp())
-            for g in groups:
-                with contextlib.suppress(OSError):
-                    os.killpg(g, signal.SIGKILL)
+        st = subprocess.run(["ps", "-o", "stat=", "-p", str(pid)], capture_output=True, text=True, timeout=5).stdout.strip()
+    return not st.startswith("Z")
+
+
+def stop_tree(pid, grace=0, done=None):
+    """Stop `pid` and everything below it, however deep and whatever session or group each descendant sits in (the Codex CLI is a node
+    shim whose native child may sit in a group of its own and ignore SIGTERM; Claude's background shells likewise). Only this tree, found
+    by parent links: never a pattern. Windows: `taskkill /T /F /PID`. POSIX: with `grace`, SIGTERM first and wait up to `grace` seconds
+    for `done()`; then SIGKILL every pid and group collected, re-collecting until nothing below is left (a dead parent orphans its
+    children, so the pids are remembered from before the first signal). -> True when nothing is left."""
+    if os.name == "nt":
+        with contextlib.suppress(Exception):
+            subprocess.run(["taskkill", "/T", "/F", "/PID", str(pid)], capture_output=True)
+        return True
+    me, mygroup = os.getpid(), os.getpgrp()
+    known = {pid}
+    groups = set()
+
+    def collect():
+        for c in [pid] + descendants(pid):
+            known.add(c)
+        for c in list(known):
+            with contextlib.suppress(OSError):
+                groups.add(os.getpgid(c))
+        groups.discard(mygroup)
+        known.discard(me)
+
+    def sweep(sig):
+        for g in groups:
+            with contextlib.suppress(OSError):
+                os.killpg(g, sig)
+        for c in known:
+            with contextlib.suppress(OSError):
+                os.kill(c, sig)
+    collect()
+    if grace:
+        sweep(signal.SIGTERM)
+        end = time.time() + grace
+        while time.time() < end and not (done() if done else not any(pid_alive(c) for c in known)):
+            time.sleep(0.2)
+    for _ in range(5):
+        collect()
+        sweep(signal.SIGKILL)
+        time.sleep(0.05)
+        if not any(pid_alive(c) for c in known):
+            return True
+    return not any(pid_alive(c) for c in known)
+
+
+def kill_tree(p):
+    """Kill the worker `p` (a Popen) and its whole tree: killing only the codex wrapper leaves the vendor binary running."""
+    with contextlib.suppress(Exception):
+        stop_tree(p.pid)
     with contextlib.suppress(Exception):
         p.kill()
+
+
+def run_tree(cmd, timeout, **kw):
+    """subprocess.run with captured text output whose timeout stops the whole tree, not just the direct child. -> CompletedProcess; TimeoutExpired on timeout."""
+    sess = {"start_new_session": True} if os.name != "nt" else {"creationflags": 0x00000200}
+    p = subprocess.Popen(cmd, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, **sess, **kw)
+    try:
+        out, err = p.communicate(timeout=timeout)
+    except BaseException:
+        kill_tree(p)
+        with contextlib.suppress(Exception):
+            p.communicate(timeout=5)
+        raise
+    return subprocess.CompletedProcess(cmd, p.returncode, out, err)
 
 
 CREDENTIAL_RE = re.compile(r"(TOKEN|SECRET|PASSW|CREDENTIAL|API_?KEY|ACCESS_?KEY|PRIVATE_?KEY)|^(AWS_|GH_|GITHUB_|SSH_AUTH_SOCK$)", re.I)
@@ -2318,7 +2458,7 @@ def launch_opencode(d, brief, a, rid, t, meta):
             shell.unlink()
     if seen["ref"]:     # opencode keeps sessions in its database: export one to a file, so `transcript` is a path like the other lanes'
         with contextlib.suppress(OSError, subprocess.TimeoutExpired):
-            x = subprocess.run([exe, "export", seen["ref"]], capture_output=True, text=True, timeout=60, env=env)
+            x = run_tree([exe, "export", seen["ref"]], 60, env=env)
             if x.returncode == 0 and x.stdout.strip():
                 f = opencode_transcript(seen["ref"])
                 f.parent.mkdir(parents=True, exist_ok=True)
@@ -2693,6 +2833,8 @@ def run_once(a, cfg):
     err = res.pop("stderr", "")
     if err:
         print(err[-2000:], file=sys.stderr)
+    if res["status"] == "done" and d["lane"] in ("CLAUDE_SUBSCRIPTION", "OPENAI_SUBSCRIPTION"):
+        write_auth(d["lane"], True, "a worker run succeeded", now())
     if agent_runs:
         agent_runs.run(rid, ended=now(), status="completed" if res["status"] == "done" else "failed", transcript=find_transcript(res.get("ref"), fam))
     if res.get("ref") and res["status"] == "done":
@@ -2738,6 +2880,9 @@ def cmd_doctor(a, cfg):
         print(json.dumps(out, indent=1))
         return 1 if out.get("error") else 0
     d = onboard.doctor(R, cfg, deep=a.deep, lane=a.lane)
+    for c in d.get("checks") or []:
+        if isinstance(c, dict) and c.get("id") == "claude_login" and c.get("ok") is True:       # only a positive answer: doctor cannot tell "logged out" from "no CLI" or "unreadable"
+            write_auth("CLAUDE_SUBSCRIPTION", c.get("ok"), "doctor", now())
     if a.next:
         step = onboard.next_step(d)
         print(json.dumps(step if step and "optional_only" not in step else {"step": None, "say": "READY", "lanes": d["lanes"]}, indent=1))
@@ -2778,7 +2923,7 @@ def main(argv=None):
                 stream.reconfigure(encoding="utf-8", errors="replace")
     ap = argparse.ArgumentParser(prog="route.py", description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = ap.add_subparsers(dest="cmd", required=True)
-    s = sub.add_parser("status"); s.add_argument("--claude-usage"); s.add_argument("--json", action="store_true"); s.add_argument("--recent", type=int, default=20)
+    s = sub.add_parser("status"); s.add_argument("--claude-usage"); s.add_argument("--json", action="store_true"); s.add_argument("--recent", type=int, default=20); s.add_argument("--cheap", action="store_true", help="no process spawns: last status snapshot plus cached logins, with age_s")
     n = sub.add_parser("next"); n.add_argument("role"); n.add_argument("--authored-by"); n.add_argument("--host", action="store_true"); n.add_argument("--failed", default="")
     n.add_argument("--premium", nargs="?", const="claude", metavar="FAMILY"); n.add_argument("--allow-degraded", action="store_true")
     n.add_argument("--claude-usage"); n.add_argument("--cwd"); n.add_argument("--verbose", action="store_true")
