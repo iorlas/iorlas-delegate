@@ -157,9 +157,9 @@ class Roles(unittest.TestCase):
 
     def test_every_reviewer_list_reaches_every_family(self):
         for who, steps in CFG["roles"]["reviewer"]["by_author"].items():
-            self.assertEqual({s["on"] for s in steps}, {"openai", "claude", "xai"}, who)
+            self.assertEqual({s["on"] for s in steps}, {"openai", "claude", "xai", "deepseek", "zai"}, who)
             if who != "unknown":
-                fam = {"openai": "openai", "claude": "claude", "xai": "xai"}[who]
+                fam = who
                 self.assertEqual(steps[-1]["flag"], "same_family", who)
                 self.assertEqual(steps[-1]["on"], fam, who)
 

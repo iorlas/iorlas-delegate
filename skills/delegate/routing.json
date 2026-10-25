@@ -36,7 +36,10 @@
     "max_parallel": 4,
     "min_dwell_minutes": 30,
     "usage_stale_minutes": 30,
-    "claude_weekly_reset": ""
+    "claude_weekly_reset": "",
+    "deepseek_free_enabled": false,
+    "zai_coding_enabled": false,
+    "codex_plan_review_only": false
   },
   "models": {
     "opus-5.5": {
@@ -70,6 +73,18 @@
     "grok-4.7": {
       "family": "xai",
       "api": "xai/grok-4.7"
+    },
+    "deepseek-v4.1-flash-free": {
+      "family": "deepseek",
+      "api": "opencode/deepseek-v4.1-flash-free"
+    },
+    "glm-5.3": {
+      "family": "zai",
+      "api": "zai-coding-plan/glm-5.3"
+    },
+    "glm-5.3-flash": {
+      "family": "zai",
+      "api": "zai-coding-plan/glm-5.3-flash"
     }
   },
   "lanes": {
@@ -101,6 +116,21 @@
       "reader": "none",
       "runner": "opencode",
       "ready": "opencode_xai"
+    },
+    "DEEPSEEK_FREE": {
+      "family": "deepseek",
+      "kind": "subscription",
+      "reader": "none",
+      "runner": "opencode",
+      "ready": "opencode_deepseek_free"
+    },
+    "ZAI_CODING_SUBSCRIPTION": {
+      "label": "Z.ai GLM Coding Plan",
+      "family": "zai",
+      "kind": "subscription",
+      "reader": "none",
+      "runner": "opencode",
+      "ready": "opencode_zai_coding"
     }
   },
   "roles": {
@@ -143,6 +173,18 @@
       "advance": "on_unavailable",
       "steps": [
         {
+          "model": "deepseek-v4.1-flash-free",
+          "effort": "high",
+          "on": "deepseek",
+          "mode": "write"
+        },
+        {
+          "model": "glm-5.3",
+          "effort": "high",
+          "on": "zai",
+          "mode": "write"
+        },
+        {
           "model": "gpt-6.1-sol",
           "effort": "medium",
           "on": "openai",
@@ -166,7 +208,7 @@
       "stop": "No worker lane is available. Hold the task; a few lines the orchestrator may write itself."
     },
     "reviewer": {
-      "about": "verify, review a diff. Prefer a different family than the author (--authored-by openai|claude|xai, optional); the same family is the last resort and is flagged same_family. Codex reviews first wherever it is another family (the Pro Lite plan since 2026-10-23 has the room, and it saves the Claude limit); Grok reviews Codex's work. Always rerun the acceptance check.",
+      "about": "verify, review a diff. Prefer a different family than the author (--authored-by openai|claude|xai|deepseek|zai, optional); the same family is the last resort and is flagged same_family. Codex reviews first wherever it is another family (the Pro Lite plan since 2026-10-23 has the room, and it saves the Claude limit); Grok reviews Codex's work. Always rerun the acceptance check.",
       "advance": "on_unavailable",
       "by_author": {
         "openai": [
@@ -182,6 +224,18 @@
             "on": "claude",
             "mode": "read_only",
             "cap": 2
+          },
+          {
+            "model": "deepseek-v4.1-flash-free",
+            "effort": "high",
+            "on": "deepseek",
+            "mode": "read_only"
+          },
+          {
+            "model": "glm-5.3",
+            "effort": "high",
+            "on": "zai",
+            "mode": "read_only"
           },
           {
             "model": "sonnet-5.5",
@@ -215,6 +269,18 @@
             "mode": "read_only"
           },
           {
+            "model": "deepseek-v4.1-flash-free",
+            "effort": "high",
+            "on": "deepseek",
+            "mode": "read_only"
+          },
+          {
+            "model": "glm-5.3",
+            "effort": "high",
+            "on": "zai",
+            "mode": "read_only"
+          },
+          {
             "model": "sonnet-5.5",
             "effort": "medium",
             "on": "claude",
@@ -245,6 +311,18 @@
             "on": "claude",
             "mode": "read_only",
             "cap": 2
+          },
+          {
+            "model": "deepseek-v4.1-flash-free",
+            "effort": "high",
+            "on": "deepseek",
+            "mode": "read_only"
+          },
+          {
+            "model": "glm-5.3",
+            "effort": "high",
+            "on": "zai",
+            "mode": "read_only"
           },
           {
             "model": "sonnet-5.5",
@@ -284,12 +362,110 @@
             "cap": 2
           },
           {
+            "model": "deepseek-v4.1-flash-free",
+            "effort": "high",
+            "on": "deepseek",
+            "mode": "read_only"
+          },
+          {
+            "model": "glm-5.3",
+            "effort": "high",
+            "on": "zai",
+            "mode": "read_only"
+          },
+          {
             "model": "sonnet-5.5",
             "effort": "low",
             "on": "claude",
             "mode": "read_only",
             "cap": 2,
             "flag": "degraded"
+          }
+        ],
+        "deepseek": [
+          {
+            "model": "gpt-6.1-sol",
+            "effort": "high",
+            "on": "openai",
+            "mode": "read_only",
+            "use": "review"
+          },
+          {
+            "model": "grok-4.7",
+            "effort": "medium",
+            "on": "xai",
+            "mode": "read_only"
+          },
+          {
+            "model": "sonnet-5.5",
+            "effort": "medium",
+            "on": "claude",
+            "mode": "read_only",
+            "cap": 2
+          },
+          {
+            "model": "sonnet-5.5",
+            "effort": "low",
+            "on": "claude",
+            "mode": "read_only",
+            "cap": 2,
+            "flag": "degraded"
+          },
+          {
+            "model": "glm-5.3",
+            "effort": "high",
+            "on": "zai",
+            "mode": "read_only"
+          },
+          {
+            "model": "deepseek-v4.1-flash-free",
+            "effort": "high",
+            "on": "deepseek",
+            "mode": "read_only",
+            "flag": "same_family"
+          }
+        ],
+        "zai": [
+          {
+            "model": "deepseek-v4.1-flash-free",
+            "effort": "high",
+            "on": "deepseek",
+            "mode": "read_only"
+          },
+          {
+            "model": "gpt-6.1-sol",
+            "effort": "high",
+            "on": "openai",
+            "mode": "read_only",
+            "use": "review"
+          },
+          {
+            "model": "grok-4.7",
+            "effort": "medium",
+            "on": "xai",
+            "mode": "read_only"
+          },
+          {
+            "model": "sonnet-5.5",
+            "effort": "medium",
+            "on": "claude",
+            "mode": "read_only",
+            "cap": 2
+          },
+          {
+            "model": "sonnet-5.5",
+            "effort": "low",
+            "on": "claude",
+            "mode": "read_only",
+            "cap": 2,
+            "flag": "degraded"
+          },
+          {
+            "model": "glm-5.3",
+            "effort": "high",
+            "on": "zai",
+            "mode": "read_only",
+            "flag": "same_family"
           }
         ]
       },
@@ -327,6 +503,18 @@
       "about": "simple, low-risk, low-reasoning work: read many files, summarise logs, classify, mechanical small edits. Not about parallelism.",
       "advance": "on_unavailable",
       "steps": [
+        {
+          "model": "deepseek-v4.1-flash-free",
+          "effort": "low",
+          "on": "deepseek",
+          "mode": "read_only"
+        },
+        {
+          "model": "glm-5.3-flash",
+          "effort": "low",
+          "on": "zai",
+          "mode": "read_only"
+        },
         {
           "model": "gpt-6-luna",
           "effort": "low",

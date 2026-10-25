@@ -107,8 +107,29 @@ def check_opencode_xai(R):
         return False
 
 
+def check_opencode_deepseek_free(R):
+    """Explicit opt-in; free OpenCode access needs no provider credential."""
+    return (sys.platform == "darwin" and bool(R.opencode_exe())
+            and R.load_routing()["settings"].get("deepseek_free_enabled") is True)
+
+
+def check_opencode_zai_coding(R):
+    """Subscription-specific saved credential only; never an API-credit provider or env key."""
+    if (sys.platform != "darwin" or not R.opencode_exe()
+            or R.load_routing()["settings"].get("zai_coding_enabled") is not True):
+        return False
+    f = Path(os.environ.get("XDG_DATA_HOME") or Path.home() / ".local" / "share") / "opencode" / "auth.json"
+    try:
+        auth = json.loads(f.read_text(encoding="utf-8")).get("zai-coding-plan", {})
+        return isinstance(auth, dict) and auth.get("type") == "api" and bool(auth.get("key"))
+    except (OSError, ValueError, TypeError, AttributeError):
+        return False
+
+
 READY_CHECKS = {
+    "opencode_zai_coding": check_opencode_zai_coding,
     "opencode_xai": check_opencode_xai,
+    "opencode_deepseek_free": check_opencode_deepseek_free,
     "codex": lambda R: check_codex_cli(R) and check_codex_login(R),
     "claude_credit": lambda R: check_claude_cli(R) and check_credit_key(R),
     "always": lambda R: True,
@@ -152,6 +173,10 @@ def build_checks(R, cfg, st):
          "url": "https://platform.claude.com"},
         {"id": "opencode_xai", "lane": "GROK_SUBSCRIPTION", "ok": check_opencode_xai(R), "skip": "GROK_SUBSCRIPTION" in skip, "who": "user", "optional": True,
          "say": "Optional Grok lane (macOS): install OpenCode (https://opencode.ai) and sign in with SuperGrok: `opencode auth login`, pick xAI, then SuperGrok Subscription."},
+        {"id": "opencode_deepseek_free", "lane": "DEEPSEEK_FREE", "ok": check_opencode_deepseek_free(R), "skip": "DEEPSEEK_FREE" in skip, "who": "user", "optional": True,
+         "say": "Optional free-only DeepSeek lane (macOS): install OpenCode, then `route.py config set deepseek_free_enabled true`. No key required. Only the exact free model is used; catalog price must be zero. Disable with `route.py config set deepseek_free_enabled false`."},
+        {"id": "opencode_zai_coding", "lane": "ZAI_CODING_SUBSCRIPTION", "ok": check_opencode_zai_coding(R), "skip": "ZAI_CODING_SUBSCRIPTION" in skip, "who": "user", "optional": True,
+         "say": "Z.ai Coding Plan: run `opencode auth login`, choose Z.AI Coding Plan and enter your subscription key in your own terminal. Enable with `route.py config set zai_coding_enabled true`. Never paste a key in chat. Ordinary Z.AI API credit is a separate provider."},
         {"id": "claude_login", "lane": "CLAUDE_SUBSCRIPTION", "ok": check_claude_login(R), "who": "user", "optional": True,
          "say": "Unattended callers (task-loop, cron) run `claude -p` on your Claude login, and it is not signed in. Run `claude auth login`."},
         {"id": "weekly_reset", "lane": "CLAUDE_SUBSCRIPTION", "ok": bool(S.get("claude_weekly_reset")), "who": "user", "optional": True,

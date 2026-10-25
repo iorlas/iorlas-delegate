@@ -144,3 +144,16 @@ https://github.com/iorlas/iorlas-task-loop/blob/main/docs/contracts/worker-run-v
 - Never make delegate read anything of task-loop's, and never write outside `agent-runs/` for a dashboard's sake.
 
 Tests: `tests/test_route.py`, class `AgentRuns` (the records' shape). Keep it green or replace it with an equivalent.
+
+
+### Dashboard routing snapshot
+
+`route.py status --json` (v1) optionally includes `routing` (v1): `at`, `caller: unattended`,
+`lanes` (id, label, family, billing, enabled, available, reason, unattended, until, five/week used percentages, model names),
+and `roles` (id, about, advance, selected, chain). `selected` is the current fresh-call decision under the same
+unattended rules, busy-slot limits and usage gates as `run`; it never starts a worker. Credit lanes are inventory
+only for unattended callers. `chain` contains ordered model/effort/family/mode/flag/rung/lanes steps; reviews
+also include `by_author` scenarios. Planning degradation still requires consent; premium models are not part of
+normal chains. This is a preview: limits can change before dispatch and resumed threads stay on their own lane.
+Consumers must tolerate a missing snapshot from older delegate installations. No credentials, private configuration
+or account subscription tier are exported; a configured login is not proof of a particular paid plan.

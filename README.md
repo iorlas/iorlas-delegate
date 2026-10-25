@@ -22,6 +22,10 @@ Requirements: Claude Code. Base mode (Claude sub-agents only) needs nothing else
 | `OPENAI_SUBSCRIPTION` | the ChatGPT Plus plan, through Codex | `codex login` |
 | `GROK_SUBSCRIPTION` | the SuperGrok plan, through OpenCode (macOS) | `opencode auth login`, xAI, SuperGrok Subscription |
 
+| `DEEPSEEK_FREE` | temporary OpenCode free tier (macOS; explicit opt-in) | none; isolated from saved provider logins |
+
+Enable with `route.py config set deepseek_free_enabled true` (disable with `false`). Light work and implementation try DeepSeek first, then fall back to the existing lanes. Reviews preserve family independence; planning and hard tasks keep their original chains. Before every launch the exact `opencode/deepseek-v4.1-flash-free` model must have zero input, output and cache prices in the CLI catalog. No paid DeepSeek replacement is selected. Free access can be withdrawn or rate-limited.
+
 Roles: `planner`, `worker`, `reviewer`, `hard`, `light`. Chains, models and thresholds are data in `skills/delegate/routing.json`. The premium tier (Fable for claude) runs only when the user asks for it by name (`--premium`).
 
 ## Layout
@@ -42,3 +46,5 @@ Git stays with the coordinator: workers never create branches or worktrees and n
 Dashboards: each Codex and `claude -p` run and the lanes' limits are published as [agent-runs v1](https://github.com/iorlas/iorlas-task-loop/blob/main/docs/contracts/agent-runs-v1.md) records in `~/.config/agent-runs` (`skills/delegate/agent_runs.py` is the only writer). That format is a public contract; everything else here is internal and may change.
 
 State, ledger, settings, profile and the key file live in Claude Code's data folder for the plugin (`~/.claude/plugins/data/iorlas-delegate-<marketplace>`), owner-only. A checkout has no default and refuses to run until `DELEGATE_CONFIG_DIR` names a folder, so state is never split between two places. Uninstalling the plugin deletes the folder, key included. Nothing secret is in this repository. Work is tracked with beads (`bd list`).
+
+Set `route.py config set codex_plan_review_only true` to pause Codex writing: only read-only planner/reviewer calls remain eligible. Worker, hard and light roles skip Codex, and saved Codex writer resumes return lane_out so the caller can start a fresh writer on another family. Running processes are not cancelled by this configuration change. Set it to false to restore normal routing.

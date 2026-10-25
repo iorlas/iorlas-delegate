@@ -599,6 +599,10 @@ def gather(cfg, st, t, ai_usage=None, check_config=True):
         import onboard
         conf = onboard.configured_lanes(sys.modules[__name__], cfg)
     for name, c in cfg["lanes"].items():
+        if name == "DEEPSEEK_FREE" and S.get("deepseek_free_enabled") is not True:
+            continue
+        if name == "ZAI_CODING_SUBSCRIPTION" and S.get("zai_coding_enabled") is not True:
+            continue
         mode = lane_mode(name, c, conf.get(name, True)) if check_config else "on"
         if mode == "off":
             continue
@@ -699,7 +703,15 @@ def pick_lane(family, lanes, S, st, t, relaxed, trace):
 LATE_FLAGS = ("degraded", "same_family")
 
 
-def build_tiers(role, cfg, args):
+def codex_step_allowed(role_name, step, cfg):
+    """A paused Codex writer may only plan/review, and always under read-only access."""
+    if not cfg["settings"].get("codex_plan_review_only"):
+        return True
+    family = (cfg["models"].get(step.get("model")) or {}).get("family") or step.get("on")
+    return family != "openai" or (role_name in ("planner", "reviewer") and step.get("mode", "read_only") == "read_only")
+
+
+def build_tiers(role, cfg, args, role_name=None):
     """-> list of tiers; each tier is a list of steps tried strict then relaxed before the next tier."""
     steps = list(role.get("steps") or [])
     if "by_author" in role:
@@ -707,12 +719,19 @@ def build_tiers(role, cfg, args):
         if w not in role["by_author"]:
             return None
         steps = list(role["by_author"][w])
+    if cfg["settings"].get("deepseek_free_enabled") is not True:
+        steps = [s for s in steps if s.get("on") != "deepseek"]
+    if cfg["settings"].get("zai_coding_enabled") is not True:
+        steps = [s for s in steps if s.get("on") != "zai"]
     prem = args.get("premium")
     if prem:
         step = (cfg.get("premium") or {}).get(prem)
         if not step:
             return None
         steps = [dict(step)] + steps
+    if role_name is None:
+        role_name = next((name for name, value in cfg["roles"].items() if value == role), None)
+    steps = [s for s in steps if codex_step_allowed(role_name, s, cfg)]
     steps = [dict(s, idx=i) for i, s in enumerate(steps)]
     if role["advance"] == "on_failure":
         failed = args.get("failed") or []
@@ -724,7 +743,7 @@ def build_tiers(role, cfg, args):
     if flagged:
         tiers.append(flagged)
     if args.get("allow_degraded") and role.get("degraded_needs_consent"):
-        tiers.append([dict(s, flag="degraded_with_consent", idx=len(steps) + i) for i, s in enumerate(role["degraded_needs_consent"])])
+        tiers.append([dict(s, flag="degraded_with_consent", idx=len(steps) + i) for i, s in enumerate(role["degraded_needs_consent"]) if codex_step_allowed(role_name, s, cfg)])
     return tiers
 
 
@@ -759,7 +778,7 @@ def decide(role_name, cfg, lanes, st, t, args):
     role = cfg["roles"].get(role_name)
     if role is None:
         return {"action": "error", "error": f"unknown role {role_name}; roles: {', '.join(cfg['roles'])}"}
-    tiers = build_tiers(role, cfg, args)
+    tiers = build_tiers(role, cfg, args, role_name)
     if tiers is None:
         if args.get("premium") and not (cfg.get("premium") or {}).get(args["premium"]):
             return {"action": "error", "error": f"no premium model configured for family {args['premium']}; premium: {[k for k, v in (cfg.get('premium') or {}).items() if v and k != 'about']}"}
@@ -904,6 +923,52 @@ def recent_runs(n):
         return []
 
 
+def routing_snapshot(cfg, lanes, st, t):
+    """Public read-only routing contract for dashboards; no vendor calls or worker launches."""
+    current = copy.deepcopy(lanes)
+    mark_busy(current, st, cfg["settings"], t)
+    workers = {n: l for n, l in current.items() if l.kind != "credit"}
+    labels = {"CLAUDE_SUBSCRIPTION": "Claude subscription", "CLAUDE_CREDIT": "Claude API credits",
+              "OPENAI_SUBSCRIPTION": "ChatGPT / Codex", "GROK_SUBSCRIPTION": "SuperGrok / OpenCode",
+              "DEEPSEEK_FREE": "DeepSeek / OpenCode Free"}
+    inventory = []
+    for name, c in cfg["lanes"].items():
+        lane = current.get(name)
+        available, why = usable(lane, cfg["settings"], True) if lane else (False, "disabled or not configured")
+        label = c.get("label") or labels.get(name, name)
+        if c["family"] == "openai" and cfg["settings"].get("codex_plan_review_only"):
+            label += " (planning/review only)"
+        inventory.append({"id": name, "label": label, "family": c["family"],
+                          "billing": "free" if name == "DEEPSEEK_FREE" else c["kind"],
+                          "enabled": lane is not None, "available": available, "reason": why,
+                          "unattended": c["kind"] != "credit", "until": lane.out_until if lane else None,
+                          "five": lane.five if lane else None, "week": lane.week if lane else None,
+                          "models": [m for m, v in cfg["models"].items() if v["family"] == c["family"]]})
+
+    def scenario(role_name, author=None):
+        role = cfg["roles"][role_name]
+        args = {"authored_by": author, "failed": [], "premium": None, "allow_degraded": False,
+                "unattended": True, "host": False, "cwd": None, "wait_busy": True}
+        d = decide(role_name, cfg, workers, st, t, args)
+        chain = []
+        for tier in build_tiers(role, cfg, args, role_name) or []:
+            for step in tier:
+                chain.append({"model": step["model"], "family": step["on"], "effort": step["effort"],
+                              "mode": step.get("mode", "read_only"), "flag": step.get("flag"),
+                              "rung": step["idx"], "lanes": [n for n, c in cfg["lanes"].items()
+                                                             if c["family"] == step["on"] and c["kind"] != "credit"]})
+        keys = ("action", "lane", "model", "effort", "flag", "warning", "say", "reason", "rung", "pass", "fallback")
+        return {"selected": {k: d[k] for k in keys if k in d}, "chain": chain}
+
+    roles = []
+    for name, role in cfg["roles"].items():
+        item = dict(id=name, about=role.get("about", ""), advance=role.get("advance"), **scenario(name))
+        if "by_author" in role:
+            item["by_author"] = {who: scenario(name, who) for who in role["by_author"] if who != "unknown"}
+        roles.append(item)
+    return {"v": 1, "at": t, "caller": "unattended", "lanes": inventory, "roles": roles}
+
+
 def cmd_status(a, cfg):
     t = now()
     st = load_state()
@@ -916,6 +981,7 @@ def cmd_status(a, cfg):
                           "running": [{"run_id": k, "lane": v["lane"], "role": v["role"], "task": v.get("task", ""), "started": v["start"], "age_s": int(t - v["start"]),
                                        "pid": v.get("pid"), "worker_pid": v.get("worker_pid")}
                                       for k, v in sorted(live_leases(st, t).items(), key=lambda kv: kv[1]["start"])],
+                          "routing": routing_snapshot(cfg, lanes, st, t),
                           "recent": recent_runs(a.recent),
                           "needs_input": needs_input(lanes)}))
         return 0
@@ -1024,6 +1090,10 @@ def decision(a, cfg):
         lane = lanes.get(rec["lane"]) if rec else None
         if not rec:
             return {"action": "error", "error": f"unknown --resume ref {ref}"}, lanes, warnings, t
+        if not codex_step_allowed(a.role, {"model": rec["model"], "mode": rec["mode"],
+                                          "on": cfg["lanes"].get(rec["lane"], {}).get("family")}, cfg):
+            return {"action": "lane_out", "lane": rec["lane"], "retry_after": t + 1,
+                    "say": "Codex writing is paused by user policy. Continue with a fresh non-Codex writer; existing file changes remain in the working directory."}, lanes, warnings, t
         if bool(rec.get("host")) != host:
             return {"action": "error", "error": f"--resume {ref} ran {'with' if rec.get('host') else 'without'} --host; pass the same"}, lanes, warnings, t
         if lane is None or not usable(lane, S, True)[0]:
@@ -1612,6 +1682,11 @@ def codex_thread_total(thread):
 def launch_codex(d, brief, a, rid, t, meta):
     """-> dict of result fields."""
     h = d["how"]
+    cfg = load_routing()
+    if cfg["settings"].get("codex_plan_review_only") and (
+            d.get("role", getattr(a, "role", None)) not in ("planner", "reviewer") or h.get("sandbox") != "read-only"):
+        return {"status": "lane_out", "reason": "lane_out", "retry_after": t + 1,
+                "say": "Codex is restricted to read-only planning and review; no worker was launched."}
     exe = shutil.which("codex")
     if not exe:
         return {"status": "error", "reason": "setup", "say": "codex CLI not found on PATH (route.py doctor --lane OPENAI_SUBSCRIPTION)"}
@@ -1788,12 +1863,35 @@ def opencode_permissions(write):
     return {"*": "allow", "read": reads, "webfetch": "deny", "websearch": "deny", "external_directory": "deny" if write else {"*": "deny", **{x + "/**": "allow" for x in opencode_readable_outside()}}, "task": "deny", **({} if write else {"edit": "deny"})}
 
 
+def opencode_free_model(exe, model, env):
+    """Fail closed if the exact free model disappears or its catalog costs change."""
+    if model != "opencode/deepseek-v4.1-flash-free":
+        return False
+    try:
+        x = subprocess.run([exe, "models", "opencode", "--verbose"], env=env,
+                           capture_output=True, text=True, timeout=30)
+        if x.returncode:
+            return False
+        marker = model + "\n"
+        if marker not in x.stdout:
+            return False
+        obj, _ = json.JSONDecoder().raw_decode(x.stdout.split(marker, 1)[1].lstrip())
+        cost = obj.get("cost") or {}
+        cache = cost.get("cache") or {}
+        return (obj.get("providerID") == "opencode" and obj.get("id") == model.split("/", 1)[1]
+                and obj.get("status") == "active"
+                and all(type(v) in (int, float) and v == 0 for v in
+                        (cost.get("input"), cost.get("output"), cache.get("read"), cache.get("write"))))
+    except (OSError, ValueError, TypeError, AttributeError, subprocess.TimeoutExpired):
+        return False
+
+
 def launch_opencode(d, brief, a, rid, t, meta):
-    """opencode run (Grok on the xAI subscription login). -> dict of result fields."""
+    """OpenCode headless runner for subscription and isolated free-only lanes."""
     h = d["how"]
     exe = opencode_exe()
     if not exe or sys.platform != "darwin":
-        return {"status": "error", "reason": "setup", "say": "the Grok lane needs macOS and the opencode CLI (route.py doctor --lane GROK_SUBSCRIPTION)"}
+        return {"status": "error", "reason": "setup", "say": f"{d['lane']} needs macOS and the opencode CLI (route.py doctor --lane {d['lane']})"}
     home = config_dir() / "opencode-home"       # an empty config root: the user's ~/.config/opencode (MCP servers, providers, permissions) stays out
     home.mkdir(parents=True, exist_ok=True)
     shell = config_dir() / f"opencode-shell-{rid[:8]}.sh"
@@ -1801,6 +1899,30 @@ def launch_opencode(d, brief, a, rid, t, meta):
     env = child_env({"SHELL": str(shell), "XDG_CONFIG_HOME": str(home), "OPENCODE_CONFIG_CONTENT": json.dumps({"permission": opencode_permissions(h["write"])}),
                      "OPENCODE_DISABLE_PROJECT_CONFIG": "1", "OPENCODE_DISABLE_CLAUDE_CODE": "1", "OPENCODE_DISABLE_EXTERNAL_SKILLS": "1",
                      "OPENCODE_DISABLE_AUTOUPDATE": "1", "OPENCODE_DISABLE_SHARE": "1", "OPENCODE_DISABLE_LSP_DOWNLOAD": "1"})
+    if d["lane"] == "DEEPSEEK_FREE":
+        # No saved provider logins or API keys: this lane cannot consume a paid balance.
+        for key in ("OPENCODE_CONFIG", "OPENCODE_CONFIG_DIR", "OPENCODE_AUTH_JSON"):
+            env.pop(key, None)
+        env["XDG_DATA_HOME"] = str(config_dir() / "opencode-free-data")
+        env["XDG_CACHE_HOME"] = str(config_dir() / "opencode-free-cache")
+        env["OPENCODE_CONFIG_CONTENT"] = json.dumps({"permission": opencode_permissions(h["write"]), "enabled_providers": ["opencode"]})
+        if not opencode_free_model(exe, h["model"], env):
+            with contextlib.suppress(OSError):
+                shell.unlink()
+            until = t + 900
+            mark_out(d["lane"], until, "exact free model unavailable or zero catalog price unverified", t)
+            return {"status": "lane_out", "reason": "lane_out", "retry_after": until,
+                    "say": "Free DeepSeek is unavailable or its zero price could not be verified; rerun to use the next configured lane."}
+    if d["lane"] == "ZAI_CODING_SUBSCRIPTION":
+        # Pin subscription routing; never substitute the pay-as-you-go `zai` provider.
+        if h["model"] not in ("zai-coding-plan/glm-5.3", "zai-coding-plan/glm-5.3-flash"):
+            with contextlib.suppress(OSError):
+                shell.unlink()
+            return {"status": "error", "reason": "setup", "say": "Z.ai Coding Plan model must use the subscription provider."}
+        for key in ("OPENCODE_CONFIG", "OPENCODE_CONFIG_DIR", "OPENCODE_AUTH_JSON", "ZHIPU_API_KEY", "ZAI_API_KEY"):
+            env.pop(key, None)
+        env["OPENCODE_CONFIG_CONTENT"] = json.dumps({"permission": opencode_permissions(h["write"]),
+            "enabled_providers": ["zai-coding-plan"]})
     cmd = [exe, "run", "--pure", "--format", "json", "-m", h["model"], "--variant", d["effort"], "--dir", h["cwd"]] + (["--session", a.resume] if a.resume else [])
     rules = " ".join((SECRET_RULE, GIT_RULES, EDIT_RULE, NO_SUBAGENTS_RULE, OC_RULE, DENIED_RULE))
     if not any((x / "AGENTS.md").is_file() for x in repo_dirs(h["cwd"])):
@@ -1879,8 +2001,11 @@ def launch_opencode(d, brief, a, rid, t, meta):
         mark_out(d["lane"], until, "limit refusal: " + why[:120].replace("\n", " "), t)
         res.update(status="lane_out", reason="lane_out", retry_after=until, say=f"{d['lane']} hit a limit; out until {local(until)}")
     elif LOGIN_RE.search(why):
-        mark_out(d["lane"], t + LOGOUT_OUT, "logged out: run `opencode auth login` (xAI, SuperGrok Subscription)", t, "logged_out")
-        res.update(status="lane_out", reason="logged_out", retry_after=now() + 60, say=f"opencode is not signed in to xAI: {why[-200:].strip()}")
+        hint = "free OpenCode access refused; no paid credentials will be used" if d["lane"] == "DEEPSEEK_FREE" else "run `opencode auth login` (xAI, SuperGrok Subscription)"
+        if d["lane"] == "ZAI_CODING_SUBSCRIPTION":
+            hint = "run `opencode auth login` and choose Z.AI Coding Plan; enter your Coding Plan key in your own terminal"
+        mark_out(d["lane"], t + LOGOUT_OUT, hint, t, "logged_out")
+        res.update(status="lane_out", reason="logged_out", retry_after=now() + 60, say=f"{d['lane']}: {hint}: {why[-200:].strip()}")
     elif why and not seen["work"]:      # failed before doing anything (network down, the service erroring): try again later
         res.update(status="stop", reason="vendor_prework", retry_after=now() + random.randint(60, 120), say=f"opencode failed before any work: {why[:200]}")
     elif why:
