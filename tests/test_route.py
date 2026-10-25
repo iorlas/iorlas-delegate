@@ -914,6 +914,58 @@ echo '{"type":"step_finish","sessionID":"ses_1","part":{"type":"step-finish","to
         auth.mkdir(parents=True, exist_ok=True)
         (auth / "auth.json").write_text('{"xai": {"type": "oauth"}}')
 
+    def watchdog_fake(self, body):
+        self.grok_ready()
+        pid = Path(self.tmp.name) / "oc.pid"
+        script = self.base / "bin" / "opencode"
+        script.write_text('#!/bin/sh\n[ "$1" = export ] && exit 1\necho $$ > "%s"\ncat >/dev/null &\n%s\n' % (pid, body))
+        self.codex_out()
+        return pid
+
+    def assert_child_gone(self, pidfile):
+        pid = int(pidfile.read_text())
+        time.sleep(0.3)
+        with self.assertRaises(OSError):
+            os.kill(pid, 0)
+
+    @unittest.skipIf(sys.platform != "darwin", "the Grok lane runs commands under sandbox-exec: macOS only")
+    def test_opencode_limit_in_its_log_stops_the_child_and_marks_the_lane_out_once(self):
+        log = Path(self.tmp.name) / ".local" / "share" / "opencode" / "log"
+        log.mkdir(parents=True, exist_ok=True)
+        pid = self.watchdog_fake('echo "ERROR Free usage limit reached" >> "%s/opencode.log"; sleep 60' % log)
+        t0 = time.time()
+        _, r = self.run_it(timeout=0)
+        self.assertLess(time.time() - t0, 20)
+        self.assertEqual((r["status"], r["reason"], r["next"], r["lane"]), ("lane_out", "lane_out", "retry", "GROK_SUBSCRIPTION"))
+        out = route.load_state()["out"]["GROK_SUBSCRIPTION"]
+        self.assertIn("Free usage limit reached", out["why"])
+        self.assertGreater(out["until"], time.time())
+        self.assertLessEqual(out["until"], route.next_utc_midnight(time.time()) + 1)
+        self.assert_child_gone(pid)
+
+    @unittest.skipIf(sys.platform != "darwin", "the Grok lane runs commands under sandbox-exec: macOS only")
+    def test_opencode_with_no_first_event_is_stopped_and_the_lane_marked_hung(self):
+        pid = self.watchdog_fake("sleep 60")
+        with mock.patch.object(route, "OC_FIRST_EVENT_SECS", 1):
+            t0 = time.time()
+            _, r = self.run_it(timeout=0)
+        self.assertLess(time.time() - t0, 20)
+        self.assertEqual((r["status"], r["reason"], r["next"]), ("lane_out", "hung", "retry"))
+        self.assertEqual(route.load_state()["out"]["GROK_SUBSCRIPTION"]["reason"], "hung")
+        self.assert_child_gone(pid)
+
+    @unittest.skipIf(sys.platform != "darwin", "the Grok lane runs commands under sandbox-exec: macOS only")
+    def test_opencode_normal_run_is_not_touched_by_the_watchdog(self):
+        log = Path(self.tmp.name) / ".local" / "share" / "opencode" / "log"
+        log.mkdir(parents=True, exist_ok=True)
+        (log / "opencode.log").write_text("old: Free usage limit reached\n")        # before launch: ignored
+        self.grok_ready()
+        self.codex_out()
+        with mock.patch.object(route, "OC_FIRST_EVENT_SECS", 1):
+            _, r = self.run_it(timeout=0)
+        self.assertEqual((r["status"], r["text"]), ("done", "grok did it"))
+        self.assertNotIn("GROK_SUBSCRIPTION", route.load_state().get("out", {}))
+
     @unittest.skipIf(sys.platform != "darwin", "the Grok lane runs commands under sandbox-exec: macOS only")
     def test_grok_is_the_worker_after_codex_in_a_sandboxed_shell_without_user_config(self):
         self.grok_ready()

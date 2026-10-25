@@ -1420,9 +1420,10 @@ def child_env(extra=None):
 WORKER_STARTED = []        # callbacks run with the worker's pid right after it starts (run_once registers one per run)
 
 
-def run_proc(cmd, text, cwd, env, timeout, on_line=None):
+def run_proc(cmd, text, cwd, env, timeout, on_line=None, poll=None):
     """-> (returncode, stdout, stderr, timed_out). Own process group; the timeout kills the group; stdin carries `text` then closes; UTF-8, errors replaced.
-    `on_line(line)` returning True stops the worker now; a number stops it that many seconds later unless it exits first."""
+    `on_line(line)` returning True stops the worker now; a number stops it that many seconds later unless it exits first.
+    `poll()` runs about every half second; a truthy answer stops the worker (its own process tree only)."""
     kw = {"start_new_session": True} if os.name != "nt" else {"creationflags": 0x00000200}
     p = subprocess.Popen(cmd, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=cwd, env=env, **kw)
     for cb in WORKER_STARTED:
@@ -1456,7 +1457,7 @@ def run_proc(cmd, text, cwd, env, timeout, on_line=None):
     try:
         while True:
             try:
-                p.wait(timeout=2 if end is None else max(0.01, min(2, end - time.time())))
+                p.wait(timeout=(0.5 if poll else 2) if end is None else max(0.01, min(0.5 if poll else 2, end - time.time())))
                 break
             except subprocess.TimeoutExpired:
                 if end is not None and time.time() >= end:
@@ -1464,7 +1465,7 @@ def run_proc(cmd, text, cwd, env, timeout, on_line=None):
                     kill_tree(p)
                     p.wait()
                     break
-                if stop_at and time.time() >= stop_at[0]:
+                if (stop_at and time.time() >= stop_at[0]) or (poll and poll()):
                     kill_tree(p)
                     p.wait()
                     break
@@ -1547,6 +1548,11 @@ def limit_until(msg, t, d):
             at += dt.timedelta(days=1)
         return at.timestamp()
     return d.get("limit_reset")
+
+
+def next_utc_midnight(t):
+    d = dt.datetime.fromtimestamp(t, dt.timezone.utc)
+    return (d.replace(hour=0, minute=0, second=0, microsecond=0) + dt.timedelta(days=1)).timestamp()
 
 
 def codex_reset_now(t):
@@ -1701,6 +1707,45 @@ def opencode_transcript(ref):
     return config_dir() / "opencode-sessions" / (ref + ".json")
 
 
+OC_FIRST_EVENT_SECS = 120      # opencode prints nothing for this long after launch: it is hung (a retry loop on a vendor limit shows nothing on stdout)
+OC_HUNG_OUT_SECS = 1800
+
+
+def opencode_log_dir():
+    return Path(os.environ.get("XDG_DATA_HOME") or Path.home() / ".local" / "share") / "opencode" / "log"
+
+
+def opencode_watchdog(first_event_secs=None):
+    """-> (poll, state) for run_proc. poll() is truthy once the child is hung: no stdout line within the window, or opencode's own log
+    gained a LIMIT_RE line since launch (it retries a limit forever without exiting). The caller bumps state["events"] per stdout line;
+    state["why"] ends as "limit" or "hung", state["msg"] is the log line."""
+    window = OC_FIRST_EVENT_SECS if first_event_secs is None else first_event_secs
+    logs, started = opencode_log_dir(), time.time()
+    state = {"why": None, "msg": "", "events": 0}
+    offs = {}
+    with contextlib.suppress(OSError):
+        offs = {f: f.stat().st_size for f in logs.glob("*.log")}
+
+    def poll():
+        with contextlib.suppress(OSError):
+            for f in logs.glob("*.log"):
+                size, off = f.stat().st_size, offs.get(f, 0)
+                if size > off:
+                    with open(f, "rb") as fh:
+                        fh.seek(off)
+                        new = fh.read(size - off).decode("utf-8", "replace")
+                    offs[f] = size
+                    m = next((ln for ln in new.splitlines() if LIMIT_RE.search(ln)), None)
+                    if m:
+                        state.update(why="limit", msg=m.strip())
+                        return True
+        if not state["events"] and time.time() - started > window:
+            state["why"] = "hung"
+            return True
+        return False
+    return poll, state
+
+
 def opencode_exe():
     return shutil.which("opencode") or next((str(p) for p in [Path.home() / ".opencode" / "bin" / "opencode"] if p.is_file()), None)
 
@@ -1764,7 +1809,10 @@ def launch_opencode(d, brief, a, rid, t, meta):
         rules += "\n\nYour final message must be only a JSON object matching this JSON Schema:\n" + Path(a.schema).read_text(encoding="utf-8")
     seen = {"ref": a.resume, "last": "", "tokens": None, "denied": [], "error": "", "work": False}
 
+    poll, dog = opencode_watchdog()
+
     def on_line(line):
+        dog["events"] += 1
         try:
             ev = json.loads(line)
         except ValueError:
@@ -1799,7 +1847,7 @@ def launch_opencode(d, brief, a, rid, t, meta):
     if agent_runs:
         agent_runs.run(rid, kind="opencode", lane=d["lane"], model=d["model"], cwd=h["cwd"], started=t, status="running", **meta)
     try:
-        rc, out, err, timed_out = run_proc(cmd, rules + "\n\n" + brief, h["cwd"], env, a.timeout, on_line)
+        rc, out, err, timed_out = run_proc(cmd, rules + "\n\n" + brief, h["cwd"], env, a.timeout, on_line, poll)
     finally:
         with contextlib.suppress(OSError):
             shell.unlink()
@@ -1816,6 +1864,14 @@ def launch_opencode(d, brief, a, rid, t, meta):
     why = seen["error"] or (err if rc != 0 else "")
     if seen.get("secret"):
         res.update(status="failed", reason="secrets", say=f"stopped: the worker ran a command on a secret path: {seen['secret'][:200]}" + (f"; {APPLY_PATCH_HINT}" if heredoc_only_hit(seen["secret"]) else ""))
+    elif dog["why"] == "limit":         # opencode's log shows a limit and it keeps retrying: end our child, mark the lane out once
+        until = limit_until(dog["msg"], t, d) or next_utc_midnight(t)
+        mark_out(d["lane"], until, "limit (opencode log): " + dog["msg"][:120], t)
+        res.update(status="lane_out", reason="lane_out", retry_after=until, say=f"{d['lane']} hit a limit ({dog['msg'][:120]}); worker stopped, lane out until {local(until)}")
+    elif dog["why"] == "hung":
+        until = t + OC_HUNG_OUT_SECS
+        mark_out(d["lane"], until, f"hung: no output within {OC_FIRST_EVENT_SECS}s", t, "hung")
+        res.update(status="lane_out", reason="hung", retry_after=until, say=f"opencode printed nothing within {OC_FIRST_EVENT_SECS}s and was stopped; {d['lane']} out until {local(until)}")
     elif timed_out:
         res.update(status="timeout", reason="timeout", say=f"opencode did not finish within {a.timeout}s and was killed")
     elif LIMIT_RE.search(why):          # opencode's error event or stderr, never the model's answer
@@ -1946,7 +2002,7 @@ def claude_tokens(u):
 
 # worker-run v2: every answer that is not done or agent names a reason, and `next` is the caller's whole policy for it:
 # retry (after retry_after), owner (a person must act: log in, set up, verify), fail (this attempt is over; re-plan or give up).
-REASONS = {"lane_out": "retry", "busy": "retry", "duplicate_task": "retry", "lock": "retry", "vendor_prework": "retry", "network": "retry",
+REASONS = {"lane_out": "retry", "busy": "retry", "duplicate_task": "retry", "lock": "retry", "vendor_prework": "retry", "hung": "retry", "network": "retry",
            "no_lane": "retry", "logged_out": "retry", "setup": "owner", "secrets": "owner", "bad_request": "owner", "crash": "owner",
            "caller": "fail", "timeout": "fail", "worker_failed": "fail", "schema_invalid": "fail"}
 LOGIN_RE = re.compile(r"not logged in|please (run|use) [`'\"]?\S*\s*login|oauth session expired|failed to authenticate|invalid api key|401 unauthorized", re.I)
