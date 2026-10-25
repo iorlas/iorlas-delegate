@@ -39,7 +39,8 @@
     "claude_weekly_reset": "",
     "deepseek_free_enabled": false,
     "zai_coding_enabled": false,
-    "codex_plan_review_only": false
+    "codex_plan_review_only": false,
+    "codex_weekly_used_override": null
   },
   "models": {
     "opus-5.5": {

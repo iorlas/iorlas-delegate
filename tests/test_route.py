@@ -142,7 +142,11 @@ class Roles(unittest.TestCase):
 
     def test_reviewer_prefers_the_other_family_and_authored_by_is_optional(self):
         self.assertEqual(decide("reviewer", lanes())["model"], "gpt-6.1-sol")                 # no author given: Codex first (the most room), no claim of independence
-        self.assertEqual(decide("reviewer", lanes(), authored_by="openai")["lane"], "CLAUDE_SUBSCRIPTION")
+        d = decide("reviewer", lanes(), authored_by="openai")                                  # Claude is the last lane tried (delegate-m86): Codex reviews Codex, flagged
+        self.assertEqual((d["lane"], d["flag"]), ("OPENAI_SUBSCRIPTION", "same_family"))
+        self.assertIn("claude is kept as the last resort", d["warning"])
+        out = {"out": True, "out_until": T + 3600}
+        self.assertEqual(decide("reviewer", lanes(openai=out), authored_by="openai")["lane"], "CLAUDE_SUBSCRIPTION")
         self.assertEqual(decide("reviewer", lanes(), authored_by="claude")["lane"], "OPENAI_SUBSCRIPTION")
         self.assertEqual(decide("reviewer", lanes(), authored_by="gemini")["action"], "error")
 
@@ -191,7 +195,7 @@ class Roles(unittest.TestCase):
         w = decide("reviewer", ls, authored_by="openai")["warning"]
         self.assertIn("xai out until", w)
         self.assertIn("claude logged out", w)
-        self.assertNotIn("warning", decide("reviewer", lanes(), authored_by="openai"))
+        self.assertNotIn("warning", decide("reviewer", lanes(), authored_by="claude"))
 
     def test_premium_only_when_requested(self):
         self.assertNotEqual(decide("hard", lanes())["model"], "fable-5.1")
@@ -766,11 +770,13 @@ printf '{"type":"result","result":"claude says hi","session_id":"sess-1","total_
         self.assertNotIn("ask_user", r)
         self.assertNotIn("needs_input", r)
         route.update_state(lambda s: s.pop("out"))
+        self.codex_out()
         _, r = self.run_it(role="planner")                                 # no Agent tool here: the subscription runs claude -p
         self.assertNotEqual(r["status"], "agent")
         self.assertEqual((r["status"], r["lane"]), ("done", "CLAUDE_SUBSCRIPTION"))
 
     def test_interactive_session_gets_the_agent_step_and_the_consent_question(self):
+        self.codex_out()                                                    # Codex plans first, Claude only when it is down
         _, r = self.run_it(role="planner", unattended=False)
         self.assertEqual((r["status"], r["lane"], r["agent_model"]), ("agent", "CLAUDE_SUBSCRIPTION", "opus"))
         self.assertIn("coordinator", r["brief_prefix"])
@@ -986,7 +992,7 @@ echo '{"type":"step_finish","sessionID":"ses_1","part":{"type":"step-finish","to
         env = Path(os.environ["FAKE_ENV"]).read_text()
         self.assertIn('"edit": "deny"', env)
         _, r = self.run_it("--authored-by", "xai", role="reviewer")
-        self.assertNotEqual(r["lane"], "GROK_SUBSCRIPTION")                 # another family reviews Grok's work
+        self.assertEqual(r["lane"], "GROK_SUBSCRIPTION")                    # no other non-Claude lane is up, and Claude is last (delegate-m86): Grok reviews Grok
 
     @unittest.skipIf(sys.platform != "darwin", "macOS only")
     def test_the_grok_shell_has_no_network_secrets_or_writes_outside_cwd(self):
@@ -1254,7 +1260,9 @@ echo '{"type":"step_finish","sessionID":"ses_1","part":{"type":"step-finish","to
 
     def test_a_logged_out_claude_sends_the_planner_to_codex(self):
         _, r = self.run_it(mode="authout", role="planner")
-        self.assertEqual((r["status"], r["lane"], r["fallback"]), ("done", "OPENAI_SUBSCRIPTION", True))
+        self.assertEqual((r["status"], r["lane"], r["fallback"]), ("done", "OPENAI_SUBSCRIPTION", False))      # Codex plans first now; Claude is never tried
+        self.codex_out()
+        self.run_it(mode="authout", role="planner")                                                        # Claude is tried only now, and answers logged out
         import io
         real, sys.stdout = sys.stdout, io.StringIO()
         try:

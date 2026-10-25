@@ -391,6 +391,7 @@ class Lane:
         self.notes = []
         self.windows = []         # every window the vendor exposes, for the cockpit: {name, used, resets_at, span, source, at}
         self.spend_blocked = False  # the vendor says a spend or credit limit stopped it (not a usage window)
+        self.warn = []            # cockpit warnings: a reading the owner should double-check (shown as `!` lines)
 
     @property
     def usage_known(self):
@@ -485,9 +486,45 @@ def span_name(mins):
     return "5-hour" if mins <= 360 else "daily" if mins <= 1500 else "weekly" if mins <= 14400 else "monthly"
 
 
-def add_window(lane, used, resets_at, span, source, at):
+def add_window(lane, used, resets_at, span, source, at, bucket=None):
     if used is not None or resets_at is not None:
-        lane.windows.append({"name": span_name(span), "used": used, "resets_at": resets_at, "span": span, "source": source, "at": at})
+        lane.windows.append({"name": (bucket + " " if bucket else "") + span_name(span), "used": used, "resets_at": resets_at, "span": span, "source": source, "at": at})
+
+
+CODEX_OVERRIDE_DAYS = 5      # `config set codex_weekly_used_override 85` holds for this long unless the value carries its own "until"
+
+
+def codex_buckets(res):
+    """-> [(bucket id, label, bucket dict)]: the top-level rateLimits plus every rateLimitsByLimitId entry (per-model limits), each once."""
+    rl = res.get("rateLimits") or {}
+    out = {rl.get("limitId") or "codex": rl}
+    for k, b in (res.get("rateLimitsByLimitId") or {}).items():
+        out.setdefault(k, b)
+    return [(k, b.get("limitName") or k, b) for k, b in out.items() if isinstance(b, dict)]
+
+
+def codex_override(S, t):
+    """The active manual weekly override {used, until}, or None (unset, malformed or expired)."""
+    o = S.get("codex_weekly_used_override")
+    if isinstance(o, dict) and isinstance(o.get("used"), (int, float)) and isinstance(o.get("until"), (int, float)) and o["until"] > t:
+        return o
+    return None
+
+
+def note_codex_restart(lane, st, t, used, reset):
+    """The API once restarted the weekly window early (84% used, due Fri 30 Oct, then 0% due Sun 1 Nov) while ChatGPT's page kept the old one.
+    Remember the last weekly reading; when a new one has a later reset and less use before the old reset passed, warn until the old reset."""
+    seen = st.get("codex_week_seen") or {}
+    jump = st.get("codex_restart")
+    if seen.get("reset") and seen["reset"] > t and reset and reset > seen["reset"] + 43200 and used < seen.get("used", 0):
+        jump = {"was_used": seen["used"], "was_reset": seen["reset"], "now_used": used, "now_reset": reset, "at": t}
+    if jump and jump["was_reset"] <= t:
+        jump = None
+    if jump != st.get("codex_restart") or seen.get("reset") != reset or seen.get("used") != used:
+        update_state(lambda s_: (s_.__setitem__("codex_week_seen", {"used": used, "reset": reset}), s_.__setitem__("codex_restart", jump)))
+    if jump:
+        lane.warn.append(f"the weekly window restarted early: it read {jump['was_used']:.0f}% used, due {local(jump['was_reset'])}, then {jump['now_used']:.0f}% due {local(jump['now_reset'])}. "
+                         "ChatGPT's usage page may still show the old window; if it does: `route.py config set codex_weekly_used_override <its used %>`")
 
 
 def read_codex(lane, S, st, t):
@@ -503,16 +540,32 @@ def read_codex(lane, S, st, t):
         return
     lane.read_at = cached["at"] if cached and res is cached["res"] else t
     rl = res.get("rateLimits") or {}
-    ws = [w for w in (rl.get("primary"), rl.get("secondary")) if w]       # by length, not by slot: Pro Lite has only a weekly window, sent as primary
-    for w in ws:
+    ws = []          # (bucket label, window): every window of every bucket, by length not by slot (Pro Lite sends its only, weekly, window as primary)
+    for bid, label, b in codex_buckets(res):
+        for w in (b.get("primary"), b.get("secondary")):
+            if w:
+                ws.append((None if bid == (rl.get("limitId") or "codex") else label, w))
+    for label, w in ws:
         span = w.get("windowDurationMins") or 300
-        add_window(lane, window(w.get("usedPercent"), w.get("resetsAt"), span, t)[0], w.get("resetsAt"), span, "live read (codex app-server)", lane.read_at)
+        add_window(lane, window(w.get("usedPercent"), w.get("resetsAt"), span, t)[0], w.get("resetsAt"), span, "live read (codex app-server)", lane.read_at, label)
     lane.spend_blocked = bool(rl.get("spendControlReached")) or bool(re.search(r"credit|spend", str(rl.get("rateLimitReachedType") or ""), re.I))
-    pr = next((w for w in ws if (w.get("windowDurationMins") or 300) <= 1440), {})
-    se = next((w for w in ws if (w.get("windowDurationMins") or 300) > 1440), {})
+    short = [w for _, w in ws if (w.get("windowDurationMins") or 300) <= 1440]
+    long_ = [w for _, w in ws if (w.get("windowDurationMins") or 300) > 1440]
+    binding = lambda group: max(group, key=lambda w: w.get("usedPercent") or 0, default={})      # the window closest to its limit binds
+    pr, se = binding(short), binding(long_)
     lane.five_reset, lane.week_reset = pr.get("resetsAt"), se.get("resetsAt")
     lane.five, _, _ = window(pr.get("usedPercent"), lane.five_reset, pr.get("windowDurationMins") or 300, t)
     lane.week, wmins, lane.pace = window(se.get("usedPercent"), lane.week_reset, se.get("windowDurationMins") or WEEK_MIN, t)
+    main = binding([w for label, w in ws if label is None and (w.get("windowDurationMins") or 300) > 1440])      # the account's own weekly window, not a per-model one
+    if main.get("usedPercent") is not None and main.get("resetsAt"):
+        note_codex_restart(lane, st, t, float(main["usedPercent"]), main["resetsAt"])
+    o = codex_override(S, t)
+    if o:
+        add_window(lane, float(o["used"]), o["until"], WEEK_MIN, f"manual override (config codex_weekly_used_override, until {local(o['until'])})", None)
+        if o["used"] >= (lane.week or 0):
+            lane.week_reset = o["until"]
+            lane.week, wmins, lane.pace = window(float(o["used"]), o["until"], WEEK_MIN, t)
+        lane.warn.append(f"weekly use is held at {o['used']:.0f}% by your override until {local(o['until'])} (the API says {se.get('usedPercent', '?')}%); `route.py config set codex_weekly_used_override null` clears it")
     apply_burn(lane, S, wmins)
     if rl.get("rateLimitReachedType") or res.get("ordinaryUsageAllowed") is False or (lane.five or 0) >= 98 or (lane.week or 0) >= 98:
         lane.out, lane.out_reason = True, "limit"
@@ -773,11 +826,15 @@ def build_tiers(role, cfg, args, role_name=None):
         failed = args.get("failed") or []
         start = (max(failed) + 1) if failed else 0
         steps = steps[start:]
-    main = [s for s in steps if s.get("flag") not in LATE_FLAGS]
-    flagged = [s for s in steps if s.get("flag") in LATE_FLAGS]       # tried only after every unflagged step, strict then relaxed
-    tiers = [main]
-    if flagged:
-        tiers.append(flagged)
+    # Order of tiers (each tried strict, then relaxed): a requested premium step, then every non-Claude step, then every Claude step;
+    # within each, unflagged steps before LATE_FLAGS ones. Claude lanes come last for every role (bead delegate-m86).
+    first = [s for s in steps if s.get("flag") == "user_requested_premium"]
+    rest = [s for s in steps if s not in first]
+    tiers = [first]
+    for claude in (False, True):
+        part = [s for s in rest if (s.get("on") == "claude") == claude]
+        tiers += [[s for s in part if s.get("flag") not in LATE_FLAGS], [s for s in part if s.get("flag") in LATE_FLAGS]]
+    tiers = [x for x in tiers if x]
     if args.get("allow_degraded") and role.get("degraded_needs_consent"):
         tiers.append([dict(s, flag="degraded_with_consent", idx=len(steps) + i) for i, s in enumerate(role["degraded_needs_consent"]) if codex_step_allowed(role_name, s, cfg)])
     return tiers
@@ -802,9 +859,12 @@ def review_warning(flag, step, author, lanes, S, cfg):
         return None
     fam = step["on"]
     others = [f for f in dict.fromkeys(c["family"] for c in cfg["lanes"].values()) if f != fam]
-    down = "; ".join(family_state(f, lanes, S) for f in others if not any(usable(l, S, True)[0] for l in lanes.values() if l.family == f))
+    down_fams = [f for f in others if not any(usable(l, S, True)[0] for l in lanes.values() if l.family == f)]
+    down = "; ".join(family_state(f, lanes, S) for f in down_fams)
     if flag == "same_family":
-        return f"reviewing {author or 'unknown'}'s work with {fam}: no other family is up" + (f" ({down})" if down else "")
+        spare = [f for f in others if f not in down_fams]
+        return (f"reviewing {author or 'unknown'}'s work with {fam}: " + (f"{', '.join(spare)} is kept as the last resort" if spare else "no other family is up")
+                + (f" ({down})" if down else ""))
     return f"degraded: {step['model']} {step['effort']} on {fam} because the better options are down" + (f" ({down})" if down else "")
 
 
@@ -820,7 +880,8 @@ def decide(role_name, cfg, lanes, st, t, args):
             return {"action": "error", "error": f"no premium model configured for family {args['premium']}; premium: {[k for k, v in (cfg.get('premium') or {}).items() if v and k != 'about']}"}
         return {"action": "error", "error": f"--authored-by must be {' or '.join(k for k in role['by_author'] if k != 'unknown')} (or omitted)"}
     trace = []
-    first = tiers[0][0] if tiers and tiers[0] else None
+    steps_ = [x for tier in tiers for x in tier]
+    first = next((x for x in steps_ if any(l.family == x["on"] for l in lanes.values())), steps_[0] if steps_ else None)      # the role's first choice among lanes that are set up
     mine = [l for l in lanes.values() if first and l.family == first["on"]]
 
     def free_ok(l):         # usable if its slots were free
@@ -1164,7 +1225,7 @@ def lane_view(name, cfg, lane, st, t, history=(), running=0, login=(None, "", No
     v = {"id": name, "label": c.get("label") or LABELS.get(name, name), "family": c["family"], "kind": c["kind"], "model": lane_model(cfg, name),
          "state": "off", "emoji": EMOJI["off"], "reason": off_why or "disabled or not configured", "detail": None,
          "unlock": {"locked": False, "known": False, "at": None, "in_s": None, "text": None, "why": "not in use"},
-         "windows": [], "low_tokens": [], "meter": c["reader"] != "none",
+         "windows": [], "low_tokens": [], "warnings": list(lane.warn) if lane else [], "meter": c["reader"] != "none",
          "login": {"ok": login[0], "why": login[1], "checked_at": login[2]}, "running": running}
     if lane is None:
         return v
@@ -1217,6 +1278,19 @@ def lane_view(name, cfg, lane, st, t, history=(), running=0, login=(None, "", No
     return v
 
 
+def claude_why(cfg, lanes):
+    """Why no non-Claude worker lane was usable when a Claude lane got the pick: 'OPENAI_SUBSCRIPTION out until ..; ZAI_CODING_SUBSCRIPTION not set up'."""
+    S = cfg["settings"]
+    fams = {s["on"] for s in cfg["roles"]["worker"]["steps"] if s["on"] != "claude"}
+    parts = []
+    for name, c in cfg["lanes"].items():
+        if c["family"] not in fams:
+            continue
+        l = lanes.get(name)
+        parts.append(f"{name} " + ("not set up" if l is None else usable(l, S, True)[1]))
+    return "; ".join(parts) or "no other lane exists"
+
+
 def next_worker(cfg, lanes, st, t):
     """The lane `next worker` would pick now: decide() on a copy, nothing written."""
     cur = copy.deepcopy(lanes)
@@ -1227,7 +1301,10 @@ def next_worker(cfg, lanes, st, t):
     d = decide("worker", cfg, cur, st, t, {"authored_by": None, "failed": [], "premium": None, "allow_degraded": False,
                                            "unattended": unattended, "host": False, "cwd": None, "wait_busy": unattended})
     if d["action"] == "run":
-        return {"action": "run", "lane": d["lane"], "model": d["model"], "effort": d["effort"], "pass": d["pass"], "fallback": d["fallback"]}
+        r = {"action": "run", "lane": d["lane"], "model": d["model"], "effort": d["effort"], "pass": d["pass"], "fallback": d["fallback"], "why": None}
+        if cfg["lanes"][d["lane"]]["family"] == "claude":
+            r["why"] = claude_why(cfg, cur)
+        return r
     return {"action": d["action"], "lane": d.get("lane"), "model": None, "effort": None, "say": d.get("say") or d.get("error")}
 
 
@@ -1251,6 +1328,9 @@ def cockpit_text(ck):
     pick = f"{nw['lane']} {nw['model']} {nw['effort']}" if nw["action"] == "run" else f"none ({(nw.get('say') or nw['action'])[:60]})"
     width = max(len(r["id"]) for r in ck["lanes"])
     mw = max(len(r["model"] or "-") for r in ck["lanes"])
+    if nw.get("why"):
+        pick += f" (Claude because {nw['why']})"
+    nw_ = max([6] + [len(w["name"]) for r in ck["lanes"] for w in r["windows"]])
     out = [f"delegate lanes, {local(t)}   next worker: {pick}"]
     for r in ck["lanes"]:
         out.append(f"{r['emoji']} {r['id']:<{width}}  {(r['model'] or '-'):<{mw}}  {r['reason']}")
@@ -1261,7 +1341,8 @@ def cockpit_text(ck):
             used = "?" if w["used_pct"] is None else f"{w['used_pct']:.0f}%"
             reset = f", resets {when(w['resets_at'], t)}" if w["resets_at"] and w["resets_at"] > t else ""
             age = "" if w["age_s"] is None else f", {fmt_in(w['age_s'])} old" if w["age_s"] >= 60 else ", just now"
-            out.append(f"     {w['name']:<6} {used:>4} used{reset}  [{w['source']}{age}]")
+            out.append(f"     {w['name']:<{nw_}} {used:>4} used{reset}  [{w['source']}{age}]")
+        out.extend("     ! " + x for x in r["warnings"])
     run = [r for r in ck["lanes"] if r["running"]]
     if run:
         out.append("running: " + ", ".join(f"{r['id']} x{r['running']}" for r in run))

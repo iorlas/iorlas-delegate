@@ -48,3 +48,7 @@ Dashboards: each Codex and `claude -p` run and the lanes' limits are published a
 State, ledger, settings, profile and the key file live in Claude Code's data folder for the plugin (`~/.claude/plugins/data/iorlas-delegate-<marketplace>`), owner-only. A checkout has no default and refuses to run until `DELEGATE_CONFIG_DIR` names a folder, so state is never split between two places. Uninstalling the plugin deletes the folder, key included. Nothing secret is in this repository. Work is tracked with beads (`bd list`).
 
 Set `route.py config set codex_plan_review_only true` to pause Codex writing: only read-only planner/reviewer calls remain eligible. Worker, hard and light roles skip Codex, and saved Codex writer resumes return lane_out so the caller can start a fresh writer on another family. Running processes are not cancelled by this configuration change. Set it to false to restore normal routing.
+
+ChatGPT's usage page can disagree with the Codex API (2026-10-26: the API restarted the weekly window early, the page kept the old one). The cockpit says so when it sees the restart. `route.py config set codex_weekly_used_override 85` holds Codex's weekly use at 85% for 5 days (or `'{"used":85,"until":EPOCH}'`) so routing gates on it; `... null` clears it.
+
+Claude lanes come last for every role: routing tries each usable Codex, Z.ai, DeepSeek and Grok lane first, and the cockpit's `next worker` line says why when it picks Claude.
