@@ -9,6 +9,7 @@ import subprocess
 import sys
 import tempfile
 import time
+from unittest import mock
 import unittest
 from pathlib import Path
 
@@ -949,6 +950,32 @@ echo '{"type":"step_finish","sessionID":"ses_1","part":{"type":"step-finish","to
             self.assertEqual(run("cat .env.example").stdout, "EX=1")
             self.assertEqual(run("touch made").returncode == 0, write)
             self.assertNotEqual(run("touch /Users/Shared/delegate-probe-x").returncode, 0)        # writable by everyone, outside the sandbox's list
+
+    @unittest.skipIf(sys.platform != "darwin", "macOS only")
+    def test_read_only_shell_may_write_dot_task_but_nothing_else_in_cwd(self):
+        import subprocess as sp
+        repo = Path(self.repo)
+        sh = self.base / "sh-task"
+        route.opencode_shell(self.repo, False, sh)
+        run = lambda c: sp.run([str(sh), "-c", c], cwd=self.repo, capture_output=True, text=True)
+        self.assertEqual(run("mkdir -p .task && touch .task/tmp1").returncode, 0)
+        self.assertTrue((repo / ".task" / "tmp1").exists())
+        self.assertNotEqual(run("touch made").returncode, 0)
+        self.assertNotEqual(run("touch .taskx").returncode, 0)
+        self.assertNotEqual(run("cat ~/.ssh/id_rsa").returncode, 0)
+
+    def test_external_directory_lets_read_only_lanes_read_runs_and_temp_only(self):
+        with mock.patch.dict(os.environ, {"XDG_CONFIG_HOME": "/x/cfg"}):
+            ext = route.opencode_permissions(False)["external_directory"]
+        self.assertEqual(ext["*"], "deny")
+        for want in ("/x/cfg/task-loop/runs/**", "/private/tmp/**", "/private/var/folders/**", "/tmp/**", "/var/folders/**"):
+            self.assertEqual(ext[want], "allow")
+        self.assertEqual(len(ext), 6)
+        with mock.patch.dict(os.environ, {}, clear=False):
+            os.environ.pop("XDG_CONFIG_HOME", None)
+            self.assertIn(str(Path.home() / ".config" / "task-loop" / "runs") + "/**", route.opencode_permissions(False)["external_directory"])
+        self.assertEqual(route.opencode_permissions(True)["external_directory"], "deny")
+        self.assertEqual(route.opencode_permissions(False)["read"][str(Path.home() / ".ssh")], "deny")
 
     def test_opencode_shell_is_offline_for_uv_and_network_refusals_are_not_denials(self):
         sh = self.base / "sh-offline"

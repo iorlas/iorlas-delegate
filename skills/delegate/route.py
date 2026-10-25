@@ -1716,23 +1716,31 @@ def opencode_shell(cwd, write, path):
     H = Path.home()
     q = lambda x: json.dumps(os.path.realpath(str(x)))
     secrets = " ".join(f"(subpath {q(H / x)})" for x in OC_SECRETS)
-    writable = ([cwd] if write else []) + ["/private/tmp", "/private/var/folders", H / "Library" / "Caches", H / ".cache"]
+    scratch = Path(cwd) / ".task"        # the task-loop engine's git-ignored scratch folder: a reviewer's test run writes its temp files there
+    writable = [cwd if write else scratch] + ["/private/tmp", "/private/var/folders", H / "Library" / "Caches", H / ".cache"]
     keep = " ".join(f"(require-not (subpath {q(x)}))" for x in writable)
     prof = ('(version 1)(allow default)(deny network-outbound (remote ip))'
             f'(deny file-read* file-write* {secrets} (regex #"/\\.env$") (regex #"/\\.env\\.[^/]*$"))'
             '(allow file-read* (regex #"/\\.env\\.(example|sample|template|dist)$"))'
-            f'(deny file-write* (require-all {keep} (require-not (regex #"^/dev/"))))' + ("" if write else f"(deny file-write* (subpath {q(cwd)}))"))
+            f'(deny file-write* (require-all {keep} (require-not (regex #"^/dev/"))))' + ("" if write else f"(deny file-write* (require-all (subpath {q(cwd)}) (require-not (subpath {q(scratch)}))))"))
     xdg = os.environ.get("XDG_CONFIG_HOME")
     head = f"export XDG_CONFIG_HOME={shlex.quote(xdg)}" if xdg else "unset XDG_CONFIG_HOME"      # commands get the user's config root back
     path.write_text(f"#!/bin/sh\n{head}\nexport SHELL=/bin/zsh\nexport UV_OFFLINE=1\nexec /usr/bin/sandbox-exec -p {shlex.quote(prof)} /bin/zsh \"$@\"\n", encoding="utf-8")
     path.chmod(0o700)
 
 
+def opencode_readable_outside():
+    """Folders outside cwd a read-only lane may read: the task-loop runs folder (the engine points reviewers at its files) and temp dirs."""
+    xdg = os.environ.get("XDG_CONFIG_HOME")
+    runs = (Path(xdg) if xdg else Path.home() / ".config") / "task-loop" / "runs"
+    return [str(runs), "/private/tmp", "/private/var/folders", "/tmp", "/var/folders"]
+
+
 def opencode_permissions(write):
     reads = {"*": "allow", ".env": "deny", "*.env": "deny", "*.env.*": "deny", "*.env.example": "allow", "*.env.sample": "allow", "*.env.template": "allow"}
     for x in OC_SECRETS:
         reads[str(Path.home() / x)] = reads[str(Path.home() / x) + "/*"] = "deny"
-    return {"*": "allow", "read": reads, "webfetch": "deny", "websearch": "deny", "external_directory": "deny", "task": "deny", **({} if write else {"edit": "deny"})}
+    return {"*": "allow", "read": reads, "webfetch": "deny", "websearch": "deny", "external_directory": "deny" if write else {"*": "deny", **{x + "/**": "allow" for x in opencode_readable_outside()}}, "task": "deny", **({} if write else {"edit": "deny"})}
 
 
 def launch_opencode(d, brief, a, rid, t, meta):
