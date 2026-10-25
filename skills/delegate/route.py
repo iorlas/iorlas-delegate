@@ -491,9 +491,6 @@ def add_window(lane, used, resets_at, span, source, at, bucket=None):
         lane.windows.append({"name": (bucket + " " if bucket else "") + span_name(span), "used": used, "resets_at": resets_at, "span": span, "source": source, "at": at})
 
 
-CODEX_OVERRIDE_DAYS = 5      # `config set codex_weekly_used_override 85` holds for this long unless the value carries its own "until"
-
-
 def codex_buckets(res):
     """-> [(bucket id, label, bucket dict)]: the top-level rateLimits plus every rateLimitsByLimitId entry (per-model limits), each once."""
     rl = res.get("rateLimits") or {}
@@ -501,30 +498,6 @@ def codex_buckets(res):
     for k, b in (res.get("rateLimitsByLimitId") or {}).items():
         out.setdefault(k, b)
     return [(k, b.get("limitName") or k, b) for k, b in out.items() if isinstance(b, dict)]
-
-
-def codex_override(S, t):
-    """The active manual weekly override {used, until}, or None (unset, malformed or expired)."""
-    o = S.get("codex_weekly_used_override")
-    if isinstance(o, dict) and isinstance(o.get("used"), (int, float)) and isinstance(o.get("until"), (int, float)) and o["until"] > t:
-        return o
-    return None
-
-
-def note_codex_restart(lane, st, t, used, reset):
-    """The API once restarted the weekly window early (84% used, due Fri 30 Oct, then 0% due Sun 1 Nov) while ChatGPT's page kept the old one.
-    Remember the last weekly reading; when a new one has a later reset and less use before the old reset passed, warn until the old reset."""
-    seen = st.get("codex_week_seen") or {}
-    jump = st.get("codex_restart")
-    if seen.get("reset") and seen["reset"] > t and reset and reset > seen["reset"] + 43200 and used < seen.get("used", 0):
-        jump = {"was_used": seen["used"], "was_reset": seen["reset"], "now_used": used, "now_reset": reset, "at": t}
-    if jump and jump["was_reset"] <= t:
-        jump = None
-    if jump != st.get("codex_restart") or seen.get("reset") != reset or seen.get("used") != used:
-        update_state(lambda s_: (s_.__setitem__("codex_week_seen", {"used": used, "reset": reset}), s_.__setitem__("codex_restart", jump)))
-    if jump:
-        lane.warn.append(f"the weekly window restarted early: it read {jump['was_used']:.0f}% used, due {local(jump['was_reset'])}, then {jump['now_used']:.0f}% due {local(jump['now_reset'])}. "
-                         "ChatGPT's usage page may still show the old window; if it does: `route.py config set codex_weekly_used_override <its used %>`")
 
 
 def read_codex(lane, S, st, t):
@@ -556,16 +529,6 @@ def read_codex(lane, S, st, t):
     lane.five_reset, lane.week_reset = pr.get("resetsAt"), se.get("resetsAt")
     lane.five, _, _ = window(pr.get("usedPercent"), lane.five_reset, pr.get("windowDurationMins") or 300, t)
     lane.week, wmins, lane.pace = window(se.get("usedPercent"), lane.week_reset, se.get("windowDurationMins") or WEEK_MIN, t)
-    main = binding([w for label, w in ws if label is None and (w.get("windowDurationMins") or 300) > 1440])      # the account's own weekly window, not a per-model one
-    if main.get("usedPercent") is not None and main.get("resetsAt"):
-        note_codex_restart(lane, st, t, float(main["usedPercent"]), main["resetsAt"])
-    o = codex_override(S, t)
-    if o:
-        add_window(lane, float(o["used"]), o["until"], WEEK_MIN, f"manual override (config codex_weekly_used_override, until {local(o['until'])})", None)
-        if o["used"] >= (lane.week or 0):
-            lane.week_reset = o["until"]
-            lane.week, wmins, lane.pace = window(float(o["used"]), o["until"], WEEK_MIN, t)
-        lane.warn.append(f"weekly use is held at {o['used']:.0f}% by your override until {local(o['until'])} (the API says {se.get('usedPercent', '?')}%); `route.py config set codex_weekly_used_override null` clears it")
     apply_burn(lane, S, wmins)
     if rl.get("rateLimitReachedType") or res.get("ordinaryUsageAllowed") is False or (lane.five or 0) >= 98 or (lane.week or 0) >= 98:
         lane.out, lane.out_reason = True, "limit"

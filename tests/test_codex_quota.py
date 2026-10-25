@@ -58,55 +58,7 @@ class CodexRead(Fresh):
         self.assertEqual(sorted(w["name"] for w in lane.windows), ["5-hour", "spark weekly", "weekly"])
         self.assertEqual((lane.five, lane.week, lane.week_reset), (30.0, 85.0, NOW + 4 * 86400))
 
-    def test_an_early_restart_of_the_week_is_called_out(self):
-        route.update_state(lambda s_: s_.__setitem__("codex_week_seen", {"used": 84.0, "reset": OLD["resetsAt"]}))
-        lane = with_res(RECORDED)
-        self.assertEqual(len(lane.warn), 1)
-        self.assertIn("restarted early", lane.warn[0])
-        self.assertIn("84% used", lane.warn[0])
-        self.assertIn("codex_weekly_used_override", lane.warn[0])
-        self.assertEqual(len(with_res(RECORDED).warn), 1)                 # still said on the next read, until the old reset passes
-        self.assertEqual(with_res(RECORDED, t=OLD["resetsAt"] + 1).warn, [])
-        self.assertIsNone(route.load_state()["codex_restart"])
-
-    def test_a_normal_rollover_is_not_a_restart(self):
-        route.update_state(lambda s_: s_.__setitem__("codex_week_seen", {"used": 84.0, "reset": NOW - 10}))
-        self.assertEqual(with_res(RECORDED).warn, [])
-
-    def test_override_holds_the_week_and_gates_routing(self):
-        S = copy.deepcopy(CFG["settings"])
-        S["codex_weekly_used_override"] = {"used": 96, "until": NOW + 4 * 86400}
-        lane = with_res(RECORDED, S)
-        self.assertEqual((lane.week, lane.week_reset), (96.0, NOW + 4 * 86400))
-        self.assertFalse(route.usable(lane, S, False)[0])                  # over the 95% gate
-        self.assertEqual({w["name"]: w["used"] for w in lane.windows if "override" in w["source"]}, {"weekly": 96.0})
-        self.assertIn("override", lane.warn[-1])
-
-    def test_override_at_85_leaves_codex_usable_and_shows_it(self):
-        S = copy.deepcopy(CFG["settings"])
-        S["codex_weekly_used_override"] = {"used": 85, "until": NOW + 86400}
-        lane = with_res(RECORDED, S)
-        self.assertEqual(lane.week, 85.0)
-        self.assertTrue(route.usable(lane, S, False)[0])
-        self.assertEqual(sorted(w["used"] for w in lane.windows), [6.0, 85.0])
-
-    def test_an_expired_override_is_ignored(self):
-        S = copy.deepcopy(CFG["settings"])
-        S["codex_weekly_used_override"] = {"used": 85, "until": NOW - 1}
-        lane = with_res(RECORDED, S)
-        self.assertEqual((lane.week, lane.warn), (6.0, []))
-
-    def test_config_set_override_writes_an_expiry_and_null_clears_it(self):
-        out = onboard.config_set(route, "codex_weekly_used_override", "85")
-        o = out["codex_weekly_used_override"]
-        self.assertEqual(o["used"], 85)
-        self.assertAlmostEqual(o["until"], route.now() + route.CODEX_OVERRIDE_DAYS * 86400, delta=5)
-        self.assertEqual(route.codex_override(route.load_routing()["settings"], route.now())["used"], 85)
-        onboard.config_set(route, "codex_weekly_used_override", "null")
-        self.assertIsNone(route.codex_override(route.load_routing()["settings"], route.now()))
-
     def test_cockpit_prints_every_window_and_the_warning(self):
-        route.update_state(lambda s_: s_.__setitem__("codex_week_seen", {"used": 84.0, "reset": OLD["resetsAt"]}))
         res = copy.deepcopy(RECORDED)
         res["rateLimitsByLimitId"]["codex_spark"] = {"limitId": "codex_spark", "limitName": "spark",
                                                      "primary": {"usedPercent": 10, "windowDurationMins": 10080, "resetsAt": NOW + 86400}, "secondary": None}
@@ -117,7 +69,6 @@ class CodexRead(Fresh):
         text = "\n".join(route.cockpit_text(ck))
         self.assertIn("spark weekly", text)
         self.assertIn("6% used, resets Sun 01 Nov", text)
-        self.assertIn("! the weekly window restarted early", text)
 
 
 class ClaudeLast(Fresh):

@@ -49,6 +49,5 @@ State, ledger, settings, profile and the key file live in Claude Code's data fol
 
 Set `route.py config set codex_plan_review_only true` to pause Codex writing: only read-only planner/reviewer calls remain eligible. Worker, hard and light roles skip Codex, and saved Codex writer resumes return lane_out so the caller can start a fresh writer on another family. Running processes are not cancelled by this configuration change. Set it to false to restore normal routing.
 
-ChatGPT's usage page can disagree with the Codex API (2026-10-26: the API restarted the weekly window early, the page kept the old one). The cockpit says so when it sees the restart. `route.py config set codex_weekly_used_override 85` holds Codex's weekly use at 85% for 5 days (or `'{"used":85,"until":EPOCH}'`) so routing gates on it; `... null` clears it.
 
 Claude lanes come last for every role: routing tries each usable Codex, Z.ai, DeepSeek and Grok lane first, and the cockpit's `next worker` line says why when it picks Claude.

@@ -538,9 +538,6 @@ def config_set(R, key, value):
     except ValueError:
         val = value
 
-    if key == "codex_weekly_used_override" and isinstance(val, (int, float)) and not isinstance(val, bool):
-        val = {"used": val, "until": R.now() + R.CODEX_OVERRIDE_DAYS * 86400}        # a bare number expires on its own; null clears it
-
     def put(cur):
         node = cur
         parts = key.split(".")
