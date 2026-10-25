@@ -1,0 +1,330 @@
+{
+ "fixture": 1,
+ "scenario": "opencode ended by hand with SIGTERM at 05:18:39 25 Oct was answered failed/worker_failed (next: fail); a signal route.py did not send is `killed`",
+ "cli": "opencode",
+ "lane": "DEEPSEEK_FREE",
+ "real": "rc and the empty error are real (engine text 'opencode exited -15 without an error:')",
+ "expected_reason": "killed",
+ "expected_wire": {
+  "status": "stop",
+  "reason": "vendor_prework",
+  "next": "retry"
+ },
+ "rows": [
+  {
+   "id": "lifesim-d5f.39-20261025-014458.jsonl:527",
+   "history": {
+    "ts": 1792894720.040765
+   },
+   "source": "engine/lifesim-d5f.39-20261025-014458.jsonl:527",
+   "evidence": {
+    "rc": -15,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   }
+  },
+  {
+   "id": "lifesim-d5f.40-20261025-041441.jsonl:26",
+   "history": {
+    "ts": 1792894720.0609741
+   },
+   "source": "engine/lifesim-d5f.40-20261025-041441.jsonl:26",
+   "evidence": {
+    "rc": -15,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   }
+  },
+  {
+   "id": "lifesim-6pld-20261025-040148.jsonl:28",
+   "history": {
+    "ts": 1792894720.137612
+   },
+   "source": "engine/lifesim-6pld-20261025-040148.jsonl:28",
+   "evidence": {
+    "rc": -15,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   }
+  },
+  {
+   "id": "lifesim-d5f.40-20261025-041441.jsonl:30",
+   "history": {
+    "ts": 1792894722.7070642
+   },
+   "source": "engine/lifesim-d5f.40-20261025-041441.jsonl:30",
+   "evidence": {
+    "rc": -15,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   }
+  },
+  {
+   "id": "lifesim-d5f.39-20261025-014458.jsonl:531",
+   "history": {
+    "ts": 1792894723.2319832
+   },
+   "source": "engine/lifesim-d5f.39-20261025-014458.jsonl:531",
+   "evidence": {
+    "rc": -15,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   }
+  },
+  {
+   "id": "lifesim-6pld-20261025-040148.jsonl:32",
+   "history": {
+    "ts": 1792894723.463532
+   },
+   "source": "engine/lifesim-6pld-20261025-040148.jsonl:32",
+   "evidence": {
+    "rc": -15,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   }
+  },
+  {
+   "id": "lifesim-d5f.40-20261025-041441.jsonl:35",
+   "history": {
+    "ts": 1792894742.0508642
+   },
+   "source": "engine/lifesim-d5f.40-20261025-041441.jsonl:35",
+   "evidence": {
+    "rc": -15,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   }
+  },
+  {
+   "id": "lifesim-d5f.39-20261025-014458.jsonl:536",
+   "history": {
+    "ts": 1792894749.868961
+   },
+   "source": "engine/lifesim-d5f.39-20261025-014458.jsonl:536",
+   "evidence": {
+    "rc": -15,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   }
+  },
+  {
+   "id": "lifesim-6pld-20261025-040148.jsonl:37",
+   "history": {
+    "ts": 1792894766.901572
+   },
+   "source": "engine/lifesim-6pld-20261025-040148.jsonl:37",
+   "evidence": {
+    "rc": -15,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   }
+  },
+  {
+   "id": "lifesim-d5f.40-20261025-174047.jsonl:26",
+   "history": {
+    "ts": 1792943182.4741719
+   },
+   "source": "engine/lifesim-d5f.40-20261025-174047.jsonl:26",
+   "evidence": {
+    "rc": -15,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   }
+  },
+  {
+   "id": "lifesim-fld.27.12-20261025-173940.jsonl:31",
+   "history": {
+    "ts": 1792943182.555541
+   },
+   "source": "engine/lifesim-fld.27.12-20261025-173940.jsonl:31",
+   "evidence": {
+    "rc": -15,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   }
+  },
+  {
+   "id": "lifesim-d5f.39-20261025-173803.jsonl:29",
+   "history": {
+    "ts": 1792943182.610633
+   },
+   "source": "engine/lifesim-d5f.39-20261025-173803.jsonl:29",
+   "evidence": {
+    "rc": -15,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   }
+  },
+  {
+   "id": "lifesim-d5f.40-20261025-174047.jsonl:27",
+   "history": {
+    "ts": 1792943182.617694
+   },
+   "source": "engine/lifesim-d5f.40-20261025-174047.jsonl:27",
+   "evidence": {
+    "rc": -15,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   }
+  },
+  {
+   "id": "lifesim-rl4s-20261025-173847.jsonl:23",
+   "history": {
+    "ts": 1792943182.655999
+   },
+   "source": "engine/lifesim-rl4s-20261025-173847.jsonl:23",
+   "evidence": {
+    "rc": -15,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   }
+  },
+  {
+   "id": "lifesim-fld.27.12-20261025-173940.jsonl:32",
+   "history": {
+    "ts": 1792943182.696998
+   },
+   "source": "engine/lifesim-fld.27.12-20261025-173940.jsonl:32",
+   "evidence": {
+    "rc": -15,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   }
+  },
+  {
+   "id": "lifesim-d5f.39-20261025-173803.jsonl:30",
+   "history": {
+    "ts": 1792943182.743423
+   },
+   "source": "engine/lifesim-d5f.39-20261025-173803.jsonl:30",
+   "evidence": {
+    "rc": -15,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   }
+  },
+  {
+   "id": "lifesim-rl4s-20261025-173847.jsonl:24",
+   "history": {
+    "ts": 1792943182.785831
+   },
+   "source": "engine/lifesim-rl4s-20261025-173847.jsonl:24",
+   "evidence": {
+    "rc": -15,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   }
+  },
+  {
+   "id": "lifesim-fld.27.12-20261025-173940.jsonl:37",
+   "history": {
+    "ts": 1792943213.118175
+   },
+   "source": "engine/lifesim-fld.27.12-20261025-173940.jsonl:37",
+   "evidence": {
+    "rc": -15,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   }
+  },
+  {
+   "id": "lifesim-rl4s-20261025-173847.jsonl:29",
+   "history": {
+    "ts": 1792943213.2933462
+   },
+   "source": "engine/lifesim-rl4s-20261025-173847.jsonl:29",
+   "evidence": {
+    "rc": -15,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   }
+  },
+  {
+   "id": "lifesim-d5f.40-20261025-174047.jsonl:32",
+   "history": {
+    "ts": 1792943214.203806
+   },
+   "source": "engine/lifesim-d5f.40-20261025-174047.jsonl:32",
+   "evidence": {
+    "rc": -15,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   }
+  },
+  {
+   "id": "lifesim-d5f.39-20261025-173803.jsonl:35",
+   "history": {
+    "ts": 1792943225.3370721
+   },
+   "source": "engine/lifesim-d5f.39-20261025-173803.jsonl:35",
+   "evidence": {
+    "rc": -15,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   }
+  }
+ ]
+}

@@ -1,0 +1,73 @@
+{
+ "fixture": 1,
+ "scenario": "Grok starts that failed for another reason, 24 Oct: 'Server error.' x3 and a connection failure",
+ "cli": "opencode",
+ "lane": "GROK_SUBSCRIPTION",
+ "real": "vendor text real",
+ "rows": [
+  {
+   "id": "lifesim-hclf.29-20261024-021801.jsonl:70",
+   "history": {
+    "ts": 1792798313.9632509
+   },
+   "source": "engine/lifesim-hclf.29-20261024-021801.jsonl:70",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "Server error.",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": "vendor_blip"
+  },
+  {
+   "id": "lifesim-hclf.29-20261024-021801.jsonl:74",
+   "history": {
+    "ts": 1792798485.480639
+   },
+   "source": "engine/lifesim-hclf.29-20261024-021801.jsonl:74",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "Server error.",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": "vendor_blip"
+  },
+  {
+   "id": "lifesim-hclf.29-20261024-021801.jsonl:78",
+   "history": {
+    "ts": 1792798676.0121422
+   },
+   "source": "engine/lifesim-hclf.29-20261024-021801.jsonl:78",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "Server error.",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": "vendor_blip"
+  },
+  {
+   "id": "lifesim-d5f.30-20261024-063223.jsonl:113",
+   "history": {
+    "ts": 1792815769.874559
+   },
+   "source": "engine/lifesim-d5f.30-20261024-063223.jsonl:113",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "Cannot connect to API: Unable to connect. Is the computer able to access the url?",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": "network"
+  }
+ ]
+}

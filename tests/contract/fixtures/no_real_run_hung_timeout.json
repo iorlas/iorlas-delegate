@@ -1,0 +1,45 @@
+{
+ "fixture": 1,
+ "scenario": "hung and timeout: the 47-minute hang of 25 Oct ended by the ENGINE's wall clock, so delegate never answered and history has no row; these are synthetic",
+ "real": false,
+ "rows": [
+  {
+   "id": "hung",
+   "synthetic": true,
+   "source": "21-lane-failures.md F1/F2",
+   "expected_reason": "hung",
+   "evidence": {
+    "rc": -15,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {
+     "watchdog": "hung"
+    }
+   },
+   "wire": {
+    "status": "lane_out",
+    "reason": "hung"
+   }
+  },
+  {
+   "id": "timeout",
+   "synthetic": true,
+   "source": "21-lane-failures.md F1 (engine 'timeout 47 min')",
+   "expected_reason": "timeout",
+   "evidence": {
+    "rc": -15,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": true,
+    "work_seen": false,
+    "structured": {}
+   },
+   "wire": {
+    "status": "timeout",
+    "reason": "timeout"
+   }
+  }
+ ]
+}

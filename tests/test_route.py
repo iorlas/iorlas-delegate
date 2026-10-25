@@ -1306,6 +1306,47 @@ echo '{"type":"step_finish","sessionID":"ses_1","part":{"type":"step-finish","to
         self.assertTrue(set(c["reasons"].values()) <= {"retry", "owner", "fail"})
         self.assertEqual(set(c["lanes"]), {"codex", "claude", "opencode", "both"})
 
+    def test_every_answer_carries_call_id_usage_transcript_object_and_typed_stop(self):
+        schema = route.classify.CONTRACT["answer_schema"]
+        rollout = Path(self.tmp.name) / ".codex" / "sessions" / "2026" / "10" / "21"
+        rollout.mkdir(parents=True)
+        (rollout / "rollout-2026-10-21T19-45-28-thread-123.jsonl").write_text("x" * 40)
+        _, r = self.run_it("--call-id", "run1#3")
+        self.assertEqual((r["call_id"], r["stop"]), ("run1#3", None))
+        self.assertEqual(r["usage"], {"tokens": {"in": 100, "cached": 40, "out": 7}, "cost": 0, "secs": r["secs"], "turns": 1, "context_k": None, "answer_bytes": len(r["text"].encode())})
+        self.assertEqual((r["transcript_info"]["kind"], r["transcript_info"]["from"], r["transcript_info"]["to"], r["transcript_info"]["bytes"]), ("codex", 0, 40, 40))
+        self.assertEqual((r["transcript_status"], r["transcript"]), ("ok", r["transcript_info"]["path"]))
+        self.assertEqual(json.loads(route.history_path().read_text().splitlines()[-1])["call_id"], "run1#3")
+        (rollout / "rollout-2026-10-21T19-45-28-thread-123.jsonl").write_text("x" * 40)
+        _, r2 = self.run_it("--resume", "thread-123")
+        self.assertEqual((r2["call_id"], r2["transcript_info"]["from"], r2["transcript_info"]["bytes"]), (None, 40, 0))      # the window this call wrote
+        self.assertIsNone(route.schema_problem(r, schema))
+        for mode, reason in (("bad_request", "bad_request"), ("limit", "rate_limited"), ("logout", "logged_out"), ("early_error", "vendor_blip"), ("net", "network"),
+                             ("late_error", "worker_failed"), ("secret", "secrets")):
+            route.update_state(lambda st: st.pop("out", None))
+            _, r = self.run_it(mode=mode)
+            self.assertEqual(r["stop"]["reason"], reason, mode)
+            self.assertIsNone(route.schema_problem(r, schema), mode)
+            self.assertEqual(json.loads(route.history_path().read_text().splitlines()[-1])["reason"], r["reason"])
+        route.update_state(lambda st: st.pop("out", None))
+
+    def test_a_request_fault_leaves_the_lane_in_state_json_alone(self):
+        before = route.load_state().get("out")
+        self.run_it(mode="bad_request")
+        self.assertEqual(route.load_state().get("out"), before)
+
+    def test_handshake_declares_contract_2_and_the_reason_table(self):
+        import io
+        real, sys.stdout = sys.stdout, io.StringIO()
+        try:
+            route.main(["contract", "--json"])
+            c = json.loads(sys.stdout.getvalue())
+        finally:
+            sys.stdout = real
+        self.assertEqual((c["contract"], c["worker_run"]), (2, 2))
+        self.assertIn("--call-id", c["run_args"])
+        self.assertEqual(set(c["outcomes"]), set(route.classify.CONTRACT["reasons"]))
+
     def test_status_json_v1_shape(self):
         import io
         self.lease("run-1", "OPENAI_SUBSCRIPTION", task="T-5")
@@ -1466,6 +1507,98 @@ echo '{"type":"step_finish","sessionID":"ses_1","part":{"type":"step-finish","to
         self.assertEqual(len(self.args_seen().splitlines()), n)            # nothing was launched
         _, r = self.run_it("--resume", "nope")
         self.assertEqual(r["status"], "error")
+
+
+class Holds(unittest.TestCase):
+    """delegate-dns: an owner hold {lane, roles, set_by, set_at, until (mandatory), reason} replaces the codex_plan_review_only flag."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        p = mock.patch.object(route, "config_dir", return_value=Path(self.tmp.name))
+        p.start()
+        self.addCleanup(p.stop)
+
+    def main(self, *argv):
+        import io
+        real, sys.stdout = sys.stdout, io.StringIO()
+        try:
+            code = route.main(list(argv))
+            return code, json.loads(sys.stdout.getvalue())
+        finally:
+            sys.stdout = real
+
+    def test_a_hold_without_until_is_refused(self):
+        with self.assertRaises(ValueError):
+            route.add_hold("OPENAI_SUBSCRIPTION", None, "pause")
+        code, out = self.main("hold", "OPENAI_SUBSCRIPTION", "--reason", "pause")
+        self.assertEqual((code, out["ok"]), (1, False))
+        self.assertIn("--until", out["error"])
+        self.assertEqual(route.load_state().get("holds"), None)
+        for bad in ("yesterday", "1000"):
+            self.assertEqual(self.main("hold", "OPENAI_SUBSCRIPTION", "--until", bad)[0], 1)
+        self.assertEqual(self.main("hold", "NOPE", "--until", "+2h")[0], 1)
+        self.assertEqual(route.load_state().get("holds"), None)
+
+    def test_a_hold_stops_its_roles_until_it_ends_and_the_trace_says_who(self):
+        h = route.add_hold("OPENAI_SUBSCRIPTION", "+2h", "weekly budget", ["worker", "hard"], t=T)
+        self.assertEqual((h["set_by"], h["until"], h["roles"]), ("owner", T + 7200, ["hard", "worker"]))
+        st = route.load_state()
+        d = route.decide("worker", copy.deepcopy(CFG), lanes(), st, T, {"authored_by": None, "failed": [], "premium": None, "allow_degraded": False})
+        self.assertNotEqual(d["lane"], "OPENAI_SUBSCRIPTION")
+        self.assertTrue(any(x.startswith("OPENAI_SUBSCRIPTION: rejected, held: owner until") and "weekly budget" in x for x in d["trace"]), d["trace"])
+        p = route.decide("planner", copy.deepcopy(CFG), lanes(), st, T, {"authored_by": None, "failed": [], "premium": None, "allow_degraded": False})
+        self.assertEqual(p["lane"], "OPENAI_SUBSCRIPTION")        # the hold names roles
+        later = route.decide("worker", copy.deepcopy(CFG), lanes(), st, T + 7201, {"authored_by": None, "failed": [], "premium": None, "allow_degraded": False})
+        self.assertEqual(later["lane"], "OPENAI_SUBSCRIPTION")      # and ends by itself
+
+    def test_a_hold_with_no_roles_stops_the_lane_for_every_role(self):
+        route.add_hold("OPENAI_SUBSCRIPTION", "+1h", "", t=T)
+        for role in ("planner", "worker", "reviewer"):
+            d = route.decide(role, copy.deepcopy(CFG), lanes(), route.load_state(), T, {"authored_by": None, "failed": [], "premium": None, "allow_degraded": False})
+            self.assertNotEqual(d.get("lane"), "OPENAI_SUBSCRIPTION", role)
+
+    def test_refusals_under_a_hold_wait_for_its_end_never_one_second(self):
+        h = route.add_hold("OPENAI_SUBSCRIPTION", "+3h", "pause", ["worker"], t=T)
+        a = argparse_ns("worker", resume="old")
+        st = {"refs": {"old": {"lane": "OPENAI_SUBSCRIPTION", "model": "gpt-6.1-sol", "mode": "write", "effort": "medium", "host": False}}, "holds": {h["id"]: h}}
+        with mock.patch.object(route, "load_state", return_value=st), mock.patch.object(route, "gather", return_value=lanes()), mock.patch.object(route, "publish_lanes"), mock.patch.object(route, "mark_busy"), \
+                mock.patch.object(route, "now", return_value=T):
+            d, _, _, _ = route.decision(a, copy.deepcopy(CFG))
+        self.assertEqual((d["action"], d["retry_after"], d["outcome"]), ("lane_out", h["until"], "held"))
+        self.assertIn("owner", d["say"])
+        res = route.launch_codex({"role": "worker", "lane": "OPENAI_SUBSCRIPTION", "how": {"sandbox": "workspace-write"}}, "b", argparse_ns("worker"), "rid", T, {})
+        self.assertEqual((res["status"], res["retry_after"], res["outcome"]), ("lane_out", h["until"], "held"))
+
+    def test_the_old_flag_refusal_has_no_time_and_is_for_the_owner(self):
+        cfg = copy.deepcopy(CFG)
+        cfg["settings"]["codex_plan_review_only"] = True
+        with mock.patch.object(route, "load_routing", return_value=cfg):
+            res = route.launch_codex({"role": "worker", "lane": "OPENAI_SUBSCRIPTION", "how": {"sandbox": "workspace-write"}}, "b", argparse_ns("worker"), "rid", T, {})
+        self.assertEqual((res["status"], res["retry_after"], res["outcome"]), ("lane_out", None, "held"))
+        r = route.result(res.pop("status"), **res)
+        self.assertEqual((r["next"], r["stop"]["reason"], r["stop"]["retry"]["kind"]), ("owner", "held", "none"))
+
+    def test_a_flag_left_in_config_json_becomes_a_hold_with_an_end(self):
+        route.update_config(lambda c: c.update(codex_plan_review_only=True))
+        code, out = self.main("holds")
+        self.assertEqual(code, 0)
+        self.assertEqual(out["holds"][0]["lane"], "OPENAI_SUBSCRIPTION")
+        self.assertEqual(out["holds"][0]["set_by"], "config")
+        self.assertGreater(out["holds"][0]["until"], time.time() + 6 * 86400)
+        self.assertNotIn("codex_plan_review_only", route.read_config())
+        self.assertEqual(len(self.main("holds")[1]["holds"]), 1)      # once
+
+    def test_release_and_status_show_the_holder_and_expiry(self):
+        h = route.add_hold("OPENAI_SUBSCRIPTION", "+2d", "budget", ["worker"], "alice")
+        with mock.patch.object(route, "gather", return_value=lanes()), mock.patch.object(route, "publish_lanes"):
+            _, st = self.main("status", "--json")
+        row = st["holds"][0]
+        self.assertEqual((row["id"], row["set_by"], row["roles"], row["reason"]), (h["id"], "alice", ["worker"], "budget"))
+        self.assertGreater(row["until"], time.time())
+        self.assertEqual(self.main("release", h["id"])[0], 0)
+        self.assertEqual(self.main("holds")[1]["holds"], [])
+        self.assertEqual(self.main("release", "nothing")[0], 1)
 
 
 class BackAt(unittest.TestCase):

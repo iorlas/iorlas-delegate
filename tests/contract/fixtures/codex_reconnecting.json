@@ -1,0 +1,90 @@
+{
+ "fixture": 1,
+ "scenario": "codex stream retries that ended the run (n/5), answered worker_failed",
+ "cli": "codex",
+ "lane": "OPENAI_SUBSCRIPTION",
+ "real": "text real; exit code assumed 1 and work_seen true (the old answer was worker_failed, not vendor_prework)",
+ "expected_reason": "worker_failed",
+ "expected_wire": {
+  "status": "failed",
+  "reason": "worker_failed",
+  "next": "fail"
+ },
+ "rows": [
+  {
+   "id": "lifesim-fld.27.12-20261024-062234.jsonl:220",
+   "history": {
+    "ts": 1792815498.5565372
+   },
+   "source": "engine/lifesim-fld.27.12-20261024-062234.jsonl:220",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "Reconnecting... 2/5 (request timed out)",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": true,
+    "structured": {}
+   }
+  },
+  {
+   "id": "lifesim-d5f.30-20261024-063223.jsonl:331",
+   "history": {
+    "ts": 1792822026.540257
+   },
+   "source": "engine/lifesim-d5f.30-20261024-063223.jsonl:331",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "Reconnecting... 5/5 (stream disconnected before completion: websocket closed by server before response.completed)",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": true,
+    "structured": {}
+   }
+  },
+  {
+   "id": "lifesim-d5f.40-20261024-123242.jsonl:256",
+   "history": {
+    "ts": 1792837191.256417
+   },
+   "source": "engine/lifesim-d5f.40-20261024-123242.jsonl:256",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "Reconnecting... 1/5 (workspace routing discovery timed out)",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": true,
+    "structured": {}
+   }
+  },
+  {
+   "id": "lifesim-t9x4-20261024-122904.jsonl:226",
+   "history": {
+    "ts": 1792837763.09666
+   },
+   "source": "engine/lifesim-t9x4-20261024-122904.jsonl:226",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "Reconnecting... 2/5 (stream disconnected before completion: idle timeout waiting for websocket)",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": true,
+    "structured": {}
+   }
+  },
+  {
+   "id": "tl-j6y-20261025-025510.jsonl:170",
+   "history": {
+    "ts": 1792890850.140896
+   },
+   "source": "engine/tl-j6y-20261025-025510.jsonl:170",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "Reconnecting... 3/5 (stream disconnected before completion: Incomplete response returned, reason: max_output_tokens)",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": true,
+    "structured": {}
+   }
+  }
+ ]
+}

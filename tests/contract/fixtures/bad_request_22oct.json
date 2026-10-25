@@ -1,0 +1,1182 @@
+{
+ "fixture": 1,
+ "scenario": "codex HTTP 400 invalid_json_schema storm, 22 Oct 22:54 -> 23 Oct 00:23",
+ "cli": "codex",
+ "lane": "OPENAI_SUBSCRIPTION",
+ "real": "history rows are real; vendor text is the engine's copy of delegate's say, cut at 300 chars (the HTTP status tail is lost), so evidence is shorter than the original error",
+ "expected_reason": "bad_request",
+ "expected_wire": {
+  "status": "error",
+  "reason": "bad_request",
+  "next": "owner"
+ },
+ "benches_pair": false,
+ "rows": [
+  {
+   "id": "2b90c691-3fa2-482d-9e70-f4083bf49050",
+   "history": {
+    "ts": 1792698881.225664,
+    "run_id": "2b90c691-3fa2-482d-9e70-f4083bf49050",
+    "role": "reviewer",
+    "lane": "OPENAI_SUBSCRIPTION",
+    "model": "gpt-6.1-sol",
+    "status": "error",
+    "reason": "bad_request",
+    "secs": 12.2
+   },
+   "source": "engine/lifesim-log-20261022-225135.jsonl:62",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "{\"type\":\"error\",\"error\":{\"message\":\"Invalid schema for response_format 'codex_output_schema': 'schema.required' is required to include every key in properties. Missing 'accept_files'.\",\"type\":\"invalid_request_error\",\"param\":\"text.format.schema\",\"code\":\"invalid_json_schema\"},\"status\":400}",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   }
+  },
+  {
+   "id": "0cb931d4-f9e1-4cf8-9bd1-6bb2c5b9f941",
+   "history": {
+    "ts": 1792699120.03502,
+    "run_id": "0cb931d4-f9e1-4cf8-9bd1-6bb2c5b9f941",
+    "role": "worker",
+    "lane": "OPENAI_SUBSCRIPTION",
+    "model": "gpt-6.1-sol",
+    "status": "error",
+    "reason": "bad_request",
+    "secs": 16.8
+   },
+   "source": "engine/lifesim-sz3-20261022-225656.jsonl:17",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "{\"type\":\"error\",\"error\":{\"message\":\"Invalid schema for response_format 'codex_output_schema': 'schema.properties.unchecked.items.required' is required to include every key in properties. Missing 'source'.\",\"type\":\"invalid_request_error\",\"param\":\"text.format.schema\",\"code\":\"invalid_json_schema\"},\"sta",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   }
+  },
+  {
+   "id": "e04b72ba-65dd-48c8-9aa0-2a92c2e5a5b6",
+   "history": {
+    "ts": 1792699351.018016,
+    "run_id": "e04b72ba-65dd-48c8-9aa0-2a92c2e5a5b6",
+    "role": "reviewer",
+    "lane": "OPENAI_SUBSCRIPTION",
+    "model": "gpt-6.1-sol",
+    "status": "error",
+    "reason": "bad_request",
+    "secs": 11.2
+   },
+   "source": "engine/lifesim-yxbb.7-20261022-230139.jsonl:20",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "{\"type\":\"error\",\"error\":{\"message\":\"Invalid schema for response_format 'codex_output_schema': 'schema.properties.unchecked.items.required' is required to include every key in properties. Missing 'source'.\",\"type\":\"invalid_request_error\",\"param\":\"text.format.schema\",\"code\":\"invalid_json_schema\"},\"sta",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   }
+  },
+  {
+   "id": "9b12a2bb-6d7a-4156-a394-f3c0f8ec8673",
+   "history": {
+    "ts": 1792699404.974835,
+    "run_id": "9b12a2bb-6d7a-4156-a394-f3c0f8ec8673",
+    "role": "worker",
+    "lane": "OPENAI_SUBSCRIPTION",
+    "model": "gpt-6.1-sol",
+    "status": "error",
+    "reason": "bad_request",
+    "secs": 7.8
+   },
+   "source": "engine/lifesim-yxbb.7-20261022-230139.jsonl:20",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "{\"type\":\"error\",\"error\":{\"message\":\"Invalid schema for response_format 'codex_output_schema': 'schema.properties.unchecked.items.required' is required to include every key in properties. Missing 'source'.\",\"type\":\"invalid_request_error\",\"param\":\"text.format.schema\",\"code\":\"invalid_json_schema\"},\"sta",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   }
+  },
+  {
+   "id": "73661b52-5cef-4e2a-bffb-87bdd8a25c70",
+   "history": {
+    "ts": 1792699575.551862,
+    "run_id": "73661b52-5cef-4e2a-bffb-87bdd8a25c70",
+    "role": "worker",
+    "lane": "OPENAI_SUBSCRIPTION",
+    "model": "gpt-6.1-sol",
+    "status": "error",
+    "reason": "bad_request",
+    "secs": 14.9
+   },
+   "source": "engine/lifesim-fld.25.15-20261022-230429.jsonl:20",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "{\"type\":\"error\",\"error\":{\"message\":\"Invalid schema for response_format 'codex_output_schema': 'schema.properties.unchecked.items.required' is required to include every key in properties. Missing 'source'.\",\"type\":\"invalid_request_error\",\"param\":\"text.format.schema\",\"code\":\"invalid_json_schema\"},\"sta",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   }
+  },
+  {
+   "id": "77022266-5ef9-40ce-804d-e17594483017",
+   "history": {
+    "ts": 1792699686.475358,
+    "run_id": "77022266-5ef9-40ce-804d-e17594483017",
+    "role": "worker",
+    "lane": "OPENAI_SUBSCRIPTION",
+    "model": "gpt-6.1-sol",
+    "status": "error",
+    "reason": "bad_request",
+    "secs": 19.1
+   },
+   "source": "engine/lifesim-d5f.44-20261022-230457.jsonl:32",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "{\"type\":\"error\",\"error\":{\"message\":\"Invalid schema for response_format 'codex_output_schema': 'schema.properties.unchecked.items.required' is required to include every key in properties. Missing 'source'.\",\"type\":\"invalid_request_error\",\"param\":\"text.format.schema\",\"code\":\"invalid_json_schema\"},\"sta",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   }
+  },
+  {
+   "id": "344f6d29-bb31-4e07-a201-7b0e05e68973",
+   "history": {
+    "ts": 1792699750.478026,
+    "run_id": "344f6d29-bb31-4e07-a201-7b0e05e68973",
+    "role": "worker",
+    "lane": "OPENAI_SUBSCRIPTION",
+    "model": "gpt-6.1-sol",
+    "status": "error",
+    "reason": "bad_request",
+    "secs": 13.4
+   },
+   "source": "engine/lifesim-iqad-20261022-230715.jsonl:22",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "{\"type\":\"error\",\"error\":{\"message\":\"Invalid schema for response_format 'codex_output_schema': 'schema.properties.unchecked.items.required' is required to include every key in properties. Missing 'source'.\",\"type\":\"invalid_request_error\",\"param\":\"text.format.schema\",\"code\":\"invalid_json_schema\"},\"sta",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   }
+  },
+  {
+   "id": "dec70c5b-5bd1-4531-8350-4e61832602e9",
+   "history": {
+    "ts": 1792699837.875852,
+    "run_id": "dec70c5b-5bd1-4531-8350-4e61832602e9",
+    "role": "worker",
+    "lane": "OPENAI_SUBSCRIPTION",
+    "model": "gpt-6.1-sol",
+    "status": "error",
+    "reason": "bad_request",
+    "secs": 12.5
+   },
+   "source": "engine/lifesim-d5f.51-20261022-230859.jsonl:17",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "{\"type\":\"error\",\"error\":{\"message\":\"Invalid schema for response_format 'codex_output_schema': 'schema.properties.unchecked.items.required' is required to include every key in properties. Missing 'source'.\",\"type\":\"invalid_request_error\",\"param\":\"text.format.schema\",\"code\":\"invalid_json_schema\"},\"sta",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   }
+  },
+  {
+   "id": "3c8d0bf4-b6ed-4cd3-87c9-d95ed1419549",
+   "history": {
+    "ts": 1792699965.2935839,
+    "run_id": "3c8d0bf4-b6ed-4cd3-87c9-d95ed1419549",
+    "role": "worker",
+    "lane": "OPENAI_SUBSCRIPTION",
+    "model": "gpt-6.1-sol",
+    "status": "error",
+    "reason": "bad_request",
+    "secs": 9.8
+   },
+   "source": "engine/lifesim-fld.25.19-20261022-230949.jsonl:27",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "{\"type\":\"error\",\"error\":{\"message\":\"Invalid schema for response_format 'codex_output_schema': 'schema.properties.unchecked.items.required' is required to include every key in properties. Missing 'source'.\",\"type\":\"invalid_request_error\",\"param\":\"text.format.schema\",\"code\":\"invalid_json_schema\"},\"sta",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   }
+  },
+  {
+   "id": "0c222ca1-ee44-4e0e-ac99-1bc10a68546b",
+   "history": {
+    "ts": 1792700025.984442,
+    "run_id": "0c222ca1-ee44-4e0e-ac99-1bc10a68546b",
+    "role": "worker",
+    "lane": "OPENAI_SUBSCRIPTION",
+    "model": "gpt-6.1-sol",
+    "status": "error",
+    "reason": "bad_request",
+    "secs": 18.8
+   },
+   "source": "engine/lifesim-d5f.61-20261022-231121.jsonl:20",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "{\"type\":\"error\",\"error\":{\"message\":\"Invalid schema for response_format 'codex_output_schema': 'schema.properties.unchecked.items.required' is required to include every key in properties. Missing 'source'.\",\"type\":\"invalid_request_error\",\"param\":\"text.format.schema\",\"code\":\"invalid_json_schema\"},\"sta",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   }
+  },
+  {
+   "id": "09f3eab2-a1dc-4bfe-8495-9fc721ce23dd",
+   "history": {
+    "ts": 1792700100.5682309,
+    "run_id": "09f3eab2-a1dc-4bfe-8495-9fc721ce23dd",
+    "role": "worker",
+    "lane": "OPENAI_SUBSCRIPTION",
+    "model": "gpt-6.1-sol",
+    "status": "error",
+    "reason": "bad_request",
+    "secs": 17.3
+   },
+   "source": "engine/lifesim-5ban.12-20261022-231332.jsonl:17",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "{\"type\":\"error\",\"error\":{\"message\":\"Invalid schema for response_format 'codex_output_schema': 'schema.properties.unchecked.items.required' is required to include every key in properties. Missing 'source'.\",\"type\":\"invalid_request_error\",\"param\":\"text.format.schema\",\"code\":\"invalid_json_schema\"},\"sta",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   }
+  },
+  {
+   "id": "e0eb7790-2a26-4f8e-a629-c2b6712c5f50",
+   "history": {
+    "ts": 1792700252.3989289,
+    "run_id": "e0eb7790-2a26-4f8e-a629-c2b6712c5f50",
+    "role": "worker",
+    "lane": "OPENAI_SUBSCRIPTION",
+    "model": "gpt-6.1-sol",
+    "status": "error",
+    "reason": "bad_request",
+    "secs": 14.5
+   },
+   "source": "engine/lifesim-gfr.39-20261022-231441.jsonl:19",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "{\"type\":\"error\",\"error\":{\"message\":\"Invalid schema for response_format 'codex_output_schema': 'schema.properties.unchecked.items.required' is required to include every key in properties. Missing 'source'.\",\"type\":\"invalid_request_error\",\"param\":\"text.format.schema\",\"code\":\"invalid_json_schema\"},\"sta",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   }
+  },
+  {
+   "id": "2fcd99ac-3064-4d0d-b319-71c6e0cd0e82",
+   "history": {
+    "ts": 1792700330.830817,
+    "run_id": "2fcd99ac-3064-4d0d-b319-71c6e0cd0e82",
+    "role": "worker",
+    "lane": "OPENAI_SUBSCRIPTION",
+    "model": "gpt-6.1-sol",
+    "status": "error",
+    "reason": "bad_request",
+    "secs": 18.0
+   },
+   "source": "engine/lifesim-5ban.14-20261022-231548.jsonl:23",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "{\"type\":\"error\",\"error\":{\"message\":\"Invalid schema for response_format 'codex_output_schema': 'schema.properties.unchecked.items.required' is required to include every key in properties. Missing 'source'.\",\"type\":\"invalid_request_error\",\"param\":\"text.format.schema\",\"code\":\"invalid_json_schema\"},\"sta",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   }
+  },
+  {
+   "id": "58113967-57a1-466e-83fd-6ba1a92d55d6",
+   "history": {
+    "ts": 1792700469.6798332,
+    "run_id": "58113967-57a1-466e-83fd-6ba1a92d55d6",
+    "role": "worker",
+    "lane": "OPENAI_SUBSCRIPTION",
+    "model": "gpt-6.1-sol",
+    "status": "error",
+    "reason": "bad_request",
+    "secs": 11.1
+   },
+   "source": "engine/lifesim-gqzz-20261022-231823.jsonl:17",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "{\"type\":\"error\",\"error\":{\"message\":\"Invalid schema for response_format 'codex_output_schema': 'schema.properties.unchecked.items.required' is required to include every key in properties. Missing 'source'.\",\"type\":\"invalid_request_error\",\"param\":\"text.format.schema\",\"code\":\"invalid_json_schema\"},\"sta",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   }
+  },
+  {
+   "id": "a9519e38-ad23-4b02-a348-5b9575fb68f6",
+   "history": {
+    "ts": 1792700479.83986,
+    "run_id": "a9519e38-ad23-4b02-a348-5b9575fb68f6",
+    "role": "worker",
+    "lane": "OPENAI_SUBSCRIPTION",
+    "model": "gpt-6.1-sol",
+    "status": "error",
+    "reason": "bad_request",
+    "secs": 11.4
+   },
+   "source": "engine/lifesim-5ban.16-20261022-231941.jsonl:17",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "{\"type\":\"error\",\"error\":{\"message\":\"Invalid schema for response_format 'codex_output_schema': 'schema.properties.unchecked.items.required' is required to include every key in properties. Missing 'source'.\",\"type\":\"invalid_request_error\",\"param\":\"text.format.schema\",\"code\":\"invalid_json_schema\"},\"sta",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   }
+  },
+  {
+   "id": "7a3abff9-a514-4c8b-9a5f-befa32ac4281",
+   "history": {
+    "ts": 1792700658.295742,
+    "run_id": "7a3abff9-a514-4c8b-9a5f-befa32ac4281",
+    "role": "worker",
+    "lane": "OPENAI_SUBSCRIPTION",
+    "model": "gpt-6.1-sol",
+    "status": "error",
+    "reason": "bad_request",
+    "secs": 7.3
+   },
+   "source": "engine/lifesim-5ban.17-20261022-232217.jsonl:17",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "{\"type\":\"error\",\"error\":{\"message\":\"Invalid schema for response_format 'codex_output_schema': 'schema.properties.unchecked.items.required' is required to include every key in properties. Missing 'source'.\",\"type\":\"invalid_request_error\",\"param\":\"text.format.schema\",\"code\":\"invalid_json_schema\"},\"sta",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   }
+  },
+  {
+   "id": "6ad58de4-3d2b-468d-8670-89f19b7b1ca8",
+   "history": {
+    "ts": 1792700735.6577091,
+    "run_id": "6ad58de4-3d2b-468d-8670-89f19b7b1ca8",
+    "role": "worker",
+    "lane": "OPENAI_SUBSCRIPTION",
+    "model": "gpt-6.1-sol",
+    "status": "error",
+    "reason": "bad_request",
+    "secs": 14.3
+   },
+   "source": "engine/lifesim-y7ll-20261022-232259.jsonl:19",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "{\"type\":\"error\",\"error\":{\"message\":\"Invalid schema for response_format 'codex_output_schema': 'schema.properties.unchecked.items.required' is required to include every key in properties. Missing 'source'.\",\"type\":\"invalid_request_error\",\"param\":\"text.format.schema\",\"code\":\"invalid_json_schema\"},\"sta",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   }
+  },
+  {
+   "id": "658e2f17-2703-4819-b966-7601e46a7403",
+   "history": {
+    "ts": 1792700816.695683,
+    "run_id": "658e2f17-2703-4819-b966-7601e46a7403",
+    "role": "worker",
+    "lane": "OPENAI_SUBSCRIPTION",
+    "model": "gpt-6.1-sol",
+    "status": "error",
+    "reason": "bad_request",
+    "secs": 13.4
+   },
+   "source": "engine/lifesim-5ban.18-20261022-232505.jsonl:17",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "{\"type\":\"error\",\"error\":{\"message\":\"Invalid schema for response_format 'codex_output_schema': 'schema.properties.unchecked.items.required' is required to include every key in properties. Missing 'source'.\",\"type\":\"invalid_request_error\",\"param\":\"text.format.schema\",\"code\":\"invalid_json_schema\"},\"sta",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   }
+  },
+  {
+   "id": "4885f59f-a2b6-4951-8b84-3703fee68027",
+   "history": {
+    "ts": 1792700963.100498,
+    "run_id": "4885f59f-a2b6-4951-8b84-3703fee68027",
+    "role": "worker",
+    "lane": "OPENAI_SUBSCRIPTION",
+    "model": "gpt-6.1-sol",
+    "status": "error",
+    "reason": "bad_request",
+    "secs": 16.4
+   },
+   "source": "engine/lifesim-f2by-20261022-232620.jsonl:26",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "{\"type\":\"error\",\"error\":{\"message\":\"Invalid schema for response_format 'codex_output_schema': 'schema.properties.unchecked.items.required' is required to include every key in properties. Missing 'source'.\",\"type\":\"invalid_request_error\",\"param\":\"text.format.schema\",\"code\":\"invalid_json_schema\"},\"sta",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   }
+  },
+  {
+   "id": "06e472a8-0942-49e6-8892-d209d5374f18",
+   "history": {
+    "ts": 1792700993.7219572,
+    "run_id": "06e472a8-0942-49e6-8892-d209d5374f18",
+    "role": "worker",
+    "lane": "OPENAI_SUBSCRIPTION",
+    "model": "gpt-6.1-sol",
+    "status": "error",
+    "reason": "bad_request",
+    "secs": 14.9
+   },
+   "source": "engine/lifesim-5ban.19-20261022-232743.jsonl:17",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "{\"type\":\"error\",\"error\":{\"message\":\"Invalid schema for response_format 'codex_output_schema': 'schema.properties.unchecked.items.required' is required to include every key in properties. Missing 'source'.\",\"type\":\"invalid_request_error\",\"param\":\"text.format.schema\",\"code\":\"invalid_json_schema\"},\"sta",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   }
+  },
+  {
+   "id": "92743256-ff9d-47b1-817b-38c16cf56387",
+   "history": {
+    "ts": 1792701115.352692,
+    "run_id": "92743256-ff9d-47b1-817b-38c16cf56387",
+    "role": "worker",
+    "lane": "OPENAI_SUBSCRIPTION",
+    "model": "gpt-6.1-sol",
+    "status": "error",
+    "reason": "bad_request",
+    "secs": 22.5
+   },
+   "source": "engine/lifesim-md1f-20261022-233005.jsonl:19",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "{\"type\":\"error\",\"error\":{\"message\":\"Invalid schema for response_format 'codex_output_schema': 'schema.properties.unchecked.items.required' is required to include every key in properties. Missing 'source'.\",\"type\":\"invalid_request_error\",\"param\":\"text.format.schema\",\"code\":\"invalid_json_schema\"},\"sta",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   }
+  },
+  {
+   "id": "a224c559-ee02-4ff1-8f1d-c7af24284b62",
+   "history": {
+    "ts": 1792701156.798462,
+    "run_id": "a224c559-ee02-4ff1-8f1d-c7af24284b62",
+    "role": "worker",
+    "lane": "OPENAI_SUBSCRIPTION",
+    "model": "gpt-6.1-sol",
+    "status": "error",
+    "reason": "bad_request",
+    "secs": 17.0
+   },
+   "source": "engine/lifesim-5ban.20-20261022-233044.jsonl:17",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "{\"type\":\"error\",\"error\":{\"message\":\"Invalid schema for response_format 'codex_output_schema': 'schema.properties.unchecked.items.required' is required to include every key in properties. Missing 'source'.\",\"type\":\"invalid_request_error\",\"param\":\"text.format.schema\",\"code\":\"invalid_json_schema\"},\"sta",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   }
+  },
+  {
+   "id": "33d786b3-75a2-44a7-bb31-bd07e29de89c",
+   "history": {
+    "ts": 1792701329.102751,
+    "run_id": "33d786b3-75a2-44a7-bb31-bd07e29de89c",
+    "role": "worker",
+    "lane": "OPENAI_SUBSCRIPTION",
+    "model": "gpt-6.1-sol",
+    "status": "error",
+    "reason": "bad_request",
+    "secs": 8.6
+   },
+   "source": "engine/lifesim-o45k-20261022-233240.jsonl:18",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "{\"type\":\"error\",\"error\":{\"message\":\"Invalid schema for response_format 'codex_output_schema': 'schema.properties.unchecked.items.required' is required to include every key in properties. Missing 'source'.\",\"type\":\"invalid_request_error\",\"param\":\"text.format.schema\",\"code\":\"invalid_json_schema\"},\"sta",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   }
+  },
+  {
+   "id": "5acbf2da-3da7-4c79-82f6-028eafe0e613",
+   "history": {
+    "ts": 1792701337.160392,
+    "run_id": "5acbf2da-3da7-4c79-82f6-028eafe0e613",
+    "role": "worker",
+    "lane": "OPENAI_SUBSCRIPTION",
+    "model": "gpt-6.1-sol",
+    "status": "error",
+    "reason": "bad_request",
+    "secs": 18.1
+   },
+   "source": "engine/lifesim-5ban.22-20261022-233321.jsonl:17",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "{\"type\":\"error\",\"error\":{\"message\":\"Invalid schema for response_format 'codex_output_schema': 'schema.properties.unchecked.items.required' is required to include every key in properties. Missing 'source'.\",\"type\":\"invalid_request_error\",\"param\":\"text.format.schema\",\"code\":\"invalid_json_schema\"},\"sta",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   }
+  },
+  {
+   "id": "5c12fd57-c899-4010-b939-5f165da7b949",
+   "history": {
+    "ts": 1792701564.7563121,
+    "run_id": "5c12fd57-c899-4010-b939-5f165da7b949",
+    "role": "worker",
+    "lane": "OPENAI_SUBSCRIPTION",
+    "model": "gpt-6.1-sol",
+    "status": "error",
+    "reason": "bad_request",
+    "secs": 14.8
+   },
+   "source": "engine/lifesim-5ban.26-20261022-233630.jsonl:17",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "{\"type\":\"error\",\"error\":{\"message\":\"Invalid schema for response_format 'codex_output_schema': 'schema.properties.unchecked.items.required' is required to include every key in properties. Missing 'source'.\",\"type\":\"invalid_request_error\",\"param\":\"text.format.schema\",\"code\":\"invalid_json_schema\"},\"sta",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   }
+  },
+  {
+   "id": "592a5b40-29cc-4bab-9f86-91122ce7b209",
+   "history": {
+    "ts": 1792701570.606234,
+    "run_id": "592a5b40-29cc-4bab-9f86-91122ce7b209",
+    "role": "worker",
+    "lane": "OPENAI_SUBSCRIPTION",
+    "model": "gpt-6.1-sol",
+    "status": "error",
+    "reason": "bad_request",
+    "secs": 17.4
+   },
+   "source": "engine/lifesim-22b3-20261022-233653.jsonl:19",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "{\"type\":\"error\",\"error\":{\"message\":\"Invalid schema for response_format 'codex_output_schema': 'schema.properties.unchecked.items.required' is required to include every key in properties. Missing 'source'.\",\"type\":\"invalid_request_error\",\"param\":\"text.format.schema\",\"code\":\"invalid_json_schema\"},\"sta",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   }
+  },
+  {
+   "id": "f313b42c-98b6-4ccd-863a-bb4baec1c2b6",
+   "history": {
+    "ts": 1792701769.6648908,
+    "run_id": "f313b42c-98b6-4ccd-863a-bb4baec1c2b6",
+    "role": "worker",
+    "lane": "OPENAI_SUBSCRIPTION",
+    "model": "gpt-6.1-sol",
+    "status": "error",
+    "reason": "bad_request",
+    "secs": 10.7
+   },
+   "source": "engine/lifesim-40jy-20261022-234030.jsonl:28",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "{\"type\":\"error\",\"error\":{\"message\":\"Invalid schema for response_format 'codex_output_schema': 'schema.properties.unchecked.items.required' is required to include every key in properties. Missing 'source'.\",\"type\":\"invalid_request_error\",\"param\":\"text.format.schema\",\"code\":\"invalid_json_schema\"},\"sta",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   }
+  },
+  {
+   "id": "625dea5c-2ecb-4402-a07d-8c1e337df46c",
+   "history": {
+    "ts": 1792701772.772058,
+    "run_id": "625dea5c-2ecb-4402-a07d-8c1e337df46c",
+    "role": "worker",
+    "lane": "OPENAI_SUBSCRIPTION",
+    "model": "gpt-6.1-sol",
+    "status": "error",
+    "reason": "bad_request",
+    "secs": 12.9
+   },
+   "source": "engine/lifesim-5ban.27-20261022-234037.jsonl:23",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "{\"type\":\"error\",\"error\":{\"message\":\"Invalid schema for response_format 'codex_output_schema': 'schema.properties.unchecked.items.required' is required to include every key in properties. Missing 'source'.\",\"type\":\"invalid_request_error\",\"param\":\"text.format.schema\",\"code\":\"invalid_json_schema\"},\"sta",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   }
+  },
+  {
+   "id": "87b7698f-ec3f-46df-b9f8-afe2a0c087fc",
+   "history": {
+    "ts": 1792701967.758951,
+    "run_id": "87b7698f-ec3f-46df-b9f8-afe2a0c087fc",
+    "role": "worker",
+    "lane": "OPENAI_SUBSCRIPTION",
+    "model": "gpt-6.1-sol",
+    "status": "error",
+    "reason": "bad_request",
+    "secs": 18.1
+   },
+   "source": "engine/lifesim-5ban.28-20261022-234409.jsonl:17",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "{\"type\":\"error\",\"error\":{\"message\":\"Invalid schema for response_format 'codex_output_schema': 'schema.properties.unchecked.items.required' is required to include every key in properties. Missing 'source'.\",\"type\":\"invalid_request_error\",\"param\":\"text.format.schema\",\"code\":\"invalid_json_schema\"},\"sta",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   }
+  },
+  {
+   "id": "b91c6d67-acb9-4d40-932d-80481f82055e",
+   "history": {
+    "ts": 1792702116.5597131,
+    "run_id": "b91c6d67-acb9-4d40-932d-80481f82055e",
+    "role": "worker",
+    "lane": "OPENAI_SUBSCRIPTION",
+    "model": "gpt-6.1-sol",
+    "status": "error",
+    "reason": "bad_request",
+    "secs": 13.6
+   },
+   "source": "engine/lifesim-fdyo-20261022-234415.jsonl:23",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "{\"type\":\"error\",\"error\":{\"message\":\"Invalid schema for response_format 'codex_output_schema': 'schema.properties.unchecked.items.required' is required to include every key in properties. Missing 'source'.\",\"type\":\"invalid_request_error\",\"param\":\"text.format.schema\",\"code\":\"invalid_json_schema\"},\"sta",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   }
+  },
+  {
+   "id": "b7e04ab9-047c-405e-9c92-82b5ebe6d052",
+   "history": {
+    "ts": 1792702178.4982789,
+    "run_id": "b7e04ab9-047c-405e-9c92-82b5ebe6d052",
+    "role": "worker",
+    "lane": "OPENAI_SUBSCRIPTION",
+    "model": "gpt-6.1-sol",
+    "status": "error",
+    "reason": "bad_request",
+    "secs": 12.0
+   },
+   "source": "engine/lifesim-5ban.30-20261022-234703.jsonl:17",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "{\"type\":\"error\",\"error\":{\"message\":\"Invalid schema for response_format 'codex_output_schema': 'schema.properties.unchecked.items.required' is required to include every key in properties. Missing 'source'.\",\"type\":\"invalid_request_error\",\"param\":\"text.format.schema\",\"code\":\"invalid_json_schema\"},\"sta",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   }
+  },
+  {
+   "id": "643eb153-ef92-4ec7-8b85-62c129afb4ae",
+   "history": {
+    "ts": 1792702270.428482,
+    "run_id": "643eb153-ef92-4ec7-8b85-62c129afb4ae",
+    "role": "worker",
+    "lane": "OPENAI_SUBSCRIPTION",
+    "model": "gpt-6.1-sol",
+    "status": "error",
+    "reason": "bad_request",
+    "secs": 13.3
+   },
+   "source": "engine/lifesim-l4ow-20261022-234925.jsonl:17",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "{\"type\":\"error\",\"error\":{\"message\":\"Invalid schema for response_format 'codex_output_schema': 'schema.properties.unchecked.items.required' is required to include every key in properties. Missing 'source'.\",\"type\":\"invalid_request_error\",\"param\":\"text.format.schema\",\"code\":\"invalid_json_schema\"},\"sta",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   }
+  },
+  {
+   "id": "4f558bcb-0654-4fbb-8e13-6f3f650dcf78",
+   "history": {
+    "ts": 1792702405.460392,
+    "run_id": "4f558bcb-0654-4fbb-8e13-6f3f650dcf78",
+    "role": "worker",
+    "lane": "OPENAI_SUBSCRIPTION",
+    "model": "gpt-6.1-sol",
+    "status": "error",
+    "reason": "bad_request",
+    "secs": 20.9
+   },
+   "source": "engine/lifesim-5ban.31-20261022-235022.jsonl:17",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "{\"type\":\"error\",\"error\":{\"message\":\"Invalid schema for response_format 'codex_output_schema': 'schema.properties.unchecked.items.required' is required to include every key in properties. Missing 'source'.\",\"type\":\"invalid_request_error\",\"param\":\"text.format.schema\",\"code\":\"invalid_json_schema\"},\"sta",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   }
+  },
+  {
+   "id": "f76fc987-5d94-40d5-ad25-c3edb4442f5f",
+   "history": {
+    "ts": 1792702467.075381,
+    "run_id": "f76fc987-5d94-40d5-ad25-c3edb4442f5f",
+    "role": "worker",
+    "lane": "OPENAI_SUBSCRIPTION",
+    "model": "gpt-6.1-sol",
+    "status": "error",
+    "reason": "bad_request",
+    "secs": 9.8
+   },
+   "source": "engine/lifesim-o67g-20261022-235154.jsonl:23",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "{\"type\":\"error\",\"error\":{\"message\":\"Invalid schema for response_format 'codex_output_schema': 'schema.properties.unchecked.items.required' is required to include every key in properties. Missing 'source'.\",\"type\":\"invalid_request_error\",\"param\":\"text.format.schema\",\"code\":\"invalid_json_schema\"},\"sta",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   }
+  },
+  {
+   "id": "82b2fae6-c6bf-48e6-a93e-da51bff46301",
+   "history": {
+    "ts": 1792702580.528169,
+    "run_id": "82b2fae6-c6bf-48e6-a93e-da51bff46301",
+    "role": "worker",
+    "lane": "OPENAI_SUBSCRIPTION",
+    "model": "gpt-6.1-sol",
+    "status": "error",
+    "reason": "bad_request",
+    "secs": 10.2
+   },
+   "source": "engine/lifesim-6pld-20261022-235405.jsonl:17",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "{\"type\":\"error\",\"error\":{\"message\":\"Invalid schema for response_format 'codex_output_schema': 'schema.properties.unchecked.items.required' is required to include every key in properties. Missing 'source'.\",\"type\":\"invalid_request_error\",\"param\":\"text.format.schema\",\"code\":\"invalid_json_schema\"},\"sta",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   }
+  },
+  {
+   "id": "09a414f4-6609-4161-9137-3f36c26b79b1",
+   "history": {
+    "ts": 1792702605.269679,
+    "run_id": "09a414f4-6609-4161-9137-3f36c26b79b1",
+    "role": "worker",
+    "lane": "OPENAI_SUBSCRIPTION",
+    "model": "gpt-6.1-sol",
+    "status": "error",
+    "reason": "bad_request",
+    "secs": 9.2
+   },
+   "source": "engine/lifesim-se15-20261022-235512.jsonl:17",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "{\"type\":\"error\",\"error\":{\"message\":\"Invalid schema for response_format 'codex_output_schema': 'schema.properties.unchecked.items.required' is required to include every key in properties. Missing 'source'.\",\"type\":\"invalid_request_error\",\"param\":\"text.format.schema\",\"code\":\"invalid_json_schema\"},\"sta",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   }
+  },
+  {
+   "id": "fb998e09-2cc3-4ae1-b56e-57933acb9512",
+   "history": {
+    "ts": 1792702757.387391,
+    "run_id": "fb998e09-2cc3-4ae1-b56e-57933acb9512",
+    "role": "worker",
+    "lane": "OPENAI_SUBSCRIPTION",
+    "model": "gpt-6.1-sol",
+    "status": "error",
+    "reason": "bad_request",
+    "secs": 8.4
+   },
+   "source": "engine/lifesim-9akx-20261022-235708.jsonl:17",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "{\"type\":\"error\",\"error\":{\"message\":\"Invalid schema for response_format 'codex_output_schema': 'schema.properties.unchecked.items.required' is required to include every key in properties. Missing 'source'.\",\"type\":\"invalid_request_error\",\"param\":\"text.format.schema\",\"code\":\"invalid_json_schema\"},\"sta",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   }
+  },
+  {
+   "id": "324fb8b0-5254-4ce8-952a-5ca5f9124ecf",
+   "history": {
+    "ts": 1792702941.557303,
+    "run_id": "324fb8b0-5254-4ce8-952a-5ca5f9124ecf",
+    "role": "worker",
+    "lane": "OPENAI_SUBSCRIPTION",
+    "model": "gpt-6.1-sol",
+    "status": "error",
+    "reason": "bad_request",
+    "secs": 9.0
+   },
+   "source": "engine/lifesim-22v.38-20261023-000019.jsonl:17",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "{\"type\":\"error\",\"error\":{\"message\":\"Invalid schema for response_format 'codex_output_schema': 'schema.properties.unchecked.items.required' is required to include every key in properties. Missing 'source'.\",\"type\":\"invalid_request_error\",\"param\":\"text.format.schema\",\"code\":\"invalid_json_schema\"},\"sta",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   }
+  },
+  {
+   "id": "e762f599-682d-4e57-9b47-f58ab00d3a41",
+   "history": {
+    "ts": 1792703029.770706,
+    "run_id": "e762f599-682d-4e57-9b47-f58ab00d3a41",
+    "role": "worker",
+    "lane": "OPENAI_SUBSCRIPTION",
+    "model": "gpt-6.1-sol",
+    "status": "error",
+    "reason": "bad_request",
+    "secs": 12.2
+   },
+   "source": "engine/lifesim-6au9-20261023-000200.jsonl:17",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "{\"type\":\"error\",\"error\":{\"message\":\"Invalid schema for response_format 'codex_output_schema': 'schema.properties.unchecked.items.required' is required to include every key in properties. Missing 'source'.\",\"type\":\"invalid_request_error\",\"param\":\"text.format.schema\",\"code\":\"invalid_json_schema\"},\"sta",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   }
+  },
+  {
+   "id": "2e6d43d5-d570-40bd-b175-ef9004129b27",
+   "history": {
+    "ts": 1792703101.3454762,
+    "run_id": "2e6d43d5-d570-40bd-b175-ef9004129b27",
+    "role": "worker",
+    "lane": "OPENAI_SUBSCRIPTION",
+    "model": "gpt-6.1-sol",
+    "status": "error",
+    "reason": "bad_request",
+    "secs": 11.7
+   },
+   "source": "engine/lifesim-jva-20261023-000303.jsonl:17",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "{\"type\":\"error\",\"error\":{\"message\":\"Invalid schema for response_format 'codex_output_schema': 'schema.properties.unchecked.items.required' is required to include every key in properties. Missing 'source'.\",\"type\":\"invalid_request_error\",\"param\":\"text.format.schema\",\"code\":\"invalid_json_schema\"},\"sta",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   }
+  },
+  {
+   "id": "3025cef2-dc7e-4956-a2be-6560cd132802",
+   "history": {
+    "ts": 1792703188.305087,
+    "run_id": "3025cef2-dc7e-4956-a2be-6560cd132802",
+    "role": "worker",
+    "lane": "OPENAI_SUBSCRIPTION",
+    "model": "gpt-6.1-sol",
+    "status": "error",
+    "reason": "bad_request",
+    "secs": 19.9
+   },
+   "source": "engine/lifesim-cd4n-20261023-000440.jsonl:17",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "{\"type\":\"error\",\"error\":{\"message\":\"Invalid schema for response_format 'codex_output_schema': 'schema.properties.unchecked.items.required' is required to include every key in properties. Missing 'source'.\",\"type\":\"invalid_request_error\",\"param\":\"text.format.schema\",\"code\":\"invalid_json_schema\"},\"sta",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   }
+  },
+  {
+   "id": "85177336-b49e-4323-8a57-d9da9f0bdd46",
+   "history": {
+    "ts": 1792703290.012383,
+    "run_id": "85177336-b49e-4323-8a57-d9da9f0bdd46",
+    "role": "worker",
+    "lane": "OPENAI_SUBSCRIPTION",
+    "model": "gpt-6.1-sol",
+    "status": "error",
+    "reason": "bad_request",
+    "secs": 9.2
+   },
+   "source": "engine/lifesim-r0yc-20261023-000547.jsonl:17",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "{\"type\":\"error\",\"error\":{\"message\":\"Invalid schema for response_format 'codex_output_schema': 'schema.properties.unchecked.items.required' is required to include every key in properties. Missing 'source'.\",\"type\":\"invalid_request_error\",\"param\":\"text.format.schema\",\"code\":\"invalid_json_schema\"},\"sta",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   }
+  },
+  {
+   "id": "701bc801-cada-40bb-8674-b0c8697d7aa0",
+   "history": {
+    "ts": 1792703321.535305,
+    "run_id": "701bc801-cada-40bb-8674-b0c8697d7aa0",
+    "role": "worker",
+    "lane": "OPENAI_SUBSCRIPTION",
+    "model": "gpt-6.1-sol",
+    "status": "error",
+    "reason": "bad_request",
+    "secs": 15.3
+   },
+   "source": "engine/lifesim-gfr.22-20261023-000712.jsonl:17",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "{\"type\":\"error\",\"error\":{\"message\":\"Invalid schema for response_format 'codex_output_schema': 'schema.properties.unchecked.items.required' is required to include every key in properties. Missing 'source'.\",\"type\":\"invalid_request_error\",\"param\":\"text.format.schema\",\"code\":\"invalid_json_schema\"},\"sta",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   }
+  },
+  {
+   "id": "9211b721-2b27-45ae-aa1e-27b97f296b0b",
+   "history": {
+    "ts": 1792703443.914007,
+    "run_id": "9211b721-2b27-45ae-aa1e-27b97f296b0b",
+    "role": "worker",
+    "lane": "OPENAI_SUBSCRIPTION",
+    "model": "gpt-6.1-sol",
+    "status": "error",
+    "reason": "bad_request",
+    "secs": 9.1
+   },
+   "source": "engine/lifesim-3i2-20261023-000857.jsonl:17",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "{\"type\":\"error\",\"error\":{\"message\":\"Invalid schema for response_format 'codex_output_schema': 'schema.properties.unchecked.items.required' is required to include every key in properties. Missing 'source'.\",\"type\":\"invalid_request_error\",\"param\":\"text.format.schema\",\"code\":\"invalid_json_schema\"},\"sta",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   }
+  },
+  {
+   "id": "472e780f-f958-4606-812c-e4674c2f5148",
+   "history": {
+    "ts": 1792703483.812611,
+    "run_id": "472e780f-f958-4606-812c-e4674c2f5148",
+    "role": "worker",
+    "lane": "OPENAI_SUBSCRIPTION",
+    "model": "gpt-6.1-sol",
+    "status": "error",
+    "reason": "bad_request",
+    "secs": 8.9
+   },
+   "source": "engine/lifesim-i52t-20261023-000932.jsonl:18",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "{\"type\":\"error\",\"error\":{\"message\":\"Invalid schema for response_format 'codex_output_schema': 'schema.properties.unchecked.items.required' is required to include every key in properties. Missing 'source'.\",\"type\":\"invalid_request_error\",\"param\":\"text.format.schema\",\"code\":\"invalid_json_schema\"},\"sta",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   }
+  },
+  {
+   "id": "b16e3c05-11d4-4f48-a21f-c72cda539caf",
+   "history": {
+    "ts": 1792703619.545163,
+    "run_id": "b16e3c05-11d4-4f48-a21f-c72cda539caf",
+    "role": "worker",
+    "lane": "OPENAI_SUBSCRIPTION",
+    "model": "gpt-6.1-sol",
+    "status": "error",
+    "reason": "bad_request",
+    "secs": 11.7
+   },
+   "source": "engine/lifesim-21l-20261023-001137.jsonl:17",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "{\"type\":\"error\",\"error\":{\"message\":\"Invalid schema for response_format 'codex_output_schema': 'schema.properties.unchecked.items.required' is required to include every key in properties. Missing 'source'.\",\"type\":\"invalid_request_error\",\"param\":\"text.format.schema\",\"code\":\"invalid_json_schema\"},\"sta",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   }
+  },
+  {
+   "id": "70358be5-f541-445b-9e39-adcc63ae5091",
+   "history": {
+    "ts": 1792703646.14298,
+    "run_id": "70358be5-f541-445b-9e39-adcc63ae5091",
+    "role": "worker",
+    "lane": "OPENAI_SUBSCRIPTION",
+    "model": "gpt-6.1-sol",
+    "status": "error",
+    "reason": "bad_request",
+    "secs": 12.7
+   },
+   "source": "engine/lifesim-qu7h-20261023-001208.jsonl:24",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "{\"type\":\"error\",\"error\":{\"message\":\"Invalid schema for response_format 'codex_output_schema': 'schema.properties.unchecked.items.required' is required to include every key in properties. Missing 'source'.\",\"type\":\"invalid_request_error\",\"param\":\"text.format.schema\",\"code\":\"invalid_json_schema\"},\"sta",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   }
+  },
+  {
+   "id": "a8cd9bbb-80af-4846-8918-010f6d23b74d",
+   "history": {
+    "ts": 1792703779.484577,
+    "run_id": "a8cd9bbb-80af-4846-8918-010f6d23b74d",
+    "role": "worker",
+    "lane": "OPENAI_SUBSCRIPTION",
+    "model": "gpt-6.1-sol",
+    "status": "error",
+    "reason": "bad_request",
+    "secs": 10.1
+   },
+   "source": "engine/lifesim-rl4s-20261023-001454.jsonl:17",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "{\"type\":\"error\",\"error\":{\"message\":\"Invalid schema for response_format 'codex_output_schema': 'schema.properties.unchecked.items.required' is required to include every key in properties. Missing 'source'.\",\"type\":\"invalid_request_error\",\"param\":\"text.format.schema\",\"code\":\"invalid_json_schema\"},\"sta",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   }
+  },
+  {
+   "id": "589798ce-8b9d-435a-88bf-dc80ef06331e",
+   "history": {
+    "ts": 1792703881.8958569,
+    "run_id": "589798ce-8b9d-435a-88bf-dc80ef06331e",
+    "role": "worker",
+    "lane": "OPENAI_SUBSCRIPTION",
+    "model": "gpt-6.1-sol",
+    "status": "error",
+    "reason": "bad_request",
+    "secs": 13.1
+   },
+   "source": "engine/lifesim-d5f.32-20261023-001538.jsonl:24",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "{\"type\":\"error\",\"error\":{\"message\":\"Invalid schema for response_format 'codex_output_schema': 'schema.properties.unchecked.items.required' is required to include every key in properties. Missing 'source'.\",\"type\":\"invalid_request_error\",\"param\":\"text.format.schema\",\"code\":\"invalid_json_schema\"},\"sta",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   }
+  },
+  {
+   "id": "b601d644-898b-4ba4-bd85-1cd37522e6bd",
+   "history": {
+    "ts": 1792703973.174602,
+    "run_id": "b601d644-898b-4ba4-bd85-1cd37522e6bd",
+    "role": "worker",
+    "lane": "OPENAI_SUBSCRIPTION",
+    "model": "gpt-6.1-sol",
+    "status": "error",
+    "reason": "bad_request",
+    "secs": 30.2
+   },
+   "source": "engine/lifesim-w5ni-20261023-001701.jsonl:25",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "{\"type\":\"error\",\"error\":{\"message\":\"Invalid schema for response_format 'codex_output_schema': 'schema.properties.unchecked.items.required' is required to include every key in properties. Missing 'source'.\",\"type\":\"invalid_request_error\",\"param\":\"text.format.schema\",\"code\":\"invalid_json_schema\"},\"sta",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   }
+  },
+  {
+   "id": "c67a2a19-076e-441f-8bca-7df94c5c8445",
+   "history": {
+    "ts": 1792704010.787752,
+    "run_id": "c67a2a19-076e-441f-8bca-7df94c5c8445",
+    "role": "worker",
+    "lane": "OPENAI_SUBSCRIPTION",
+    "model": "gpt-6.1-sol",
+    "status": "error",
+    "reason": "bad_request",
+    "secs": 9.1
+   },
+   "source": "engine/lifesim-h1fw-20261023-001837.jsonl:17",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "{\"type\":\"error\",\"error\":{\"message\":\"Invalid schema for response_format 'codex_output_schema': 'schema.properties.unchecked.items.required' is required to include every key in properties. Missing 'source'.\",\"type\":\"invalid_request_error\",\"param\":\"text.format.schema\",\"code\":\"invalid_json_schema\"},\"sta",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   }
+  },
+  {
+   "id": "506d0971-cde6-43fb-b5df-99dead033676",
+   "history": {
+    "ts": 1792704074.6700318,
+    "run_id": "506d0971-cde6-43fb-b5df-99dead033676",
+    "role": "worker",
+    "lane": "OPENAI_SUBSCRIPTION",
+    "model": "gpt-6.1-sol",
+    "status": "error",
+    "reason": "bad_request",
+    "secs": 10.7
+   },
+   "source": "engine/lifesim-kh1s-20261023-002013.jsonl:17",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "{\"type\":\"error\",\"error\":{\"message\":\"Invalid schema for response_format 'codex_output_schema': 'schema.properties.unchecked.items.required' is required to include every key in properties. Missing 'source'.\",\"type\":\"invalid_request_error\",\"param\":\"text.format.schema\",\"code\":\"invalid_json_schema\"},\"sta",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   }
+  },
+  {
+   "id": "e88f4e16-4245-49cc-9c47-294bab2fa9fc",
+   "history": {
+    "ts": 1792704187.792864,
+    "run_id": "e88f4e16-4245-49cc-9c47-294bab2fa9fc",
+    "role": "worker",
+    "lane": "OPENAI_SUBSCRIPTION",
+    "model": "gpt-6.1-sol",
+    "status": "error",
+    "reason": "bad_request",
+    "secs": 7.1
+   },
+   "source": "engine/lifesim-xea5-20261023-002049.jsonl:17",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "{\"type\":\"error\",\"error\":{\"message\":\"Invalid schema for response_format 'codex_output_schema': 'schema.properties.unchecked.items.required' is required to include every key in properties. Missing 'source'.\",\"type\":\"invalid_request_error\",\"param\":\"text.format.schema\",\"code\":\"invalid_json_schema\"},\"sta",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   }
+  }
+ ]
+}

@@ -14,6 +14,7 @@ The model supplies only what the script cannot read itself; the script decides.
   route.py doctor [--lane L] [--next] [--fix ID] [--decline L] [--undecline L] [--ack ID] [--deep] [--json] [--quiet]   the one setup command: what each lane needs, and how to act on it
   route.py set-key [--stdin] [--force] | --web [--host IP|tailscale] [--port N] [--timeout S]   the key is handed over by the USER (terminal prompt or one-shot page); the agent never handles it
   route.py config set KEY VALUE | show
+  route.py hold LANE --until EPOCH|ISO|+2h|+3d [--roles worker,hard] [--reason TEXT] | release ID|LANE | holds   an owner hold stops a lane for some roles; --until is mandatory
 
 Data: routing.json next to this file (lanes, models, roles, thresholds).
 Per-user settings: <config dir>/config.json (same keys as "settings"); profile, state, ledger and key live in <config dir>:
@@ -47,6 +48,7 @@ except ImportError:  # pragma: no cover
 HERE = Path(__file__).resolve().parent
 if str(HERE) not in sys.path:
     sys.path.insert(0, str(HERE))
+from lanes import classify      # the one outcome ladder and every vendor-text pattern (delegate-e05)
 WEEK_MIN = 7 * 24 * 60
 
 
@@ -392,6 +394,7 @@ class Lane:
         self.windows = []         # every window the vendor exposes, for the cockpit: {name, used, resets_at, span, source, at}
         self.spend_blocked = False  # the vendor says a spend or credit limit stopped it (not a usage window)
         self.warn = []            # cockpit warnings: a reading the owner should double-check (shown as `!` lines)
+        self.held = None          # the owner's hold record covering the role being decided (decide sets it); usable() then refuses
 
     @property
     def usage_known(self):
@@ -698,6 +701,8 @@ def limits_for(lane, S, relaxed):
 
 def usable(lane, S, relaxed):
     """-> (bool, reason)."""
+    if lane.held:
+        return False, hold_text(lane.held)
     if lane.out:
         return False, f"out until {local(lane.out_until)}" if lane.out_until else "out"
     wk, fv, why = limits_for(lane, S, relaxed)
@@ -713,6 +718,8 @@ def back_at(lane, S):
     ok, why = usable(lane, S, True)
     if ok:
         return None
+    if lane.held:
+        return lane.held.get("until")
     if lane.out:
         return lane.out_until
     return lane.week_reset if why.startswith("weekly") else lane.five_reset if why.startswith("5h") else None
@@ -759,6 +766,107 @@ def pick_lane(family, lanes, S, st, t, relaxed, trace):
 
 
 LATE_FLAGS = ("degraded", "same_family")
+
+
+# ----------------------------------------------------------------------------- owner holds (delegate-dns)
+
+LEGACY_HOLD = "flag:codex_plan_review_only"      # the config flag read as a hold with no expiry: the only hold that may lack `until`; the config migration removes it
+
+
+def real_hold(lane, role, st, t):
+    """-> the owner's hold record that stops `role` on `lane` at time t, else None. A record is {id, lane, roles, set_by, set_at, until, reason}."""
+    for h in (st.get("holds") or {}).values():
+        if h.get("lane") == lane and (not h.get("roles") or role in h["roles"]) and h.get("until", 0) > t:
+            return h
+    return None
+
+
+def held(lane, role, mode, cfg, st, t):
+    """-> the hold that stops `role` (step mode read_only|write) on `lane` now, else None: a hold record, else the legacy codex_plan_review_only flag."""
+    h = real_hold(lane, role, st, t)
+    if h or not cfg["settings"].get("codex_plan_review_only") or (cfg["lanes"].get(lane) or {}).get("family") != "openai":
+        return h
+    if role in ("planner", "reviewer") and mode == "read_only":
+        return None
+    return {"id": LEGACY_HOLD, "lane": lane, "roles": [], "set_by": "config", "set_at": None, "until": None,
+            "reason": "codex_plan_review_only is set in config.json: Codex plans and reviews read-only"}
+
+
+def hold_text(h):
+    return f"held: {h.get('set_by') or 'owner'} " + (f"until {local(h['until'])}" if h.get("until") else "with no expiry") + (f" ({h['reason']})" if h.get("reason") else "")
+
+
+def refusal_fields(h, say=None):
+    """The answer fields for a refused call under a hold: the lane is out for this role until the hold ends, never `retry_after = now + 1`."""
+    return {"status": "lane_out", "reason": "lane_out", "outcome": "held", "retry_after": h.get("until"), "say": say or f"{h['lane']} is on hold, {hold_text(h)}"}
+
+
+def add_hold(lane, until, reason, roles=None, set_by="owner", t=None):
+    """Record an owner hold. `until` is mandatory and must be in the future: a hold with no end is how codex_plan_review_only stayed on for 12 hours."""
+    t = now() if t is None else t
+    end = parse_until(until, t)
+    if end is None:
+        raise ValueError("a hold needs --until (an epoch, an ISO time, or +2h / +3d): a hold with no end is refused")
+    if end <= t:
+        raise ValueError(f"--until {until} is in the past")
+    if lane not in load_routing()["lanes"]:
+        raise ValueError(f"unknown lane {lane}; lanes: {', '.join(load_routing()['lanes'])}")
+    rec = {"id": uuid.uuid4().hex[:8], "lane": lane, "roles": sorted(roles or []), "set_by": set_by, "set_at": t, "until": end, "reason": reason or ""}
+    update_state(lambda s: s.setdefault("holds", {}).__setitem__(rec["id"], rec))
+    return rec
+
+
+def parse_until(v, t):
+    m = re.fullmatch(r"\+(\d+)([mhd])", str(v or "").strip())
+    if m:
+        return t + int(m.group(1)) * {"m": 60, "h": 3600, "d": 86400}[m.group(2)]
+    return to_epoch(v)
+
+
+def hold_rows(cfg, st, t):
+    """Every hold now in force, with who set it and when it ends: for status --json and `holds`."""
+    rows = [dict(h, ends_in_s=int(h["until"] - t)) for h in (st.get("holds") or {}).values() if h.get("until", 0) > t]
+    if cfg["settings"].get("codex_plan_review_only"):
+        rows.append(dict(held("OPENAI_SUBSCRIPTION", "worker", "write", cfg, {}, t) or {}, ends_in_s=None))
+    return sorted(rows, key=lambda h: (h.get("until") or 1e18))
+
+
+def cmd_hold(a, cfg):
+    try:
+        rec = add_hold(a.lane, a.until, a.reason, [x for x in (a.roles or "").split(",") if x], a.set_by)
+    except ValueError as e:
+        print(json.dumps({"ok": False, "error": str(e)}))
+        return 1
+    print(json.dumps({"ok": True, "hold": rec}))
+    return 0
+
+
+def cmd_release(a, cfg):
+    gone = []
+
+    def drop(st):
+        for k, h in list((st.get("holds") or {}).items()):
+            if a.target in (k, h.get("lane")):
+                gone.append(st["holds"].pop(k))
+    update_state(drop)
+    print(json.dumps({"ok": bool(gone), "released": gone}))
+    return 0 if gone else 1
+
+
+def cmd_holds(a, cfg):
+    print(json.dumps({"holds": hold_rows(cfg, load_state(), now())}))
+    return 0
+
+
+def migrate_legacy_hold(t):
+    """codex_plan_review_only in config.json becomes a hold record that ends in 7 days, and the flag is removed from the file."""
+    if not read_config().get("codex_plan_review_only"):
+        if "codex_plan_review_only" in read_config():
+            update_config(lambda c: c.pop("codex_plan_review_only", None))
+        return None
+    rec = add_hold("OPENAI_SUBSCRIPTION", "+7d", "migrated from codex_plan_review_only", ["worker", "hard", "light"], "config", t)
+    update_config(lambda c: c.pop("codex_plan_review_only", None))
+    return rec
 
 
 def codex_step_allowed(role_name, step, cfg):
@@ -849,6 +957,8 @@ def decide(role_name, cfg, lanes, st, t, args):
             return {"action": "error", "error": f"no premium model configured for family {args['premium']}; premium: {[k for k, v in (cfg.get('premium') or {}).items() if v and k != 'about']}"}
         return {"action": "error", "error": f"--authored-by must be {' or '.join(k for k in role['by_author'] if k != 'unknown')} (or omitted)"}
     trace = []
+    for l in lanes.values():
+        l.held = real_hold(l.name, role_name, st, t)
     steps_ = [x for tier in tiers for x in tier]
     first = next((x for x in steps_ if any(l.family == x["on"] for l in lanes.values())), steps_[0] if steps_ else None)      # the role's first choice among lanes that are set up
     mine = [l for l in lanes.values() if first and l.family == first["on"]]
@@ -1042,7 +1152,6 @@ LABELS = {"CLAUDE_SUBSCRIPTION": "Claude subscription", "CLAUDE_CREDIT": "Claude
 LOGIN_CMD = {"OPENAI_SUBSCRIPTION": "codex login", "CLAUDE_SUBSCRIPTION": "claude auth login", "CLAUDE_CREDIT": "route.py set-key",
              "GROK_SUBSCRIPTION": "opencode auth login", "ZAI_CODING_SUBSCRIPTION": "opencode auth login, choose Z.AI Coding Plan",
              "DEEPSEEK_FREE": "route.py doctor --lane DEEPSEEK_FREE"}
-SPEND_RE = re.compile(r"spend(ing)?[- ]?(limit|control)|out of credits|credit balance|top[- ]?up|billing|insufficient (funds|credit)|credits? (exhausted|too low)|cycle cap|cap reached", re.I)
 AUTH_TTL = 300          # a login check answers for this long: it spawns a CLI, cheap but not free
 AUTH_TIMEOUT = 10
 AUTH_FILE_TTL = 600     # auth-cache.json: written by a non-cheap status, doctor, a login probe and a successful run; read by next and status --cheap
@@ -1190,9 +1299,9 @@ def classify_out(lane, rec):
     """Why a lane that is out is out -> logged_out | spend | slow | resting. rec is its state.json entry (older ones have no typed reason)."""
     r = lane.out_reason
     text = " ".join([(rec or {}).get("why", "")] + lane.notes)
-    if r == "logged_out" or (r in (None, "error") and LOGIN_RE.search(text)):
+    if r == "logged_out" or (r in (None, "error") and classify.LOGIN_RE.search(text)):
         return "logged_out"
-    if lane.spend_blocked or SPEND_RE.search(text) or (r == "limit" and lane.kind == "credit"):
+    if lane.spend_blocked or classify.SPEND_RE.search(text) or (r == "limit" and lane.kind == "credit"):
         return "spend"
     if r == "hung":
         return "slow"
@@ -1372,7 +1481,7 @@ def status_payload(cfg, lanes, ck, st, t, recent):
             "running": running_rows(st, t),
             "routing": routing_snapshot(cfg, lanes, st, t),
             "recent": recent_runs(recent),
-            "needs_input": needs_input(lanes)}
+            "needs_input": needs_input(lanes), "holds": hold_rows(cfg, st, t)}
 
 
 def running_rows(st, t):
@@ -1401,7 +1510,7 @@ def cmd_status_cheap(a, cfg):
         snap = d if isinstance(d, dict) else {}
     at = snap.get("ts")
     out = {k: v for k, v in snap.items() if k not in ("ts", "running")}
-    out.update(v=1, cheap=True, ts=t, age_s=int(t - at) if isinstance(at, (int, float)) else None, running=running_rows(st, t),
+    out.update(v=1, cheap=True, ts=t, age_s=int(t - at) if isinstance(at, (int, float)) else None, running=running_rows(st, t), holds=hold_rows(cfg, st, t),
                auth={n: {"ok": c.get("ok"), "why": c.get("why"), "age_s": int(t - c.get("at", 0))} for n, c in read_auth_cache().items() if isinstance(c, dict)})
     out.setdefault("lanes", {})
     print(json.dumps(out) if a.json else "\n".join(f"{n}: {c['ok']} ({c['age_s']}s old)" for n, c in out["auth"].items()) + f"\nrunning: {len(out['running'])}  snapshot age: {out['age_s']}s")
@@ -1510,10 +1619,11 @@ def decision(a, cfg):
         lane = lanes.get(rec["lane"]) if rec else None
         if not rec:
             return {"action": "error", "error": f"unknown --resume ref {ref}"}, lanes, warnings, t
-        if not codex_step_allowed(a.role, {"model": rec["model"], "mode": rec["mode"],
-                                          "on": cfg["lanes"].get(rec["lane"], {}).get("family")}, cfg):
-            return {"action": "lane_out", "lane": rec["lane"], "retry_after": t + 1,
-                    "say": "Codex writing is paused by user policy. Continue with a fresh non-Codex writer; existing file changes remain in the working directory."}, lanes, warnings, t
+        hold = held(rec["lane"], a.role, rec["mode"], cfg, st, t)
+        if hold:
+            return {"action": "lane_out", "lane": rec["lane"], "retry_after": hold.get("until"), "outcome": "held",
+                    "say": ("Codex writing is paused by user policy." if hold["id"] == LEGACY_HOLD else f"{rec['lane']} is on hold, {hold_text(hold)}.")
+                    + " Continue with a fresh writer on another lane; existing file changes remain in the working directory."}, lanes, warnings, t
         if bool(rec.get("host")) != host:
             return {"action": "error", "error": f"--resume {ref} ran {'with' if rec.get('host') else 'without'} --host; pass the same"}, lanes, warnings, t
         if lane is None or not usable(lane, S, True)[0]:
@@ -1606,10 +1716,6 @@ def cmd_capture(a, cfg):
 
 # ----------------------------------------------------------------------------- git ownership: the coordinator owns git, workers do not
 
-# Paths a worker must never touch: credentials outside the repo and .env files in it (.env.example and kin are fine). A tripwire for
-# accidents and lazy injections, not a boundary: a determined worker can spell a path so it does not match.
-SECRET_RE = re.compile(r"\.ssh\b|\.gnupg\b|\.aws\b|\.azure\b|\.config/gh\b|\.docker/config\.json|\.netrc\b|\.git-credentials\b|"
-                       r"\.codex/auth\.json|Library/Keychains|(?<![\w.-])\.env(?:\.(?!(?:example|sample|template|dist)\b)[\w-]+)?(?![\w.-])")
 # Arguments that keep a path OUT of a search or listing (rg --glob '!**/.env*', grep --exclude, find -not -path, git ':!x'): a worker
 # avoiding a secret must not trip the guard.
 EXCLUDED_RE = re.compile(r"""(?:--i?glob|-g)[=\s]+(?:(['"])!.*?\1|!\S+)|--exclude(?:-dir)?[=\s]+(?:(['"]).*?\2|\S+)"""
@@ -1656,7 +1762,7 @@ def secret_hit(text):
     """The secret path `text` names, ignoring paths it only excludes; None when there is none."""
     text = text or ""
     stripped = without_excluded(text)
-    m = SECRET_RE.search(stripped if stripped is not None else EXCLUDED_RE.sub(" ", text))
+    m = classify.SECRET_RE.search(stripped if stripped is not None else EXCLUDED_RE.sub(" ", text))
     return m.group() if m else None
 
 
@@ -1855,7 +1961,6 @@ def publish_lanes(lanes, st, t):
 
 # ----------------------------------------------------------------------------- run: one step, end to end, one JSON answer
 
-LIMIT_RE = re.compile(r"usage limit|rate.?limit|quota|too many requests|\b429\b|try again (later|in)|credit balance", re.I)
 
 
 def descendants(pid):
@@ -2162,14 +2267,73 @@ def codex_thread_total(thread):
     return None
 
 
+CREDIT_PROBE = 6 * 3600      # a lane out of credits with no stated end is looked at again after this long
+
+
+def settle(res, o, d, t, who, a, rc=None, tail="", reset=None, credit_until=None, login=None):
+    """Apply a classified outcome (lanes/classify.py) to the answer and, for a lane-scoped reason, to the lane's state. The one place all three
+    launchers end in. `reset` -> default end of a limit when the message names no time; `credit_until` -> the end of a credit cycle, when known;
+    `login` -> (hint stored with the lane, text of the answer with {why})."""
+    r, why, lane = o.reason, o.detail.strip(), d["lane"]
+    soon = lambda: now() + random.randint(60, 120)
+    res["outcome"] = r
+    if r == "secrets":
+        res.update(status="failed", reason="secrets", say=f"stopped: the worker ran a command on a secret path: {why[:200]}" + (f"; {APPLY_PATCH_HINT}" if heredoc_only_hit(why) else ""))
+    elif r == "timeout":
+        res.update(status="timeout", reason="timeout", say=f"{who} did not finish within {a.timeout}s and was killed")
+    elif r == "hung":
+        until = t + OC_HUNG_OUT_SECS
+        mark_out(lane, until, f"hung: no output within {OC_FIRST_EVENT_SECS}s", t, "hung")
+        res.update(status="lane_out", reason="hung", retry_after=until, say=f"{who} printed nothing within {OC_FIRST_EVENT_SECS}s and was stopped; {lane} out until {local(until)}")
+    elif r == "rate_limited":
+        until = limit_until(why, t, d) or (reset() if reset else t + 3600)
+        mark_out(lane, until, ("limit (opencode log): " if o.source == "ours" else "limit refusal: ") + why[:120].replace("\n", " "), t)
+        res.update(status="lane_out", reason="lane_out", retry_after=until, say=f"{lane} hit a limit" + (f" ({why[:120]}); worker stopped, lane" if o.source == "ours" else ";") + f" out until {local(until)}")
+    elif r == "credit_exhausted":
+        until = credit_until or t + CREDIT_PROBE
+        mark_out(lane, until, "out of credits: " + why[:120].replace("\n", " "), t, "credit")
+        res.update(status="lane_out", reason="lane_out", retry_after=credit_until, say=f"{lane} is out of credits ({why[:120]}); out until {local(until)}")
+    elif r == "logged_out":
+        hint, say = login or (f"logged out: run `{LOGIN_CMD.get(lane, 'route.py doctor')}`", f"{who} is not logged in: {{why}}")
+        mark_out(lane, t + LOGOUT_OUT, hint, t, "logged_out")
+        res.update(status="lane_out", reason="logged_out", retry_after=now() + 60, say=say.format(why=why[-200:].strip()))
+    elif r == "bad_request":
+        res.update(status="error", reason="bad_request", say=f"{who} rejected the request: {why[:300]}")
+    elif r == "network":
+        res.update(status="stop", reason="network", retry_after=soon(), say=f"{who} could not reach its service: {why[-200:].strip()}")
+    elif r == "killed":
+        res.update(status="stop", reason="vendor_prework", retry_after=soon(), say=f"{who} was ended by a signal it did not get from route.py ({why}); retry")
+    elif r == "vendor_blip":
+        res.update(status="stop", reason="vendor_prework", retry_after=soon(), say=f"{who} failed before any work: {why[:200]}")
+    else:
+        res.update(status="failed", reason="worker_failed",
+                   say=f"{who}: {why[:300]}" if o.source == "event" else f"{who} exited {rc} without an error: {(why or tail)[-300:].strip()}")
+    return res
+
+
+def codex_context_k(thread):
+    """-> thousands of input tokens of the thread's last model request (its context size), from the end of its rollout file, else None."""
+    if not thread:
+        return None
+    root = Path(os.environ.get("CODEX_HOME") or Path.home() / ".codex") / "sessions"
+    for f in root.glob(f"*/*/*/rollout-*{thread}.jsonl"):
+        with contextlib.suppress(OSError, ValueError, KeyError, TypeError, AttributeError):
+            with f.open("rb") as fh:
+                fh.seek(max(0, f.stat().st_size - 131072))
+                tail = fh.read().decode("utf-8", "replace").splitlines()
+            for line in reversed(tail):
+                if '"token_count"' in line:
+                    info = json.loads(line)["payload"]["info"]
+                    return round(info["last_token_usage"]["input_tokens"] / 1000, 1)
+    return None
+
+
 def launch_codex(d, brief, a, rid, t, meta):
     """-> dict of result fields."""
     h = d["how"]
-    cfg = load_routing()
-    if cfg["settings"].get("codex_plan_review_only") and (
-            d.get("role", getattr(a, "role", None)) not in ("planner", "reviewer") or h.get("sandbox") != "read-only"):
-        return {"status": "lane_out", "reason": "lane_out", "retry_after": t + 1,
-                "say": "Codex is restricted to read-only planning and review; no worker was launched."}
+    hold = held(d.get("lane") or "OPENAI_SUBSCRIPTION", d.get("role", getattr(a, "role", None)), "read_only" if h.get("sandbox") == "read-only" else "write", load_routing(), load_state(), t)
+    if hold:
+        return refusal_fields(hold, "Codex is restricted to read-only planning and review; no worker was launched." if hold["id"] == LEGACY_HOLD else "no worker was launched")
     exe = shutil.which("codex")
     if not exe:
         return {"status": "error", "reason": "setup", "say": "codex CLI not found on PATH (route.py doctor --lane OPENAI_SUBSCRIPTION)"}
@@ -2180,7 +2344,7 @@ def launch_codex(d, brief, a, rid, t, meta):
         cmd += (["--output-schema", a.schema] if a.schema else []) + [a.resume, "-"]
     else:
         cmd = [exe] + h["cli"][1:] + ["--json", "-o", str(out_file)] + (["--output-schema", a.schema] if a.schema else []) + ["-"]
-    seen = {"ref": a.resume, "last": "", "tokens": None, "denied": [], "error": "", "work": False}
+    seen = {"ref": a.resume, "last": "", "tokens": None, "denied": [], "error": "", "transient": "", "work": False, "turns": 0}
 
     def on_line(line):
         try:
@@ -2196,8 +2360,10 @@ def launch_codex(d, brief, a, rid, t, meta):
         if ev.get("type") == "turn.completed" and isinstance(ev.get("usage"), dict):
             u = ev["usage"]
             seen["tokens"] = {"in": u.get("input_tokens"), "cached": u.get("cached_input_tokens"), "out": u.get("output_tokens")}
+            seen["turns"] += 1
         if ev.get("type") in ("turn.failed", "error"):      # codex's own reason; stderr then holds only transport noise
-            seen["error"] = str((ev.get("error") or {}).get("message") if ev.get("type") == "turn.failed" else ev.get("message") or "")
+            msg = str((ev.get("error") or {}).get("message") if ev.get("type") == "turn.failed" else ev.get("message") or "")
+            seen["transient" if classify.transient(msg) else "error"] = msg        # "Reconnecting... 2/5" is progress, not a failure
         item = ev.get("item") or {}
         if ev.get("type") == "item.completed" and item.get("type") in ("command_execution", "file_change", "agent_message", "mcp_tool_call"):
             seen["work"] = True
@@ -2226,29 +2392,12 @@ def launch_codex(d, brief, a, rid, t, meta):
         if n:
             base = seen["tokens"] or {"in": 0, "cached": 0, "out": 0}
             seen["tokens"] = {k: (base.get(k) or 0) + extra[k] for k in extra}
-    res = {"text": text, "ref": seen["ref"], "stderr": err, "tokens": seen["tokens"], "denied": seen["denied"]}
-    if seen.get("secret"):
-        res.update(status="failed", reason="secrets", say=f"stopped: the worker ran a command on a secret path: {seen['secret'][:200]}" + (f"; {APPLY_PATCH_HINT}" if heredoc_only_hit(seen["secret"]) else ""))
-    elif timed_out:
-        res.update(status="timeout", reason="timeout", say=f"codex did not finish within {a.timeout}s and was killed")
-    elif LIMIT_RE.search(seen["error"]) or rc != 0 and LIMIT_RE.search(err):     # codex's error or stderr, never the model's answer
-        why = seen["error"] or err
-        until = limit_until(why, t, d) or codex_reset_now(t) or t + 3600
-        mark_out(d["lane"], until, "limit refusal: " + why[:120].replace("\n", " "), t)
-        res.update(status="lane_out", reason="lane_out", retry_after=until, say=f"{d['lane']} hit a limit; out until {local(until)}")
-    elif LOGIN_RE.search(seen["error"] + err):
-        mark_out(d["lane"], t + LOGOUT_OUT, "logged out: run `codex login`", t, "logged_out")
-        res.update(status="lane_out", reason="logged_out", retry_after=now() + 60, say=f"codex is not logged in: {(seen['error'] or err)[-200:].strip()} (route.py doctor --lane {d['lane']})")
-    elif re.search(r'"status":\s*4(?!29)\d\d', seen["error"]):     # the request itself is wrong (unsupported model): retrying cannot help
-        res.update(status="error", reason="bad_request", say=f"codex rejected the request: {seen['error'][:300]}")
-    elif seen["error"] and not seen["work"]:    # failed before doing anything (network down, the Mac waking from sleep): try again later
-        res.update(status="stop", reason="vendor_prework", retry_after=now() + random.randint(60, 120), say=f"codex failed before any work: {seen['error'][:200]}")
-    elif seen["error"]:
-        res.update(status="failed", reason="worker_failed", say=f"codex: {seen['error'][:300]}")
-    elif rc != 0 and NETWORK_RE.search(err) and not seen["work"]:
-        res.update(status="stop", reason="network", retry_after=now() + random.randint(60, 120), say=f"codex could not reach its service: {err[-200:].strip()}")
-    elif rc != 0:
-        res.update(status="failed", reason="worker_failed", say=(err or text)[-300:].strip())
+    res = {"text": text, "ref": seen["ref"], "stderr": err, "tokens": seen["tokens"], "denied": seen["denied"], "turns": seen["turns"] or None,
+           "context_k": codex_context_k(seen["ref"])}
+    o = classify.classify(rc, seen["error"] or (seen["transient"] if rc != 0 else ""), err, timed_out, seen["work"], {"secret": seen.get("secret")})
+    if o:       # codex's error or stderr, never the model's answer
+        settle(res, o, d, t, "codex", a, rc, err or text, reset=lambda: codex_reset_now(t) or t + 3600,
+               login=("logged out: run `codex login`", f"codex is not logged in: {{why}} (route.py doctor --lane {d['lane']})"))
     else:
         update_state(lambda s: s.setdefault("out", {}).pop(d["lane"], None))
         res.update(status="done", data=parse_data(text, a.schema))
@@ -2293,7 +2442,7 @@ def opencode_watchdog(first_event_secs=None):
                         fh.seek(off)
                         new = fh.read(size - off).decode("utf-8", "replace")
                     offs[f] = size
-                    m = next((ln for ln in new.splitlines() if LIMIT_RE.search(ln)), None)
+                    m = next((ln for ln in new.splitlines() if classify.LIMIT_RE.search(ln)), None)
                     if m:
                         state.update(why="limit", msg=m.strip())
                         return True
@@ -2412,7 +2561,7 @@ def launch_opencode(d, brief, a, rid, t, meta):
         rules += "\n\n" + repo_instruction_text(h["cwd"])         # opencode reads AGENTS.md itself; CLAUDE.md only through what is turned off
     if a.schema:
         rules += "\n\nYour final message must be only a JSON object matching this JSON Schema:\n" + Path(a.schema).read_text(encoding="utf-8")
-    seen = {"ref": a.resume, "last": "", "tokens": None, "denied": [], "error": "", "work": False}
+    seen = {"ref": a.resume, "last": "", "tokens": None, "denied": [], "error": "", "work": False, "turns": 0, "ctx": None}
 
     poll, dog = opencode_watchdog()
 
@@ -2432,6 +2581,8 @@ def launch_opencode(d, brief, a, rid, t, meta):
             tk = seen["tokens"] or {"in": 0, "cached": 0, "out": 0}
             seen["tokens"] = {"in": tk["in"] + (u.get("input") or 0) + (c.get("read") or 0) + (c.get("write") or 0), "cached": tk["cached"] + (c.get("read") or 0),
                               "out": tk["out"] + (u.get("output") or 0) + (u.get("reasoning") or 0)}
+            seen["turns"] += 1
+            seen["ctx"] = round(((u.get("input") or 0) + (c.get("read") or 0) + (c.get("write") or 0)) / 1000, 1)
         if ev.get("type") == "text":
             seen["last"] = p.get("text", "")
             seen["work"] = True
@@ -2465,36 +2616,15 @@ def launch_opencode(d, brief, a, rid, t, meta):
                 f.write_text(x.stdout, encoding="utf-8")
                 private(f)
     text = seen["last"].strip()
-    res = {"text": text, "ref": seen["ref"], "stderr": err, "tokens": seen["tokens"], "denied": seen["denied"]}
+    res = {"text": text, "ref": seen["ref"], "stderr": err, "tokens": seen["tokens"], "denied": seen["denied"], "turns": seen["turns"] or None, "context_k": seen["ctx"]}
     why = seen["error"] or (err if rc != 0 else "")
-    if seen.get("secret"):
-        res.update(status="failed", reason="secrets", say=f"stopped: the worker ran a command on a secret path: {seen['secret'][:200]}" + (f"; {APPLY_PATCH_HINT}" if heredoc_only_hit(seen["secret"]) else ""))
-    elif dog["why"] == "limit":         # opencode's log shows a limit and it keeps retrying: end our child, mark the lane out once
-        until = limit_until(dog["msg"], t, d) or next_utc_midnight(t)
-        mark_out(d["lane"], until, "limit (opencode log): " + dog["msg"][:120], t)
-        res.update(status="lane_out", reason="lane_out", retry_after=until, say=f"{d['lane']} hit a limit ({dog['msg'][:120]}); worker stopped, lane out until {local(until)}")
-    elif dog["why"] == "hung":
-        until = t + OC_HUNG_OUT_SECS
-        mark_out(d["lane"], until, f"hung: no output within {OC_FIRST_EVENT_SECS}s", t, "hung")
-        res.update(status="lane_out", reason="hung", retry_after=until, say=f"opencode printed nothing within {OC_FIRST_EVENT_SECS}s and was stopped; {d['lane']} out until {local(until)}")
-    elif timed_out:
-        res.update(status="timeout", reason="timeout", say=f"opencode did not finish within {a.timeout}s and was killed")
-    elif LIMIT_RE.search(why):          # opencode's error event or stderr, never the model's answer
-        until = limit_until(why, t, d) or t + 3600
-        mark_out(d["lane"], until, "limit refusal: " + why[:120].replace("\n", " "), t)
-        res.update(status="lane_out", reason="lane_out", retry_after=until, say=f"{d['lane']} hit a limit; out until {local(until)}")
-    elif LOGIN_RE.search(why):
+    o = classify.classify(rc, why, "", timed_out, seen["work"], {"secret": seen.get("secret"), "watchdog": dog["why"], "msg": dog["msg"]})
+    if o:       # opencode's error event, stderr or log, never the model's answer
         hint = "free OpenCode access refused; no paid credentials will be used" if d["lane"] == "DEEPSEEK_FREE" else "run `opencode auth login` (xAI, SuperGrok Subscription)"
         if d["lane"] == "ZAI_CODING_SUBSCRIPTION":
             hint = "run `opencode auth login` and choose Z.AI Coding Plan; enter your Coding Plan key in your own terminal"
-        mark_out(d["lane"], t + LOGOUT_OUT, hint, t, "logged_out")
-        res.update(status="lane_out", reason="logged_out", retry_after=now() + 60, say=f"{d['lane']}: {hint}: {why[-200:].strip()}")
-    elif why and not seen["work"]:      # failed before doing anything (network down, the service erroring): try again later
-        res.update(status="stop", reason="vendor_prework", retry_after=now() + random.randint(60, 120), say=f"opencode failed before any work: {why[:200]}")
-    elif why:
-        res.update(status="failed", reason="worker_failed", say=f"opencode: {why[:300]}")
-    elif rc != 0:
-        res.update(status="failed", reason="worker_failed", say=f"opencode exited {rc} without an error: {(err or text)[-300:].strip()}")
+        settle(res, o, d, t, "opencode", a, rc, err or text, reset=lambda: next_utc_midnight(t) if o.source == "ours" else t + 3600,
+               login=(hint, f"{d['lane']}: {hint}: {{why}}"))
     else:
         update_state(lambda s_: s_.setdefault("out", {}).pop(d["lane"], None))
         res.update(status="done", data=parse_data(text, a.schema))
@@ -2547,7 +2677,7 @@ def launch_claude(d, brief, a, rid, t, cfg, meta):
     ref = a.resume or rid
     if agent_runs:
         agent_runs.run(rid, kind="claude-p", session=ref, lane=d["lane"], model=d["model"], cwd=h["cwd"], started=t, status="running", **meta)
-    final = []
+    final, ctx = [], []
 
     def on_line(line):      # the first result is the answer: claude -p then waits for background tasks and takes another turn on their exit
         with contextlib.suppress(ValueError):
@@ -2555,6 +2685,9 @@ def launch_claude(d, brief, a, rid, t, cfg, meta):
             if isinstance(e, dict) and e.get("type") == "result" and not final:
                 final.append(e)
                 return RESULT_GRACE
+            if isinstance(e, dict) and e.get("type") == "assistant" and isinstance((e.get("message") or {}).get("usage"), dict):
+                u_ = e["message"]["usage"]       # one model request: its whole input is the context size
+                ctx[:] = [round(((u_.get("input_tokens") or 0) + (u_.get("cache_read_input_tokens") or 0) + (u_.get("cache_creation_input_tokens") or 0)) / 1000, 1)]
         return None
     rc, out, err, timed_out = run_proc(cmd, brief, h["cwd"], child_env(extra), a.timeout, on_line)
     j = final[0] if final else {}
@@ -2568,24 +2701,12 @@ def launch_claude(d, brief, a, rid, t, cfg, meta):
     res = {"text": text, "ref": j.get("session_id") or ref, "cost": cost, "stderr": err, "tokens": claude_tokens(u),
            "denied": [{"tool": x.get("tool_name"), "input": x.get("tool_input")} for x in j.get("permission_denials") or []
                       if isinstance(x, dict) and not policy_denial(x, h.get("read_only"))]}
-    if timed_out:
-        res.update(status="timeout", reason="timeout", say=f"claude did not finish within {a.timeout}s and was killed")
-    elif rc != 0 or j.get("is_error"):
-        blob = text + err
-        if credit and re.search(r"credit balance (is )?too low", blob, re.I):
-            mark_out(d["lane"], nxt, "credit balance too low", t)
-            res.update(status="lane_out", reason="lane_out", retry_after=nxt, say=f"credit exhausted; out until {local(nxt)}")
-        elif LIMIT_RE.search(blob):
-            until = limit_until(blob, t, d) or t + 3600
-            mark_out(d["lane"], until, "limit refusal: " + blob[:120].replace("\n", " "), t)
-            res.update(status="lane_out", reason="lane_out", retry_after=until, say=f"{d['lane']} hit a limit; out until {local(until)}")
-        elif LOGIN_RE.search(blob):
-            mark_out(d["lane"], t + LOGOUT_OUT, "logged out: run `claude auth login`", t, "logged_out")
-            res.update(status="lane_out", reason="logged_out", retry_after=now() + 60, say=f"claude is not logged in: {blob[-200:].strip()} (claude auth login)")
-        elif NETWORK_RE.search(blob) and (j.get("num_turns") or 0) <= 1:      # failed before any work
-            res.update(status="stop", reason="network", retry_after=now() + random.randint(60, 120), say=f"claude could not reach its service: {blob[-200:].strip()}")
-        else:
-            res.update(status="failed", reason="worker_failed", say=blob[-300:].strip())
+    res.update(turns=j.get("num_turns"), context_k=ctx[0] if ctx else None)
+    failed = rc != 0 or bool(j.get("is_error"))
+    o = classify.classify(rc or (1 if failed else 0), classify.claude_vendor_error(j), err, timed_out, (j.get("num_turns") or 0) > 1,
+                          {"http_status": j.get("api_error_status")}) if failed or timed_out else None
+    if o:       # the CLI's own error and stderr, never the model's answer (a worker may write "rate limit")
+        settle(res, o, d, t, "claude", a, rc, text, credit_until=nxt, login=("logged out: run `claude auth login`", "claude is not logged in: {why} (claude auth login)"))
     else:
         update_state(lambda s: s.setdefault("out", {}).pop(d["lane"], None))
         data = j.get("structured_output") if isinstance(j.get("structured_output"), (dict, list)) else parse_data(text, a.schema)
@@ -2608,24 +2729,49 @@ def claude_tokens(u):
             "cached": cached, "out": u.get("output_tokens")}
 
 
+LAUNCHERS = {"codex": lambda d, b, a, rid, t, cfg, meta: launch_codex(d, b, a, rid, t, meta),
+             "opencode": lambda d, b, a, rid, t, cfg, meta: launch_opencode(d, b, a, rid, t, meta),
+             "claude_p": launch_claude}      # by how()'s `kind`; an unknown kind is a setup error, not a silent `claude -p`
+
+
+def transcript_info(path, family, start=0):
+    """-> {path, kind, from, to, bytes}: the transcript file and the byte window this call wrote (a resumed thread appends to one file), or None."""
+    if not path:
+        return None
+    try:
+        size = Path(path).stat().st_size
+    except OSError:
+        return None
+    kind = {"claude": "claude", "openai": "codex"}.get(family, "opencode_export")
+    frm = start if kind != "opencode_export" and 0 <= start <= size else 0          # an opencode export is rewritten whole each run
+    return {"path": path, "kind": kind, "from": frm, "to": size, "bytes": size - frm}
+
+
+def file_size(path):
+    try:
+        return Path(path).stat().st_size if path else 0
+    except OSError:
+        return 0
+
+
 # worker-run v2: every answer that is not done or agent names a reason, and `next` is the caller's whole policy for it:
 # retry (after retry_after), owner (a person must act: log in, set up, verify), fail (this attempt is over; re-plan or give up).
-REASONS = {"lane_out": "retry", "busy": "retry", "duplicate_task": "retry", "lock": "retry", "vendor_prework": "retry", "hung": "retry", "network": "retry",
-           "no_lane": "retry", "logged_out": "retry", "setup": "owner", "secrets": "owner", "bad_request": "owner", "crash": "owner",
-           "caller": "fail", "timeout": "fail", "worker_failed": "fail", "schema_invalid": "fail"}
-LOGIN_RE = re.compile(r"not logged in|please (run|use) [`'\"]?\S*\s*login|oauth session expired|failed to authenticate|invalid api key|401 unauthorized", re.I)
-NETWORK_RE = re.compile(r"ENOTFOUND|ECONNRESET|ECONNREFUSED|ETIMEDOUT|EAI_AGAIN|getaddrinfo|could not resolve host|network is unreachable", re.I)
+REASONS = classify.CONTRACT["wire_reasons"]      # a view over contract.json: one table
 
-
-def result(status, reason=None, **kw):
-    nxt = None
+def result(status, reason=None, outcome=None, **kw):
+    """The v2 answer. `outcome` is the contract.json reason behind a non-done answer (lanes/classify.py); without it the wire reason's default stands."""
+    nxt = stop = None
     if status not in ("done", "agent"):
         reason = reason or {"timeout": "timeout", "lane_out": "lane_out", "stop": "no_lane", "error": "crash"}.get(status, "worker_failed")
         nxt = REASONS[reason]
         if nxt == "retry" and not kw.get("retry_after"):     # nothing to wait for (no lane will come back by itself): a person must act
             nxt = "owner"
+        outcome = outcome or classify.CONTRACT["wire_default"][reason]
+        stop = classify.stop_facts(outcome, None if reason == "logged_out" else kw.get("retry_after"))      # logged_out's retry_after is a wire courtesy, not a time it ends
     r = {"v": 2, "status": status, "reason": reason, "next": nxt, "data": None, "text": "", "ref": None, "lane": None, "model": None, "effort": None, "family": None,
-         "flag": None, "cost": 0, "tokens": None, "denied": [], "secs": 0, "run_id": None, "transcript": None, "retry_after": None, "say": "", "git_violation": []}
+         "flag": None, "cost": 0, "tokens": None, "denied": [], "secs": 0, "run_id": None, "transcript": None, "retry_after": None, "say": "", "git_violation": [],
+         "call_id": None, "transcript_info": None, "transcript_status": None, "stop": stop,      # additive to v2 (contract.json): the typed facts behind reason/next
+         "usage": {"tokens": None, "cost": 0, "secs": 0, "turns": None, "context_k": None, "answer_bytes": 0}}
     r.update(kw)
     return r
 
@@ -2633,7 +2779,7 @@ def result(status, reason=None, **kw):
 def emit(r):
     """One object on stdout. A model reads it when a Claude session is behind us, so empty fields are dropped there; scripts get every field."""
     if interactive():
-        r = {k: v for k, v in r.items() if k in ("v", "status") or v not in (None, "", [], 0) and k != "context"}     # context is for scripts
+        r = {k: v for k, v in r.items() if k in ("v", "status") or v not in (None, "", [], 0) and k not in ("context", "usage", "transcript_info", "transcript_status")}     # these are for scripts
     print(json.dumps(r))
     return 0        # exit 0 whenever the object was printed; non-zero only if route.py itself crashed
 
@@ -2688,16 +2834,19 @@ LANE_CONTEXT = {
 
 def cmd_contract(a, cfg):
     """What a caller may rely on, for a handshake: the worker-run version, its features, every reason with its `next`, and what workers see."""
-    print(json.dumps({"worker_run": 2, "features": ["reason", "next", "context", "schema_reask", "denied", "tokens_include_child_threads", "secrets_guard", "rung", "fallback", "busy_wait"],
-                      "reasons": REASONS, "lanes": LANE_CONTEXT}))
+    print(json.dumps({"contract": classify.CONTRACT["contract"], "worker_run": 2,
+                      "features": ["reason", "next", "context", "schema_reask", "denied", "tokens_include_child_threads", "secrets_guard", "rung", "fallback", "busy_wait",
+                                   "stop", "usage", "call_id", "transcript_info", "holds"],
+                      "reasons": REASONS, "outcomes": classify.CONTRACT["reasons"], "run_args": classify.CONTRACT["run_args"], "lanes": LANE_CONTEXT}))
     return 0
 
 
-def refuse(a, status, reason, say, retry_after, extra, **who):
+def refuse(a, status, reason, say, retry_after, extra, outcome=None, **who):
     """An answer given without launching a worker; history keeps it too, so refusals are countable."""
-    history_add({"ts": now(), "run_id": None, "role": a.role, "task": getattr(a, "task", None) or "", "lane": who.get("lane"), "model": who.get("model"),
+    call_id = getattr(a, "call_id", None)
+    history_add({"ts": now(), "run_id": None, "call_id": call_id, "role": a.role, "task": getattr(a, "task", None) or "", "lane": who.get("lane"), "model": who.get("model"),
                  "status": status, "reason": reason, "retry_after": retry_after, "resume": bool(getattr(a, "resume", None)), "host": bool(getattr(a, "host", False))})
-    return emit(result(status, reason=reason, say=say, retry_after=retry_after, **who, **extra))
+    return emit(result(status, reason=reason, outcome=outcome, say=say, retry_after=retry_after, call_id=call_id, **who, **extra))
 
 
 def cmd_run(a, cfg):
@@ -2721,7 +2870,7 @@ def run_once(a, cfg):
     if d["action"] == "error":
         return refuse(a, "error", "caller", d["error"], None, extra)
     if d["action"] == "lane_out":
-        return refuse(a, "lane_out", "lane_out", d["say"], d.get("retry_after"), extra, lane=d["lane"])
+        return refuse(a, "lane_out", "lane_out", d["say"], d.get("retry_after"), extra, outcome=d.get("outcome"), lane=d["lane"])
     if d["action"] == "stop":
         retry = min([x for x in (back_at(l, cfg["settings"]) for l in lanes.values()) if x] or [None])
         if not unattended and d.get("ask_user"):
@@ -2737,11 +2886,14 @@ def run_once(a, cfg):
         ni = [n["what"] for n in needs_input(lanes)]
         if ni:
             extra["needs_input"] = ni
+    runner = LAUNCHERS.get(h["kind"])
+    if runner is None and h["kind"] != "agent_tool":
+        return refuse(a, "error", "setup", f"no launcher for runner kind {h['kind']!r}: route.py has codex, opencode and claude_p", None, extra, **who)
     if h["kind"] == "agent_tool":
-        return emit(result("agent", **who, agent_model=h["model"], brief_prefix=SECRET_RULE + " " + GIT_RULES, cwd=h["cwd"], **extra))
+        return emit(result("agent", **who, call_id=getattr(a, "call_id", None), agent_model=h["model"], brief_prefix=SECRET_RULE + " " + GIT_RULES, cwd=h["cwd"], **extra))
     brief = Path(a.brief).read_text(encoding="utf-8", errors="replace") if a.brief else sys.stdin.read()
     if not brief.strip():
-        return emit(result("error", reason="caller", **who, say="empty brief: pass it on stdin or with --brief FILE", **extra))
+        return emit(result("error", reason="caller", **who, call_id=getattr(a, "call_id", None), say="empty brief: pass it on stdin or with --brief FILE", **extra))
     cwd = h["cwd"]
     rid = str(uuid.uuid4())
     S, lane = cfg["settings"], lanes[d["lane"]]
@@ -2803,8 +2955,8 @@ def run_once(a, cfg):
         meta["task"] = a.task
     git_before = git_state(cwd)
     t0, ends = time.time(), {}
-    launch = {"codex": lambda b, a_: launch_codex(d, b, a_, rid, t, meta), "opencode": lambda b, a_: launch_opencode(d, b, a_, rid, t, meta)}.get(
-        h["kind"], lambda b, a_: launch_claude(d, b, a_, rid, t, cfg, meta))
+    launch = lambda b, a_: runner(d, b, a_, rid, t, cfg, meta)
+    t_from = file_size(find_transcript(a.resume, fam)) if a.resume else 0
     try:
         res = launch(brief, a)
         if res["status"] == "done" and a.schema:     # delegate enforces the schema: one re-ask in the same thread, then schema_invalid
@@ -2850,13 +3002,17 @@ def run_once(a, cfg):
     secs = round(time.time() - t0, 1)
     five_after, week_after = lane_use(cfg, d["lane"], now())
     transcript = find_transcript(res.get("ref"), fam)
-    history_add({"ts": now(), "run_id": rid, "role": a.role, "task": a.task or "", "lane": d["lane"], "model": d["model"], "effort": d["effort"],
+    history_add({"ts": now(), "run_id": rid, "call_id": getattr(a, "call_id", None), "role": a.role, "task": a.task or "", "lane": d["lane"], "model": d["model"], "effort": d["effort"],
                  "status": res["status"], "reason": res.get("reason"), "host": bool(a.host), "denials": len(res.get("denied") or []), "secs": secs, "cost": res.get("cost", 0), "tokens": res.get("tokens"),
                  "five_before": lane.five, "week_before": lane.week, "five_after": five_after, "week_after": week_after,
                  "overlap": sorted(set(taken["peers"]) | set(ends.get("peers", []))), "slots": cap, "transcript": transcript})
+    info = transcript_info(transcript, fam, t_from)
+    usage = {"tokens": res.get("tokens"), "cost": res.get("cost", 0), "secs": secs, "turns": res.pop("turns", None), "context_k": res.pop("context_k", None),
+             "answer_bytes": len((res.get("text") or "").encode("utf-8"))}
     res.update(**who, run_id=rid, secs=secs, git_violation=git_changes(git_before, git_state(cwd)),
                context={"instructions": [str(f) for f in repo_instructions(cwd)], "env_keys": sorted(child_env().keys())},
-               transcript=transcript, **extra)
+               transcript=transcript, call_id=getattr(a, "call_id", None), usage=usage, transcript_info=info,
+               transcript_status="ok" if info else "ref_unresolvable" if res.get("ref") else "died_before_session_id", **extra)
     return emit(result(res.pop("status"), **res))
 
 
@@ -2942,14 +3098,22 @@ def main(argv=None):
     ru.add_argument("--premium", nargs="?", const="claude", metavar="FAMILY"); ru.add_argument("--allow-degraded", action="store_true")
     ru.add_argument("--claude-usage"); ru.add_argument("--cwd"); ru.add_argument("--brief"); ru.add_argument("--timeout", type=int, help="seconds; none by default"); ru.add_argument("--unattended", action="store_true")
     ru.add_argument("--schema"); ru.add_argument("--resume"); ru.add_argument("--cap", type=float); ru.add_argument("--parent"); ru.add_argument("--task"); ru.add_argument("--title")
+    ru.add_argument("--call-id", help="the caller's id for this call: echoed in the answer and written to history.jsonl, the key that joins the caller's record to ours")
+    ho = sub.add_parser("hold", help="stop a lane for some roles until a time; --until is mandatory"); ho.add_argument("lane"); ho.add_argument("--until"); ho.add_argument("--roles")
+    ho.add_argument("--reason", default=""); ho.add_argument("--set-by", default="owner")
+    sub.add_parser("release", help="end a hold early (by id or lane)").add_argument("target")
+    sub.add_parser("holds", help="every hold in force, with holder and expiry")
     a = ap.parse_args(argv)
     global UNATTENDED
     UNATTENDED = getattr(a, "unattended", False)
     if a.cmd == "guard":        # a hook: no config, no state
         return cmd_guard(a)
+    with contextlib.suppress(Exception):
+        migrate_legacy_hold(now())      # a codex_plan_review_only flag left in config.json becomes a hold with an end
     cfg = load_routing()
     return {"status": cmd_status, "next": cmd_next, "report": cmd_report, "capture-limits": cmd_capture,
-            "run": cmd_run, "contract": cmd_contract, "doctor": cmd_doctor, "set-key": cmd_set_key, "config": cmd_config}[a.cmd](a, cfg)
+            "run": cmd_run, "contract": cmd_contract, "doctor": cmd_doctor, "set-key": cmd_set_key, "config": cmd_config,
+            "hold": cmd_hold, "release": cmd_release, "holds": cmd_holds}[a.cmd](a, cfg)
 
 
 if __name__ == "__main__":

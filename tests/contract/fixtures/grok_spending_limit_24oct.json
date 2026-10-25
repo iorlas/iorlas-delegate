@@ -1,0 +1,1726 @@
+{
+ "fixture": 1,
+ "scenario": "Grok out of credits answered as vendor_prework 109 times 24 Oct 16:15-18:48 (114 in the engine logs); lane never marked out",
+ "cli": "opencode",
+ "lane": "GROK_SUBSCRIPTION",
+ "real": "vendor text real (engine warn lines, cut at 160 chars)",
+ "expected_reason": "credit_exhausted",
+ "expected_wire": {
+  "status": "lane_out",
+  "reason": "lane_out",
+  "next": "owner"
+ },
+ "benches_pair": true,
+ "rows": [
+  {
+   "id": "lifesim-d5f.48-20261024-145440.jsonl:352",
+   "history": {
+    "ts": 1792847759.583472
+   },
+   "source": "engine/lifesim-d5f.48-20261024-145440.jsonl:352",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "personal-team-blocked:spending-limit: You have run out of credits or need a Grok subscription. Add credits at https://grok.com/",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   }
+  },
+  {
+   "id": "lifesim-d5f.48-20261024-145440.jsonl:357",
+   "history": {
+    "ts": 1792847868.45264
+   },
+   "source": "engine/lifesim-d5f.48-20261024-145440.jsonl:357",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "personal-team-blocked:spending-limit: You have run out of credits or need a Grok subscription. Add credits at https://grok.com/",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   }
+  },
+  {
+   "id": "lifesim-14lf-20261024-154508.jsonl:50",
+   "history": {
+    "ts": 1792847894.475921
+   },
+   "source": "engine/lifesim-14lf-20261024-154508.jsonl:50",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "personal-team-blocked:spending-limit: You have run out of credits or need a Grok subscription. Add credits at https://grok.com/",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   }
+  },
+  {
+   "id": "lifesim-d5f.48-20261024-145440.jsonl:362",
+   "history": {
+    "ts": 1792847942.14682
+   },
+   "source": "engine/lifesim-d5f.48-20261024-145440.jsonl:362",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "personal-team-blocked:spending-limit: You have run out of credits or need a Grok subscription. Add credits at https://grok.com/",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   }
+  },
+  {
+   "id": "lifesim-14lf-20261024-154508.jsonl:55",
+   "history": {
+    "ts": 1792848018.313144
+   },
+   "source": "engine/lifesim-14lf-20261024-154508.jsonl:55",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "personal-team-blocked:spending-limit: You have run out of credits or need a Grok subscription. Add credits at https://grok.com/",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   }
+  },
+  {
+   "id": "lifesim-d5f.48-20261024-145440.jsonl:367",
+   "history": {
+    "ts": 1792848055.5404952
+   },
+   "source": "engine/lifesim-d5f.48-20261024-145440.jsonl:367",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "personal-team-blocked:spending-limit: You have run out of credits or need a Grok subscription. Add credits at https://grok.com/",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   }
+  },
+  {
+   "id": "lifesim-d5f.48-20261024-145440.jsonl:372",
+   "history": {
+    "ts": 1792848127.5536041
+   },
+   "source": "engine/lifesim-d5f.48-20261024-145440.jsonl:372",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "personal-team-blocked:spending-limit: You have run out of credits or need a Grok subscription. Add credits at https://grok.com/",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   }
+  },
+  {
+   "id": "lifesim-14lf-20261024-154508.jsonl:60",
+   "history": {
+    "ts": 1792848136.647035
+   },
+   "source": "engine/lifesim-14lf-20261024-154508.jsonl:60",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "personal-team-blocked:spending-limit: You have run out of credits or need a Grok subscription. Add credits at https://grok.com/",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   }
+  },
+  {
+   "id": "lifesim-14lf-20261024-154508.jsonl:65",
+   "history": {
+    "ts": 1792848220.611157
+   },
+   "source": "engine/lifesim-14lf-20261024-154508.jsonl:65",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "personal-team-blocked:spending-limit: You have run out of credits or need a Grok subscription. Add credits at https://grok.com/",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   }
+  },
+  {
+   "id": "lifesim-d5f.48-20261024-145440.jsonl:377",
+   "history": {
+    "ts": 1792848238.646317
+   },
+   "source": "engine/lifesim-d5f.48-20261024-145440.jsonl:377",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "personal-team-blocked:spending-limit: You have run out of credits or need a Grok subscription. Add credits at https://grok.com/",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   }
+  },
+  {
+   "id": "lifesim-14lf-20261024-154508.jsonl:70",
+   "history": {
+    "ts": 1792848338.5338728
+   },
+   "source": "engine/lifesim-14lf-20261024-154508.jsonl:70",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "personal-team-blocked:spending-limit: You have run out of credits or need a Grok subscription. Add credits at https://grok.com/",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   }
+  },
+  {
+   "id": "lifesim-fdyo-20261024-161343.jsonl:51",
+   "history": {
+    "ts": 1792848638.161972
+   },
+   "source": "engine/lifesim-fdyo-20261024-161343.jsonl:51",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "personal-team-blocked:spending-limit: You have run out of credits or need a Grok subscription. Add credits at https://grok.com/",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   }
+  },
+  {
+   "id": "lifesim-fdyo-20261024-161343.jsonl:56",
+   "history": {
+    "ts": 1792848727.06861
+   },
+   "source": "engine/lifesim-fdyo-20261024-161343.jsonl:56",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "personal-team-blocked:spending-limit: You have run out of credits or need a Grok subscription. Add credits at https://grok.com/",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   }
+  },
+  {
+   "id": "lifesim-fdyo-20261024-161343.jsonl:61",
+   "history": {
+    "ts": 1792848833.161022
+   },
+   "source": "engine/lifesim-fdyo-20261024-161343.jsonl:61",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "personal-team-blocked:spending-limit: You have run out of credits or need a Grok subscription. Add credits at https://grok.com/",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   }
+  },
+  {
+   "id": "lifesim-yxbb.10.2-20261024-142443.jsonl:268",
+   "history": {
+    "ts": 1792848915.865321
+   },
+   "source": "engine/lifesim-yxbb.10.2-20261024-142443.jsonl:268",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "personal-team-blocked:spending-limit: You have run out of credits or need a Grok subscription. Add credits at https://grok.com/",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   }
+  },
+  {
+   "id": "lifesim-fdyo-20261024-161343.jsonl:66",
+   "history": {
+    "ts": 1792848932.6008651
+   },
+   "source": "engine/lifesim-fdyo-20261024-161343.jsonl:66",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "personal-team-blocked:spending-limit: You have run out of credits or need a Grok subscription. Add credits at https://grok.com/",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   }
+  },
+  {
+   "id": "lifesim-fdyo-20261024-161343.jsonl:71",
+   "history": {
+    "ts": 1792849027.184978
+   },
+   "source": "engine/lifesim-fdyo-20261024-161343.jsonl:71",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "personal-team-blocked:spending-limit: You have run out of credits or need a Grok subscription. Add credits at https://grok.com/",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   }
+  },
+  {
+   "id": "lifesim-yxbb.10.2-20261024-142443.jsonl:273",
+   "history": {
+    "ts": 1792849034.87647
+   },
+   "source": "engine/lifesim-yxbb.10.2-20261024-142443.jsonl:273",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "personal-team-blocked:spending-limit: You have run out of credits or need a Grok subscription. Add credits at https://grok.com/",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   }
+  },
+  {
+   "id": "lifesim-yxbb.10.2-20261024-142443.jsonl:278",
+   "history": {
+    "ts": 1792849123.948871
+   },
+   "source": "engine/lifesim-yxbb.10.2-20261024-142443.jsonl:278",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "personal-team-blocked:spending-limit: You have run out of credits or need a Grok subscription. Add credits at https://grok.com/",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   }
+  },
+  {
+   "id": "lifesim-fdyo-20261024-161343.jsonl:76",
+   "history": {
+    "ts": 1792849135.8104389
+   },
+   "source": "engine/lifesim-fdyo-20261024-161343.jsonl:76",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "personal-team-blocked:spending-limit: You have run out of credits or need a Grok subscription. Add credits at https://grok.com/",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   }
+  },
+  {
+   "id": "lifesim-yxbb.10.2-20261024-142443.jsonl:283",
+   "history": {
+    "ts": 1792849217.10121
+   },
+   "source": "engine/lifesim-yxbb.10.2-20261024-142443.jsonl:283",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "personal-team-blocked:spending-limit: You have run out of credits or need a Grok subscription. Add credits at https://grok.com/",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   }
+  },
+  {
+   "id": "lifesim-yxbb.10.2-20261024-142443.jsonl:288",
+   "history": {
+    "ts": 1792849308.4094179
+   },
+   "source": "engine/lifesim-yxbb.10.2-20261024-142443.jsonl:288",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "personal-team-blocked:spending-limit: You have run out of credits or need a Grok subscription. Add credits at https://grok.com/",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   }
+  },
+  {
+   "id": "lifesim-yxbb.10.2-20261024-142443.jsonl:293",
+   "history": {
+    "ts": 1792849375.148278
+   },
+   "source": "engine/lifesim-yxbb.10.2-20261024-142443.jsonl:293",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "personal-team-blocked:spending-limit: You have run out of credits or need a Grok subscription. Add credits at https://grok.com/",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   }
+  },
+  {
+   "id": "lifesim-yxbb.10.2-20261024-142443.jsonl:298",
+   "history": {
+    "ts": 1792849465.860447
+   },
+   "source": "engine/lifesim-yxbb.10.2-20261024-142443.jsonl:298",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "personal-team-blocked:spending-limit: You have run out of credits or need a Grok subscription. Add credits at https://grok.com/",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   }
+  },
+  {
+   "id": "lifesim-fdyo-20261024-164412.jsonl:41",
+   "history": {
+    "ts": 1792849683.3453069
+   },
+   "source": "engine/lifesim-fdyo-20261024-164412.jsonl:41",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "personal-team-blocked:spending-limit: You have run out of credits or need a Grok subscription. Add credits at https://grok.com/",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   }
+  },
+  {
+   "id": "lifesim-fdyo-20261024-164412.jsonl:46",
+   "history": {
+    "ts": 1792849760.3018959
+   },
+   "source": "engine/lifesim-fdyo-20261024-164412.jsonl:46",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "personal-team-blocked:spending-limit: You have run out of credits or need a Grok subscription. Add credits at https://grok.com/",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   }
+  },
+  {
+   "id": "lifesim-fdyo-20261024-164412.jsonl:51",
+   "history": {
+    "ts": 1792849846.23529
+   },
+   "source": "engine/lifesim-fdyo-20261024-164412.jsonl:51",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "personal-team-blocked:spending-limit: You have run out of credits or need a Grok subscription. Add credits at https://grok.com/",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   }
+  },
+  {
+   "id": "lifesim-fdyo-20261024-164412.jsonl:56",
+   "history": {
+    "ts": 1792849942.138467
+   },
+   "source": "engine/lifesim-fdyo-20261024-164412.jsonl:56",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "personal-team-blocked:spending-limit: You have run out of credits or need a Grok subscription. Add credits at https://grok.com/",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   }
+  },
+  {
+   "id": "lifesim-fdyo-20261024-164412.jsonl:61",
+   "history": {
+    "ts": 1792850019.260361
+   },
+   "source": "engine/lifesim-fdyo-20261024-164412.jsonl:61",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "personal-team-blocked:spending-limit: You have run out of credits or need a Grok subscription. Add credits at https://grok.com/",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   }
+  },
+  {
+   "id": "lifesim-fdyo-20261024-164412.jsonl:66",
+   "history": {
+    "ts": 1792850093.399275
+   },
+   "source": "engine/lifesim-fdyo-20261024-164412.jsonl:66",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "personal-team-blocked:spending-limit: You have run out of credits or need a Grok subscription. Add credits at https://grok.com/",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   }
+  },
+  {
+   "id": "lifesim-fdyo-20261024-164412.jsonl:71",
+   "history": {
+    "ts": 1792850165.0037801
+   },
+   "source": "engine/lifesim-fdyo-20261024-164412.jsonl:71",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "personal-team-blocked:spending-limit: You have run out of credits or need a Grok subscription. Add credits at https://grok.com/",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   }
+  },
+  {
+   "id": "lifesim-rl4s-20261024-160925.jsonl:215",
+   "history": {
+    "ts": 1792850304.287715
+   },
+   "source": "engine/lifesim-rl4s-20261024-160925.jsonl:215",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "personal-team-blocked:spending-limit: You have run out of credits or need a Grok subscription. Add credits at https://grok.com/",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   }
+  },
+  {
+   "id": "lifesim-d5f.48-20261024-162912.jsonl:67",
+   "history": {
+    "ts": 1792850341.865363
+   },
+   "source": "engine/lifesim-d5f.48-20261024-162912.jsonl:67",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "personal-team-blocked:spending-limit: You have run out of credits or need a Grok subscription. Add credits at https://grok.com/",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   }
+  },
+  {
+   "id": "lifesim-d5f.48-20261024-162912.jsonl:72",
+   "history": {
+    "ts": 1792850425.2434628
+   },
+   "source": "engine/lifesim-d5f.48-20261024-162912.jsonl:72",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "personal-team-blocked:spending-limit: You have run out of credits or need a Grok subscription. Add credits at https://grok.com/",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   }
+  },
+  {
+   "id": "lifesim-rl4s-20261024-160925.jsonl:220",
+   "history": {
+    "ts": 1792850426.75919
+   },
+   "source": "engine/lifesim-rl4s-20261024-160925.jsonl:220",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "personal-team-blocked:spending-limit: You have run out of credits or need a Grok subscription. Add credits at https://grok.com/",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   }
+  },
+  {
+   "id": "lifesim-rl4s-20261024-160925.jsonl:225",
+   "history": {
+    "ts": 1792850494.6208389
+   },
+   "source": "engine/lifesim-rl4s-20261024-160925.jsonl:225",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "personal-team-blocked:spending-limit: You have run out of credits or need a Grok subscription. Add credits at https://grok.com/",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   }
+  },
+  {
+   "id": "lifesim-d5f.48-20261024-162912.jsonl:77",
+   "history": {
+    "ts": 1792850513.713106
+   },
+   "source": "engine/lifesim-d5f.48-20261024-162912.jsonl:77",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "personal-team-blocked:spending-limit: You have run out of credits or need a Grok subscription. Add credits at https://grok.com/",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   }
+  },
+  {
+   "id": "lifesim-rl4s-20261024-160925.jsonl:230",
+   "history": {
+    "ts": 1792850569.950221
+   },
+   "source": "engine/lifesim-rl4s-20261024-160925.jsonl:230",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "personal-team-blocked:spending-limit: You have run out of credits or need a Grok subscription. Add credits at https://grok.com/",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   }
+  },
+  {
+   "id": "lifesim-d5f.48-20261024-162912.jsonl:82",
+   "history": {
+    "ts": 1792850589.600519
+   },
+   "source": "engine/lifesim-d5f.48-20261024-162912.jsonl:82",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "personal-team-blocked:spending-limit: You have run out of credits or need a Grok subscription. Add credits at https://grok.com/",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   }
+  },
+  {
+   "id": "lifesim-rl4s-20261024-160925.jsonl:235",
+   "history": {
+    "ts": 1792850675.591236
+   },
+   "source": "engine/lifesim-rl4s-20261024-160925.jsonl:235",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "personal-team-blocked:spending-limit: You have run out of credits or need a Grok subscription. Add credits at https://grok.com/",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   }
+  },
+  {
+   "id": "lifesim-d5f.48-20261024-162912.jsonl:87",
+   "history": {
+    "ts": 1792850679.542624
+   },
+   "source": "engine/lifesim-d5f.48-20261024-162912.jsonl:87",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "personal-team-blocked:spending-limit: You have run out of credits or need a Grok subscription. Add credits at https://grok.com/",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   }
+  },
+  {
+   "id": "lifesim-fdyo-20261024-170142.jsonl:35",
+   "history": {
+    "ts": 1792850679.80687
+   },
+   "source": "engine/lifesim-fdyo-20261024-170142.jsonl:35",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "personal-team-blocked:spending-limit: You have run out of credits or need a Grok subscription. Add credits at https://grok.com/",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   }
+  },
+  {
+   "id": "lifesim-rl4s-20261024-160925.jsonl:240",
+   "history": {
+    "ts": 1792850754.702532
+   },
+   "source": "engine/lifesim-rl4s-20261024-160925.jsonl:240",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "personal-team-blocked:spending-limit: You have run out of credits or need a Grok subscription. Add credits at https://grok.com/",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   }
+  },
+  {
+   "id": "lifesim-fdyo-20261024-170142.jsonl:40",
+   "history": {
+    "ts": 1792850778.179808
+   },
+   "source": "engine/lifesim-fdyo-20261024-170142.jsonl:40",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "personal-team-blocked:spending-limit: You have run out of credits or need a Grok subscription. Add credits at https://grok.com/",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   }
+  },
+  {
+   "id": "lifesim-d5f.48-20261024-162912.jsonl:92",
+   "history": {
+    "ts": 1792850786.283595
+   },
+   "source": "engine/lifesim-d5f.48-20261024-162912.jsonl:92",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "personal-team-blocked:spending-limit: You have run out of credits or need a Grok subscription. Add credits at https://grok.com/",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   }
+  },
+  {
+   "id": "lifesim-fdyo-20261024-170142.jsonl:45",
+   "history": {
+    "ts": 1792850847.853339
+   },
+   "source": "engine/lifesim-fdyo-20261024-170142.jsonl:45",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "personal-team-blocked:spending-limit: You have run out of credits or need a Grok subscription. Add credits at https://grok.com/",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   }
+  },
+  {
+   "id": "lifesim-d5f.48-20261024-162912.jsonl:97",
+   "history": {
+    "ts": 1792850864.405944
+   },
+   "source": "engine/lifesim-d5f.48-20261024-162912.jsonl:97",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "personal-team-blocked:spending-limit: You have run out of credits or need a Grok subscription. Add credits at https://grok.com/",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   }
+  },
+  {
+   "id": "lifesim-fdyo-20261024-170142.jsonl:50",
+   "history": {
+    "ts": 1792850957.8435452
+   },
+   "source": "engine/lifesim-fdyo-20261024-170142.jsonl:50",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "personal-team-blocked:spending-limit: You have run out of credits or need a Grok subscription. Add credits at https://grok.com/",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   }
+  },
+  {
+   "id": "lifesim-fdyo-20261024-170142.jsonl:55",
+   "history": {
+    "ts": 1792851059.773744
+   },
+   "source": "engine/lifesim-fdyo-20261024-170142.jsonl:55",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "personal-team-blocked:spending-limit: You have run out of credits or need a Grok subscription. Add credits at https://grok.com/",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   }
+  },
+  {
+   "id": "lifesim-fdyo-20261024-170142.jsonl:60",
+   "history": {
+    "ts": 1792851146.891422
+   },
+   "source": "engine/lifesim-fdyo-20261024-170142.jsonl:60",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "personal-team-blocked:spending-limit: You have run out of credits or need a Grok subscription. Add credits at https://grok.com/",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   }
+  },
+  {
+   "id": "lifesim-fdyo-20261024-170142.jsonl:65",
+   "history": {
+    "ts": 1792851234.344681
+   },
+   "source": "engine/lifesim-fdyo-20261024-170142.jsonl:65",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "personal-team-blocked:spending-limit: You have run out of credits or need a Grok subscription. Add credits at https://grok.com/",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   }
+  },
+  {
+   "id": "lifesim-fld.25.15-20261024-171626.jsonl:54",
+   "history": {
+    "ts": 1792851709.612876
+   },
+   "source": "engine/lifesim-fld.25.15-20261024-171626.jsonl:54",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "personal-team-blocked:spending-limit: You have run out of credits or need a Grok subscription. Add credits at https://grok.com/",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   }
+  },
+  {
+   "id": "lifesim-fld.25.15-20261024-171626.jsonl:59",
+   "history": {
+    "ts": 1792851826.334422
+   },
+   "source": "engine/lifesim-fld.25.15-20261024-171626.jsonl:59",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "personal-team-blocked:spending-limit: You have run out of credits or need a Grok subscription. Add credits at https://grok.com/",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   }
+  },
+  {
+   "id": "lifesim-fld.25.15-20261024-171626.jsonl:64",
+   "history": {
+    "ts": 1792851901.7079868
+   },
+   "source": "engine/lifesim-fld.25.15-20261024-171626.jsonl:64",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "personal-team-blocked:spending-limit: You have run out of credits or need a Grok subscription. Add credits at https://grok.com/",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   }
+  },
+  {
+   "id": "lifesim-fld.25.15-20261024-171626.jsonl:69",
+   "history": {
+    "ts": 1792851991.1573792
+   },
+   "source": "engine/lifesim-fld.25.15-20261024-171626.jsonl:69",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "personal-team-blocked:spending-limit: You have run out of credits or need a Grok subscription. Add credits at https://grok.com/",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   }
+  },
+  {
+   "id": "lifesim-fld.25.15-20261024-171626.jsonl:74",
+   "history": {
+    "ts": 1792852087.444138
+   },
+   "source": "engine/lifesim-fld.25.15-20261024-171626.jsonl:74",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "personal-team-blocked:spending-limit: You have run out of credits or need a Grok subscription. Add credits at https://grok.com/",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   }
+  },
+  {
+   "id": "lifesim-fld.25.15-20261024-171626.jsonl:79",
+   "history": {
+    "ts": 1792852165.694334
+   },
+   "source": "engine/lifesim-fld.25.15-20261024-171626.jsonl:79",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "personal-team-blocked:spending-limit: You have run out of credits or need a Grok subscription. Add credits at https://grok.com/",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   }
+  },
+  {
+   "id": "lifesim-d5f.48-20261024-171123.jsonl:67",
+   "history": {
+    "ts": 1792852947.8259032
+   },
+   "source": "engine/lifesim-d5f.48-20261024-171123.jsonl:67",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "personal-team-blocked:spending-limit: You have run out of credits or need a Grok subscription. Add credits at https://grok.com/",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   }
+  },
+  {
+   "id": "lifesim-d5f.48-20261024-171123.jsonl:72",
+   "history": {
+    "ts": 1792853027.890296
+   },
+   "source": "engine/lifesim-d5f.48-20261024-171123.jsonl:72",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "personal-team-blocked:spending-limit: You have run out of credits or need a Grok subscription. Add credits at https://grok.com/",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   }
+  },
+  {
+   "id": "lifesim-d5f.48-20261024-171123.jsonl:77",
+   "history": {
+    "ts": 1792853112.51738
+   },
+   "source": "engine/lifesim-d5f.48-20261024-171123.jsonl:77",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "personal-team-blocked:spending-limit: You have run out of credits or need a Grok subscription. Add credits at https://grok.com/",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   }
+  },
+  {
+   "id": "lifesim-d5f.48-20261024-171123.jsonl:82",
+   "history": {
+    "ts": 1792853220.838163
+   },
+   "source": "engine/lifesim-d5f.48-20261024-171123.jsonl:82",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "personal-team-blocked:spending-limit: You have run out of credits or need a Grok subscription. Add credits at https://grok.com/",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   }
+  },
+  {
+   "id": "lifesim-5ban.28-20261024-173541.jsonl:54",
+   "history": {
+    "ts": 1792853269.879622
+   },
+   "source": "engine/lifesim-5ban.28-20261024-173541.jsonl:54",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "personal-team-blocked:spending-limit: You have run out of credits or need a Grok subscription. Add credits at https://grok.com/",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   }
+  },
+  {
+   "id": "lifesim-d5f.48-20261024-171123.jsonl:87",
+   "history": {
+    "ts": 1792853320.918216
+   },
+   "source": "engine/lifesim-d5f.48-20261024-171123.jsonl:87",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "personal-team-blocked:spending-limit: You have run out of credits or need a Grok subscription. Add credits at https://grok.com/",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   }
+  },
+  {
+   "id": "lifesim-gfr.38-20261024-171406.jsonl:195",
+   "history": {
+    "ts": 1792853383.018323
+   },
+   "source": "engine/lifesim-gfr.38-20261024-171406.jsonl:195",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "personal-team-blocked:spending-limit: You have run out of credits or need a Grok subscription. Add credits at https://grok.com/",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   }
+  },
+  {
+   "id": "lifesim-5ban.28-20261024-173541.jsonl:59",
+   "history": {
+    "ts": 1792853385.429827
+   },
+   "source": "engine/lifesim-5ban.28-20261024-173541.jsonl:59",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "personal-team-blocked:spending-limit: You have run out of credits or need a Grok subscription. Add credits at https://grok.com/",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   }
+  },
+  {
+   "id": "lifesim-d5f.48-20261024-171123.jsonl:92",
+   "history": {
+    "ts": 1792853420.5106251
+   },
+   "source": "engine/lifesim-d5f.48-20261024-171123.jsonl:92",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "personal-team-blocked:spending-limit: You have run out of credits or need a Grok subscription. Add credits at https://grok.com/",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   }
+  },
+  {
+   "id": "lifesim-5ban.28-20261024-173541.jsonl:64",
+   "history": {
+    "ts": 1792853488.8877828
+   },
+   "source": "engine/lifesim-5ban.28-20261024-173541.jsonl:64",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "personal-team-blocked:spending-limit: You have run out of credits or need a Grok subscription. Add credits at https://grok.com/",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   }
+  },
+  {
+   "id": "lifesim-gfr.38-20261024-171406.jsonl:200",
+   "history": {
+    "ts": 1792853500.3311858
+   },
+   "source": "engine/lifesim-gfr.38-20261024-171406.jsonl:200",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "personal-team-blocked:spending-limit: You have run out of credits or need a Grok subscription. Add credits at https://grok.com/",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   }
+  },
+  {
+   "id": "lifesim-5ban.28-20261024-173541.jsonl:69",
+   "history": {
+    "ts": 1792853603.516802
+   },
+   "source": "engine/lifesim-5ban.28-20261024-173541.jsonl:69",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "personal-team-blocked:spending-limit: You have run out of credits or need a Grok subscription. Add credits at https://grok.com/",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   }
+  },
+  {
+   "id": "lifesim-gfr.38-20261024-171406.jsonl:205",
+   "history": {
+    "ts": 1792853618.232065
+   },
+   "source": "engine/lifesim-gfr.38-20261024-171406.jsonl:205",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "personal-team-blocked:spending-limit: You have run out of credits or need a Grok subscription. Add credits at https://grok.com/",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   }
+  },
+  {
+   "id": "lifesim-5ban.28-20261024-173541.jsonl:74",
+   "history": {
+    "ts": 1792853708.523676
+   },
+   "source": "engine/lifesim-5ban.28-20261024-173541.jsonl:74",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "personal-team-blocked:spending-limit: You have run out of credits or need a Grok subscription. Add credits at https://grok.com/",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   }
+  },
+  {
+   "id": "lifesim-gfr.38-20261024-171406.jsonl:210",
+   "history": {
+    "ts": 1792853741.769676
+   },
+   "source": "engine/lifesim-gfr.38-20261024-171406.jsonl:210",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "personal-team-blocked:spending-limit: You have run out of credits or need a Grok subscription. Add credits at https://grok.com/",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   }
+  },
+  {
+   "id": "lifesim-gfr.38-20261024-171406.jsonl:215",
+   "history": {
+    "ts": 1792853844.2331479
+   },
+   "source": "engine/lifesim-gfr.38-20261024-171406.jsonl:215",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "personal-team-blocked:spending-limit: You have run out of credits or need a Grok subscription. Add credits at https://grok.com/",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   }
+  },
+  {
+   "id": "lifesim-yxbb.10.3-20261024-170948.jsonl:96",
+   "history": {
+    "ts": 1792853848.815259
+   },
+   "source": "engine/lifesim-yxbb.10.3-20261024-170948.jsonl:96",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "personal-team-blocked:spending-limit: You have run out of credits or need a Grok subscription. Add credits at https://grok.com/",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   }
+  },
+  {
+   "id": "lifesim-yxbb.10.3-20261024-170948.jsonl:101",
+   "history": {
+    "ts": 1792853947.071809
+   },
+   "source": "engine/lifesim-yxbb.10.3-20261024-170948.jsonl:101",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "personal-team-blocked:spending-limit: You have run out of credits or need a Grok subscription. Add credits at https://grok.com/",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   }
+  },
+  {
+   "id": "lifesim-yxbb.10.3-20261024-170948.jsonl:106",
+   "history": {
+    "ts": 1792854046.773473
+   },
+   "source": "engine/lifesim-yxbb.10.3-20261024-170948.jsonl:106",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "personal-team-blocked:spending-limit: You have run out of credits or need a Grok subscription. Add credits at https://grok.com/",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   }
+  },
+  {
+   "id": "lifesim-yxbb.10.3-20261024-170948.jsonl:111",
+   "history": {
+    "ts": 1792854162.062156
+   },
+   "source": "engine/lifesim-yxbb.10.3-20261024-170948.jsonl:111",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "personal-team-blocked:spending-limit: You have run out of credits or need a Grok subscription. Add credits at https://grok.com/",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   }
+  },
+  {
+   "id": "lifesim-yxbb.10.3-20261024-170948.jsonl:116",
+   "history": {
+    "ts": 1792854261.4584162
+   },
+   "source": "engine/lifesim-yxbb.10.3-20261024-170948.jsonl:116",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "personal-team-blocked:spending-limit: You have run out of credits or need a Grok subscription. Add credits at https://grok.com/",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   }
+  },
+  {
+   "id": "lifesim-yxbb.10.3-20261024-170948.jsonl:121",
+   "history": {
+    "ts": 1792854365.6839209
+   },
+   "source": "engine/lifesim-yxbb.10.3-20261024-170948.jsonl:121",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "personal-team-blocked:spending-limit: You have run out of credits or need a Grok subscription. Add credits at https://grok.com/",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   }
+  },
+  {
+   "id": "lifesim-o67g-20261024-181722.jsonl:42",
+   "history": {
+    "ts": 1792855556.456791
+   },
+   "source": "engine/lifesim-o67g-20261024-181722.jsonl:42",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "personal-team-blocked:spending-limit: You have run out of credits or need a Grok subscription. Add credits at https://grok.com/",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   }
+  },
+  {
+   "id": "lifesim-o67g-20261024-181722.jsonl:47",
+   "history": {
+    "ts": 1792855657.826797
+   },
+   "source": "engine/lifesim-o67g-20261024-181722.jsonl:47",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "personal-team-blocked:spending-limit: You have run out of credits or need a Grok subscription. Add credits at https://grok.com/",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   }
+  },
+  {
+   "id": "lifesim-o67g-20261024-181722.jsonl:52",
+   "history": {
+    "ts": 1792855750.31778
+   },
+   "source": "engine/lifesim-o67g-20261024-181722.jsonl:52",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "personal-team-blocked:spending-limit: You have run out of credits or need a Grok subscription. Add credits at https://grok.com/",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   }
+  },
+  {
+   "id": "lifesim-14lf-20261024-163030.jsonl:324",
+   "history": {
+    "ts": 1792855779.023648
+   },
+   "source": "engine/lifesim-14lf-20261024-163030.jsonl:324",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "personal-team-blocked:spending-limit: You have run out of credits or need a Grok subscription. Add credits at https://grok.com/",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   }
+  },
+  {
+   "id": "lifesim-o67g-20261024-181722.jsonl:57",
+   "history": {
+    "ts": 1792855841.7649071
+   },
+   "source": "engine/lifesim-o67g-20261024-181722.jsonl:57",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "personal-team-blocked:spending-limit: You have run out of credits or need a Grok subscription. Add credits at https://grok.com/",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   }
+  },
+  {
+   "id": "lifesim-14lf-20261024-163030.jsonl:329",
+   "history": {
+    "ts": 1792855867.817003
+   },
+   "source": "engine/lifesim-14lf-20261024-163030.jsonl:329",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "personal-team-blocked:spending-limit: You have run out of credits or need a Grok subscription. Add credits at https://grok.com/",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   }
+  },
+  {
+   "id": "lifesim-o67g-20261024-181722.jsonl:62",
+   "history": {
+    "ts": 1792855958.896245
+   },
+   "source": "engine/lifesim-o67g-20261024-181722.jsonl:62",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "personal-team-blocked:spending-limit: You have run out of credits or need a Grok subscription. Add credits at https://grok.com/",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   }
+  },
+  {
+   "id": "lifesim-14lf-20261024-163030.jsonl:334",
+   "history": {
+    "ts": 1792855966.061766
+   },
+   "source": "engine/lifesim-14lf-20261024-163030.jsonl:334",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "personal-team-blocked:spending-limit: You have run out of credits or need a Grok subscription. Add credits at https://grok.com/",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   }
+  },
+  {
+   "id": "lifesim-14lf-20261024-163030.jsonl:339",
+   "history": {
+    "ts": 1792856039.008234
+   },
+   "source": "engine/lifesim-14lf-20261024-163030.jsonl:339",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "personal-team-blocked:spending-limit: You have run out of credits or need a Grok subscription. Add credits at https://grok.com/",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   }
+  },
+  {
+   "id": "lifesim-o67g-20261024-181722.jsonl:67",
+   "history": {
+    "ts": 1792856066.40223
+   },
+   "source": "engine/lifesim-o67g-20261024-181722.jsonl:67",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "personal-team-blocked:spending-limit: You have run out of credits or need a Grok subscription. Add credits at https://grok.com/",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   }
+  },
+  {
+   "id": "lifesim-14lf-20261024-163030.jsonl:344",
+   "history": {
+    "ts": 1792856157.45016
+   },
+   "source": "engine/lifesim-14lf-20261024-163030.jsonl:344",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "personal-team-blocked:spending-limit: You have run out of credits or need a Grok subscription. Add credits at https://grok.com/",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   }
+  },
+  {
+   "id": "lifesim-14lf-20261024-163030.jsonl:349",
+   "history": {
+    "ts": 1792856265.741614
+   },
+   "source": "engine/lifesim-14lf-20261024-163030.jsonl:349",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "personal-team-blocked:spending-limit: You have run out of credits or need a Grok subscription. Add credits at https://grok.com/",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   }
+  },
+  {
+   "id": "lifesim-5ban.7-20261024-183823.jsonl:35",
+   "history": {
+    "ts": 1792856680.485156
+   },
+   "source": "engine/lifesim-5ban.7-20261024-183823.jsonl:35",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "personal-team-blocked:spending-limit: You have run out of credits or need a Grok subscription. Add credits at https://grok.com/",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   }
+  },
+  {
+   "id": "lifesim-5ban.7-20261024-183823.jsonl:40",
+   "history": {
+    "ts": 1792856752.880796
+   },
+   "source": "engine/lifesim-5ban.7-20261024-183823.jsonl:40",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "personal-team-blocked:spending-limit: You have run out of credits or need a Grok subscription. Add credits at https://grok.com/",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   }
+  },
+  {
+   "id": "lifesim-5ban.7-20261024-183823.jsonl:45",
+   "history": {
+    "ts": 1792856825.536766
+   },
+   "source": "engine/lifesim-5ban.7-20261024-183823.jsonl:45",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "personal-team-blocked:spending-limit: You have run out of credits or need a Grok subscription. Add credits at https://grok.com/",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   }
+  },
+  {
+   "id": "lifesim-5ban.7-20261024-183823.jsonl:50",
+   "history": {
+    "ts": 1792856905.408999
+   },
+   "source": "engine/lifesim-5ban.7-20261024-183823.jsonl:50",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "personal-team-blocked:spending-limit: You have run out of credits or need a Grok subscription. Add credits at https://grok.com/",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   }
+  },
+  {
+   "id": "lifesim-o67g-20261025-174120.jsonl:83",
+   "history": {
+    "ts": 1792940316.592302
+   },
+   "source": "engine/lifesim-o67g-20261025-174120.jsonl:83",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "personal-team-blocked:spending-limit: You have run out of credits or need a Grok subscription. Add credits at https://grok.com/",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   }
+  },
+  {
+   "id": "lifesim-fld.27.12-20261025-191711.jsonl:39",
+   "history": {
+    "ts": 1792945586.591498
+   },
+   "source": "engine/lifesim-fld.27.12-20261025-191711.jsonl:39",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "personal-team-blocked:spending-limit: You have run out of credits or need a Grok subscription. Add credits at https://grok.com/",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   }
+  },
+  {
+   "id": "lifesim-fdyo-20261025-192758.jsonl:50",
+   "history": {
+    "ts": 1792945973.673304
+   },
+   "source": "engine/lifesim-fdyo-20261025-192758.jsonl:50",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "personal-team-blocked:spending-limit: You have run out of credits or need a Grok subscription. Add credits at https://grok.com/",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   }
+  },
+  {
+   "id": "lifesim-fdyo-20261025-192758.jsonl:105",
+   "history": {
+    "ts": 1792946825.744863
+   },
+   "source": "engine/lifesim-fdyo-20261025-192758.jsonl:105",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "personal-team-blocked:spending-limit: You have run out of credits or need a Grok subscription. Add credits at https://grok.com/",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   }
+  },
+  {
+   "id": "lifesim-fld.27.12-20261025-191711.jsonl:92",
+   "history": {
+    "ts": 1792946895.4520488
+   },
+   "source": "engine/lifesim-fld.27.12-20261025-191711.jsonl:92",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "personal-team-blocked:spending-limit: You have run out of credits or need a Grok subscription. Add credits at https://grok.com/",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   }
+  },
+  {
+   "id": "lifesim-fld.27.12-20261025-191711.jsonl:244",
+   "history": {
+    "ts": 1792948059.739887
+   },
+   "source": "engine/lifesim-fld.27.12-20261025-191711.jsonl:244",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "personal-team-blocked:spending-limit: You have run out of credits or need a Grok subscription. Add credits at https://grok.com/",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   }
+  },
+  {
+   "id": "lifesim-5ban.9-20261025-194831.jsonl:158",
+   "history": {
+    "ts": 1792949244.2320828
+   },
+   "source": "engine/lifesim-5ban.9-20261025-194831.jsonl:158",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "personal-team-blocked:spending-limit: You have run out of credits or need a Grok subscription. Add credits at https://grok.com/",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   }
+  },
+  {
+   "id": "lifesim-fld.27.12-20261025-191711.jsonl:296",
+   "history": {
+    "ts": 1792949425.8382232
+   },
+   "source": "engine/lifesim-fld.27.12-20261025-191711.jsonl:296",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "personal-team-blocked:spending-limit: You have run out of credits or need a Grok subscription. Add credits at https://grok.com/",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   }
+  },
+  {
+   "id": "lifesim-5ban.9-20261025-194831.jsonl:190",
+   "history": {
+    "ts": 1792949596.335835
+   },
+   "source": "engine/lifesim-5ban.9-20261025-194831.jsonl:190",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "personal-team-blocked:spending-limit: You have run out of credits or need a Grok subscription. Add credits at https://grok.com/",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   }
+  },
+  {
+   "id": "lifesim-yxbb.10.6-20261025-195205.jsonl:236",
+   "history": {
+    "ts": 1792949623.012037
+   },
+   "source": "engine/lifesim-yxbb.10.6-20261025-195205.jsonl:236",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "personal-team-blocked:spending-limit: You have run out of credits or need a Grok subscription. Add credits at https://grok.com/",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   }
+  },
+  {
+   "id": "lifesim-fld.27.12-20261025-191711.jsonl:320",
+   "history": {
+    "ts": 1792949679.32764
+   },
+   "source": "engine/lifesim-fld.27.12-20261025-191711.jsonl:320",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "personal-team-blocked:spending-limit: You have run out of credits or need a Grok subscription. Add credits at https://grok.com/",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   }
+  },
+  {
+   "id": "lifesim-fld.27.12-20261025-191711.jsonl:343",
+   "history": {
+    "ts": 1792949865.501272
+   },
+   "source": "engine/lifesim-fld.27.12-20261025-191711.jsonl:343",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "personal-team-blocked:spending-limit: You have run out of credits or need a Grok subscription. Add credits at https://grok.com/",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   }
+  },
+  {
+   "id": "lifesim-5ban.9-20261025-194831.jsonl:233",
+   "history": {
+    "ts": 1792950360.730749
+   },
+   "source": "engine/lifesim-5ban.9-20261025-194831.jsonl:233",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "personal-team-blocked:spending-limit: You have run out of credits or need a Grok subscription. Add credits at https://grok.com/",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   }
+  },
+  {
+   "id": "lifesim-6pld-20261025-202608.jsonl:81",
+   "history": {
+    "ts": 1792951266.24751
+   },
+   "source": "engine/lifesim-6pld-20261025-202608.jsonl:81",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "personal-team-blocked:spending-limit: You have run out of credits or need a Grok subscription. Add credits at https://grok.com/",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   }
+  },
+  {
+   "id": "lifesim-5ban.9-20261025-194831.jsonl:378",
+   "history": {
+    "ts": 1792951751.209153
+   },
+   "source": "engine/lifesim-5ban.9-20261025-194831.jsonl:378",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "personal-team-blocked:spending-limit: You have run out of credits or need a Grok subscription. Add credits at https://grok.com/",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   }
+  },
+  {
+   "id": "lifesim-r0yc-20261025-203428.jsonl:226",
+   "history": {
+    "ts": 1792952893.915995
+   },
+   "source": "engine/lifesim-r0yc-20261025-203428.jsonl:226",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "personal-team-blocked:spending-limit: You have run out of credits or need a Grok subscription. Add credits at https://grok.com/",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   }
+  },
+  {
+   "id": "lifesim-5ban.9-20261025-194831.jsonl:475",
+   "history": {
+    "ts": 1792952900.132818
+   },
+   "source": "engine/lifesim-5ban.9-20261025-194831.jsonl:475",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "personal-team-blocked:spending-limit: You have run out of credits or need a Grok subscription. Add credits at https://grok.com/",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   }
+  },
+  {
+   "id": "lifesim-r0yc-20261025-203428.jsonl:239",
+   "history": {
+    "ts": 1792953132.27364
+   },
+   "source": "engine/lifesim-r0yc-20261025-203428.jsonl:239",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "personal-team-blocked:spending-limit: You have run out of credits or need a Grok subscription. Add credits at https://grok.com/",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   }
+  },
+  {
+   "id": "lifesim-r0yc-20261025-203428.jsonl:322",
+   "history": {
+    "ts": 1792954094.858048
+   },
+   "source": "engine/lifesim-r0yc-20261025-203428.jsonl:322",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "personal-team-blocked:spending-limit: You have run out of credits or need a Grok subscription. Add credits at https://grok.com/",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   }
+  }
+ ]
+}

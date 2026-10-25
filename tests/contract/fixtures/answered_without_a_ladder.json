@@ -1,0 +1,151 @@
+{
+ "fixture": 1,
+ "scenario": "answers route.py gives before a worker starts or after its answer, one row per reason; real where history.jsonl has one",
+ "real": "mixed: rows with `synthetic` are not from a real run",
+ "rows": [
+  {
+   "id": "busy",
+   "expected_reason": "busy",
+   "wire": {
+    "status": "stop",
+    "reason": "busy"
+   },
+   "history": {
+    "ts": 1792715820.755656,
+    "run_id": null,
+    "role": "worker",
+    "lane": "OPENAI_SUBSCRIPTION",
+    "model": null,
+    "status": "stop",
+    "reason": "busy",
+    "secs": null
+   },
+   "source": "history.jsonl"
+  },
+  {
+   "id": "no_lane",
+   "expected_reason": "no_lane",
+   "wire": {
+    "status": "stop",
+    "reason": "no_lane"
+   },
+   "history": {
+    "ts": 1792857735.397677,
+    "run_id": null,
+    "role": "reviewer",
+    "lane": null,
+    "model": null,
+    "status": "stop",
+    "reason": "no_lane",
+    "secs": null
+   },
+   "source": "history.jsonl"
+  },
+  {
+   "id": "duplicate_task",
+   "expected_reason": "duplicate_task",
+   "wire": {
+    "status": "stop",
+    "reason": "duplicate_task"
+   },
+   "history": {
+    "ts": 1792595980.093282,
+    "run_id": null,
+    "role": "planner",
+    "lane": "CLAUDE_SUBSCRIPTION",
+    "model": "opus-5.5",
+    "status": "stop",
+    "reason": "duplicate_task",
+    "secs": null
+   },
+   "source": "history.jsonl"
+  },
+  {
+   "id": "caller",
+   "expected_reason": "caller",
+   "wire": {
+    "status": "error",
+    "reason": "caller"
+   },
+   "history": {
+    "ts": 1792775341.047137,
+    "run_id": null,
+    "role": "worker",
+    "lane": null,
+    "model": null,
+    "status": "error",
+    "reason": "caller",
+    "secs": null
+   },
+   "source": "history.jsonl"
+  },
+  {
+   "id": "crash",
+   "expected_reason": "crash",
+   "wire": {
+    "status": "error",
+    "reason": "crash"
+   },
+   "history": {
+    "ts": 1792783578.84361,
+    "run_id": "df4cb6a1-ed28-40dd-b627-d62b2671c96c",
+    "role": "reviewer",
+    "lane": "GROK_SUBSCRIPTION",
+    "model": "grok-4.7",
+    "status": "error",
+    "reason": "crash",
+    "secs": 305.5
+   },
+   "source": "history.jsonl"
+  },
+  {
+   "id": "schema_invalid",
+   "expected_reason": "schema_invalid",
+   "wire": {
+    "status": "failed",
+    "reason": "schema_invalid"
+   },
+   "history": {
+    "ts": 1792890769.822012,
+    "run_id": "79c086fa-28e7-4e2f-a993-27e5816a7dd9",
+    "role": "worker",
+    "lane": "DEEPSEEK_FREE",
+    "model": "deepseek-v4.1-flash-free",
+    "status": "failed",
+    "reason": "schema_invalid",
+    "secs": 988.4
+   },
+   "source": "history.jsonl"
+  },
+  {
+   "id": "lock",
+   "expected_reason": "lock",
+   "wire": {
+    "status": "stop",
+    "reason": "lock"
+   },
+   "synthetic": true,
+   "source": "tests/test_route.py (state lock timeout)"
+  },
+  {
+   "id": "setup",
+   "expected_reason": "setup",
+   "wire": {
+    "status": "error",
+    "reason": "setup"
+   },
+   "synthetic": true,
+   "source": "tests/test_zai.py (non-subscription model)"
+  },
+  {
+   "id": "held",
+   "expected_reason": "held",
+   "wire": {
+    "status": "lane_out",
+    "reason": "lane_out"
+   },
+   "synthetic": true,
+   "source": "the 25 Oct 05:36 codex_plan_review_only incident, answered now as a hold"
+  }
+ ]
+}

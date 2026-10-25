@@ -1,0 +1,72 @@
+{
+ "fixture": 1,
+ "scenario": "a vendor limit that opencode retries forever (ZAI 5 hour limit, DeepSeek free limit) 25 Oct: the log watchdog and the error event both give rate_limited",
+ "cli": "opencode",
+ "real": "ZAI log lines and state text real; the DeepSeek line is quoted from the failure study",
+ "expected_reason": "rate_limited",
+ "expected_wire": {
+  "status": "lane_out",
+  "reason": "lane_out",
+  "next": "retry"
+ },
+ "rows": [
+  {
+   "id": "opencode.log:38957",
+   "source": "opencode.log:38957",
+   "evidence": {
+    "rc": -15,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {
+     "watchdog": "limit",
+     "msg": "timestamp=2026-10-25T03:02:47.846Z level=ERROR run=0df4a3c4 message=\"stream error\" providerID=zai-coding-plan modelID=glm-5.3 session.id=ses_e8f0ce0b8ffeOBB604ecWzi5ik small=false agent=build mode=primary error.error=\"AI_APICallError: Usage limit reached for 5 hour. Your limit will reset at 2026-10-25 14:49:00\""
+    }
+   }
+  },
+  {
+   "id": "opencode.log:38966",
+   "source": "opencode.log:38966",
+   "evidence": {
+    "rc": -15,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {
+     "watchdog": "limit",
+     "msg": "timestamp=2026-10-25T03:02:51.183Z level=ERROR run=0df4a3c4 message=\"stream error\" providerID=zai-coding-plan modelID=glm-5.3 session.id=ses_e8f0ce0b8ffeOBB604ecWzi5ik small=false agent=build mode=primary error.error=\"AI_APICallError: Usage limit reached for 5 hour. Your limit will reset at 2026-10-25 14:49:00\""
+    }
+   }
+  },
+  {
+   "id": "state.json:out.ZAI",
+   "source": "state.json out[ZAI_CODING_SUBSCRIPTION].why",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "AI_APICallError: Usage limit reached for 5 hour. Your limit will reset at 2026-10-25 14:49:00",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   }
+  },
+  {
+   "id": "21-lane-failures.md:F1",
+   "source": "21-lane-failures.md F1 (quoted; the raw opencode.log line has rotated away)",
+   "synthetic": true,
+   "evidence": {
+    "rc": -15,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {
+     "watchdog": "limit",
+     "msg": "AI_APICallError: Free usage limit reached. Subscribe to OpenCode Go..."
+    }
+   }
+  }
+ ]
+}

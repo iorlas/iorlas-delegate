@@ -1,0 +1,6172 @@
+{
+ "fixture": 1,
+ "scenario": "22 Oct 20:00 -> 23 Oct 02:30, every delegate run: done runs stay done, the storm stays bad_request",
+ "cli": "codex+claude",
+ "real": "history rows real; done evidence is rc 0 with no error",
+ "rows": [
+  {
+   "id": "a036950e-7ad0-4f2b-8eef-84f3f94c033b",
+   "history": {
+    "ts": 1792688434.2999601,
+    "run_id": "a036950e-7ad0-4f2b-8eef-84f3f94c033b",
+    "role": "reviewer",
+    "lane": "CLAUDE_SUBSCRIPTION",
+    "model": "sonnet-5.5",
+    "status": "done",
+    "reason": null,
+    "secs": 20.7
+   },
+   "source": "history.jsonl",
+   "evidence": {
+    "rc": 0,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": null
+  },
+  {
+   "id": "45d06fa1-9e81-44cf-a2cd-3246c906c224",
+   "history": {
+    "ts": 1792688456.631444,
+    "run_id": "45d06fa1-9e81-44cf-a2cd-3246c906c224",
+    "role": "planner",
+    "lane": "CLAUDE_SUBSCRIPTION",
+    "model": "opus-5.5",
+    "status": "done",
+    "reason": null,
+    "secs": 59.8
+   },
+   "source": "history.jsonl",
+   "evidence": {
+    "rc": 0,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": null
+  },
+  {
+   "id": "415b866f-41cc-4a6e-8950-7a637de4b9df",
+   "history": {
+    "ts": 1792688477.025972,
+    "run_id": "415b866f-41cc-4a6e-8950-7a637de4b9df",
+    "role": "worker",
+    "lane": "CLAUDE_SUBSCRIPTION",
+    "model": "sonnet-5.5",
+    "status": "done",
+    "reason": null,
+    "secs": 73.0
+   },
+   "source": "history.jsonl",
+   "evidence": {
+    "rc": 0,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": null
+  },
+  {
+   "id": "b426f993-c00c-4a15-b39a-ee4a5d02daa6",
+   "history": {
+    "ts": 1792688492.020301,
+    "run_id": "b426f993-c00c-4a15-b39a-ee4a5d02daa6",
+    "role": "worker",
+    "lane": "CLAUDE_SUBSCRIPTION",
+    "model": "sonnet-5.5",
+    "status": "done",
+    "reason": null,
+    "secs": 53.1
+   },
+   "source": "history.jsonl",
+   "evidence": {
+    "rc": 0,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": null
+  },
+  {
+   "id": "935d0225-bf29-4057-8053-9b83d6895837",
+   "history": {
+    "ts": 1792688519.6699488,
+    "run_id": "935d0225-bf29-4057-8053-9b83d6895837",
+    "role": "worker",
+    "lane": "CLAUDE_SUBSCRIPTION",
+    "model": "sonnet-5.5",
+    "status": "done",
+    "reason": null,
+    "secs": 56.3
+   },
+   "source": "history.jsonl",
+   "evidence": {
+    "rc": 0,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": null
+  },
+  {
+   "id": "812974a2-d020-4f43-8fd1-432d5eccfe63",
+   "history": {
+    "ts": 1792688546.7284071,
+    "run_id": "812974a2-d020-4f43-8fd1-432d5eccfe63",
+    "role": "reviewer",
+    "lane": "CLAUDE_SUBSCRIPTION",
+    "model": "sonnet-5.5",
+    "status": "done",
+    "reason": null,
+    "secs": 13.5
+   },
+   "source": "history.jsonl",
+   "evidence": {
+    "rc": 0,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": null
+  },
+  {
+   "id": "832fbff0-c2cd-4fba-8c8e-6aa48247966f",
+   "history": {
+    "ts": 1792688609.716179,
+    "run_id": "832fbff0-c2cd-4fba-8c8e-6aa48247966f",
+    "role": "reviewer",
+    "lane": "CLAUDE_SUBSCRIPTION",
+    "model": "sonnet-5.5",
+    "status": "done",
+    "reason": null,
+    "secs": 57.8
+   },
+   "source": "history.jsonl",
+   "evidence": {
+    "rc": 0,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": null
+  },
+  {
+   "id": "d10f3c18-4505-4b4a-9ea1-5bea4cc5b471",
+   "history": {
+    "ts": 1792688759.363137,
+    "run_id": "d10f3c18-4505-4b4a-9ea1-5bea4cc5b471",
+    "role": "planner",
+    "lane": "CLAUDE_SUBSCRIPTION",
+    "model": "opus-5.5",
+    "status": "done",
+    "reason": null,
+    "secs": 89.5
+   },
+   "source": "history.jsonl",
+   "evidence": {
+    "rc": 0,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": null
+  },
+  {
+   "id": "ee4de3d6-4051-4f9a-82dc-071fe21961c1",
+   "history": {
+    "ts": 1792689129.205773,
+    "run_id": "ee4de3d6-4051-4f9a-82dc-071fe21961c1",
+    "role": "reviewer",
+    "lane": "CLAUDE_SUBSCRIPTION",
+    "model": "sonnet-5.5",
+    "status": "done",
+    "reason": null,
+    "secs": 24.2
+   },
+   "source": "history.jsonl",
+   "evidence": {
+    "rc": 0,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": null
+  },
+  {
+   "id": "7389db67-d665-46f2-9a74-6849e69e6689",
+   "history": {
+    "ts": 1792689157.6162298,
+    "run_id": "7389db67-d665-46f2-9a74-6849e69e6689",
+    "role": "worker",
+    "lane": "CLAUDE_SUBSCRIPTION",
+    "model": "sonnet-5.5",
+    "status": "done",
+    "reason": null,
+    "secs": 24.4
+   },
+   "source": "history.jsonl",
+   "evidence": {
+    "rc": 0,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": null
+  },
+  {
+   "id": "dd8868e1-35ee-4857-83bc-12ed7ac4807b",
+   "history": {
+    "ts": 1792689585.162441,
+    "run_id": "dd8868e1-35ee-4857-83bc-12ed7ac4807b",
+    "role": "worker",
+    "lane": "CLAUDE_SUBSCRIPTION",
+    "model": "sonnet-5.5",
+    "status": "done",
+    "reason": null,
+    "secs": 813.1
+   },
+   "source": "history.jsonl",
+   "evidence": {
+    "rc": 0,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": null
+  },
+  {
+   "id": "b87bcc1c-54f9-46b3-8f16-be076632523f",
+   "history": {
+    "ts": 1792689704.0692658,
+    "run_id": "b87bcc1c-54f9-46b3-8f16-be076632523f",
+    "role": "planner",
+    "lane": "CLAUDE_SUBSCRIPTION",
+    "model": "opus-5.5",
+    "status": "done",
+    "reason": null,
+    "secs": 128.0
+   },
+   "source": "history.jsonl",
+   "evidence": {
+    "rc": 0,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": null
+  },
+  {
+   "id": "c37df50d-1e5a-4013-8521-27bcb2a7a477",
+   "history": {
+    "ts": 1792689808.251244,
+    "run_id": "c37df50d-1e5a-4013-8521-27bcb2a7a477",
+    "role": "reviewer",
+    "lane": "CLAUDE_SUBSCRIPTION",
+    "model": "sonnet-5.5",
+    "status": "done",
+    "reason": null,
+    "secs": 26.4
+   },
+   "source": "history.jsonl",
+   "evidence": {
+    "rc": 0,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": null
+  },
+  {
+   "id": "fe2952f0-5e98-444c-b320-3ffcbe7376f5",
+   "history": {
+    "ts": 1792689829.110642,
+    "run_id": "fe2952f0-5e98-444c-b320-3ffcbe7376f5",
+    "role": "worker",
+    "lane": "CLAUDE_SUBSCRIPTION",
+    "model": "sonnet-5.5",
+    "status": "done",
+    "reason": null,
+    "secs": 16.4
+   },
+   "source": "history.jsonl",
+   "evidence": {
+    "rc": 0,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": null
+  },
+  {
+   "id": "e8c6c773-0177-4698-b111-80f66a7ac92c",
+   "history": {
+    "ts": 1792689863.362924,
+    "run_id": "e8c6c773-0177-4698-b111-80f66a7ac92c",
+    "role": "reviewer",
+    "lane": "CLAUDE_SUBSCRIPTION",
+    "model": "sonnet-5.5",
+    "status": "done",
+    "reason": null,
+    "secs": 26.0
+   },
+   "source": "history.jsonl",
+   "evidence": {
+    "rc": 0,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": null
+  },
+  {
+   "id": "ae263717-75f1-456e-99c5-efd6f2f7a89b",
+   "history": {
+    "ts": 1792689893.092716,
+    "run_id": "ae263717-75f1-456e-99c5-efd6f2f7a89b",
+    "role": "worker",
+    "lane": "CLAUDE_SUBSCRIPTION",
+    "model": "sonnet-5.5",
+    "status": "done",
+    "reason": null,
+    "secs": 175.9
+   },
+   "source": "history.jsonl",
+   "evidence": {
+    "rc": 0,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": null
+  },
+  {
+   "id": "6eda9e72-403c-49d5-b599-f98557a5c058",
+   "history": {
+    "ts": 1792689915.284943,
+    "run_id": "6eda9e72-403c-49d5-b599-f98557a5c058",
+    "role": "planner",
+    "lane": "CLAUDE_SUBSCRIPTION",
+    "model": "opus-5.5",
+    "status": "done",
+    "reason": null,
+    "secs": 47.5
+   },
+   "source": "history.jsonl",
+   "evidence": {
+    "rc": 0,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": null
+  },
+  {
+   "id": "c2555d7f-ca26-4c8a-97bf-21ea771a4269",
+   "history": {
+    "ts": 1792689976.093599,
+    "run_id": "c2555d7f-ca26-4c8a-97bf-21ea771a4269",
+    "role": "worker",
+    "lane": "CLAUDE_SUBSCRIPTION",
+    "model": "sonnet-5.5",
+    "status": "done",
+    "reason": null,
+    "secs": 20.2
+   },
+   "source": "history.jsonl",
+   "evidence": {
+    "rc": 0,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": null
+  },
+  {
+   "id": "675884e6-c27d-4e52-9f47-950483c2de29",
+   "history": {
+    "ts": 1792689995.9893959,
+    "run_id": "675884e6-c27d-4e52-9f47-950483c2de29",
+    "role": "worker",
+    "lane": "CLAUDE_SUBSCRIPTION",
+    "model": "sonnet-5.5",
+    "status": "done",
+    "reason": null,
+    "secs": 74.5
+   },
+   "source": "history.jsonl",
+   "evidence": {
+    "rc": 0,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": null
+  },
+  {
+   "id": "c01599ad-a787-4863-8546-160b5199dc85",
+   "history": {
+    "ts": 1792690011.6182349,
+    "run_id": "c01599ad-a787-4863-8546-160b5199dc85",
+    "role": "worker",
+    "lane": "CLAUDE_SUBSCRIPTION",
+    "model": "sonnet-5.5",
+    "status": "done",
+    "reason": null,
+    "secs": 18.2
+   },
+   "source": "history.jsonl",
+   "evidence": {
+    "rc": 0,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": null
+  },
+  {
+   "id": "b61c1b86-0ba7-40fc-a30f-5b2d62216b3b",
+   "history": {
+    "ts": 1792690507.577721,
+    "run_id": "b61c1b86-0ba7-40fc-a30f-5b2d62216b3b",
+    "role": "worker",
+    "lane": "CLAUDE_SUBSCRIPTION",
+    "model": "sonnet-5.5",
+    "status": "done",
+    "reason": null,
+    "secs": 209.5
+   },
+   "source": "history.jsonl",
+   "evidence": {
+    "rc": 0,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": null
+  },
+  {
+   "id": "e168afd7-c414-4fd6-818f-374d78f9a12c",
+   "history": {
+    "ts": 1792690628.584675,
+    "run_id": "e168afd7-c414-4fd6-818f-374d78f9a12c",
+    "role": "reviewer",
+    "lane": "CLAUDE_SUBSCRIPTION",
+    "model": "sonnet-5.5",
+    "status": "done",
+    "reason": null,
+    "secs": 27.5
+   },
+   "source": "history.jsonl",
+   "evidence": {
+    "rc": 0,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": null
+  },
+  {
+   "id": "e59a4654-ae3a-4082-ab60-938c4e13fba6",
+   "history": {
+    "ts": 1792690646.7500842,
+    "run_id": "e59a4654-ae3a-4082-ab60-938c4e13fba6",
+    "role": "worker",
+    "lane": "CLAUDE_SUBSCRIPTION",
+    "model": "sonnet-5.5",
+    "status": "done",
+    "reason": null,
+    "secs": 14.1
+   },
+   "source": "history.jsonl",
+   "evidence": {
+    "rc": 0,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": null
+  },
+  {
+   "id": "aeb86599-cb76-4384-ad9f-5f8709a3b1a5",
+   "history": {
+    "ts": 1792690675.783148,
+    "run_id": "aeb86599-cb76-4384-ad9f-5f8709a3b1a5",
+    "role": "reviewer",
+    "lane": "CLAUDE_SUBSCRIPTION",
+    "model": "sonnet-5.5",
+    "status": "done",
+    "reason": null,
+    "secs": 19.7
+   },
+   "source": "history.jsonl",
+   "evidence": {
+    "rc": 0,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": null
+  },
+  {
+   "id": "598c671b-8d79-41ee-97b6-a05987b600d6",
+   "history": {
+    "ts": 1792690690.66975,
+    "run_id": "598c671b-8d79-41ee-97b6-a05987b600d6",
+    "role": "worker",
+    "lane": "CLAUDE_SUBSCRIPTION",
+    "model": "sonnet-5.5",
+    "status": "done",
+    "reason": null,
+    "secs": 10.1
+   },
+   "source": "history.jsonl",
+   "evidence": {
+    "rc": 0,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": null
+  },
+  {
+   "id": "7a9b2194-1444-44c0-9a0d-5b4a2a0a33be",
+   "history": {
+    "ts": 1792690698.602228,
+    "run_id": "7a9b2194-1444-44c0-9a0d-5b4a2a0a33be",
+    "role": "worker",
+    "lane": "CLAUDE_SUBSCRIPTION",
+    "model": "sonnet-5.5",
+    "status": "done",
+    "reason": null,
+    "secs": 35.7
+   },
+   "source": "history.jsonl",
+   "evidence": {
+    "rc": 0,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": null
+  },
+  {
+   "id": "7f37c7c7-7705-4622-b30f-5daf5848169b",
+   "history": {
+    "ts": 1792690725.4721029,
+    "run_id": "7f37c7c7-7705-4622-b30f-5daf5848169b",
+    "role": "reviewer",
+    "lane": "CLAUDE_SUBSCRIPTION",
+    "model": "sonnet-5.5",
+    "status": "done",
+    "reason": null,
+    "secs": 26.0
+   },
+   "source": "history.jsonl",
+   "evidence": {
+    "rc": 0,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": null
+  },
+  {
+   "id": "5cf1020f-45ed-4a60-adc8-e557838da99f",
+   "history": {
+    "ts": 1792690761.438248,
+    "run_id": "5cf1020f-45ed-4a60-adc8-e557838da99f",
+    "role": "reviewer",
+    "lane": "CLAUDE_SUBSCRIPTION",
+    "model": "sonnet-5.5",
+    "status": "done",
+    "reason": null,
+    "secs": 23.5
+   },
+   "source": "history.jsonl",
+   "evidence": {
+    "rc": 0,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": null
+  },
+  {
+   "id": "65d2bc1e-4d09-4f86-973e-81078ae00fb4",
+   "history": {
+    "ts": 1792690766.000577,
+    "run_id": "65d2bc1e-4d09-4f86-973e-81078ae00fb4",
+    "role": "planner",
+    "lane": "CLAUDE_SUBSCRIPTION",
+    "model": "opus-5.5",
+    "status": "done",
+    "reason": null,
+    "secs": 35.9
+   },
+   "source": "history.jsonl",
+   "evidence": {
+    "rc": 0,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": null
+  },
+  {
+   "id": "a8a019f8-2c49-4dba-83ae-1aafd84ce1ed",
+   "history": {
+    "ts": 1792690790.785295,
+    "run_id": "a8a019f8-2c49-4dba-83ae-1aafd84ce1ed",
+    "role": "worker",
+    "lane": "CLAUDE_SUBSCRIPTION",
+    "model": "sonnet-5.5",
+    "status": "done",
+    "reason": null,
+    "secs": 18.7
+   },
+   "source": "history.jsonl",
+   "evidence": {
+    "rc": 0,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": null
+  },
+  {
+   "id": "14fbd642-acbf-4f75-ba85-b6b75ac63d78",
+   "history": {
+    "ts": 1792690819.5204558,
+    "run_id": "14fbd642-acbf-4f75-ba85-b6b75ac63d78",
+    "role": "reviewer",
+    "lane": "CLAUDE_SUBSCRIPTION",
+    "model": "sonnet-5.5",
+    "status": "done",
+    "reason": null,
+    "secs": 17.3
+   },
+   "source": "history.jsonl",
+   "evidence": {
+    "rc": 0,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": null
+  },
+  {
+   "id": "a76ff2b7-1064-42be-9134-750a1b86bd59",
+   "history": {
+    "ts": 1792690834.0140212,
+    "run_id": "a76ff2b7-1064-42be-9134-750a1b86bd59",
+    "role": "worker",
+    "lane": "CLAUDE_SUBSCRIPTION",
+    "model": "sonnet-5.5",
+    "status": "done",
+    "reason": null,
+    "secs": 10.3
+   },
+   "source": "history.jsonl",
+   "evidence": {
+    "rc": 0,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": null
+  },
+  {
+   "id": "a09bb23b-f238-49e3-87a0-7d4ebb5e4d38",
+   "history": {
+    "ts": 1792690857.034027,
+    "run_id": "a09bb23b-f238-49e3-87a0-7d4ebb5e4d38",
+    "role": "reviewer",
+    "lane": "CLAUDE_SUBSCRIPTION",
+    "model": "sonnet-5.5",
+    "status": "done",
+    "reason": null,
+    "secs": 14.3
+   },
+   "source": "history.jsonl",
+   "evidence": {
+    "rc": 0,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": null
+  },
+  {
+   "id": "f1fedcb3-ea10-4d84-9f52-80073e6d3617",
+   "history": {
+    "ts": 1792690872.772944,
+    "run_id": "f1fedcb3-ea10-4d84-9f52-80073e6d3617",
+    "role": "worker",
+    "lane": "CLAUDE_SUBSCRIPTION",
+    "model": "sonnet-5.5",
+    "status": "done",
+    "reason": null,
+    "secs": 9.3
+   },
+   "source": "history.jsonl",
+   "evidence": {
+    "rc": 0,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": null
+  },
+  {
+   "id": "4a6f7d7b-f7aa-4904-b302-7fc12547c1a6",
+   "history": {
+    "ts": 1792690881.7367291,
+    "run_id": "4a6f7d7b-f7aa-4904-b302-7fc12547c1a6",
+    "role": "planner",
+    "lane": "CLAUDE_SUBSCRIPTION",
+    "model": "opus-5.5",
+    "status": "done",
+    "reason": null,
+    "secs": 44.2
+   },
+   "source": "history.jsonl",
+   "evidence": {
+    "rc": 0,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": null
+  },
+  {
+   "id": "b35c25b2-fb86-4997-985a-bf4d6a8c9d33",
+   "history": {
+    "ts": 1792690888.182762,
+    "run_id": "b35c25b2-fb86-4997-985a-bf4d6a8c9d33",
+    "role": "worker",
+    "lane": "CLAUDE_SUBSCRIPTION",
+    "model": "sonnet-5.5",
+    "status": "done",
+    "reason": null,
+    "secs": 122.7
+   },
+   "source": "history.jsonl",
+   "evidence": {
+    "rc": 0,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": null
+  },
+  {
+   "id": "bd53e091-cb56-424a-a687-33fddfa1b4c8",
+   "history": {
+    "ts": 1792690903.506902,
+    "run_id": "bd53e091-cb56-424a-a687-33fddfa1b4c8",
+    "role": "worker",
+    "lane": "CLAUDE_SUBSCRIPTION",
+    "model": "sonnet-5.5",
+    "status": "done",
+    "reason": null,
+    "secs": 13.9
+   },
+   "source": "history.jsonl",
+   "evidence": {
+    "rc": 0,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": null
+  },
+  {
+   "id": "4a824647-5177-47f5-8738-9196bf1e0bee",
+   "history": {
+    "ts": 1792690913.811451,
+    "run_id": "4a824647-5177-47f5-8738-9196bf1e0bee",
+    "role": "reviewer",
+    "lane": "CLAUDE_SUBSCRIPTION",
+    "model": "sonnet-5.5",
+    "status": "done",
+    "reason": null,
+    "secs": 33.1
+   },
+   "source": "history.jsonl",
+   "evidence": {
+    "rc": 0,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": null
+  },
+  {
+   "id": "ebc4bf05-6ce2-43ef-8754-6363fd25968d",
+   "history": {
+    "ts": 1792690953.835653,
+    "run_id": "ebc4bf05-6ce2-43ef-8754-6363fd25968d",
+    "role": "worker",
+    "lane": "CLAUDE_SUBSCRIPTION",
+    "model": "sonnet-5.5",
+    "status": "done",
+    "reason": null,
+    "secs": 19.8
+   },
+   "source": "history.jsonl",
+   "evidence": {
+    "rc": 0,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": null
+  },
+  {
+   "id": "54b2270b-e24c-4547-8390-9cf912be0893",
+   "history": {
+    "ts": 1792691074.6464388,
+    "run_id": "54b2270b-e24c-4547-8390-9cf912be0893",
+    "role": "reviewer",
+    "lane": "CLAUDE_SUBSCRIPTION",
+    "model": "sonnet-5.5",
+    "status": "done",
+    "reason": null,
+    "secs": 15.8
+   },
+   "source": "history.jsonl",
+   "evidence": {
+    "rc": 0,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": null
+  },
+  {
+   "id": "8947301d-3319-46c3-ba4e-51bb65229b20",
+   "history": {
+    "ts": 1792691088.9511008,
+    "run_id": "8947301d-3319-46c3-ba4e-51bb65229b20",
+    "role": "planner",
+    "lane": "CLAUDE_SUBSCRIPTION",
+    "model": "opus-5.5",
+    "status": "done",
+    "reason": null,
+    "secs": 113.5
+   },
+   "source": "history.jsonl",
+   "evidence": {
+    "rc": 0,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": null
+  },
+  {
+   "id": "ecc71e9f-a88b-40dc-a949-fd06e3ed7487",
+   "history": {
+    "ts": 1792691430.337824,
+    "run_id": "ecc71e9f-a88b-40dc-a949-fd06e3ed7487",
+    "role": "worker",
+    "lane": "CLAUDE_SUBSCRIPTION",
+    "model": "sonnet-5.5",
+    "status": "done",
+    "reason": null,
+    "secs": 327.8
+   },
+   "source": "history.jsonl",
+   "evidence": {
+    "rc": 0,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": null
+  },
+  {
+   "id": "b09da424-d481-482c-8381-1fa426fd03f3",
+   "history": {
+    "ts": 1792691622.6745632,
+    "run_id": "b09da424-d481-482c-8381-1fa426fd03f3",
+    "role": "worker",
+    "lane": "CLAUDE_SUBSCRIPTION",
+    "model": "sonnet-5.5",
+    "status": "done",
+    "reason": null,
+    "secs": 116.0
+   },
+   "source": "history.jsonl",
+   "evidence": {
+    "rc": 0,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": null
+  },
+  {
+   "id": "fdcc1e09-c778-4bd0-a2a5-d044889d5067",
+   "history": {
+    "ts": 1792691670.9657311,
+    "run_id": "fdcc1e09-c778-4bd0-a2a5-d044889d5067",
+    "role": "worker",
+    "lane": "CLAUDE_SUBSCRIPTION",
+    "model": "sonnet-5.5",
+    "status": "done",
+    "reason": null,
+    "secs": 22.9
+   },
+   "source": "history.jsonl",
+   "evidence": {
+    "rc": 0,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": null
+  },
+  {
+   "id": "91cf7f9a-43e8-42e8-af98-9e890f09f65f",
+   "history": {
+    "ts": 1792691697.380676,
+    "run_id": "91cf7f9a-43e8-42e8-af98-9e890f09f65f",
+    "role": "reviewer",
+    "lane": "CLAUDE_SUBSCRIPTION",
+    "model": "sonnet-5.5",
+    "status": "done",
+    "reason": null,
+    "secs": 20.8
+   },
+   "source": "history.jsonl",
+   "evidence": {
+    "rc": 0,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": null
+  },
+  {
+   "id": "14a7dd36-11e1-44a4-8546-c6f39bf519c5",
+   "history": {
+    "ts": 1792692305.08626,
+    "run_id": "14a7dd36-11e1-44a4-8546-c6f39bf519c5",
+    "role": "planner",
+    "lane": "CLAUDE_SUBSCRIPTION",
+    "model": "opus-5.5",
+    "status": "done",
+    "reason": null,
+    "secs": 55.3
+   },
+   "source": "history.jsonl",
+   "evidence": {
+    "rc": 0,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": null
+  },
+  {
+   "id": "459390af-1d6d-448d-9d56-93c1b27f0f21",
+   "history": {
+    "ts": 1792692357.9348538,
+    "run_id": "459390af-1d6d-448d-9d56-93c1b27f0f21",
+    "role": "worker",
+    "lane": "CLAUDE_SUBSCRIPTION",
+    "model": "sonnet-5.5",
+    "status": "done",
+    "reason": null,
+    "secs": 41.1
+   },
+   "source": "history.jsonl",
+   "evidence": {
+    "rc": 0,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": null
+  },
+  {
+   "id": "f13185cf-eab7-490d-8db1-f404673d4664",
+   "history": {
+    "ts": 1792692383.78058,
+    "run_id": "f13185cf-eab7-490d-8db1-f404673d4664",
+    "role": "reviewer",
+    "lane": "CLAUDE_SUBSCRIPTION",
+    "model": "sonnet-5.5",
+    "status": "done",
+    "reason": null,
+    "secs": 15.1
+   },
+   "source": "history.jsonl",
+   "evidence": {
+    "rc": 0,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": null
+  },
+  {
+   "id": "13fdc8aa-67fd-4136-8b79-d804c403d338",
+   "history": {
+    "ts": 1792692414.300056,
+    "run_id": "13fdc8aa-67fd-4136-8b79-d804c403d338",
+    "role": "worker",
+    "lane": "CLAUDE_SUBSCRIPTION",
+    "model": "sonnet-5.5",
+    "status": "done",
+    "reason": null,
+    "secs": 51.1
+   },
+   "source": "history.jsonl",
+   "evidence": {
+    "rc": 0,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": null
+  },
+  {
+   "id": "4665f3da-ddf1-4966-b642-89b004a7102d",
+   "history": {
+    "ts": 1792692469.6497211,
+    "run_id": "4665f3da-ddf1-4966-b642-89b004a7102d",
+    "role": "worker",
+    "lane": "CLAUDE_SUBSCRIPTION",
+    "model": "sonnet-5.5",
+    "status": "done",
+    "reason": null,
+    "secs": 13.8
+   },
+   "source": "history.jsonl",
+   "evidence": {
+    "rc": 0,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": null
+  },
+  {
+   "id": "8b1d86ae-c2c0-4753-bd52-e03c3e95e5ef",
+   "history": {
+    "ts": 1792693109.5806808,
+    "run_id": "8b1d86ae-c2c0-4753-bd52-e03c3e95e5ef",
+    "role": "reviewer",
+    "lane": "CLAUDE_SUBSCRIPTION",
+    "model": "sonnet-5.5",
+    "status": "done",
+    "reason": null,
+    "secs": 46.9
+   },
+   "source": "history.jsonl",
+   "evidence": {
+    "rc": 0,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": null
+  },
+  {
+   "id": "f1e145d2-3017-4397-a431-13c3653e3185",
+   "history": {
+    "ts": 1792693316.5943282,
+    "run_id": "f1e145d2-3017-4397-a431-13c3653e3185",
+    "role": "worker",
+    "lane": "CLAUDE_SUBSCRIPTION",
+    "model": "sonnet-5.5",
+    "status": "done",
+    "reason": null,
+    "secs": 203.2
+   },
+   "source": "history.jsonl",
+   "evidence": {
+    "rc": 0,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": null
+  },
+  {
+   "id": "a651d6f0-c7e6-497a-8559-19c397848471",
+   "history": {
+    "ts": 1792693339.900887,
+    "run_id": "a651d6f0-c7e6-497a-8559-19c397848471",
+    "role": "planner",
+    "lane": "CLAUDE_SUBSCRIPTION",
+    "model": "opus-5.5",
+    "status": "done",
+    "reason": null,
+    "secs": 55.4
+   },
+   "source": "history.jsonl",
+   "evidence": {
+    "rc": 0,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": null
+  },
+  {
+   "id": "646dbbc9-25a8-480b-9919-2e4b91c7cae4",
+   "history": {
+    "ts": 1792693362.068314,
+    "run_id": "646dbbc9-25a8-480b-9919-2e4b91c7cae4",
+    "role": "planner",
+    "lane": "CLAUDE_SUBSCRIPTION",
+    "model": "opus-5.5",
+    "status": "done",
+    "reason": null,
+    "secs": 21.2
+   },
+   "source": "history.jsonl",
+   "evidence": {
+    "rc": 0,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": null
+  },
+  {
+   "id": "76718da8-674c-4304-8467-9ebe7185a6d9",
+   "history": {
+    "ts": 1792693382.1525812,
+    "run_id": "76718da8-674c-4304-8467-9ebe7185a6d9",
+    "role": "worker",
+    "lane": "CLAUDE_SUBSCRIPTION",
+    "model": "sonnet-5.5",
+    "status": "done",
+    "reason": null,
+    "secs": 22.7
+   },
+   "source": "history.jsonl",
+   "evidence": {
+    "rc": 0,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": null
+  },
+  {
+   "id": "b9da898c-0622-4650-a3b6-b5426fd71f0e",
+   "history": {
+    "ts": 1792693407.477814,
+    "run_id": "b9da898c-0622-4650-a3b6-b5426fd71f0e",
+    "role": "worker",
+    "lane": "CLAUDE_SUBSCRIPTION",
+    "model": "sonnet-5.5",
+    "status": "done",
+    "reason": null,
+    "secs": 39.6
+   },
+   "source": "history.jsonl",
+   "evidence": {
+    "rc": 0,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": null
+  },
+  {
+   "id": "89a7f798-a568-42f1-91cc-77ca04da3ada",
+   "history": {
+    "ts": 1792693630.106157,
+    "run_id": "89a7f798-a568-42f1-91cc-77ca04da3ada",
+    "role": "planner",
+    "lane": "CLAUDE_SUBSCRIPTION",
+    "model": "opus-5.5",
+    "status": "done",
+    "reason": null,
+    "secs": 61.5
+   },
+   "source": "history.jsonl",
+   "evidence": {
+    "rc": 0,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": null
+  },
+  {
+   "id": "d155a9b6-a465-43fc-a8dc-8722e5d53efb",
+   "history": {
+    "ts": 1792693771.0801752,
+    "run_id": "d155a9b6-a465-43fc-a8dc-8722e5d53efb",
+    "role": "worker",
+    "lane": "CLAUDE_SUBSCRIPTION",
+    "model": "sonnet-5.5",
+    "status": "done",
+    "reason": null,
+    "secs": 131.2
+   },
+   "source": "history.jsonl",
+   "evidence": {
+    "rc": 0,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": null
+  },
+  {
+   "id": "bfa728ac-a6c4-4d2d-9b9f-4bd359fc18cb",
+   "history": {
+    "ts": 1792693822.271957,
+    "run_id": "bfa728ac-a6c4-4d2d-9b9f-4bd359fc18cb",
+    "role": "reviewer",
+    "lane": "CLAUDE_SUBSCRIPTION",
+    "model": "sonnet-5.5",
+    "status": "done",
+    "reason": null,
+    "secs": 36.6
+   },
+   "source": "history.jsonl",
+   "evidence": {
+    "rc": 0,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": null
+  },
+  {
+   "id": "aa9d9228-8d11-4704-b11b-a96a8dc88564",
+   "history": {
+    "ts": 1792693867.597982,
+    "run_id": "aa9d9228-8d11-4704-b11b-a96a8dc88564",
+    "role": "worker",
+    "lane": "CLAUDE_SUBSCRIPTION",
+    "model": "sonnet-5.5",
+    "status": "done",
+    "reason": null,
+    "secs": 40.3
+   },
+   "source": "history.jsonl",
+   "evidence": {
+    "rc": 0,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": null
+  },
+  {
+   "id": "816514cf-5c1e-48aa-9646-1af90baf2991",
+   "history": {
+    "ts": 1792693907.909108,
+    "run_id": "816514cf-5c1e-48aa-9646-1af90baf2991",
+    "role": "reviewer",
+    "lane": "CLAUDE_SUBSCRIPTION",
+    "model": "sonnet-5.5",
+    "status": "done",
+    "reason": null,
+    "secs": 22.9
+   },
+   "source": "history.jsonl",
+   "evidence": {
+    "rc": 0,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": null
+  },
+  {
+   "id": "4a415dfe-caeb-4c60-babb-db2e802b2284",
+   "history": {
+    "ts": 1792693956.843631,
+    "run_id": "4a415dfe-caeb-4c60-babb-db2e802b2284",
+    "role": "reviewer",
+    "lane": "CLAUDE_SUBSCRIPTION",
+    "model": "sonnet-5.5",
+    "status": "done",
+    "reason": null,
+    "secs": 42.1
+   },
+   "source": "history.jsonl",
+   "evidence": {
+    "rc": 0,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": null
+  },
+  {
+   "id": "f5b7f562-2bc4-485b-a8eb-f2a55e768ec8",
+   "history": {
+    "ts": 1792693979.618489,
+    "run_id": "f5b7f562-2bc4-485b-a8eb-f2a55e768ec8",
+    "role": "worker",
+    "lane": "CLAUDE_SUBSCRIPTION",
+    "model": "sonnet-5.5",
+    "status": "done",
+    "reason": null,
+    "secs": 14.5
+   },
+   "source": "history.jsonl",
+   "evidence": {
+    "rc": 0,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": null
+  },
+  {
+   "id": "e2c0eb66-ef72-4767-828d-6d0de4b6d1e9",
+   "history": {
+    "ts": 1792694003.49897,
+    "run_id": "e2c0eb66-ef72-4767-828d-6d0de4b6d1e9",
+    "role": "reviewer",
+    "lane": "CLAUDE_SUBSCRIPTION",
+    "model": "sonnet-5.5",
+    "status": "done",
+    "reason": null,
+    "secs": 12.4
+   },
+   "source": "history.jsonl",
+   "evidence": {
+    "rc": 0,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": null
+  },
+  {
+   "id": "bfc98a36-18c3-4d0e-85ee-efb7c914001b",
+   "history": {
+    "ts": 1792694018.3225658,
+    "run_id": "bfc98a36-18c3-4d0e-85ee-efb7c914001b",
+    "role": "reviewer",
+    "lane": "CLAUDE_SUBSCRIPTION",
+    "model": "sonnet-5.5",
+    "status": "done",
+    "reason": null,
+    "secs": 43.9
+   },
+   "source": "history.jsonl",
+   "evidence": {
+    "rc": 0,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": null
+  },
+  {
+   "id": "3bf715ea-b850-4c14-bb70-857faf72ddc3",
+   "history": {
+    "ts": 1792694084.6719842,
+    "run_id": "3bf715ea-b850-4c14-bb70-857faf72ddc3",
+    "role": "reviewer",
+    "lane": "CLAUDE_SUBSCRIPTION",
+    "model": "sonnet-5.5",
+    "status": "done",
+    "reason": null,
+    "secs": 11.8
+   },
+   "source": "history.jsonl",
+   "evidence": {
+    "rc": 0,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": null
+  },
+  {
+   "id": "bd065389-0897-49a5-a1e0-c04732a49424",
+   "history": {
+    "ts": 1792694107.0527759,
+    "run_id": "bd065389-0897-49a5-a1e0-c04732a49424",
+    "role": "planner",
+    "lane": "CLAUDE_SUBSCRIPTION",
+    "model": "opus-5.5",
+    "status": "done",
+    "reason": null,
+    "secs": 86.3
+   },
+   "source": "history.jsonl",
+   "evidence": {
+    "rc": 0,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": null
+  },
+  {
+   "id": "c6f18582-3e2f-4cae-ad14-eb72e4bd1811",
+   "history": {
+    "ts": 1792694265.165783,
+    "run_id": "c6f18582-3e2f-4cae-ad14-eb72e4bd1811",
+    "role": "worker",
+    "lane": "CLAUDE_SUBSCRIPTION",
+    "model": "sonnet-5.5",
+    "status": "done",
+    "reason": null,
+    "secs": 151.2
+   },
+   "source": "history.jsonl",
+   "evidence": {
+    "rc": 0,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": null
+  },
+  {
+   "id": "945c4431-4e49-4de8-81ed-da0695b527ea",
+   "history": {
+    "ts": 1792694392.449009,
+    "run_id": "945c4431-4e49-4de8-81ed-da0695b527ea",
+    "role": "planner",
+    "lane": "CLAUDE_SUBSCRIPTION",
+    "model": "opus-5.5",
+    "status": "done",
+    "reason": null,
+    "secs": 94.1
+   },
+   "source": "history.jsonl",
+   "evidence": {
+    "rc": 0,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": null
+  },
+  {
+   "id": "c7a1ac40-bf30-4512-90cc-bc55cc1169bc",
+   "history": {
+    "ts": 1792694422.860022,
+    "run_id": "c7a1ac40-bf30-4512-90cc-bc55cc1169bc",
+    "role": "planner",
+    "lane": "CLAUDE_SUBSCRIPTION",
+    "model": "opus-5.5",
+    "status": "done",
+    "reason": null,
+    "secs": 28.2
+   },
+   "source": "history.jsonl",
+   "evidence": {
+    "rc": 0,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": null
+  },
+  {
+   "id": "b22e0bb1-b962-4b52-91c7-75ceb5521eb8",
+   "history": {
+    "ts": 1792694550.829642,
+    "run_id": "b22e0bb1-b962-4b52-91c7-75ceb5521eb8",
+    "role": "worker",
+    "lane": "CLAUDE_SUBSCRIPTION",
+    "model": "sonnet-5.5",
+    "status": "done",
+    "reason": null,
+    "secs": 122.4
+   },
+   "source": "history.jsonl",
+   "evidence": {
+    "rc": 0,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": null
+  },
+  {
+   "id": "b9b273a7-1987-4f37-a7a9-94b2956470ef",
+   "history": {
+    "ts": 1792694597.050092,
+    "run_id": "b9b273a7-1987-4f37-a7a9-94b2956470ef",
+    "role": "reviewer",
+    "lane": "CLAUDE_SUBSCRIPTION",
+    "model": "sonnet-5.5",
+    "status": "done",
+    "reason": null,
+    "secs": 9.4
+   },
+   "source": "history.jsonl",
+   "evidence": {
+    "rc": 0,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": null
+  },
+  {
+   "id": "08f529d7-0763-427a-8141-0ce8d8adea1b",
+   "history": {
+    "ts": 1792694930.089945,
+    "run_id": "08f529d7-0763-427a-8141-0ce8d8adea1b",
+    "role": "worker",
+    "lane": "CLAUDE_SUBSCRIPTION",
+    "model": "sonnet-5.5",
+    "status": "done",
+    "reason": null,
+    "secs": 13.2
+   },
+   "source": "history.jsonl",
+   "evidence": {
+    "rc": 0,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": null
+  },
+  {
+   "id": "76926cca-a14b-49cb-9597-9c05af41c63a",
+   "history": {
+    "ts": 1792695025.951478,
+    "run_id": "76926cca-a14b-49cb-9597-9c05af41c63a",
+    "role": "worker",
+    "lane": "CLAUDE_SUBSCRIPTION",
+    "model": "sonnet-5.5",
+    "status": "done",
+    "reason": null,
+    "secs": 18.2
+   },
+   "source": "history.jsonl",
+   "evidence": {
+    "rc": 0,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": null
+  },
+  {
+   "id": "ace080e2-6f9e-4e5d-84cf-16c365b20ee9",
+   "history": {
+    "ts": 1792695104.649913,
+    "run_id": "ace080e2-6f9e-4e5d-84cf-16c365b20ee9",
+    "role": "worker",
+    "lane": "CLAUDE_SUBSCRIPTION",
+    "model": "sonnet-5.5",
+    "status": "done",
+    "reason": null,
+    "secs": 9.7
+   },
+   "source": "history.jsonl",
+   "evidence": {
+    "rc": 0,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": null
+  },
+  {
+   "id": "fd61c84e-2089-4766-a7f8-21afb6d8f633",
+   "history": {
+    "ts": 1792695181.3889039,
+    "run_id": "fd61c84e-2089-4766-a7f8-21afb6d8f633",
+    "role": "worker",
+    "lane": "CLAUDE_SUBSCRIPTION",
+    "model": "sonnet-5.5",
+    "status": "done",
+    "reason": null,
+    "secs": 10.6
+   },
+   "source": "history.jsonl",
+   "evidence": {
+    "rc": 0,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": null
+  },
+  {
+   "id": "3f9549b4-8d6d-46d5-ab8d-afeb8bf9cf2d",
+   "history": {
+    "ts": 1792695262.809493,
+    "run_id": "3f9549b4-8d6d-46d5-ab8d-afeb8bf9cf2d",
+    "role": "worker",
+    "lane": "CLAUDE_SUBSCRIPTION",
+    "model": "sonnet-5.5",
+    "status": "done",
+    "reason": null,
+    "secs": 9.9
+   },
+   "source": "history.jsonl",
+   "evidence": {
+    "rc": 0,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": null
+  },
+  {
+   "id": "41501a1b-7ce0-42e8-bc9d-0ae0137a6394",
+   "history": {
+    "ts": 1792695488.710613,
+    "run_id": "41501a1b-7ce0-42e8-bc9d-0ae0137a6394",
+    "role": "planner",
+    "lane": "CLAUDE_SUBSCRIPTION",
+    "model": "opus-5.5",
+    "status": "done",
+    "reason": null,
+    "secs": 63.2
+   },
+   "source": "history.jsonl",
+   "evidence": {
+    "rc": 0,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": null
+  },
+  {
+   "id": "97fdd292-23b0-4cbc-87ff-3520b21350f1",
+   "history": {
+    "ts": 1792695522.659015,
+    "run_id": "97fdd292-23b0-4cbc-87ff-3520b21350f1",
+    "role": "planner",
+    "lane": "CLAUDE_SUBSCRIPTION",
+    "model": "opus-5.5",
+    "status": "done",
+    "reason": null,
+    "secs": 28.7
+   },
+   "source": "history.jsonl",
+   "evidence": {
+    "rc": 0,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": null
+  },
+  {
+   "id": "47e7fb4e-1667-4a19-b3a0-ab6f2511074a",
+   "history": {
+    "ts": 1792695579.4844658,
+    "run_id": "47e7fb4e-1667-4a19-b3a0-ab6f2511074a",
+    "role": "worker",
+    "lane": "CLAUDE_SUBSCRIPTION",
+    "model": "sonnet-5.5",
+    "status": "done",
+    "reason": null,
+    "secs": 49.2
+   },
+   "source": "history.jsonl",
+   "evidence": {
+    "rc": 0,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": null
+  },
+  {
+   "id": "04e376a9-1dcf-48f9-a3a0-9861e22a3196",
+   "history": {
+    "ts": 1792695956.756625,
+    "run_id": "04e376a9-1dcf-48f9-a3a0-9861e22a3196",
+    "role": "worker",
+    "lane": "CLAUDE_SUBSCRIPTION",
+    "model": "sonnet-5.5",
+    "status": "done",
+    "reason": null,
+    "secs": 11.9
+   },
+   "source": "history.jsonl",
+   "evidence": {
+    "rc": 0,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": null
+  },
+  {
+   "id": "cd0122a2-d5ea-4934-b1fd-ac2e48a87f98",
+   "history": {
+    "ts": 1792696130.909291,
+    "run_id": "cd0122a2-d5ea-4934-b1fd-ac2e48a87f98",
+    "role": "planner",
+    "lane": "CLAUDE_SUBSCRIPTION",
+    "model": "opus-5.5",
+    "status": "done",
+    "reason": null,
+    "secs": 92.3
+   },
+   "source": "history.jsonl",
+   "evidence": {
+    "rc": 0,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": null
+  },
+  {
+   "id": "631838ad-6d76-4ae2-8694-77f4728abb53",
+   "history": {
+    "ts": 1792696202.685169,
+    "run_id": "631838ad-6d76-4ae2-8694-77f4728abb53",
+    "role": "worker",
+    "lane": "CLAUDE_SUBSCRIPTION",
+    "model": "sonnet-5.5",
+    "status": "done",
+    "reason": null,
+    "secs": 64.4
+   },
+   "source": "history.jsonl",
+   "evidence": {
+    "rc": 0,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": null
+  },
+  {
+   "id": "da7991db-4687-4451-b4ee-6b7ff38f709f",
+   "history": {
+    "ts": 1792696202.9200552,
+    "run_id": "da7991db-4687-4451-b4ee-6b7ff38f709f",
+    "role": "reviewer",
+    "lane": "CLAUDE_SUBSCRIPTION",
+    "model": "sonnet-5.5",
+    "status": "done",
+    "reason": null,
+    "secs": 12.3
+   },
+   "source": "history.jsonl",
+   "evidence": {
+    "rc": 0,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": null
+  },
+  {
+   "id": "e5df65ed-3187-43c1-82a9-dc1ee8351308",
+   "history": {
+    "ts": 1792696328.546907,
+    "run_id": "e5df65ed-3187-43c1-82a9-dc1ee8351308",
+    "role": "worker",
+    "lane": "CLAUDE_SUBSCRIPTION",
+    "model": "sonnet-5.5",
+    "status": "done",
+    "reason": null,
+    "secs": 24.5
+   },
+   "source": "history.jsonl",
+   "evidence": {
+    "rc": 0,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": null
+  },
+  {
+   "id": "eee83060-7402-402b-b18a-6d17a70ff8de",
+   "history": {
+    "ts": 1792696649.414449,
+    "run_id": "eee83060-7402-402b-b18a-6d17a70ff8de",
+    "role": "worker",
+    "lane": "CLAUDE_SUBSCRIPTION",
+    "model": "sonnet-5.5",
+    "status": "done",
+    "reason": null,
+    "secs": 13.2
+   },
+   "source": "history.jsonl",
+   "evidence": {
+    "rc": 0,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": null
+  },
+  {
+   "id": "4f1517b0-fb7b-416d-be74-1dd2919a236f",
+   "history": {
+    "ts": 1792696744.533825,
+    "run_id": "4f1517b0-fb7b-416d-be74-1dd2919a236f",
+    "role": "worker",
+    "lane": "CLAUDE_SUBSCRIPTION",
+    "model": "sonnet-5.5",
+    "status": "done",
+    "reason": null,
+    "secs": 10.7
+   },
+   "source": "history.jsonl",
+   "evidence": {
+    "rc": 0,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": null
+  },
+  {
+   "id": "33546386-083a-4b0b-b3d2-2c5d6929cb94",
+   "history": {
+    "ts": 1792696876.163584,
+    "run_id": "33546386-083a-4b0b-b3d2-2c5d6929cb94",
+    "role": "planner",
+    "lane": "CLAUDE_SUBSCRIPTION",
+    "model": "opus-5.5",
+    "status": "done",
+    "reason": null,
+    "secs": 56.1
+   },
+   "source": "history.jsonl",
+   "evidence": {
+    "rc": 0,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": null
+  },
+  {
+   "id": "ea737f70-0bfd-4a6d-833e-6dd29de1b6fc",
+   "history": {
+    "ts": 1792696915.910317,
+    "run_id": "ea737f70-0bfd-4a6d-833e-6dd29de1b6fc",
+    "role": "worker",
+    "lane": "CLAUDE_SUBSCRIPTION",
+    "model": "sonnet-5.5",
+    "status": "done",
+    "reason": null,
+    "secs": 27.6
+   },
+   "source": "history.jsonl",
+   "evidence": {
+    "rc": 0,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": null
+  },
+  {
+   "id": "2ff54269-f551-4654-b22b-e67a0eec64aa",
+   "history": {
+    "ts": 1792697048.147459,
+    "run_id": "2ff54269-f551-4654-b22b-e67a0eec64aa",
+    "role": "worker",
+    "lane": "CLAUDE_SUBSCRIPTION",
+    "model": "sonnet-5.5",
+    "status": "done",
+    "reason": null,
+    "secs": 32.3
+   },
+   "source": "history.jsonl",
+   "evidence": {
+    "rc": 0,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": null
+  },
+  {
+   "id": "f08738c1-2d56-4bd6-b58f-59c51472b526",
+   "history": {
+    "ts": 1792697051.098177,
+    "run_id": "f08738c1-2d56-4bd6-b58f-59c51472b526",
+    "role": "reviewer",
+    "lane": "CLAUDE_SUBSCRIPTION",
+    "model": "sonnet-5.5",
+    "status": "done",
+    "reason": null,
+    "secs": 48.2
+   },
+   "source": "history.jsonl",
+   "evidence": {
+    "rc": 0,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": null
+  },
+  {
+   "id": "7a25b71d-8bef-4de7-89e2-e4458ef356c9",
+   "history": {
+    "ts": 1792697114.0933409,
+    "run_id": "7a25b71d-8bef-4de7-89e2-e4458ef356c9",
+    "role": "worker",
+    "lane": "CLAUDE_SUBSCRIPTION",
+    "model": "sonnet-5.5",
+    "status": "done",
+    "reason": null,
+    "secs": 17.9
+   },
+   "source": "history.jsonl",
+   "evidence": {
+    "rc": 0,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": null
+  },
+  {
+   "id": "e3fad2ec-d6cd-4d04-9856-059e140847d2",
+   "history": {
+    "ts": 1792697215.4660459,
+    "run_id": "e3fad2ec-d6cd-4d04-9856-059e140847d2",
+    "role": "worker",
+    "lane": "CLAUDE_SUBSCRIPTION",
+    "model": "sonnet-5.5",
+    "status": "done",
+    "reason": null,
+    "secs": 160.0
+   },
+   "source": "history.jsonl",
+   "evidence": {
+    "rc": 0,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": null
+  },
+  {
+   "id": "58d6b5d1-efa9-47be-a713-658b26299ba4",
+   "history": {
+    "ts": 1792697291.99631,
+    "run_id": "58d6b5d1-efa9-47be-a713-658b26299ba4",
+    "role": "worker",
+    "lane": "CLAUDE_SUBSCRIPTION",
+    "model": "sonnet-5.5",
+    "status": "done",
+    "reason": null,
+    "secs": 22.5
+   },
+   "source": "history.jsonl",
+   "evidence": {
+    "rc": 0,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": null
+  },
+  {
+   "id": "ddd743de-472d-49b3-873c-582ccce2f989",
+   "history": {
+    "ts": 1792697478.278146,
+    "run_id": "ddd743de-472d-49b3-873c-582ccce2f989",
+    "role": "planner",
+    "lane": "CLAUDE_SUBSCRIPTION",
+    "model": "opus-5.5",
+    "status": "done",
+    "reason": null,
+    "secs": 126.7
+   },
+   "source": "history.jsonl",
+   "evidence": {
+    "rc": 0,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": null
+  },
+  {
+   "id": "498c4c8e-b4c1-4bd6-b095-697a2fc07f7f",
+   "history": {
+    "ts": 1792697715.98463,
+    "run_id": "498c4c8e-b4c1-4bd6-b095-697a2fc07f7f",
+    "role": "worker",
+    "lane": "CLAUDE_SUBSCRIPTION",
+    "model": "sonnet-5.5",
+    "status": "done",
+    "reason": null,
+    "secs": 225.8
+   },
+   "source": "history.jsonl",
+   "evidence": {
+    "rc": 0,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": null
+  },
+  {
+   "id": "849ff064-244e-4c46-bcf1-c98e61774e8d",
+   "history": {
+    "ts": 1792697803.494389,
+    "run_id": "849ff064-244e-4c46-bcf1-c98e61774e8d",
+    "role": "reviewer",
+    "lane": "CLAUDE_SUBSCRIPTION",
+    "model": "sonnet-5.5",
+    "status": "done",
+    "reason": null,
+    "secs": 21.8
+   },
+   "source": "history.jsonl",
+   "evidence": {
+    "rc": 0,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": null
+  },
+  {
+   "id": "0fb327b9-3ebc-4c55-9be7-40af66d44a4f",
+   "history": {
+    "ts": 1792697832.765962,
+    "run_id": "0fb327b9-3ebc-4c55-9be7-40af66d44a4f",
+    "role": "worker",
+    "lane": "CLAUDE_SUBSCRIPTION",
+    "model": "sonnet-5.5",
+    "status": "done",
+    "reason": null,
+    "secs": 24.0
+   },
+   "source": "history.jsonl",
+   "evidence": {
+    "rc": 0,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": null
+  },
+  {
+   "id": "05bf60f3-050e-4c90-bab6-2c02a81d5941",
+   "history": {
+    "ts": 1792697941.410026,
+    "run_id": "05bf60f3-050e-4c90-bab6-2c02a81d5941",
+    "role": "reviewer",
+    "lane": "CLAUDE_SUBSCRIPTION",
+    "model": "sonnet-5.5",
+    "status": "done",
+    "reason": null,
+    "secs": 27.6
+   },
+   "source": "history.jsonl",
+   "evidence": {
+    "rc": 0,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": null
+  },
+  {
+   "id": "0009146c-1306-464e-84b7-3c85cfd7ca3e",
+   "history": {
+    "ts": 1792698015.3563719,
+    "run_id": "0009146c-1306-464e-84b7-3c85cfd7ca3e",
+    "role": "worker",
+    "lane": "CLAUDE_SUBSCRIPTION",
+    "model": "sonnet-5.5",
+    "status": "done",
+    "reason": null,
+    "secs": 68.2
+   },
+   "source": "history.jsonl",
+   "evidence": {
+    "rc": 0,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": null
+  },
+  {
+   "id": "2a16f92b-e7b4-4cd8-a457-7c5b33fe68a0",
+   "history": {
+    "ts": 1792698384.2825038,
+    "run_id": "2a16f92b-e7b4-4cd8-a457-7c5b33fe68a0",
+    "role": "reviewer",
+    "lane": "CLAUDE_SUBSCRIPTION",
+    "model": "sonnet-5.5",
+    "status": "done",
+    "reason": null,
+    "secs": 11.2
+   },
+   "source": "history.jsonl",
+   "evidence": {
+    "rc": 0,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": null
+  },
+  {
+   "id": "17d9e7d8-b6d8-4acd-99f4-33f3af185292",
+   "history": {
+    "ts": 1792698412.577881,
+    "run_id": "17d9e7d8-b6d8-4acd-99f4-33f3af185292",
+    "role": "reviewer",
+    "lane": "CLAUDE_SUBSCRIPTION",
+    "model": "sonnet-5.5",
+    "status": "done",
+    "reason": null,
+    "secs": 22.5
+   },
+   "source": "history.jsonl",
+   "evidence": {
+    "rc": 0,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": null
+  },
+  {
+   "id": "db00ba15-d156-452b-841b-02f64066c771",
+   "history": {
+    "ts": 1792698555.060381,
+    "run_id": "db00ba15-d156-452b-841b-02f64066c771",
+    "role": "reviewer",
+    "lane": "CLAUDE_SUBSCRIPTION",
+    "model": "sonnet-5.5",
+    "status": "done",
+    "reason": null,
+    "secs": 43.7
+   },
+   "source": "history.jsonl",
+   "evidence": {
+    "rc": 0,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": null
+  },
+  {
+   "id": "0de2c187-49bc-4616-b1bc-9ab60025e92d",
+   "history": {
+    "ts": 1792698594.344128,
+    "run_id": "0de2c187-49bc-4616-b1bc-9ab60025e92d",
+    "role": "planner",
+    "lane": "CLAUDE_SUBSCRIPTION",
+    "model": "opus-5.5",
+    "status": "done",
+    "reason": null,
+    "secs": 35.8
+   },
+   "source": "history.jsonl",
+   "evidence": {
+    "rc": 0,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": null
+  },
+  {
+   "id": "b4aee493-663a-4f4e-86e6-4f0d179555ca",
+   "history": {
+    "ts": 1792698682.083955,
+    "run_id": "b4aee493-663a-4f4e-86e6-4f0d179555ca",
+    "role": "reviewer",
+    "lane": "CLAUDE_SUBSCRIPTION",
+    "model": "sonnet-5.5",
+    "status": "done",
+    "reason": null,
+    "secs": 27.2
+   },
+   "source": "history.jsonl",
+   "evidence": {
+    "rc": 0,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": null
+  },
+  {
+   "id": "0dbab46a-0bed-4cf3-a84c-dfcfd2b43108",
+   "history": {
+    "ts": 1792698713.230593,
+    "run_id": "0dbab46a-0bed-4cf3-a84c-dfcfd2b43108",
+    "role": "worker",
+    "lane": "CLAUDE_SUBSCRIPTION",
+    "model": "sonnet-5.5",
+    "status": "done",
+    "reason": null,
+    "secs": 26.7
+   },
+   "source": "history.jsonl",
+   "evidence": {
+    "rc": 0,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": null
+  },
+  {
+   "id": "c44b248f-3fd0-4982-9869-cd149c235dc0",
+   "history": {
+    "ts": 1792698789.426529,
+    "run_id": "c44b248f-3fd0-4982-9869-cd149c235dc0",
+    "role": "planner",
+    "lane": "CLAUDE_SUBSCRIPTION",
+    "model": "opus-5.5",
+    "status": "done",
+    "reason": null,
+    "secs": 86.7
+   },
+   "source": "history.jsonl",
+   "evidence": {
+    "rc": 0,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": null
+  },
+  {
+   "id": "1bc69333-8126-4381-9f9d-9bcdfba37702",
+   "history": {
+    "ts": 1792698855.3484359,
+    "run_id": "1bc69333-8126-4381-9f9d-9bcdfba37702",
+    "role": "worker",
+    "lane": "CLAUDE_SUBSCRIPTION",
+    "model": "sonnet-5.5",
+    "status": "done",
+    "reason": null,
+    "secs": 57.2
+   },
+   "source": "history.jsonl",
+   "evidence": {
+    "rc": 0,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": null
+  },
+  {
+   "id": "2b90c691-3fa2-482d-9e70-f4083bf49050",
+   "history": {
+    "ts": 1792698881.225664,
+    "run_id": "2b90c691-3fa2-482d-9e70-f4083bf49050",
+    "role": "reviewer",
+    "lane": "OPENAI_SUBSCRIPTION",
+    "model": "gpt-6.1-sol",
+    "status": "error",
+    "reason": "bad_request",
+    "secs": 12.2
+   },
+   "source": "engine/lifesim-log-20261022-225135.jsonl:62",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "{\"type\":\"error\",\"error\":{\"message\":\"Invalid schema for response_format 'codex_output_schema': 'schema.required' is required to include every key in properties. Missing 'accept_files'.\",\"type\":\"invalid_request_error\",\"param\":\"text.format.schema\",\"code\":\"invalid_json_schema\"},\"status\":400}",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": "bad_request"
+  },
+  {
+   "id": "ce8076a6-f017-490d-ad8c-71fb6a200cca",
+   "history": {
+    "ts": 1792699096.606287,
+    "run_id": "ce8076a6-f017-490d-ad8c-71fb6a200cca",
+    "role": "planner",
+    "lane": "CLAUDE_SUBSCRIPTION",
+    "model": "opus-5.5",
+    "status": "done",
+    "reason": null,
+    "secs": 57.8
+   },
+   "source": "history.jsonl",
+   "evidence": {
+    "rc": 0,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": null
+  },
+  {
+   "id": "0cb931d4-f9e1-4cf8-9bd1-6bb2c5b9f941",
+   "history": {
+    "ts": 1792699120.03502,
+    "run_id": "0cb931d4-f9e1-4cf8-9bd1-6bb2c5b9f941",
+    "role": "worker",
+    "lane": "OPENAI_SUBSCRIPTION",
+    "model": "gpt-6.1-sol",
+    "status": "error",
+    "reason": "bad_request",
+    "secs": 16.8
+   },
+   "source": "engine/lifesim-sz3-20261022-225656.jsonl:17",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "{\"type\":\"error\",\"error\":{\"message\":\"Invalid schema for response_format 'codex_output_schema': 'schema.properties.unchecked.items.required' is required to include every key in properties. Missing 'source'.\",\"type\":\"invalid_request_error\",\"param\":\"text.format.schema\",\"code\":\"invalid_json_schema\"},\"sta",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": "bad_request"
+  },
+  {
+   "id": "e79f38fc-17e2-48b0-92e8-829a6f55b217",
+   "history": {
+    "ts": 1792699231.7747562,
+    "run_id": "e79f38fc-17e2-48b0-92e8-829a6f55b217",
+    "role": "planner",
+    "lane": "CLAUDE_SUBSCRIPTION",
+    "model": "opus-5.5",
+    "status": "done",
+    "reason": null,
+    "secs": 30.0
+   },
+   "source": "history.jsonl",
+   "evidence": {
+    "rc": 0,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": null
+  },
+  {
+   "id": "4a785c09-7845-439f-b099-c615d82cca5f",
+   "history": {
+    "ts": 1792699337.8243499,
+    "run_id": "4a785c09-7845-439f-b099-c615d82cca5f",
+    "role": "planner",
+    "lane": "CLAUDE_SUBSCRIPTION",
+    "model": "opus-5.5",
+    "status": "done",
+    "reason": null,
+    "secs": 29.3
+   },
+   "source": "history.jsonl",
+   "evidence": {
+    "rc": 0,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": null
+  },
+  {
+   "id": "e04b72ba-65dd-48c8-9aa0-2a92c2e5a5b6",
+   "history": {
+    "ts": 1792699351.018016,
+    "run_id": "e04b72ba-65dd-48c8-9aa0-2a92c2e5a5b6",
+    "role": "reviewer",
+    "lane": "OPENAI_SUBSCRIPTION",
+    "model": "gpt-6.1-sol",
+    "status": "error",
+    "reason": "bad_request",
+    "secs": 11.2
+   },
+   "source": "engine/lifesim-yxbb.7-20261022-230139.jsonl:20",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "{\"type\":\"error\",\"error\":{\"message\":\"Invalid schema for response_format 'codex_output_schema': 'schema.properties.unchecked.items.required' is required to include every key in properties. Missing 'source'.\",\"type\":\"invalid_request_error\",\"param\":\"text.format.schema\",\"code\":\"invalid_json_schema\"},\"sta",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": "bad_request"
+  },
+  {
+   "id": "9b12a2bb-6d7a-4156-a394-f3c0f8ec8673",
+   "history": {
+    "ts": 1792699404.974835,
+    "run_id": "9b12a2bb-6d7a-4156-a394-f3c0f8ec8673",
+    "role": "worker",
+    "lane": "OPENAI_SUBSCRIPTION",
+    "model": "gpt-6.1-sol",
+    "status": "error",
+    "reason": "bad_request",
+    "secs": 7.8
+   },
+   "source": "engine/lifesim-yxbb.7-20261022-230139.jsonl:20",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "{\"type\":\"error\",\"error\":{\"message\":\"Invalid schema for response_format 'codex_output_schema': 'schema.properties.unchecked.items.required' is required to include every key in properties. Missing 'source'.\",\"type\":\"invalid_request_error\",\"param\":\"text.format.schema\",\"code\":\"invalid_json_schema\"},\"sta",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": "bad_request"
+  },
+  {
+   "id": "9a7fd442-7b74-4299-9d3a-16b2ff54305b",
+   "history": {
+    "ts": 1792699546.628992,
+    "run_id": "9a7fd442-7b74-4299-9d3a-16b2ff54305b",
+    "role": "planner",
+    "lane": "CLAUDE_SUBSCRIPTION",
+    "model": "opus-5.5",
+    "status": "done",
+    "reason": null,
+    "secs": 57.4
+   },
+   "source": "history.jsonl",
+   "evidence": {
+    "rc": 0,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": null
+  },
+  {
+   "id": "73661b52-5cef-4e2a-bffb-87bdd8a25c70",
+   "history": {
+    "ts": 1792699575.551862,
+    "run_id": "73661b52-5cef-4e2a-bffb-87bdd8a25c70",
+    "role": "worker",
+    "lane": "OPENAI_SUBSCRIPTION",
+    "model": "gpt-6.1-sol",
+    "status": "error",
+    "reason": "bad_request",
+    "secs": 14.9
+   },
+   "source": "engine/lifesim-fld.25.15-20261022-230429.jsonl:20",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "{\"type\":\"error\",\"error\":{\"message\":\"Invalid schema for response_format 'codex_output_schema': 'schema.properties.unchecked.items.required' is required to include every key in properties. Missing 'source'.\",\"type\":\"invalid_request_error\",\"param\":\"text.format.schema\",\"code\":\"invalid_json_schema\"},\"sta",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": "bad_request"
+  },
+  {
+   "id": "9e57d79e-0aa0-41b1-a8dc-bd38d08c8786",
+   "history": {
+    "ts": 1792699623.775649,
+    "run_id": "9e57d79e-0aa0-41b1-a8dc-bd38d08c8786",
+    "role": "planner",
+    "lane": "CLAUDE_SUBSCRIPTION",
+    "model": "opus-5.5",
+    "status": "done",
+    "reason": null,
+    "secs": 107.7
+   },
+   "source": "history.jsonl",
+   "evidence": {
+    "rc": 0,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": null
+  },
+  {
+   "id": "a93b75df-b84d-490d-bbd5-2c6d4780af6c",
+   "history": {
+    "ts": 1792699655.547137,
+    "run_id": "a93b75df-b84d-490d-bbd5-2c6d4780af6c",
+    "role": "planner",
+    "lane": "CLAUDE_SUBSCRIPTION",
+    "model": "opus-5.5",
+    "status": "done",
+    "reason": null,
+    "secs": 30.8
+   },
+   "source": "history.jsonl",
+   "evidence": {
+    "rc": 0,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": null
+  },
+  {
+   "id": "77022266-5ef9-40ce-804d-e17594483017",
+   "history": {
+    "ts": 1792699686.475358,
+    "run_id": "77022266-5ef9-40ce-804d-e17594483017",
+    "role": "worker",
+    "lane": "OPENAI_SUBSCRIPTION",
+    "model": "gpt-6.1-sol",
+    "status": "error",
+    "reason": "bad_request",
+    "secs": 19.1
+   },
+   "source": "engine/lifesim-d5f.44-20261022-230457.jsonl:32",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "{\"type\":\"error\",\"error\":{\"message\":\"Invalid schema for response_format 'codex_output_schema': 'schema.properties.unchecked.items.required' is required to include every key in properties. Missing 'source'.\",\"type\":\"invalid_request_error\",\"param\":\"text.format.schema\",\"code\":\"invalid_json_schema\"},\"sta",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": "bad_request"
+  },
+  {
+   "id": "1f175043-1d34-4c72-a521-aec8a5f7592a",
+   "history": {
+    "ts": 1792699719.348497,
+    "run_id": "1f175043-1d34-4c72-a521-aec8a5f7592a",
+    "role": "planner",
+    "lane": "CLAUDE_SUBSCRIPTION",
+    "model": "opus-5.5",
+    "status": "done",
+    "reason": null,
+    "secs": 53.4
+   },
+   "source": "history.jsonl",
+   "evidence": {
+    "rc": 0,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": null
+  },
+  {
+   "id": "0d6f52df-74df-449f-8bb9-662ad7ce3329",
+   "history": {
+    "ts": 1792699741.57097,
+    "run_id": "0d6f52df-74df-449f-8bb9-662ad7ce3329",
+    "role": "planner",
+    "lane": "CLAUDE_SUBSCRIPTION",
+    "model": "opus-5.5",
+    "status": "done",
+    "reason": null,
+    "secs": 71.8
+   },
+   "source": "history.jsonl",
+   "evidence": {
+    "rc": 0,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": null
+  },
+  {
+   "id": "344f6d29-bb31-4e07-a201-7b0e05e68973",
+   "history": {
+    "ts": 1792699750.478026,
+    "run_id": "344f6d29-bb31-4e07-a201-7b0e05e68973",
+    "role": "worker",
+    "lane": "OPENAI_SUBSCRIPTION",
+    "model": "gpt-6.1-sol",
+    "status": "error",
+    "reason": "bad_request",
+    "secs": 13.4
+   },
+   "source": "engine/lifesim-iqad-20261022-230715.jsonl:22",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "{\"type\":\"error\",\"error\":{\"message\":\"Invalid schema for response_format 'codex_output_schema': 'schema.properties.unchecked.items.required' is required to include every key in properties. Missing 'source'.\",\"type\":\"invalid_request_error\",\"param\":\"text.format.schema\",\"code\":\"invalid_json_schema\"},\"sta",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": "bad_request"
+  },
+  {
+   "id": "16bc671f-a710-4144-ae18-3c056030351b",
+   "history": {
+    "ts": 1792699820.016723,
+    "run_id": "16bc671f-a710-4144-ae18-3c056030351b",
+    "role": "planner",
+    "lane": "CLAUDE_SUBSCRIPTION",
+    "model": "opus-5.5",
+    "status": "done",
+    "reason": null,
+    "secs": 71.0
+   },
+   "source": "history.jsonl",
+   "evidence": {
+    "rc": 0,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": null
+  },
+  {
+   "id": "dec70c5b-5bd1-4531-8350-4e61832602e9",
+   "history": {
+    "ts": 1792699837.875852,
+    "run_id": "dec70c5b-5bd1-4531-8350-4e61832602e9",
+    "role": "worker",
+    "lane": "OPENAI_SUBSCRIPTION",
+    "model": "gpt-6.1-sol",
+    "status": "error",
+    "reason": "bad_request",
+    "secs": 12.5
+   },
+   "source": "engine/lifesim-d5f.51-20261022-230859.jsonl:17",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "{\"type\":\"error\",\"error\":{\"message\":\"Invalid schema for response_format 'codex_output_schema': 'schema.properties.unchecked.items.required' is required to include every key in properties. Missing 'source'.\",\"type\":\"invalid_request_error\",\"param\":\"text.format.schema\",\"code\":\"invalid_json_schema\"},\"sta",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": "bad_request"
+  },
+  {
+   "id": "64982b53-57df-4467-9bb6-e521e7d30242",
+   "history": {
+    "ts": 1792699911.8772008,
+    "run_id": "64982b53-57df-4467-9bb6-e521e7d30242",
+    "role": "planner",
+    "lane": "CLAUDE_SUBSCRIPTION",
+    "model": "opus-5.5",
+    "status": "done",
+    "reason": null,
+    "secs": 108.6
+   },
+   "source": "history.jsonl",
+   "evidence": {
+    "rc": 0,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": null
+  },
+  {
+   "id": "3347020a-3862-489f-b144-9cecf46772d3",
+   "history": {
+    "ts": 1792699942.992186,
+    "run_id": "3347020a-3862-489f-b144-9cecf46772d3",
+    "role": "planner",
+    "lane": "CLAUDE_SUBSCRIPTION",
+    "model": "opus-5.5",
+    "status": "done",
+    "reason": null,
+    "secs": 30.2
+   },
+   "source": "history.jsonl",
+   "evidence": {
+    "rc": 0,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": null
+  },
+  {
+   "id": "3c8d0bf4-b6ed-4cd3-87c9-d95ed1419549",
+   "history": {
+    "ts": 1792699965.2935839,
+    "run_id": "3c8d0bf4-b6ed-4cd3-87c9-d95ed1419549",
+    "role": "worker",
+    "lane": "OPENAI_SUBSCRIPTION",
+    "model": "gpt-6.1-sol",
+    "status": "error",
+    "reason": "bad_request",
+    "secs": 9.8
+   },
+   "source": "engine/lifesim-fld.25.19-20261022-230949.jsonl:27",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "{\"type\":\"error\",\"error\":{\"message\":\"Invalid schema for response_format 'codex_output_schema': 'schema.properties.unchecked.items.required' is required to include every key in properties. Missing 'source'.\",\"type\":\"invalid_request_error\",\"param\":\"text.format.schema\",\"code\":\"invalid_json_schema\"},\"sta",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": "bad_request"
+  },
+  {
+   "id": "78ae46d3-58c1-4af0-bc5c-6776966d91c7",
+   "history": {
+    "ts": 1792699996.2722461,
+    "run_id": "78ae46d3-58c1-4af0-bc5c-6776966d91c7",
+    "role": "planner",
+    "lane": "CLAUDE_SUBSCRIPTION",
+    "model": "opus-5.5",
+    "status": "done",
+    "reason": null,
+    "secs": 105.8
+   },
+   "source": "history.jsonl",
+   "evidence": {
+    "rc": 0,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": null
+  },
+  {
+   "id": "0c222ca1-ee44-4e0e-ac99-1bc10a68546b",
+   "history": {
+    "ts": 1792700025.984442,
+    "run_id": "0c222ca1-ee44-4e0e-ac99-1bc10a68546b",
+    "role": "worker",
+    "lane": "OPENAI_SUBSCRIPTION",
+    "model": "gpt-6.1-sol",
+    "status": "error",
+    "reason": "bad_request",
+    "secs": 18.8
+   },
+   "source": "engine/lifesim-d5f.61-20261022-231121.jsonl:20",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "{\"type\":\"error\",\"error\":{\"message\":\"Invalid schema for response_format 'codex_output_schema': 'schema.properties.unchecked.items.required' is required to include every key in properties. Missing 'source'.\",\"type\":\"invalid_request_error\",\"param\":\"text.format.schema\",\"code\":\"invalid_json_schema\"},\"sta",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": "bad_request"
+  },
+  {
+   "id": "fd51a096-0a90-48aa-9c04-11221bc9dee9",
+   "history": {
+    "ts": 1792700074.854391,
+    "run_id": "fd51a096-0a90-48aa-9c04-11221bc9dee9",
+    "role": "planner",
+    "lane": "CLAUDE_SUBSCRIPTION",
+    "model": "opus-5.5",
+    "status": "done",
+    "reason": null,
+    "secs": 48.2
+   },
+   "source": "history.jsonl",
+   "evidence": {
+    "rc": 0,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": null
+  },
+  {
+   "id": "09f3eab2-a1dc-4bfe-8495-9fc721ce23dd",
+   "history": {
+    "ts": 1792700100.5682309,
+    "run_id": "09f3eab2-a1dc-4bfe-8495-9fc721ce23dd",
+    "role": "worker",
+    "lane": "OPENAI_SUBSCRIPTION",
+    "model": "gpt-6.1-sol",
+    "status": "error",
+    "reason": "bad_request",
+    "secs": 17.3
+   },
+   "source": "engine/lifesim-5ban.12-20261022-231332.jsonl:17",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "{\"type\":\"error\",\"error\":{\"message\":\"Invalid schema for response_format 'codex_output_schema': 'schema.properties.unchecked.items.required' is required to include every key in properties. Missing 'source'.\",\"type\":\"invalid_request_error\",\"param\":\"text.format.schema\",\"code\":\"invalid_json_schema\"},\"sta",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": "bad_request"
+  },
+  {
+   "id": "a3bd068c-4a0d-4119-94bb-56f860959f99",
+   "history": {
+    "ts": 1792700231.8929331,
+    "run_id": "a3bd068c-4a0d-4119-94bb-56f860959f99",
+    "role": "planner",
+    "lane": "CLAUDE_SUBSCRIPTION",
+    "model": "opus-5.5",
+    "status": "done",
+    "reason": null,
+    "secs": 137.2
+   },
+   "source": "history.jsonl",
+   "evidence": {
+    "rc": 0,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": null
+  },
+  {
+   "id": "e0eb7790-2a26-4f8e-a629-c2b6712c5f50",
+   "history": {
+    "ts": 1792700252.3989289,
+    "run_id": "e0eb7790-2a26-4f8e-a629-c2b6712c5f50",
+    "role": "worker",
+    "lane": "OPENAI_SUBSCRIPTION",
+    "model": "gpt-6.1-sol",
+    "status": "error",
+    "reason": "bad_request",
+    "secs": 14.5
+   },
+   "source": "engine/lifesim-gfr.39-20261022-231441.jsonl:19",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "{\"type\":\"error\",\"error\":{\"message\":\"Invalid schema for response_format 'codex_output_schema': 'schema.properties.unchecked.items.required' is required to include every key in properties. Missing 'source'.\",\"type\":\"invalid_request_error\",\"param\":\"text.format.schema\",\"code\":\"invalid_json_schema\"},\"sta",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": "bad_request"
+  },
+  {
+   "id": "1918cbd6-7f4e-4066-80ae-8ecc68a0a399",
+   "history": {
+    "ts": 1792700272.266952,
+    "run_id": "1918cbd6-7f4e-4066-80ae-8ecc68a0a399",
+    "role": "planner",
+    "lane": "CLAUDE_SUBSCRIPTION",
+    "model": "opus-5.5",
+    "status": "done",
+    "reason": null,
+    "secs": 113.3
+   },
+   "source": "history.jsonl",
+   "evidence": {
+    "rc": 0,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": null
+  },
+  {
+   "id": "50a006bc-6f0b-429f-a567-70cde4e4cab1",
+   "history": {
+    "ts": 1792700304.543159,
+    "run_id": "50a006bc-6f0b-429f-a567-70cde4e4cab1",
+    "role": "planner",
+    "lane": "CLAUDE_SUBSCRIPTION",
+    "model": "opus-5.5",
+    "status": "done",
+    "reason": null,
+    "secs": 31.3
+   },
+   "source": "history.jsonl",
+   "evidence": {
+    "rc": 0,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": null
+  },
+  {
+   "id": "2fcd99ac-3064-4d0d-b319-71c6e0cd0e82",
+   "history": {
+    "ts": 1792700330.830817,
+    "run_id": "2fcd99ac-3064-4d0d-b319-71c6e0cd0e82",
+    "role": "worker",
+    "lane": "OPENAI_SUBSCRIPTION",
+    "model": "gpt-6.1-sol",
+    "status": "error",
+    "reason": "bad_request",
+    "secs": 18.0
+   },
+   "source": "engine/lifesim-5ban.14-20261022-231548.jsonl:23",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "{\"type\":\"error\",\"error\":{\"message\":\"Invalid schema for response_format 'codex_output_schema': 'schema.properties.unchecked.items.required' is required to include every key in properties. Missing 'source'.\",\"type\":\"invalid_request_error\",\"param\":\"text.format.schema\",\"code\":\"invalid_json_schema\"},\"sta",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": "bad_request"
+  },
+  {
+   "id": "1f5380ca-6d7d-49d0-a471-dbf82027d93d",
+   "history": {
+    "ts": 1792700452.669096,
+    "run_id": "1f5380ca-6d7d-49d0-a471-dbf82027d93d",
+    "role": "planner",
+    "lane": "CLAUDE_SUBSCRIPTION",
+    "model": "opus-5.5",
+    "status": "done",
+    "reason": null,
+    "secs": 139.9
+   },
+   "source": "history.jsonl",
+   "evidence": {
+    "rc": 0,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": null
+  },
+  {
+   "id": "af7d40e8-e826-4169-a5ac-24142190ac1a",
+   "history": {
+    "ts": 1792700458.750877,
+    "run_id": "af7d40e8-e826-4169-a5ac-24142190ac1a",
+    "role": "planner",
+    "lane": "CLAUDE_SUBSCRIPTION",
+    "model": "opus-5.5",
+    "status": "done",
+    "reason": null,
+    "secs": 67.1
+   },
+   "source": "history.jsonl",
+   "evidence": {
+    "rc": 0,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": null
+  },
+  {
+   "id": "58113967-57a1-466e-83fd-6ba1a92d55d6",
+   "history": {
+    "ts": 1792700469.6798332,
+    "run_id": "58113967-57a1-466e-83fd-6ba1a92d55d6",
+    "role": "worker",
+    "lane": "OPENAI_SUBSCRIPTION",
+    "model": "gpt-6.1-sol",
+    "status": "error",
+    "reason": "bad_request",
+    "secs": 11.1
+   },
+   "source": "engine/lifesim-gqzz-20261022-231823.jsonl:17",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "{\"type\":\"error\",\"error\":{\"message\":\"Invalid schema for response_format 'codex_output_schema': 'schema.properties.unchecked.items.required' is required to include every key in properties. Missing 'source'.\",\"type\":\"invalid_request_error\",\"param\":\"text.format.schema\",\"code\":\"invalid_json_schema\"},\"sta",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": "bad_request"
+  },
+  {
+   "id": "a9519e38-ad23-4b02-a348-5b9575fb68f6",
+   "history": {
+    "ts": 1792700479.83986,
+    "run_id": "a9519e38-ad23-4b02-a348-5b9575fb68f6",
+    "role": "worker",
+    "lane": "OPENAI_SUBSCRIPTION",
+    "model": "gpt-6.1-sol",
+    "status": "error",
+    "reason": "bad_request",
+    "secs": 11.4
+   },
+   "source": "engine/lifesim-5ban.16-20261022-231941.jsonl:17",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "{\"type\":\"error\",\"error\":{\"message\":\"Invalid schema for response_format 'codex_output_schema': 'schema.properties.unchecked.items.required' is required to include every key in properties. Missing 'source'.\",\"type\":\"invalid_request_error\",\"param\":\"text.format.schema\",\"code\":\"invalid_json_schema\"},\"sta",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": "bad_request"
+  },
+  {
+   "id": "a47c40fc-d215-4e89-8c2e-0b29fdde8391",
+   "history": {
+    "ts": 1792700639.815385,
+    "run_id": "a47c40fc-d215-4e89-8c2e-0b29fdde8391",
+    "role": "planner",
+    "lane": "CLAUDE_SUBSCRIPTION",
+    "model": "opus-5.5",
+    "status": "done",
+    "reason": null,
+    "secs": 89.0
+   },
+   "source": "history.jsonl",
+   "evidence": {
+    "rc": 0,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": null
+  },
+  {
+   "id": "7a3abff9-a514-4c8b-9a5f-befa32ac4281",
+   "history": {
+    "ts": 1792700658.295742,
+    "run_id": "7a3abff9-a514-4c8b-9a5f-befa32ac4281",
+    "role": "worker",
+    "lane": "OPENAI_SUBSCRIPTION",
+    "model": "gpt-6.1-sol",
+    "status": "error",
+    "reason": "bad_request",
+    "secs": 7.3
+   },
+   "source": "engine/lifesim-5ban.17-20261022-232217.jsonl:17",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "{\"type\":\"error\",\"error\":{\"message\":\"Invalid schema for response_format 'codex_output_schema': 'schema.properties.unchecked.items.required' is required to include every key in properties. Missing 'source'.\",\"type\":\"invalid_request_error\",\"param\":\"text.format.schema\",\"code\":\"invalid_json_schema\"},\"sta",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": "bad_request"
+  },
+  {
+   "id": "6cd7dff6-6921-4704-aadd-b7e97c973a77",
+   "history": {
+    "ts": 1792700694.229135,
+    "run_id": "6cd7dff6-6921-4704-aadd-b7e97c973a77",
+    "role": "planner",
+    "lane": "CLAUDE_SUBSCRIPTION",
+    "model": "opus-5.5",
+    "status": "done",
+    "reason": null,
+    "secs": 94.1
+   },
+   "source": "history.jsonl",
+   "evidence": {
+    "rc": 0,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": null
+  },
+  {
+   "id": "6ad58de4-3d2b-468d-8670-89f19b7b1ca8",
+   "history": {
+    "ts": 1792700735.6577091,
+    "run_id": "6ad58de4-3d2b-468d-8670-89f19b7b1ca8",
+    "role": "worker",
+    "lane": "OPENAI_SUBSCRIPTION",
+    "model": "gpt-6.1-sol",
+    "status": "error",
+    "reason": "bad_request",
+    "secs": 14.3
+   },
+   "source": "engine/lifesim-y7ll-20261022-232259.jsonl:19",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "{\"type\":\"error\",\"error\":{\"message\":\"Invalid schema for response_format 'codex_output_schema': 'schema.properties.unchecked.items.required' is required to include every key in properties. Missing 'source'.\",\"type\":\"invalid_request_error\",\"param\":\"text.format.schema\",\"code\":\"invalid_json_schema\"},\"sta",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": "bad_request"
+  },
+  {
+   "id": "b27de340-bb89-4a4a-af8f-d83954a656e0",
+   "history": {
+    "ts": 1792700797.7427359,
+    "run_id": "b27de340-bb89-4a4a-af8f-d83954a656e0",
+    "role": "planner",
+    "lane": "CLAUDE_SUBSCRIPTION",
+    "model": "opus-5.5",
+    "status": "done",
+    "reason": null,
+    "secs": 82.3
+   },
+   "source": "history.jsonl",
+   "evidence": {
+    "rc": 0,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": null
+  },
+  {
+   "id": "658e2f17-2703-4819-b966-7601e46a7403",
+   "history": {
+    "ts": 1792700816.695683,
+    "run_id": "658e2f17-2703-4819-b966-7601e46a7403",
+    "role": "worker",
+    "lane": "OPENAI_SUBSCRIPTION",
+    "model": "gpt-6.1-sol",
+    "status": "error",
+    "reason": "bad_request",
+    "secs": 13.4
+   },
+   "source": "engine/lifesim-5ban.18-20261022-232505.jsonl:17",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "{\"type\":\"error\",\"error\":{\"message\":\"Invalid schema for response_format 'codex_output_schema': 'schema.properties.unchecked.items.required' is required to include every key in properties. Missing 'source'.\",\"type\":\"invalid_request_error\",\"param\":\"text.format.schema\",\"code\":\"invalid_json_schema\"},\"sta",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": "bad_request"
+  },
+  {
+   "id": "04ea11c3-4623-43b7-a8e2-6f1936537741",
+   "history": {
+    "ts": 1792700937.586346,
+    "run_id": "04ea11c3-4623-43b7-a8e2-6f1936537741",
+    "role": "planner",
+    "lane": "CLAUDE_SUBSCRIPTION",
+    "model": "opus-5.5",
+    "status": "done",
+    "reason": null,
+    "secs": 144.1
+   },
+   "source": "history.jsonl",
+   "evidence": {
+    "rc": 0,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": null
+  },
+  {
+   "id": "4885f59f-a2b6-4951-8b84-3703fee68027",
+   "history": {
+    "ts": 1792700963.100498,
+    "run_id": "4885f59f-a2b6-4951-8b84-3703fee68027",
+    "role": "worker",
+    "lane": "OPENAI_SUBSCRIPTION",
+    "model": "gpt-6.1-sol",
+    "status": "error",
+    "reason": "bad_request",
+    "secs": 16.4
+   },
+   "source": "engine/lifesim-f2by-20261022-232620.jsonl:26",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "{\"type\":\"error\",\"error\":{\"message\":\"Invalid schema for response_format 'codex_output_schema': 'schema.properties.unchecked.items.required' is required to include every key in properties. Missing 'source'.\",\"type\":\"invalid_request_error\",\"param\":\"text.format.schema\",\"code\":\"invalid_json_schema\"},\"sta",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": "bad_request"
+  },
+  {
+   "id": "b9236899-97be-410b-8d1d-e70d6f02119c",
+   "history": {
+    "ts": 1792700972.9251251,
+    "run_id": "b9236899-97be-410b-8d1d-e70d6f02119c",
+    "role": "planner",
+    "lane": "CLAUDE_SUBSCRIPTION",
+    "model": "opus-5.5",
+    "status": "done",
+    "reason": null,
+    "secs": 85.4
+   },
+   "source": "history.jsonl",
+   "evidence": {
+    "rc": 0,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": null
+  },
+  {
+   "id": "06e472a8-0942-49e6-8892-d209d5374f18",
+   "history": {
+    "ts": 1792700993.7219572,
+    "run_id": "06e472a8-0942-49e6-8892-d209d5374f18",
+    "role": "worker",
+    "lane": "OPENAI_SUBSCRIPTION",
+    "model": "gpt-6.1-sol",
+    "status": "error",
+    "reason": "bad_request",
+    "secs": 14.9
+   },
+   "source": "engine/lifesim-5ban.19-20261022-232743.jsonl:17",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "{\"type\":\"error\",\"error\":{\"message\":\"Invalid schema for response_format 'codex_output_schema': 'schema.properties.unchecked.items.required' is required to include every key in properties. Missing 'source'.\",\"type\":\"invalid_request_error\",\"param\":\"text.format.schema\",\"code\":\"invalid_json_schema\"},\"sta",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": "bad_request"
+  },
+  {
+   "id": "114b7625-8a01-4a6a-b526-85a4de36d685",
+   "history": {
+    "ts": 1792701081.670989,
+    "run_id": "114b7625-8a01-4a6a-b526-85a4de36d685",
+    "role": "planner",
+    "lane": "CLAUDE_SUBSCRIPTION",
+    "model": "opus-5.5",
+    "status": "done",
+    "reason": null,
+    "secs": 57.4
+   },
+   "source": "history.jsonl",
+   "evidence": {
+    "rc": 0,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": null
+  },
+  {
+   "id": "92743256-ff9d-47b1-817b-38c16cf56387",
+   "history": {
+    "ts": 1792701115.352692,
+    "run_id": "92743256-ff9d-47b1-817b-38c16cf56387",
+    "role": "worker",
+    "lane": "OPENAI_SUBSCRIPTION",
+    "model": "gpt-6.1-sol",
+    "status": "error",
+    "reason": "bad_request",
+    "secs": 22.5
+   },
+   "source": "engine/lifesim-md1f-20261022-233005.jsonl:19",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "{\"type\":\"error\",\"error\":{\"message\":\"Invalid schema for response_format 'codex_output_schema': 'schema.properties.unchecked.items.required' is required to include every key in properties. Missing 'source'.\",\"type\":\"invalid_request_error\",\"param\":\"text.format.schema\",\"code\":\"invalid_json_schema\"},\"sta",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": "bad_request"
+  },
+  {
+   "id": "196772f1-c452-4333-bddd-8aaa489536bc",
+   "history": {
+    "ts": 1792701127.630676,
+    "run_id": "196772f1-c452-4333-bddd-8aaa489536bc",
+    "role": "planner",
+    "lane": "CLAUDE_SUBSCRIPTION",
+    "model": "opus-5.5",
+    "status": "done",
+    "reason": null,
+    "secs": 75.8
+   },
+   "source": "history.jsonl",
+   "evidence": {
+    "rc": 0,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": null
+  },
+  {
+   "id": "a224c559-ee02-4ff1-8f1d-c7af24284b62",
+   "history": {
+    "ts": 1792701156.798462,
+    "run_id": "a224c559-ee02-4ff1-8f1d-c7af24284b62",
+    "role": "worker",
+    "lane": "OPENAI_SUBSCRIPTION",
+    "model": "gpt-6.1-sol",
+    "status": "error",
+    "reason": "bad_request",
+    "secs": 17.0
+   },
+   "source": "engine/lifesim-5ban.20-20261022-233044.jsonl:17",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "{\"type\":\"error\",\"error\":{\"message\":\"Invalid schema for response_format 'codex_output_schema': 'schema.properties.unchecked.items.required' is required to include every key in properties. Missing 'source'.\",\"type\":\"invalid_request_error\",\"param\":\"text.format.schema\",\"code\":\"invalid_json_schema\"},\"sta",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": "bad_request"
+  },
+  {
+   "id": "f43500b4-28a7-4459-ab7a-732cdf73cfe8",
+   "history": {
+    "ts": 1792701312.004141,
+    "run_id": "f43500b4-28a7-4459-ab7a-732cdf73cfe8",
+    "role": "planner",
+    "lane": "CLAUDE_SUBSCRIPTION",
+    "model": "opus-5.5",
+    "status": "done",
+    "reason": null,
+    "secs": 97.8
+   },
+   "source": "history.jsonl",
+   "evidence": {
+    "rc": 0,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": null
+  },
+  {
+   "id": "307d9b14-1d35-4e4a-905a-945c34b154eb",
+   "history": {
+    "ts": 1792701313.1744058,
+    "run_id": "307d9b14-1d35-4e4a-905a-945c34b154eb",
+    "role": "planner",
+    "lane": "CLAUDE_SUBSCRIPTION",
+    "model": "opus-5.5",
+    "status": "done",
+    "reason": null,
+    "secs": 145.0
+   },
+   "source": "history.jsonl",
+   "evidence": {
+    "rc": 0,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": null
+  },
+  {
+   "id": "33d786b3-75a2-44a7-bb31-bd07e29de89c",
+   "history": {
+    "ts": 1792701329.102751,
+    "run_id": "33d786b3-75a2-44a7-bb31-bd07e29de89c",
+    "role": "worker",
+    "lane": "OPENAI_SUBSCRIPTION",
+    "model": "gpt-6.1-sol",
+    "status": "error",
+    "reason": "bad_request",
+    "secs": 8.6
+   },
+   "source": "engine/lifesim-o45k-20261022-233240.jsonl:18",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "{\"type\":\"error\",\"error\":{\"message\":\"Invalid schema for response_format 'codex_output_schema': 'schema.properties.unchecked.items.required' is required to include every key in properties. Missing 'source'.\",\"type\":\"invalid_request_error\",\"param\":\"text.format.schema\",\"code\":\"invalid_json_schema\"},\"sta",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": "bad_request"
+  },
+  {
+   "id": "5acbf2da-3da7-4c79-82f6-028eafe0e613",
+   "history": {
+    "ts": 1792701337.160392,
+    "run_id": "5acbf2da-3da7-4c79-82f6-028eafe0e613",
+    "role": "worker",
+    "lane": "OPENAI_SUBSCRIPTION",
+    "model": "gpt-6.1-sol",
+    "status": "error",
+    "reason": "bad_request",
+    "secs": 18.1
+   },
+   "source": "engine/lifesim-5ban.22-20261022-233321.jsonl:17",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "{\"type\":\"error\",\"error\":{\"message\":\"Invalid schema for response_format 'codex_output_schema': 'schema.properties.unchecked.items.required' is required to include every key in properties. Missing 'source'.\",\"type\":\"invalid_request_error\",\"param\":\"text.format.schema\",\"code\":\"invalid_json_schema\"},\"sta",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": "bad_request"
+  },
+  {
+   "id": "a03a0ab8-3b2c-4805-ba78-78bf31e59246",
+   "history": {
+    "ts": 1792701531.430491,
+    "run_id": "a03a0ab8-3b2c-4805-ba78-78bf31e59246",
+    "role": "planner",
+    "lane": "CLAUDE_SUBSCRIPTION",
+    "model": "opus-5.5",
+    "status": "done",
+    "reason": null,
+    "secs": 124.6
+   },
+   "source": "history.jsonl",
+   "evidence": {
+    "rc": 0,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": null
+  },
+  {
+   "id": "057c85a1-afc9-4055-b658-553ce9897f8f",
+   "history": {
+    "ts": 1792701546.36144,
+    "run_id": "057c85a1-afc9-4055-b658-553ce9897f8f",
+    "role": "planner",
+    "lane": "CLAUDE_SUBSCRIPTION",
+    "model": "opus-5.5",
+    "status": "done",
+    "reason": null,
+    "secs": 110.3
+   },
+   "source": "history.jsonl",
+   "evidence": {
+    "rc": 0,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": null
+  },
+  {
+   "id": "5c12fd57-c899-4010-b939-5f165da7b949",
+   "history": {
+    "ts": 1792701564.7563121,
+    "run_id": "5c12fd57-c899-4010-b939-5f165da7b949",
+    "role": "worker",
+    "lane": "OPENAI_SUBSCRIPTION",
+    "model": "gpt-6.1-sol",
+    "status": "error",
+    "reason": "bad_request",
+    "secs": 14.8
+   },
+   "source": "engine/lifesim-5ban.26-20261022-233630.jsonl:17",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "{\"type\":\"error\",\"error\":{\"message\":\"Invalid schema for response_format 'codex_output_schema': 'schema.properties.unchecked.items.required' is required to include every key in properties. Missing 'source'.\",\"type\":\"invalid_request_error\",\"param\":\"text.format.schema\",\"code\":\"invalid_json_schema\"},\"sta",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": "bad_request"
+  },
+  {
+   "id": "592a5b40-29cc-4bab-9f86-91122ce7b209",
+   "history": {
+    "ts": 1792701570.606234,
+    "run_id": "592a5b40-29cc-4bab-9f86-91122ce7b209",
+    "role": "worker",
+    "lane": "OPENAI_SUBSCRIPTION",
+    "model": "gpt-6.1-sol",
+    "status": "error",
+    "reason": "bad_request",
+    "secs": 17.4
+   },
+   "source": "engine/lifesim-22b3-20261022-233653.jsonl:19",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "{\"type\":\"error\",\"error\":{\"message\":\"Invalid schema for response_format 'codex_output_schema': 'schema.properties.unchecked.items.required' is required to include every key in properties. Missing 'source'.\",\"type\":\"invalid_request_error\",\"param\":\"text.format.schema\",\"code\":\"invalid_json_schema\"},\"sta",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": "bad_request"
+  },
+  {
+   "id": "4837ccbb-61f6-42d3-be45-d7f24574ce98",
+   "history": {
+    "ts": 1792701714.440491,
+    "run_id": "4837ccbb-61f6-42d3-be45-d7f24574ce98",
+    "role": "planner",
+    "lane": "CLAUDE_SUBSCRIPTION",
+    "model": "opus-5.5",
+    "status": "done",
+    "reason": null,
+    "secs": 75.3
+   },
+   "source": "history.jsonl",
+   "evidence": {
+    "rc": 0,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": null
+  },
+  {
+   "id": "cd5aa56d-dadd-4b15-9e96-ab5410da9f70",
+   "history": {
+    "ts": 1792701729.948509,
+    "run_id": "cd5aa56d-dadd-4b15-9e96-ab5410da9f70",
+    "role": "planner",
+    "lane": "CLAUDE_SUBSCRIPTION",
+    "model": "opus-5.5",
+    "status": "done",
+    "reason": null,
+    "secs": 77.1
+   },
+   "source": "history.jsonl",
+   "evidence": {
+    "rc": 0,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": null
+  },
+  {
+   "id": "459ae0af-0dc5-44d6-a4e9-ccd61fc4d268",
+   "history": {
+    "ts": 1792701751.784585,
+    "run_id": "459ae0af-0dc5-44d6-a4e9-ccd61fc4d268",
+    "role": "planner",
+    "lane": "CLAUDE_SUBSCRIPTION",
+    "model": "opus-5.5",
+    "status": "done",
+    "reason": null,
+    "secs": 33.9
+   },
+   "source": "history.jsonl",
+   "evidence": {
+    "rc": 0,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": null
+  },
+  {
+   "id": "2781df0b-02a6-4f57-8667-1cfa15f5cbe9",
+   "history": {
+    "ts": 1792701753.875673,
+    "run_id": "2781df0b-02a6-4f57-8667-1cfa15f5cbe9",
+    "role": "planner",
+    "lane": "CLAUDE_SUBSCRIPTION",
+    "model": "opus-5.5",
+    "status": "done",
+    "reason": null,
+    "secs": 23.1
+   },
+   "source": "history.jsonl",
+   "evidence": {
+    "rc": 0,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": null
+  },
+  {
+   "id": "f313b42c-98b6-4ccd-863a-bb4baec1c2b6",
+   "history": {
+    "ts": 1792701769.6648908,
+    "run_id": "f313b42c-98b6-4ccd-863a-bb4baec1c2b6",
+    "role": "worker",
+    "lane": "OPENAI_SUBSCRIPTION",
+    "model": "gpt-6.1-sol",
+    "status": "error",
+    "reason": "bad_request",
+    "secs": 10.7
+   },
+   "source": "engine/lifesim-40jy-20261022-234030.jsonl:28",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "{\"type\":\"error\",\"error\":{\"message\":\"Invalid schema for response_format 'codex_output_schema': 'schema.properties.unchecked.items.required' is required to include every key in properties. Missing 'source'.\",\"type\":\"invalid_request_error\",\"param\":\"text.format.schema\",\"code\":\"invalid_json_schema\"},\"sta",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": "bad_request"
+  },
+  {
+   "id": "625dea5c-2ecb-4402-a07d-8c1e337df46c",
+   "history": {
+    "ts": 1792701772.772058,
+    "run_id": "625dea5c-2ecb-4402-a07d-8c1e337df46c",
+    "role": "worker",
+    "lane": "OPENAI_SUBSCRIPTION",
+    "model": "gpt-6.1-sol",
+    "status": "error",
+    "reason": "bad_request",
+    "secs": 12.9
+   },
+   "source": "engine/lifesim-5ban.27-20261022-234037.jsonl:23",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "{\"type\":\"error\",\"error\":{\"message\":\"Invalid schema for response_format 'codex_output_schema': 'schema.properties.unchecked.items.required' is required to include every key in properties. Missing 'source'.\",\"type\":\"invalid_request_error\",\"param\":\"text.format.schema\",\"code\":\"invalid_json_schema\"},\"sta",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": "bad_request"
+  },
+  {
+   "id": "290aae23-34f7-4117-b719-65179e195f8d",
+   "history": {
+    "ts": 1792701939.316493,
+    "run_id": "290aae23-34f7-4117-b719-65179e195f8d",
+    "role": "planner",
+    "lane": "CLAUDE_SUBSCRIPTION",
+    "model": "opus-5.5",
+    "status": "done",
+    "reason": null,
+    "secs": 75.8
+   },
+   "source": "history.jsonl",
+   "evidence": {
+    "rc": 0,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": null
+  },
+  {
+   "id": "87b7698f-ec3f-46df-b9f8-afe2a0c087fc",
+   "history": {
+    "ts": 1792701967.758951,
+    "run_id": "87b7698f-ec3f-46df-b9f8-afe2a0c087fc",
+    "role": "worker",
+    "lane": "OPENAI_SUBSCRIPTION",
+    "model": "gpt-6.1-sol",
+    "status": "error",
+    "reason": "bad_request",
+    "secs": 18.1
+   },
+   "source": "engine/lifesim-5ban.28-20261022-234409.jsonl:17",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "{\"type\":\"error\",\"error\":{\"message\":\"Invalid schema for response_format 'codex_output_schema': 'schema.properties.unchecked.items.required' is required to include every key in properties. Missing 'source'.\",\"type\":\"invalid_request_error\",\"param\":\"text.format.schema\",\"code\":\"invalid_json_schema\"},\"sta",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": "bad_request"
+  },
+  {
+   "id": "1b995121-a6c7-4136-a8df-c7dbcb9f0d21",
+   "history": {
+    "ts": 1792702056.922366,
+    "run_id": "1b995121-a6c7-4136-a8df-c7dbcb9f0d21",
+    "role": "planner",
+    "lane": "CLAUDE_SUBSCRIPTION",
+    "model": "opus-5.5",
+    "status": "done",
+    "reason": null,
+    "secs": 191.9
+   },
+   "source": "history.jsonl",
+   "evidence": {
+    "rc": 0,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": null
+  },
+  {
+   "id": "c9786c06-5fbf-4485-bae6-ace4665577fa",
+   "history": {
+    "ts": 1792702095.838336,
+    "run_id": "c9786c06-5fbf-4485-bae6-ace4665577fa",
+    "role": "planner",
+    "lane": "CLAUDE_SUBSCRIPTION",
+    "model": "opus-5.5",
+    "status": "done",
+    "reason": null,
+    "secs": 38.1
+   },
+   "source": "history.jsonl",
+   "evidence": {
+    "rc": 0,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": null
+  },
+  {
+   "id": "b91c6d67-acb9-4d40-932d-80481f82055e",
+   "history": {
+    "ts": 1792702116.5597131,
+    "run_id": "b91c6d67-acb9-4d40-932d-80481f82055e",
+    "role": "worker",
+    "lane": "OPENAI_SUBSCRIPTION",
+    "model": "gpt-6.1-sol",
+    "status": "error",
+    "reason": "bad_request",
+    "secs": 13.6
+   },
+   "source": "engine/lifesim-fdyo-20261022-234415.jsonl:23",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "{\"type\":\"error\",\"error\":{\"message\":\"Invalid schema for response_format 'codex_output_schema': 'schema.properties.unchecked.items.required' is required to include every key in properties. Missing 'source'.\",\"type\":\"invalid_request_error\",\"param\":\"text.format.schema\",\"code\":\"invalid_json_schema\"},\"sta",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": "bad_request"
+  },
+  {
+   "id": "156ae0ce-0559-4fcb-920b-10bd32e6a6ae",
+   "history": {
+    "ts": 1792702139.065278,
+    "run_id": "156ae0ce-0559-4fcb-920b-10bd32e6a6ae",
+    "role": "planner",
+    "lane": "CLAUDE_SUBSCRIPTION",
+    "model": "opus-5.5",
+    "status": "done",
+    "reason": null,
+    "secs": 103.0
+   },
+   "source": "history.jsonl",
+   "evidence": {
+    "rc": 0,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": null
+  },
+  {
+   "id": "b7e04ab9-047c-405e-9c92-82b5ebe6d052",
+   "history": {
+    "ts": 1792702178.4982789,
+    "run_id": "b7e04ab9-047c-405e-9c92-82b5ebe6d052",
+    "role": "worker",
+    "lane": "OPENAI_SUBSCRIPTION",
+    "model": "gpt-6.1-sol",
+    "status": "error",
+    "reason": "bad_request",
+    "secs": 12.0
+   },
+   "source": "engine/lifesim-5ban.30-20261022-234703.jsonl:17",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "{\"type\":\"error\",\"error\":{\"message\":\"Invalid schema for response_format 'codex_output_schema': 'schema.properties.unchecked.items.required' is required to include every key in properties. Missing 'source'.\",\"type\":\"invalid_request_error\",\"param\":\"text.format.schema\",\"code\":\"invalid_json_schema\"},\"sta",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": "bad_request"
+  },
+  {
+   "id": "dfdd036a-0977-4327-94ce-bd59826cb05d",
+   "history": {
+    "ts": 1792702251.323782,
+    "run_id": "dfdd036a-0977-4327-94ce-bd59826cb05d",
+    "role": "planner",
+    "lane": "CLAUDE_SUBSCRIPTION",
+    "model": "opus-5.5",
+    "status": "done",
+    "reason": null,
+    "secs": 76.9
+   },
+   "source": "history.jsonl",
+   "evidence": {
+    "rc": 0,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": null
+  },
+  {
+   "id": "643eb153-ef92-4ec7-8b85-62c129afb4ae",
+   "history": {
+    "ts": 1792702270.428482,
+    "run_id": "643eb153-ef92-4ec7-8b85-62c129afb4ae",
+    "role": "worker",
+    "lane": "OPENAI_SUBSCRIPTION",
+    "model": "gpt-6.1-sol",
+    "status": "error",
+    "reason": "bad_request",
+    "secs": 13.3
+   },
+   "source": "engine/lifesim-l4ow-20261022-234925.jsonl:17",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "{\"type\":\"error\",\"error\":{\"message\":\"Invalid schema for response_format 'codex_output_schema': 'schema.properties.unchecked.items.required' is required to include every key in properties. Missing 'source'.\",\"type\":\"invalid_request_error\",\"param\":\"text.format.schema\",\"code\":\"invalid_json_schema\"},\"sta",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": "bad_request"
+  },
+  {
+   "id": "879c416c-c5e4-439f-8d72-462a07306666",
+   "history": {
+    "ts": 1792702359.115514,
+    "run_id": "879c416c-c5e4-439f-8d72-462a07306666",
+    "role": "planner",
+    "lane": "CLAUDE_SUBSCRIPTION",
+    "model": "opus-5.5",
+    "status": "done",
+    "reason": null,
+    "secs": 127.2
+   },
+   "source": "history.jsonl",
+   "evidence": {
+    "rc": 0,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": null
+  },
+  {
+   "id": "4f558bcb-0654-4fbb-8e13-6f3f650dcf78",
+   "history": {
+    "ts": 1792702405.460392,
+    "run_id": "4f558bcb-0654-4fbb-8e13-6f3f650dcf78",
+    "role": "worker",
+    "lane": "OPENAI_SUBSCRIPTION",
+    "model": "gpt-6.1-sol",
+    "status": "error",
+    "reason": "bad_request",
+    "secs": 20.9
+   },
+   "source": "engine/lifesim-5ban.31-20261022-235022.jsonl:17",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "{\"type\":\"error\",\"error\":{\"message\":\"Invalid schema for response_format 'codex_output_schema': 'schema.properties.unchecked.items.required' is required to include every key in properties. Missing 'source'.\",\"type\":\"invalid_request_error\",\"param\":\"text.format.schema\",\"code\":\"invalid_json_schema\"},\"sta",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": "bad_request"
+  },
+  {
+   "id": "09913a6d-bb8c-4f58-a5c7-d7e5c67c2ca0",
+   "history": {
+    "ts": 1792702414.1072042,
+    "run_id": "09913a6d-bb8c-4f58-a5c7-d7e5c67c2ca0",
+    "role": "planner",
+    "lane": "CLAUDE_SUBSCRIPTION",
+    "model": "opus-5.5",
+    "status": "done",
+    "reason": null,
+    "secs": 91.8
+   },
+   "source": "history.jsonl",
+   "evidence": {
+    "rc": 0,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": null
+  },
+  {
+   "id": "4af21751-fef2-413d-8e5d-a41e40b52993",
+   "history": {
+    "ts": 1792702449.779565,
+    "run_id": "4af21751-fef2-413d-8e5d-a41e40b52993",
+    "role": "planner",
+    "lane": "CLAUDE_SUBSCRIPTION",
+    "model": "opus-5.5",
+    "status": "done",
+    "reason": null,
+    "secs": 32.1
+   },
+   "source": "history.jsonl",
+   "evidence": {
+    "rc": 0,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": null
+  },
+  {
+   "id": "f76fc987-5d94-40d5-ad25-c3edb4442f5f",
+   "history": {
+    "ts": 1792702467.075381,
+    "run_id": "f76fc987-5d94-40d5-ad25-c3edb4442f5f",
+    "role": "worker",
+    "lane": "OPENAI_SUBSCRIPTION",
+    "model": "gpt-6.1-sol",
+    "status": "error",
+    "reason": "bad_request",
+    "secs": 9.8
+   },
+   "source": "engine/lifesim-o67g-20261022-235154.jsonl:23",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "{\"type\":\"error\",\"error\":{\"message\":\"Invalid schema for response_format 'codex_output_schema': 'schema.properties.unchecked.items.required' is required to include every key in properties. Missing 'source'.\",\"type\":\"invalid_request_error\",\"param\":\"text.format.schema\",\"code\":\"invalid_json_schema\"},\"sta",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": "bad_request"
+  },
+  {
+   "id": "116f7dd5-8d2c-4fc6-ac18-01bf62700d63",
+   "history": {
+    "ts": 1792702561.9335349,
+    "run_id": "116f7dd5-8d2c-4fc6-ac18-01bf62700d63",
+    "role": "planner",
+    "lane": "CLAUDE_SUBSCRIPTION",
+    "model": "opus-5.5",
+    "status": "done",
+    "reason": null,
+    "secs": 105.8
+   },
+   "source": "history.jsonl",
+   "evidence": {
+    "rc": 0,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": null
+  },
+  {
+   "id": "82b2fae6-c6bf-48e6-a93e-da51bff46301",
+   "history": {
+    "ts": 1792702580.528169,
+    "run_id": "82b2fae6-c6bf-48e6-a93e-da51bff46301",
+    "role": "worker",
+    "lane": "OPENAI_SUBSCRIPTION",
+    "model": "gpt-6.1-sol",
+    "status": "error",
+    "reason": "bad_request",
+    "secs": 10.2
+   },
+   "source": "engine/lifesim-6pld-20261022-235405.jsonl:17",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "{\"type\":\"error\",\"error\":{\"message\":\"Invalid schema for response_format 'codex_output_schema': 'schema.properties.unchecked.items.required' is required to include every key in properties. Missing 'source'.\",\"type\":\"invalid_request_error\",\"param\":\"text.format.schema\",\"code\":\"invalid_json_schema\"},\"sta",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": "bad_request"
+  },
+  {
+   "id": "8cc633cf-c80f-47fa-bddc-8c81634fd075",
+   "history": {
+    "ts": 1792702590.325602,
+    "run_id": "8cc633cf-c80f-47fa-bddc-8c81634fd075",
+    "role": "planner",
+    "lane": "CLAUDE_SUBSCRIPTION",
+    "model": "opus-5.5",
+    "status": "done",
+    "reason": null,
+    "secs": 69.7
+   },
+   "source": "history.jsonl",
+   "evidence": {
+    "rc": 0,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": null
+  },
+  {
+   "id": "09a414f4-6609-4161-9137-3f36c26b79b1",
+   "history": {
+    "ts": 1792702605.269679,
+    "run_id": "09a414f4-6609-4161-9137-3f36c26b79b1",
+    "role": "worker",
+    "lane": "OPENAI_SUBSCRIPTION",
+    "model": "gpt-6.1-sol",
+    "status": "error",
+    "reason": "bad_request",
+    "secs": 9.2
+   },
+   "source": "engine/lifesim-se15-20261022-235512.jsonl:17",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "{\"type\":\"error\",\"error\":{\"message\":\"Invalid schema for response_format 'codex_output_schema': 'schema.properties.unchecked.items.required' is required to include every key in properties. Missing 'source'.\",\"type\":\"invalid_request_error\",\"param\":\"text.format.schema\",\"code\":\"invalid_json_schema\"},\"sta",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": "bad_request"
+  },
+  {
+   "id": "2c4fc724-6594-45c2-a869-2b8597fb531b",
+   "history": {
+    "ts": 1792702739.7960289,
+    "run_id": "2c4fc724-6594-45c2-a869-2b8597fb531b",
+    "role": "planner",
+    "lane": "CLAUDE_SUBSCRIPTION",
+    "model": "opus-5.5",
+    "status": "done",
+    "reason": null,
+    "secs": 92.6
+   },
+   "source": "history.jsonl",
+   "evidence": {
+    "rc": 0,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": null
+  },
+  {
+   "id": "fb998e09-2cc3-4ae1-b56e-57933acb9512",
+   "history": {
+    "ts": 1792702757.387391,
+    "run_id": "fb998e09-2cc3-4ae1-b56e-57933acb9512",
+    "role": "worker",
+    "lane": "OPENAI_SUBSCRIPTION",
+    "model": "gpt-6.1-sol",
+    "status": "error",
+    "reason": "bad_request",
+    "secs": 8.4
+   },
+   "source": "engine/lifesim-9akx-20261022-235708.jsonl:17",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "{\"type\":\"error\",\"error\":{\"message\":\"Invalid schema for response_format 'codex_output_schema': 'schema.properties.unchecked.items.required' is required to include every key in properties. Missing 'source'.\",\"type\":\"invalid_request_error\",\"param\":\"text.format.schema\",\"code\":\"invalid_json_schema\"},\"sta",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": "bad_request"
+  },
+  {
+   "id": "ed651196-60c8-4993-8b52-a511529dc911",
+   "history": {
+    "ts": 1792702838.102495,
+    "run_id": "ed651196-60c8-4993-8b52-a511529dc911",
+    "role": "planner",
+    "lane": "CLAUDE_SUBSCRIPTION",
+    "model": "opus-5.5",
+    "status": "done",
+    "reason": null,
+    "secs": 166.1
+   },
+   "source": "history.jsonl",
+   "evidence": {
+    "rc": 0,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": null
+  },
+  {
+   "id": "74af8da7-a352-49aa-bafd-a23299b221f1",
+   "history": {
+    "ts": 1792702871.053406,
+    "run_id": "74af8da7-a352-49aa-bafd-a23299b221f1",
+    "role": "planner",
+    "lane": "CLAUDE_SUBSCRIPTION",
+    "model": "opus-5.5",
+    "status": "done",
+    "reason": null,
+    "secs": 32.0
+   },
+   "source": "history.jsonl",
+   "evidence": {
+    "rc": 0,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": null
+  },
+  {
+   "id": "f78ecb84-986d-4511-84a6-fc3eb75f067d",
+   "history": {
+    "ts": 1792702924.0329049,
+    "run_id": "f78ecb84-986d-4511-84a6-fc3eb75f067d",
+    "role": "planner",
+    "lane": "CLAUDE_SUBSCRIPTION",
+    "model": "opus-5.5",
+    "status": "done",
+    "reason": null,
+    "secs": 93.6
+   },
+   "source": "history.jsonl",
+   "evidence": {
+    "rc": 0,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": null
+  },
+  {
+   "id": "324fb8b0-5254-4ce8-952a-5ca5f9124ecf",
+   "history": {
+    "ts": 1792702941.557303,
+    "run_id": "324fb8b0-5254-4ce8-952a-5ca5f9124ecf",
+    "role": "worker",
+    "lane": "OPENAI_SUBSCRIPTION",
+    "model": "gpt-6.1-sol",
+    "status": "error",
+    "reason": "bad_request",
+    "secs": 9.0
+   },
+   "source": "engine/lifesim-22v.38-20261023-000019.jsonl:17",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "{\"type\":\"error\",\"error\":{\"message\":\"Invalid schema for response_format 'codex_output_schema': 'schema.properties.unchecked.items.required' is required to include every key in properties. Missing 'source'.\",\"type\":\"invalid_request_error\",\"param\":\"text.format.schema\",\"code\":\"invalid_json_schema\"},\"sta",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": "bad_request"
+  },
+  {
+   "id": "ae540a1b-f5a1-4d12-ab4f-05968b0ea292",
+   "history": {
+    "ts": 1792703011.817368,
+    "run_id": "ae540a1b-f5a1-4d12-ab4f-05968b0ea292",
+    "role": "planner",
+    "lane": "CLAUDE_SUBSCRIPTION",
+    "model": "opus-5.5",
+    "status": "done",
+    "reason": null,
+    "secs": 79.4
+   },
+   "source": "history.jsonl",
+   "evidence": {
+    "rc": 0,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": null
+  },
+  {
+   "id": "e762f599-682d-4e57-9b47-f58ab00d3a41",
+   "history": {
+    "ts": 1792703029.770706,
+    "run_id": "e762f599-682d-4e57-9b47-f58ab00d3a41",
+    "role": "worker",
+    "lane": "OPENAI_SUBSCRIPTION",
+    "model": "gpt-6.1-sol",
+    "status": "error",
+    "reason": "bad_request",
+    "secs": 12.2
+   },
+   "source": "engine/lifesim-6au9-20261023-000200.jsonl:17",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "{\"type\":\"error\",\"error\":{\"message\":\"Invalid schema for response_format 'codex_output_schema': 'schema.properties.unchecked.items.required' is required to include every key in properties. Missing 'source'.\",\"type\":\"invalid_request_error\",\"param\":\"text.format.schema\",\"code\":\"invalid_json_schema\"},\"sta",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": "bad_request"
+  },
+  {
+   "id": "c3722d72-4b40-4070-a7ea-3c83dc560e1b",
+   "history": {
+    "ts": 1792703076.2462862,
+    "run_id": "c3722d72-4b40-4070-a7ea-3c83dc560e1b",
+    "role": "planner",
+    "lane": "CLAUDE_SUBSCRIPTION",
+    "model": "opus-5.5",
+    "status": "done",
+    "reason": null,
+    "secs": 81.9
+   },
+   "source": "history.jsonl",
+   "evidence": {
+    "rc": 0,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": null
+  },
+  {
+   "id": "2e6d43d5-d570-40bd-b175-ef9004129b27",
+   "history": {
+    "ts": 1792703101.3454762,
+    "run_id": "2e6d43d5-d570-40bd-b175-ef9004129b27",
+    "role": "worker",
+    "lane": "OPENAI_SUBSCRIPTION",
+    "model": "gpt-6.1-sol",
+    "status": "error",
+    "reason": "bad_request",
+    "secs": 11.7
+   },
+   "source": "engine/lifesim-jva-20261023-000303.jsonl:17",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "{\"type\":\"error\",\"error\":{\"message\":\"Invalid schema for response_format 'codex_output_schema': 'schema.properties.unchecked.items.required' is required to include every key in properties. Missing 'source'.\",\"type\":\"invalid_request_error\",\"param\":\"text.format.schema\",\"code\":\"invalid_json_schema\"},\"sta",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": "bad_request"
+  },
+  {
+   "id": "e38ab7e1-3ee1-47ab-99a4-b8c02bbdc7c3",
+   "history": {
+    "ts": 1792703162.6578271,
+    "run_id": "e38ab7e1-3ee1-47ab-99a4-b8c02bbdc7c3",
+    "role": "planner",
+    "lane": "CLAUDE_SUBSCRIPTION",
+    "model": "opus-5.5",
+    "status": "done",
+    "reason": null,
+    "secs": 69.1
+   },
+   "source": "history.jsonl",
+   "evidence": {
+    "rc": 0,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": null
+  },
+  {
+   "id": "3025cef2-dc7e-4956-a2be-6560cd132802",
+   "history": {
+    "ts": 1792703188.305087,
+    "run_id": "3025cef2-dc7e-4956-a2be-6560cd132802",
+    "role": "worker",
+    "lane": "OPENAI_SUBSCRIPTION",
+    "model": "gpt-6.1-sol",
+    "status": "error",
+    "reason": "bad_request",
+    "secs": 19.9
+   },
+   "source": "engine/lifesim-cd4n-20261023-000440.jsonl:17",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "{\"type\":\"error\",\"error\":{\"message\":\"Invalid schema for response_format 'codex_output_schema': 'schema.properties.unchecked.items.required' is required to include every key in properties. Missing 'source'.\",\"type\":\"invalid_request_error\",\"param\":\"text.format.schema\",\"code\":\"invalid_json_schema\"},\"sta",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": "bad_request"
+  },
+  {
+   "id": "bd79ff7a-4ef3-4835-8b8e-85e6623e84ea",
+   "history": {
+    "ts": 1792703271.892579,
+    "run_id": "bd79ff7a-4ef3-4835-8b8e-85e6623e84ea",
+    "role": "planner",
+    "lane": "CLAUDE_SUBSCRIPTION",
+    "model": "opus-5.5",
+    "status": "done",
+    "reason": null,
+    "secs": 113.5
+   },
+   "source": "history.jsonl",
+   "evidence": {
+    "rc": 0,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": null
+  },
+  {
+   "id": "85177336-b49e-4323-8a57-d9da9f0bdd46",
+   "history": {
+    "ts": 1792703290.012383,
+    "run_id": "85177336-b49e-4323-8a57-d9da9f0bdd46",
+    "role": "worker",
+    "lane": "OPENAI_SUBSCRIPTION",
+    "model": "gpt-6.1-sol",
+    "status": "error",
+    "reason": "bad_request",
+    "secs": 9.2
+   },
+   "source": "engine/lifesim-r0yc-20261023-000547.jsonl:17",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "{\"type\":\"error\",\"error\":{\"message\":\"Invalid schema for response_format 'codex_output_schema': 'schema.properties.unchecked.items.required' is required to include every key in properties. Missing 'source'.\",\"type\":\"invalid_request_error\",\"param\":\"text.format.schema\",\"code\":\"invalid_json_schema\"},\"sta",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": "bad_request"
+  },
+  {
+   "id": "c64b6018-a4f9-435d-aa72-ffc3b701fb36",
+   "history": {
+    "ts": 1792703291.028146,
+    "run_id": "c64b6018-a4f9-435d-aa72-ffc3b701fb36",
+    "role": "planner",
+    "lane": "CLAUDE_SUBSCRIPTION",
+    "model": "opus-5.5",
+    "status": "done",
+    "reason": null,
+    "secs": 50.3
+   },
+   "source": "history.jsonl",
+   "evidence": {
+    "rc": 0,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": null
+  },
+  {
+   "id": "701bc801-cada-40bb-8674-b0c8697d7aa0",
+   "history": {
+    "ts": 1792703321.535305,
+    "run_id": "701bc801-cada-40bb-8674-b0c8697d7aa0",
+    "role": "worker",
+    "lane": "OPENAI_SUBSCRIPTION",
+    "model": "gpt-6.1-sol",
+    "status": "error",
+    "reason": "bad_request",
+    "secs": 15.3
+   },
+   "source": "engine/lifesim-gfr.22-20261023-000712.jsonl:17",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "{\"type\":\"error\",\"error\":{\"message\":\"Invalid schema for response_format 'codex_output_schema': 'schema.properties.unchecked.items.required' is required to include every key in properties. Missing 'source'.\",\"type\":\"invalid_request_error\",\"param\":\"text.format.schema\",\"code\":\"invalid_json_schema\"},\"sta",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": "bad_request"
+  },
+  {
+   "id": "c8f8ad6e-4d6a-4586-b091-58fcc0dccff2",
+   "history": {
+    "ts": 1792703426.242244,
+    "run_id": "c8f8ad6e-4d6a-4586-b091-58fcc0dccff2",
+    "role": "planner",
+    "lane": "CLAUDE_SUBSCRIPTION",
+    "model": "opus-5.5",
+    "status": "done",
+    "reason": null,
+    "secs": 82.1
+   },
+   "source": "history.jsonl",
+   "evidence": {
+    "rc": 0,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": null
+  },
+  {
+   "id": "9211b721-2b27-45ae-aa1e-27b97f296b0b",
+   "history": {
+    "ts": 1792703443.914007,
+    "run_id": "9211b721-2b27-45ae-aa1e-27b97f296b0b",
+    "role": "worker",
+    "lane": "OPENAI_SUBSCRIPTION",
+    "model": "gpt-6.1-sol",
+    "status": "error",
+    "reason": "bad_request",
+    "secs": 9.1
+   },
+   "source": "engine/lifesim-3i2-20261023-000857.jsonl:17",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "{\"type\":\"error\",\"error\":{\"message\":\"Invalid schema for response_format 'codex_output_schema': 'schema.properties.unchecked.items.required' is required to include every key in properties. Missing 'source'.\",\"type\":\"invalid_request_error\",\"param\":\"text.format.schema\",\"code\":\"invalid_json_schema\"},\"sta",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": "bad_request"
+  },
+  {
+   "id": "580e4616-61b2-4cde-b9d0-558ae2ae7e41",
+   "history": {
+    "ts": 1792703465.6524942,
+    "run_id": "580e4616-61b2-4cde-b9d0-558ae2ae7e41",
+    "role": "planner",
+    "lane": "CLAUDE_SUBSCRIPTION",
+    "model": "opus-5.5",
+    "status": "done",
+    "reason": null,
+    "secs": 83.1
+   },
+   "source": "history.jsonl",
+   "evidence": {
+    "rc": 0,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": null
+  },
+  {
+   "id": "472e780f-f958-4606-812c-e4674c2f5148",
+   "history": {
+    "ts": 1792703483.812611,
+    "run_id": "472e780f-f958-4606-812c-e4674c2f5148",
+    "role": "worker",
+    "lane": "OPENAI_SUBSCRIPTION",
+    "model": "gpt-6.1-sol",
+    "status": "error",
+    "reason": "bad_request",
+    "secs": 8.9
+   },
+   "source": "engine/lifesim-i52t-20261023-000932.jsonl:18",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "{\"type\":\"error\",\"error\":{\"message\":\"Invalid schema for response_format 'codex_output_schema': 'schema.properties.unchecked.items.required' is required to include every key in properties. Missing 'source'.\",\"type\":\"invalid_request_error\",\"param\":\"text.format.schema\",\"code\":\"invalid_json_schema\"},\"sta",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": "bad_request"
+  },
+  {
+   "id": "4d4716ed-ddbb-49b6-b9b4-37d97f033e20",
+   "history": {
+    "ts": 1792703592.746591,
+    "run_id": "4d4716ed-ddbb-49b6-b9b4-37d97f033e20",
+    "role": "planner",
+    "lane": "CLAUDE_SUBSCRIPTION",
+    "model": "opus-5.5",
+    "status": "done",
+    "reason": null,
+    "secs": 52.6
+   },
+   "source": "history.jsonl",
+   "evidence": {
+    "rc": 0,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": null
+  },
+  {
+   "id": "3ba06474-6cef-4fba-b4b8-8bba8acba490",
+   "history": {
+    "ts": 1792703602.249687,
+    "run_id": "3ba06474-6cef-4fba-b4b8-8bba8acba490",
+    "role": "planner",
+    "lane": "CLAUDE_SUBSCRIPTION",
+    "model": "opus-5.5",
+    "status": "done",
+    "reason": null,
+    "secs": 82.3
+   },
+   "source": "history.jsonl",
+   "evidence": {
+    "rc": 0,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": null
+  },
+  {
+   "id": "b16e3c05-11d4-4f48-a21f-c72cda539caf",
+   "history": {
+    "ts": 1792703619.545163,
+    "run_id": "b16e3c05-11d4-4f48-a21f-c72cda539caf",
+    "role": "worker",
+    "lane": "OPENAI_SUBSCRIPTION",
+    "model": "gpt-6.1-sol",
+    "status": "error",
+    "reason": "bad_request",
+    "secs": 11.7
+   },
+   "source": "engine/lifesim-21l-20261023-001137.jsonl:17",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "{\"type\":\"error\",\"error\":{\"message\":\"Invalid schema for response_format 'codex_output_schema': 'schema.properties.unchecked.items.required' is required to include every key in properties. Missing 'source'.\",\"type\":\"invalid_request_error\",\"param\":\"text.format.schema\",\"code\":\"invalid_json_schema\"},\"sta",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": "bad_request"
+  },
+  {
+   "id": "7b517bd4-df2a-4ebd-9ba0-f28bacd6233c",
+   "history": {
+    "ts": 1792703620.884819,
+    "run_id": "7b517bd4-df2a-4ebd-9ba0-f28bacd6233c",
+    "role": "planner",
+    "lane": "CLAUDE_SUBSCRIPTION",
+    "model": "opus-5.5",
+    "status": "done",
+    "reason": null,
+    "secs": 22.8
+   },
+   "source": "history.jsonl",
+   "evidence": {
+    "rc": 0,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": null
+  },
+  {
+   "id": "70358be5-f541-445b-9e39-adcc63ae5091",
+   "history": {
+    "ts": 1792703646.14298,
+    "run_id": "70358be5-f541-445b-9e39-adcc63ae5091",
+    "role": "worker",
+    "lane": "OPENAI_SUBSCRIPTION",
+    "model": "gpt-6.1-sol",
+    "status": "error",
+    "reason": "bad_request",
+    "secs": 12.7
+   },
+   "source": "engine/lifesim-qu7h-20261023-001208.jsonl:24",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "{\"type\":\"error\",\"error\":{\"message\":\"Invalid schema for response_format 'codex_output_schema': 'schema.properties.unchecked.items.required' is required to include every key in properties. Missing 'source'.\",\"type\":\"invalid_request_error\",\"param\":\"text.format.schema\",\"code\":\"invalid_json_schema\"},\"sta",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": "bad_request"
+  },
+  {
+   "id": "1e0f8e33-84e7-4ad5-9284-2b734d05600d",
+   "history": {
+    "ts": 1792703753.593169,
+    "run_id": "1e0f8e33-84e7-4ad5-9284-2b734d05600d",
+    "role": "planner",
+    "lane": "CLAUDE_SUBSCRIPTION",
+    "model": "opus-5.5",
+    "status": "done",
+    "reason": null,
+    "secs": 48.0
+   },
+   "source": "history.jsonl",
+   "evidence": {
+    "rc": 0,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": null
+  },
+  {
+   "id": "a8cd9bbb-80af-4846-8918-010f6d23b74d",
+   "history": {
+    "ts": 1792703779.484577,
+    "run_id": "a8cd9bbb-80af-4846-8918-010f6d23b74d",
+    "role": "worker",
+    "lane": "OPENAI_SUBSCRIPTION",
+    "model": "gpt-6.1-sol",
+    "status": "error",
+    "reason": "bad_request",
+    "secs": 10.1
+   },
+   "source": "engine/lifesim-rl4s-20261023-001454.jsonl:17",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "{\"type\":\"error\",\"error\":{\"message\":\"Invalid schema for response_format 'codex_output_schema': 'schema.properties.unchecked.items.required' is required to include every key in properties. Missing 'source'.\",\"type\":\"invalid_request_error\",\"param\":\"text.format.schema\",\"code\":\"invalid_json_schema\"},\"sta",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": "bad_request"
+  },
+  {
+   "id": "bd2e2e98-f55d-4c2e-82f8-a93ec1e93193",
+   "history": {
+    "ts": 1792703831.6281211,
+    "run_id": "bd2e2e98-f55d-4c2e-82f8-a93ec1e93193",
+    "role": "planner",
+    "lane": "CLAUDE_SUBSCRIPTION",
+    "model": "opus-5.5",
+    "status": "done",
+    "reason": null,
+    "secs": 87.9
+   },
+   "source": "history.jsonl",
+   "evidence": {
+    "rc": 0,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": null
+  },
+  {
+   "id": "c7bef8dd-ef4a-4f8a-9f73-58923fea28f5",
+   "history": {
+    "ts": 1792703863.383729,
+    "run_id": "c7bef8dd-ef4a-4f8a-9f73-58923fea28f5",
+    "role": "planner",
+    "lane": "CLAUDE_SUBSCRIPTION",
+    "model": "opus-5.5",
+    "status": "done",
+    "reason": null,
+    "secs": 28.6
+   },
+   "source": "history.jsonl",
+   "evidence": {
+    "rc": 0,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": null
+  },
+  {
+   "id": "589798ce-8b9d-435a-88bf-dc80ef06331e",
+   "history": {
+    "ts": 1792703881.8958569,
+    "run_id": "589798ce-8b9d-435a-88bf-dc80ef06331e",
+    "role": "worker",
+    "lane": "OPENAI_SUBSCRIPTION",
+    "model": "gpt-6.1-sol",
+    "status": "error",
+    "reason": "bad_request",
+    "secs": 13.1
+   },
+   "source": "engine/lifesim-d5f.32-20261023-001538.jsonl:24",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "{\"type\":\"error\",\"error\":{\"message\":\"Invalid schema for response_format 'codex_output_schema': 'schema.properties.unchecked.items.required' is required to include every key in properties. Missing 'source'.\",\"type\":\"invalid_request_error\",\"param\":\"text.format.schema\",\"code\":\"invalid_json_schema\"},\"sta",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": "bad_request"
+  },
+  {
+   "id": "a79881d9-6b52-42e5-a5ea-865e5462f502",
+   "history": {
+    "ts": 1792703909.777285,
+    "run_id": "a79881d9-6b52-42e5-a5ea-865e5462f502",
+    "role": "planner",
+    "lane": "CLAUDE_SUBSCRIPTION",
+    "model": "opus-5.5",
+    "status": "done",
+    "reason": null,
+    "secs": 79.1
+   },
+   "source": "history.jsonl",
+   "evidence": {
+    "rc": 0,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": null
+  },
+  {
+   "id": "59e56078-8460-400c-b774-ef873b130631",
+   "history": {
+    "ts": 1792703934.9611452,
+    "run_id": "59e56078-8460-400c-b774-ef873b130631",
+    "role": "planner",
+    "lane": "CLAUDE_SUBSCRIPTION",
+    "model": "opus-5.5",
+    "status": "done",
+    "reason": null,
+    "secs": 22.9
+   },
+   "source": "history.jsonl",
+   "evidence": {
+    "rc": 0,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": null
+  },
+  {
+   "id": "b601d644-898b-4ba4-bd85-1cd37522e6bd",
+   "history": {
+    "ts": 1792703973.174602,
+    "run_id": "b601d644-898b-4ba4-bd85-1cd37522e6bd",
+    "role": "worker",
+    "lane": "OPENAI_SUBSCRIPTION",
+    "model": "gpt-6.1-sol",
+    "status": "error",
+    "reason": "bad_request",
+    "secs": 30.2
+   },
+   "source": "engine/lifesim-w5ni-20261023-001701.jsonl:25",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "{\"type\":\"error\",\"error\":{\"message\":\"Invalid schema for response_format 'codex_output_schema': 'schema.properties.unchecked.items.required' is required to include every key in properties. Missing 'source'.\",\"type\":\"invalid_request_error\",\"param\":\"text.format.schema\",\"code\":\"invalid_json_schema\"},\"sta",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": "bad_request"
+  },
+  {
+   "id": "6a783319-b7a7-4eef-bae8-bf640cc760ba",
+   "history": {
+    "ts": 1792703995.8671029,
+    "run_id": "6a783319-b7a7-4eef-bae8-bf640cc760ba",
+    "role": "planner",
+    "lane": "CLAUDE_SUBSCRIPTION",
+    "model": "opus-5.5",
+    "status": "done",
+    "reason": null,
+    "secs": 72.8
+   },
+   "source": "history.jsonl",
+   "evidence": {
+    "rc": 0,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": null
+  },
+  {
+   "id": "c67a2a19-076e-441f-8bca-7df94c5c8445",
+   "history": {
+    "ts": 1792704010.787752,
+    "run_id": "c67a2a19-076e-441f-8bca-7df94c5c8445",
+    "role": "worker",
+    "lane": "OPENAI_SUBSCRIPTION",
+    "model": "gpt-6.1-sol",
+    "status": "error",
+    "reason": "bad_request",
+    "secs": 9.1
+   },
+   "source": "engine/lifesim-h1fw-20261023-001837.jsonl:17",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "{\"type\":\"error\",\"error\":{\"message\":\"Invalid schema for response_format 'codex_output_schema': 'schema.properties.unchecked.items.required' is required to include every key in properties. Missing 'source'.\",\"type\":\"invalid_request_error\",\"param\":\"text.format.schema\",\"code\":\"invalid_json_schema\"},\"sta",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": "bad_request"
+  },
+  {
+   "id": "5214e1f1-3528-45ff-9365-2f0c2be300b7",
+   "history": {
+    "ts": 1792704058.69934,
+    "run_id": "5214e1f1-3528-45ff-9365-2f0c2be300b7",
+    "role": "planner",
+    "lane": "CLAUDE_SUBSCRIPTION",
+    "model": "opus-5.5",
+    "status": "done",
+    "reason": null,
+    "secs": 36.6
+   },
+   "source": "history.jsonl",
+   "evidence": {
+    "rc": 0,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": null
+  },
+  {
+   "id": "506d0971-cde6-43fb-b5df-99dead033676",
+   "history": {
+    "ts": 1792704074.6700318,
+    "run_id": "506d0971-cde6-43fb-b5df-99dead033676",
+    "role": "worker",
+    "lane": "OPENAI_SUBSCRIPTION",
+    "model": "gpt-6.1-sol",
+    "status": "error",
+    "reason": "bad_request",
+    "secs": 10.7
+   },
+   "source": "engine/lifesim-kh1s-20261023-002013.jsonl:17",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "{\"type\":\"error\",\"error\":{\"message\":\"Invalid schema for response_format 'codex_output_schema': 'schema.properties.unchecked.items.required' is required to include every key in properties. Missing 'source'.\",\"type\":\"invalid_request_error\",\"param\":\"text.format.schema\",\"code\":\"invalid_json_schema\"},\"sta",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": "bad_request"
+  },
+  {
+   "id": "4fcd9f14-70e8-4d36-856a-1a3f4ec532b0",
+   "history": {
+    "ts": 1792704171.54044,
+    "run_id": "4fcd9f14-70e8-4d36-856a-1a3f4ec532b0",
+    "role": "planner",
+    "lane": "CLAUDE_SUBSCRIPTION",
+    "model": "opus-5.5",
+    "status": "done",
+    "reason": null,
+    "secs": 113.1
+   },
+   "source": "history.jsonl",
+   "evidence": {
+    "rc": 0,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": null
+  },
+  {
+   "id": "e88f4e16-4245-49cc-9c47-294bab2fa9fc",
+   "history": {
+    "ts": 1792704187.792864,
+    "run_id": "e88f4e16-4245-49cc-9c47-294bab2fa9fc",
+    "role": "worker",
+    "lane": "OPENAI_SUBSCRIPTION",
+    "model": "gpt-6.1-sol",
+    "status": "error",
+    "reason": "bad_request",
+    "secs": 7.1
+   },
+   "source": "engine/lifesim-xea5-20261023-002049.jsonl:17",
+   "evidence": {
+    "rc": 1,
+    "vendor_err": "{\"type\":\"error\",\"error\":{\"message\":\"Invalid schema for response_format 'codex_output_schema': 'schema.properties.unchecked.items.required' is required to include every key in properties. Missing 'source'.\",\"type\":\"invalid_request_error\",\"param\":\"text.format.schema\",\"code\":\"invalid_json_schema\"},\"sta",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": "bad_request"
+  },
+  {
+   "id": "feb5a9fa-b626-4053-a263-019cddd1dc9d",
+   "history": {
+    "ts": 1792707915.102839,
+    "run_id": "feb5a9fa-b626-4053-a263-019cddd1dc9d",
+    "role": "worker",
+    "lane": "OPENAI_SUBSCRIPTION",
+    "model": "gpt-6.1-sol",
+    "status": "done",
+    "reason": null,
+    "secs": 53.2
+   },
+   "source": "history.jsonl",
+   "evidence": {
+    "rc": 0,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": null
+  },
+  {
+   "id": "23071b0e-cf46-4cee-b7e2-81a106f11495",
+   "history": {
+    "ts": 1792707936.20984,
+    "run_id": "23071b0e-cf46-4cee-b7e2-81a106f11495",
+    "role": "reviewer",
+    "lane": "CLAUDE_SUBSCRIPTION",
+    "model": "sonnet-5.5",
+    "status": "done",
+    "reason": null,
+    "secs": 9.1
+   },
+   "source": "history.jsonl",
+   "evidence": {
+    "rc": 0,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": null
+  },
+  {
+   "id": "09233fab-be60-4bd9-9e70-4a95f7e2a0f3",
+   "history": {
+    "ts": 1792707970.4126751,
+    "run_id": "09233fab-be60-4bd9-9e70-4a95f7e2a0f3",
+    "role": "worker",
+    "lane": "OPENAI_SUBSCRIPTION",
+    "model": "gpt-6.1-sol",
+    "status": "done",
+    "reason": null,
+    "secs": 81.0
+   },
+   "source": "history.jsonl",
+   "evidence": {
+    "rc": 0,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": null
+  },
+  {
+   "id": "3857bb13-99b3-441e-81ed-8fb1ec81436b",
+   "history": {
+    "ts": 1792708002.0773408,
+    "run_id": "3857bb13-99b3-441e-81ed-8fb1ec81436b",
+    "role": "worker",
+    "lane": "OPENAI_SUBSCRIPTION",
+    "model": "gpt-6.1-sol",
+    "status": "done",
+    "reason": null,
+    "secs": 147.0
+   },
+   "source": "history.jsonl",
+   "evidence": {
+    "rc": 0,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": null
+  },
+  {
+   "id": "6130cc14-95cd-418f-9621-05541f1f1224",
+   "history": {
+    "ts": 1792708475.388057,
+    "run_id": "6130cc14-95cd-418f-9621-05541f1f1224",
+    "role": "worker",
+    "lane": "OPENAI_SUBSCRIPTION",
+    "model": "gpt-6.1-sol",
+    "status": "done",
+    "reason": null,
+    "secs": 218.1
+   },
+   "source": "history.jsonl",
+   "evidence": {
+    "rc": 0,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": null
+  },
+  {
+   "id": "0c612caa-a636-44d5-8b0e-3b35b377263f",
+   "history": {
+    "ts": 1792708508.978556,
+    "run_id": "0c612caa-a636-44d5-8b0e-3b35b377263f",
+    "role": "reviewer",
+    "lane": "CLAUDE_SUBSCRIPTION",
+    "model": "sonnet-5.5",
+    "status": "done",
+    "reason": null,
+    "secs": 20.0
+   },
+   "source": "history.jsonl",
+   "evidence": {
+    "rc": 0,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": null
+  },
+  {
+   "id": "1a33b288-b1ac-4808-a799-3b7a88f29212",
+   "history": {
+    "ts": 1792708701.893218,
+    "run_id": "1a33b288-b1ac-4808-a799-3b7a88f29212",
+    "role": "worker",
+    "lane": "OPENAI_SUBSCRIPTION",
+    "model": "gpt-6.1-sol",
+    "status": "done",
+    "reason": null,
+    "secs": 186.2
+   },
+   "source": "history.jsonl",
+   "evidence": {
+    "rc": 0,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": null
+  },
+  {
+   "id": "1134a4be-b5e9-46ff-80bb-ded990f3dc6c",
+   "history": {
+    "ts": 1792708731.0981498,
+    "run_id": "1134a4be-b5e9-46ff-80bb-ded990f3dc6c",
+    "role": "reviewer",
+    "lane": "CLAUDE_SUBSCRIPTION",
+    "model": "sonnet-5.5",
+    "status": "done",
+    "reason": null,
+    "secs": 17.5
+   },
+   "source": "history.jsonl",
+   "evidence": {
+    "rc": 0,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": null
+  },
+  {
+   "id": "b35d92f5-baea-4b6e-967c-17b98067a48f",
+   "history": {
+    "ts": 1792708739.5636501,
+    "run_id": "b35d92f5-baea-4b6e-967c-17b98067a48f",
+    "role": "worker",
+    "lane": "OPENAI_SUBSCRIPTION",
+    "model": "gpt-6.1-sol",
+    "status": "done",
+    "reason": null,
+    "secs": 57.3
+   },
+   "source": "history.jsonl",
+   "evidence": {
+    "rc": 0,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": null
+  },
+  {
+   "id": "450af0b3-c949-45f2-84fd-59f2c2e781a7",
+   "history": {
+    "ts": 1792708770.194844,
+    "run_id": "450af0b3-c949-45f2-84fd-59f2c2e781a7",
+    "role": "worker",
+    "lane": "OPENAI_SUBSCRIPTION",
+    "model": "gpt-6.1-sol",
+    "status": "done",
+    "reason": null,
+    "secs": 31.6
+   },
+   "source": "history.jsonl",
+   "evidence": {
+    "rc": 0,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": null
+  },
+  {
+   "id": "ffb51d29-024f-4dfa-b355-9ff2c736d895",
+   "history": {
+    "ts": 1792708799.3256361,
+    "run_id": "ffb51d29-024f-4dfa-b355-9ff2c736d895",
+    "role": "reviewer",
+    "lane": "CLAUDE_SUBSCRIPTION",
+    "model": "sonnet-5.5",
+    "status": "done",
+    "reason": null,
+    "secs": 19.9
+   },
+   "source": "history.jsonl",
+   "evidence": {
+    "rc": 0,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": null
+  },
+  {
+   "id": "89d73fee-a375-47f7-90c1-d944622ae61d",
+   "history": {
+    "ts": 1792708845.816837,
+    "run_id": "89d73fee-a375-47f7-90c1-d944622ae61d",
+    "role": "planner",
+    "lane": "CLAUDE_SUBSCRIPTION",
+    "model": "opus-5.5",
+    "status": "done",
+    "reason": null,
+    "secs": 38.9
+   },
+   "source": "history.jsonl",
+   "evidence": {
+    "rc": 0,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": null
+  },
+  {
+   "id": "6cbe9f68-cabb-4f3f-bc8e-046eb2b37c0a",
+   "history": {
+    "ts": 1792709106.1991549,
+    "run_id": "6cbe9f68-cabb-4f3f-bc8e-046eb2b37c0a",
+    "role": "worker",
+    "lane": "OPENAI_SUBSCRIPTION",
+    "model": "gpt-6.1-sol",
+    "status": "done",
+    "reason": null,
+    "secs": 272.4
+   },
+   "source": "history.jsonl",
+   "evidence": {
+    "rc": 0,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": null
+  },
+  {
+   "id": "28cf3e53-3bd3-444c-bfc6-1e76a185fe3d",
+   "history": {
+    "ts": 1792709185.40716,
+    "run_id": "28cf3e53-3bd3-444c-bfc6-1e76a185fe3d",
+    "role": "worker",
+    "lane": "OPENAI_SUBSCRIPTION",
+    "model": "gpt-6.1-sol",
+    "status": "done",
+    "reason": null,
+    "secs": 273.0
+   },
+   "source": "history.jsonl",
+   "evidence": {
+    "rc": 0,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": null
+  },
+  {
+   "id": "17fb6f22-dc82-4aa3-b44f-d3621745e7f5",
+   "history": {
+    "ts": 1792709214.709404,
+    "run_id": "17fb6f22-dc82-4aa3-b44f-d3621745e7f5",
+    "role": "reviewer",
+    "lane": "CLAUDE_SUBSCRIPTION",
+    "model": "sonnet-5.5",
+    "status": "done",
+    "reason": null,
+    "secs": 17.2
+   },
+   "source": "history.jsonl",
+   "evidence": {
+    "rc": 0,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": null
+  },
+  {
+   "id": "ab2f40f2-0678-4930-aee1-3cf0da6cf272",
+   "history": {
+    "ts": 1792709238.167006,
+    "run_id": "ab2f40f2-0678-4930-aee1-3cf0da6cf272",
+    "role": "reviewer",
+    "lane": "CLAUDE_SUBSCRIPTION",
+    "model": "sonnet-5.5",
+    "status": "done",
+    "reason": null,
+    "secs": 16.4
+   },
+   "source": "history.jsonl",
+   "evidence": {
+    "rc": 0,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": null
+  },
+  {
+   "id": "9eb8a74e-f6ea-4c0a-9646-6545b53800c7",
+   "history": {
+    "ts": 1792709333.7315578,
+    "run_id": "9eb8a74e-f6ea-4c0a-9646-6545b53800c7",
+    "role": "worker",
+    "lane": "OPENAI_SUBSCRIPTION",
+    "model": "gpt-6.1-sol",
+    "status": "done",
+    "reason": null,
+    "secs": 85.7
+   },
+   "source": "history.jsonl",
+   "evidence": {
+    "rc": 0,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": null
+  },
+  {
+   "id": "1f4149fc-4aaf-408e-90f0-c0315a748943",
+   "history": {
+    "ts": 1792709394.383424,
+    "run_id": "1f4149fc-4aaf-408e-90f0-c0315a748943",
+    "role": "worker",
+    "lane": "OPENAI_SUBSCRIPTION",
+    "model": "gpt-6.1-sol",
+    "status": "done",
+    "reason": null,
+    "secs": 49.7
+   },
+   "source": "history.jsonl",
+   "evidence": {
+    "rc": 0,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": null
+  },
+  {
+   "id": "1814f50a-259d-4379-a2d2-1ba9e3c6a7db",
+   "history": {
+    "ts": 1792709438.311231,
+    "run_id": "1814f50a-259d-4379-a2d2-1ba9e3c6a7db",
+    "role": "worker",
+    "lane": "OPENAI_SUBSCRIPTION",
+    "model": "gpt-6.1-sol",
+    "status": "done",
+    "reason": null,
+    "secs": 34.4
+   },
+   "source": "history.jsonl",
+   "evidence": {
+    "rc": 0,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": null
+  },
+  {
+   "id": "a5bc5a4a-b69f-4879-9f90-3de033e8e4f0",
+   "history": {
+    "ts": 1792709456.70885,
+    "run_id": "a5bc5a4a-b69f-4879-9f90-3de033e8e4f0",
+    "role": "worker",
+    "lane": "OPENAI_SUBSCRIPTION",
+    "model": "gpt-6.1-sol",
+    "status": "done",
+    "reason": null,
+    "secs": 74.2
+   },
+   "source": "history.jsonl",
+   "evidence": {
+    "rc": 0,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": null
+  },
+  {
+   "id": "0d1e220d-7db9-4b75-a3aa-a35f18319802",
+   "history": {
+    "ts": 1792709526.936954,
+    "run_id": "0d1e220d-7db9-4b75-a3aa-a35f18319802",
+    "role": "worker",
+    "lane": "OPENAI_SUBSCRIPTION",
+    "model": "gpt-6.1-sol",
+    "status": "done",
+    "reason": null,
+    "secs": 25.7
+   },
+   "source": "history.jsonl",
+   "evidence": {
+    "rc": 0,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": null
+  },
+  {
+   "id": "03db294c-2003-4ec1-b08a-858c1249fd1c",
+   "history": {
+    "ts": 1792709553.021633,
+    "run_id": "03db294c-2003-4ec1-b08a-858c1249fd1c",
+    "role": "worker",
+    "lane": "OPENAI_SUBSCRIPTION",
+    "model": "gpt-6.1-sol",
+    "status": "done",
+    "reason": null,
+    "secs": 52.5
+   },
+   "source": "history.jsonl",
+   "evidence": {
+    "rc": 0,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": null
+  },
+  {
+   "id": "cb3daac8-b732-4329-8a37-189afc1d54ab",
+   "history": {
+    "ts": 1792709911.7518568,
+    "run_id": "cb3daac8-b732-4329-8a37-189afc1d54ab",
+    "role": "reviewer",
+    "lane": "CLAUDE_SUBSCRIPTION",
+    "model": "sonnet-5.5",
+    "status": "done",
+    "reason": null,
+    "secs": 14.6
+   },
+   "source": "history.jsonl",
+   "evidence": {
+    "rc": 0,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": null
+  },
+  {
+   "id": "16389143-f55f-49b6-b760-382431b0fe10",
+   "history": {
+    "ts": 1792709971.842156,
+    "run_id": "16389143-f55f-49b6-b760-382431b0fe10",
+    "role": "worker",
+    "lane": "OPENAI_SUBSCRIPTION",
+    "model": "gpt-6.1-sol",
+    "status": "done",
+    "reason": null,
+    "secs": 53.7
+   },
+   "source": "history.jsonl",
+   "evidence": {
+    "rc": 0,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": null
+  },
+  {
+   "id": "76669ee8-9cb3-4246-81d2-93f33d27857f",
+   "history": {
+    "ts": 1792710255.0700061,
+    "run_id": "76669ee8-9cb3-4246-81d2-93f33d27857f",
+    "role": "reviewer",
+    "lane": "CLAUDE_SUBSCRIPTION",
+    "model": "sonnet-5.5",
+    "status": "done",
+    "reason": null,
+    "secs": 15.3
+   },
+   "source": "history.jsonl",
+   "evidence": {
+    "rc": 0,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": null
+  },
+  {
+   "id": "a952ea05-a67f-4b7f-b0ba-35c179d4a064",
+   "history": {
+    "ts": 1792710321.8066702,
+    "run_id": "a952ea05-a67f-4b7f-b0ba-35c179d4a064",
+    "role": "worker",
+    "lane": "OPENAI_SUBSCRIPTION",
+    "model": "gpt-6.1-sol",
+    "status": "done",
+    "reason": null,
+    "secs": 27.1
+   },
+   "source": "history.jsonl",
+   "evidence": {
+    "rc": 0,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": null
+  },
+  {
+   "id": "b3b43813-bf67-4fae-adcd-e7e0706716c8",
+   "history": {
+    "ts": 1792710337.8898659,
+    "run_id": "b3b43813-bf67-4fae-adcd-e7e0706716c8",
+    "role": "worker",
+    "lane": "OPENAI_SUBSCRIPTION",
+    "model": "gpt-6.1-sol",
+    "status": "done",
+    "reason": null,
+    "secs": 77.4
+   },
+   "source": "history.jsonl",
+   "evidence": {
+    "rc": 0,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": null
+  },
+  {
+   "id": "481d1c01-7010-4a29-9aa7-e06a1c3b2749",
+   "history": {
+    "ts": 1792710363.5307012,
+    "run_id": "481d1c01-7010-4a29-9aa7-e06a1c3b2749",
+    "role": "reviewer",
+    "lane": "CLAUDE_SUBSCRIPTION",
+    "model": "sonnet-5.5",
+    "status": "done",
+    "reason": null,
+    "secs": 17.7
+   },
+   "source": "history.jsonl",
+   "evidence": {
+    "rc": 0,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": null
+  },
+  {
+   "id": "582c099a-442b-46ba-a17b-2c8be20e3e41",
+   "history": {
+    "ts": 1792710423.408532,
+    "run_id": "582c099a-442b-46ba-a17b-2c8be20e3e41",
+    "role": "worker",
+    "lane": "OPENAI_SUBSCRIPTION",
+    "model": "gpt-6.1-sol",
+    "status": "done",
+    "reason": null,
+    "secs": 34.9
+   },
+   "source": "history.jsonl",
+   "evidence": {
+    "rc": 0,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": null
+  },
+  {
+   "id": "e3b60e43-2540-4bac-9062-1b12238e4348",
+   "history": {
+    "ts": 1792710464.337399,
+    "run_id": "e3b60e43-2540-4bac-9062-1b12238e4348",
+    "role": "worker",
+    "lane": "OPENAI_SUBSCRIPTION",
+    "model": "gpt-6.1-sol",
+    "status": "done",
+    "reason": null,
+    "secs": 94.0
+   },
+   "source": "history.jsonl",
+   "evidence": {
+    "rc": 0,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": null
+  },
+  {
+   "id": "4e8dfa09-043d-4871-9023-2393c9eecbc5",
+   "history": {
+    "ts": 1792710493.8373609,
+    "run_id": "4e8dfa09-043d-4871-9023-2393c9eecbc5",
+    "role": "reviewer",
+    "lane": "CLAUDE_SUBSCRIPTION",
+    "model": "sonnet-5.5",
+    "status": "done",
+    "reason": null,
+    "secs": 20.9
+   },
+   "source": "history.jsonl",
+   "evidence": {
+    "rc": 0,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": null
+  },
+  {
+   "id": "3effe870-c4a7-4812-aaf8-a606d6198ae4",
+   "history": {
+    "ts": 1792710534.392224,
+    "run_id": "3effe870-c4a7-4812-aaf8-a606d6198ae4",
+    "role": "planner",
+    "lane": "CLAUDE_SUBSCRIPTION",
+    "model": "opus-5.5",
+    "status": "done",
+    "reason": null,
+    "secs": 37.2
+   },
+   "source": "history.jsonl",
+   "evidence": {
+    "rc": 0,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": null
+  },
+  {
+   "id": "f68e8977-8af6-4529-ad64-1eacf8e0fbc7",
+   "history": {
+    "ts": 1792710543.637593,
+    "run_id": "f68e8977-8af6-4529-ad64-1eacf8e0fbc7",
+    "role": "planner",
+    "lane": "CLAUDE_SUBSCRIPTION",
+    "model": "opus-5.5",
+    "status": "done",
+    "reason": null,
+    "secs": 46.5
+   },
+   "source": "history.jsonl",
+   "evidence": {
+    "rc": 0,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": null
+  },
+  {
+   "id": "64683d80-8451-42f9-b991-51330e67272b",
+   "history": {
+    "ts": 1792710584.990418,
+    "run_id": "64683d80-8451-42f9-b991-51330e67272b",
+    "role": "worker",
+    "lane": "OPENAI_SUBSCRIPTION",
+    "model": "gpt-6.1-sol",
+    "status": "done",
+    "reason": null,
+    "secs": 35.7
+   },
+   "source": "history.jsonl",
+   "evidence": {
+    "rc": 0,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": null
+  },
+  {
+   "id": "0d1c187e-8cd9-49b7-bcd5-2c9850ce8f0b",
+   "history": {
+    "ts": 1792710729.950189,
+    "run_id": "0d1c187e-8cd9-49b7-bcd5-2c9850ce8f0b",
+    "role": "reviewer",
+    "lane": "CLAUDE_SUBSCRIPTION",
+    "model": "sonnet-5.5",
+    "status": "done",
+    "reason": null,
+    "secs": 16.6
+   },
+   "source": "history.jsonl",
+   "evidence": {
+    "rc": 0,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": null
+  },
+  {
+   "id": "86f49d24-f1fc-48eb-be9f-b6c2638e9894",
+   "history": {
+    "ts": 1792710734.104453,
+    "run_id": "86f49d24-f1fc-48eb-be9f-b6c2638e9894",
+    "role": "worker",
+    "lane": "OPENAI_SUBSCRIPTION",
+    "model": "gpt-6.1-sol",
+    "status": "done",
+    "reason": null,
+    "secs": 178.6
+   },
+   "source": "history.jsonl",
+   "evidence": {
+    "rc": 0,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": null
+  },
+  {
+   "id": "de4efd52-f570-4590-a9e9-a2e4c020d05b",
+   "history": {
+    "ts": 1792710878.016147,
+    "run_id": "de4efd52-f570-4590-a9e9-a2e4c020d05b",
+    "role": "reviewer",
+    "lane": "CLAUDE_SUBSCRIPTION",
+    "model": "sonnet-5.5",
+    "status": "done",
+    "reason": null,
+    "secs": 12.2
+   },
+   "source": "history.jsonl",
+   "evidence": {
+    "rc": 0,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": null
+  },
+  {
+   "id": "c565f91c-faff-4c03-9269-8f9c0dc062fd",
+   "history": {
+    "ts": 1792710895.3901498,
+    "run_id": "c565f91c-faff-4c03-9269-8f9c0dc062fd",
+    "role": "reviewer",
+    "lane": "CLAUDE_SUBSCRIPTION",
+    "model": "sonnet-5.5",
+    "status": "done",
+    "reason": null,
+    "secs": 7.3
+   },
+   "source": "history.jsonl",
+   "evidence": {
+    "rc": 0,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": null
+  },
+  {
+   "id": "5f1ad7cf-f73f-466b-b133-96a6f6ff12e4",
+   "history": {
+    "ts": 1792710897.0852852,
+    "run_id": "5f1ad7cf-f73f-466b-b133-96a6f6ff12e4",
+    "role": "worker",
+    "lane": "OPENAI_SUBSCRIPTION",
+    "model": "gpt-6.1-sol",
+    "status": "done",
+    "reason": null,
+    "secs": 28.5
+   },
+   "source": "history.jsonl",
+   "evidence": {
+    "rc": 0,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": null
+  },
+  {
+   "id": "7a1bbb8c-5f58-4afd-a1a0-0fa98f3c6b2c",
+   "history": {
+    "ts": 1792710942.567689,
+    "run_id": "7a1bbb8c-5f58-4afd-a1a0-0fa98f3c6b2c",
+    "role": "worker",
+    "lane": "OPENAI_SUBSCRIPTION",
+    "model": "gpt-6.1-sol",
+    "status": "done",
+    "reason": null,
+    "secs": 35.6
+   },
+   "source": "history.jsonl",
+   "evidence": {
+    "rc": 0,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": null
+  },
+  {
+   "id": "031ecf8a-6b79-4e58-8a67-be16af5cfc26",
+   "history": {
+    "ts": 1792711372.947514,
+    "run_id": "031ecf8a-6b79-4e58-8a67-be16af5cfc26",
+    "role": "worker",
+    "lane": "OPENAI_SUBSCRIPTION",
+    "model": "gpt-6.1-sol",
+    "status": "done",
+    "reason": null,
+    "secs": 122.4
+   },
+   "source": "history.jsonl",
+   "evidence": {
+    "rc": 0,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": null
+  },
+  {
+   "id": "c60a2a80-ed06-41dd-a1eb-5531e47a17c6",
+   "history": {
+    "ts": 1792711796.274797,
+    "run_id": "c60a2a80-ed06-41dd-a1eb-5531e47a17c6",
+    "role": "worker",
+    "lane": "OPENAI_SUBSCRIPTION",
+    "model": "gpt-6.1-sol",
+    "status": "done",
+    "reason": null,
+    "secs": 37.5
+   },
+   "source": "history.jsonl",
+   "evidence": {
+    "rc": 0,
+    "vendor_err": "",
+    "stderr": "",
+    "timed_out": false,
+    "work_seen": false,
+    "structured": {}
+   },
+   "expected_reason": null
+  }
+ ]
+}
