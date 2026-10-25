@@ -37,7 +37,7 @@ skills/delegate/route.py      the router: run, next, status, report, capture-lim
 skills/delegate/onboard.py    readiness checks and setup steps
 skills/delegate/agent_runs.py publishes runs and lane limits as agent-runs v1 (a public contract)
 skills/delegate/routing.json  lanes, models, roles, thresholds
-commands/                     /iorlas-delegate:init, /iorlas-delegate:status
+commands/                     /iorlas-delegate:init, /iorlas-delegate:status (the lane cockpit)
 tests/                        python3 -m unittest discover -s tests   (CI: 3 OS x Python 3.8 and 3.12)
 ```
 

@@ -352,6 +352,14 @@ def ledger_spend(since_epoch):
     return total
 
 
+def ledger_last_ts():
+    try:
+        with open(ledger_path(), encoding="utf-8") as f:
+            return json.loads(f.read().splitlines()[-1])["ts"]
+    except (OSError, ValueError, KeyError, IndexError, TypeError):
+        return None
+
+
 def ledger_add(cost, model, now_t):
     with locked(ledger_path()):
         with open(ledger_path(), "a", encoding="utf-8") as f:
@@ -381,6 +389,8 @@ class Lane:
         self.spend = 0.0
         self.cap = None
         self.notes = []
+        self.windows = []         # every window the vendor exposes, for the cockpit: {name, used, resets_at, span, source, at}
+        self.spend_blocked = False  # the vendor says a spend or credit limit stopped it (not a usage window)
 
     @property
     def usage_known(self):
@@ -471,6 +481,15 @@ def fetch_codex_limits():
     return r["result"], None
 
 
+def span_name(mins):
+    return "5-hour" if mins <= 360 else "daily" if mins <= 1500 else "weekly" if mins <= 14400 else "monthly"
+
+
+def add_window(lane, used, resets_at, span, source, at):
+    if used is not None or resets_at is not None:
+        lane.windows.append({"name": span_name(span), "used": used, "resets_at": resets_at, "span": span, "source": source, "at": at})
+
+
 def read_codex(lane, S, st, t):
     cached = st.get("codex_limits")
     if cached and t - cached.get("at", 0) <= 60 and not os.environ.get("DELEGATE_NOCACHE"):
@@ -485,6 +504,10 @@ def read_codex(lane, S, st, t):
     lane.read_at = cached["at"] if cached and res is cached["res"] else t
     rl = res.get("rateLimits") or {}
     ws = [w for w in (rl.get("primary"), rl.get("secondary")) if w]       # by length, not by slot: Pro Lite has only a weekly window, sent as primary
+    for w in ws:
+        span = w.get("windowDurationMins") or 300
+        add_window(lane, window(w.get("usedPercent"), w.get("resetsAt"), span, t)[0], w.get("resetsAt"), span, "live read (codex app-server)", lane.read_at)
+    lane.spend_blocked = bool(rl.get("spendControlReached")) or bool(re.search(r"credit|spend", str(rl.get("rateLimitReachedType") or ""), re.I))
     pr = next((w for w in ws if (w.get("windowDurationMins") or 300) <= 1440), {})
     se = next((w for w in ws if (w.get("windowDurationMins") or 300) > 1440), {})
     lane.five_reset, lane.week_reset = pr.get("resetsAt"), se.get("resetsAt")
@@ -529,14 +552,17 @@ def claude_logged_out():
 def read_claude_subscription(lane, S, st, t, ai_usage=None):
     stale = S["usage_stale_minutes"] * 60
     usage = None
+    src = None      # (where the numbers came from, when they were taken)
     if ai_usage:
         usage = normalize_usage(ai_usage)
         if usage:
             update_state(lambda s: s.__setitem__("claude_usage", {"at": t, "data": usage}))
+            src = ("manual mark (get_usage passed in)", t)
     if usage is None:
         saved = st.get("claude_usage")
         if saved and t - saved.get("at", 0) <= stale:
             usage = saved["data"]
+            src = ("manual mark (get_usage passed in)", saved["at"])
             lane.notes.append(f"usage from {fmt_dur(t - saved['at'])} ago")
     if usage is None:
         f = Path.home() / ".claude" / "state" / "max-limits.json"
@@ -549,6 +575,7 @@ def read_claude_subscription(lane, S, st, t, ai_usage=None):
                          for k, w in (("five_hour", rl.get("five_hour") or {}), ("weekly", rl.get("seven_day") or {})) if w.get("used_percentage") is not None} or None
                 if usage:
                     lane.notes.append("usage from the status-line file")
+                    src = ("live read (status line)", float(d.get("updated", 0)))
         except (OSError, ValueError, TypeError):
             pass
     if claude_logged_out():
@@ -560,6 +587,10 @@ def read_claude_subscription(lane, S, st, t, ai_usage=None):
         lane.five_reset, lane.week_reset = f5.get("resets_at"), wk.get("resets_at")
         lane.five, _, _ = window(f5.get("used"), lane.five_reset, 300, t)
         lane.week, wmins, lane.pace = window(wk.get("used"), lane.week_reset, WEEK_MIN, t)
+        if f5:
+            add_window(lane, lane.five, lane.five_reset, 300, src[0], src[1])
+        if wk:
+            add_window(lane, lane.week, lane.week_reset, WEEK_MIN, src[0], src[1])
         apply_burn(lane, S, wmins)
         if (lane.five or 0) >= 98 or (lane.week or 0) >= 98:
             lane.out, lane.out_reason = True, "limit"
@@ -568,6 +599,7 @@ def read_claude_subscription(lane, S, st, t, ai_usage=None):
         nxt = next_weekly(weekly_spec, t)
         if nxt:
             lane.week_reset = nxt
+            add_window(lane, None, nxt, WEEK_MIN, "manual mark (claude_weekly_reset in config)", None)
             lane.notes.append(f"weekly reset {local(nxt)} (config); use unknown")
 
 
@@ -578,6 +610,7 @@ def read_claude_credit(lane, S, st, t):
     lane.spend = ledger_spend(start)
     lane.reset_in_days = (nxt - t) / 86400.0
     lane.week_reset = nxt
+    add_window(lane, 100.0 * lane.spend / lane.cap if lane.cap else None, nxt, 43200, "estimated from history (this tool's ledger)", ledger_last_ts())
     out = (st.get("out") or {}).get(lane.name)
     if out and out.get("until", 0) > t:
         lane.out, lane.out_until, lane.out_reason = True, out["until"], out.get("reason", "error")
@@ -629,20 +662,23 @@ def gather(cfg, st, t, ai_usage=None, check_config=True):
 
 # ----------------------------------------------------------------------------- the decision functions (pure)
 
+def limits_for(lane, S, relaxed):
+    """-> (weekly %, five-hour %, name): where the router stops using the lane. The strict pass uses the gate (a shared lane keeps the orchestrator's reserve), the relaxed pass the ceiling."""
+    c = S["relaxed_ceiling"]
+    if lane.shared:
+        r = S["orchestrator_reserve"]
+        wk, fv = (c["orchestrator_weekly"], c["orchestrator_five_hour"]) if relaxed else (r["weekly"], r["five_hour"])
+        return wk, fv, "hard ceiling" if relaxed else "orchestrator reserve"
+    g = S["worker_lane_gate"]
+    wk, fv = (c["weekly"], c["five_hour"]) if relaxed else (g["weekly"], g["five_hour"])
+    return wk, fv, "hard ceiling" if relaxed else "lane gate"
+
+
 def usable(lane, S, relaxed):
     """-> (bool, reason)."""
     if lane.out:
         return False, f"out until {local(lane.out_until)}" if lane.out_until else "out"
-    if lane.shared:
-        r = S["orchestrator_reserve"]
-        c = S["relaxed_ceiling"]
-        wk, fv = (c["orchestrator_weekly"], c["orchestrator_five_hour"]) if relaxed else (r["weekly"], r["five_hour"])
-        why = "orchestrator reserve" if not relaxed else "hard ceiling"
-    else:
-        g = S["worker_lane_gate"]
-        c = S["relaxed_ceiling"]
-        wk, fv = (c["weekly"], c["five_hour"]) if relaxed else (g["weekly"], g["five_hour"])
-        why = "lane gate" if not relaxed else "hard ceiling"
+    wk, fv, why = limits_for(lane, S, relaxed)
     if lane.week is not None and lane.week >= wk:
         return False, f"weekly {lane.week:.0f}% >= {wk} ({why})"
     if lane.five is not None and lane.five >= fv:
@@ -928,14 +964,11 @@ def routing_snapshot(cfg, lanes, st, t):
     current = copy.deepcopy(lanes)
     mark_busy(current, st, cfg["settings"], t)
     workers = {n: l for n, l in current.items() if l.kind != "credit"}
-    labels = {"CLAUDE_SUBSCRIPTION": "Claude subscription", "CLAUDE_CREDIT": "Claude API credits",
-              "OPENAI_SUBSCRIPTION": "ChatGPT / Codex", "GROK_SUBSCRIPTION": "SuperGrok / OpenCode",
-              "DEEPSEEK_FREE": "DeepSeek / OpenCode Free"}
     inventory = []
     for name, c in cfg["lanes"].items():
         lane = current.get(name)
         available, why = usable(lane, cfg["settings"], True) if lane else (False, "disabled or not configured")
-        label = c.get("label") or labels.get(name, name)
+        label = c.get("label") or LABELS.get(name, name)
         if c["family"] == "openai" and cfg["settings"].get("codex_plan_review_only"):
             label += " (planning/review only)"
         inventory.append({"id": name, "label": label, "family": c["family"],
@@ -969,15 +1002,284 @@ def routing_snapshot(cfg, lanes, st, t):
     return {"v": 1, "at": t, "caller": "unattended", "lanes": inventory, "roles": roles}
 
 
+# ----------------------------------------------------------------------------- the cockpit: every lane, one row each
+
+EMOJI = {"ready": "✅", "resting": "⏳", "logged_out": "🔑", "spend": "💸", "slow": "🐢", "off": "⛔", "unknown": "❓"}
+LEGEND = {"ready": "ready", "resting": "usage limit", "logged_out": "logged out", "spend": "spend/credit limit",
+          "slow": "slow/hung", "off": "disabled", "unknown": "no read yet"}
+LABELS = {"CLAUDE_SUBSCRIPTION": "Claude subscription", "CLAUDE_CREDIT": "Claude API credits", "OPENAI_SUBSCRIPTION": "ChatGPT / Codex",
+          "GROK_SUBSCRIPTION": "SuperGrok / OpenCode", "DEEPSEEK_FREE": "DeepSeek / OpenCode Free", "ZAI_CODING_SUBSCRIPTION": "Z.ai GLM Coding Plan"}
+LOGIN_CMD = {"OPENAI_SUBSCRIPTION": "codex login", "CLAUDE_SUBSCRIPTION": "claude auth login", "CLAUDE_CREDIT": "route.py set-key",
+             "GROK_SUBSCRIPTION": "opencode auth login", "ZAI_CODING_SUBSCRIPTION": "opencode auth login, choose Z.AI Coding Plan",
+             "DEEPSEEK_FREE": "route.py doctor --lane DEEPSEEK_FREE"}
+SPEND_RE = re.compile(r"spend(ing)?[- ]?(limit|control)|out of credits|credit balance|top[- ]?up|billing|insufficient (funds|credit)|credits? (exhausted|too low)|cycle cap|cap reached", re.I)
+AUTH_TTL = 300          # a login check answers for this long: it spawns a CLI, cheap but not free
+AUTH_TIMEOUT = 10
+SLOW_WINDOW = 2 * 3600  # a hang or timeout this recent, with no good run on the lane since, keeps it marked slow
+SLOW_KINDS = ("hung", "timeout")
+
+
+def fmt_in(secs):
+    """'2h 10m', '6d 21h', '45m'."""
+    s = int(secs)
+    if s < 60:
+        return "<1m"
+    d, r = divmod(s, 86400)
+    h, r = divmod(r, 3600)
+    m = r // 60
+    return f"{d}d {h}h" if d else f"{h}h {m:02d}m" if h else f"{m}m"
+
+
+def when(epoch, t):
+    return f"{local(epoch)} (in {fmt_in(epoch - t)})"
+
+
+def cli_login(exe_name, args, ok_if):
+    """-> (True | False | None, why). Runs a vendor's own status command (no model call, no quota); None = could not tell."""
+    exe = shutil.which(exe_name)
+    if not exe:
+        return None, f"{exe_name} CLI not installed"
+    try:
+        r = subprocess.run([exe] + args, capture_output=True, text=True, timeout=AUTH_TIMEOUT)
+    except (OSError, subprocess.TimeoutExpired) as e:
+        return None, f"{exe_name} login check failed: {type(e).__name__}"
+    return ok_if(r), (r.stdout + r.stderr).strip()[:120]
+
+
+def codex_login_ok(r):
+    return r.returncode == 0 and "not logged" not in (r.stdout + r.stderr).lower()
+
+
+def claude_login_ok(r):
+    try:
+        v = json.loads(r.stdout).get("loggedIn")
+    except (ValueError, AttributeError):
+        return None
+    return v if isinstance(v, bool) else None
+
+
+def opencode_auth_has(key, need_key=False):
+    f = Path(os.environ.get("XDG_DATA_HOME") or Path.home() / ".local" / "share") / "opencode" / "auth.json"
+    try:
+        v = json.loads(f.read_text(encoding="utf-8")).get(key)
+    except (OSError, ValueError, TypeError, AttributeError):
+        return False
+    return bool(v) and (not need_key or (isinstance(v, dict) and bool(v.get("key"))))
+
+
+def probe_login(name):
+    """-> (True | False | None, why): is the lane's login really there? A status command or a file, never a model call."""
+    if name == "OPENAI_SUBSCRIPTION":
+        return cli_login("codex", ["login", "status"], codex_login_ok)
+    if name == "CLAUDE_SUBSCRIPTION":
+        return cli_login("claude", ["auth", "status"], claude_login_ok)
+    if name == "CLAUDE_CREDIT":
+        return (True, "API key stored") if find_key(quiet=True) else (False, "no API key stored")
+    if name in ("GROK_SUBSCRIPTION", "ZAI_CODING_SUBSCRIPTION", "DEEPSEEK_FREE"):
+        if not opencode_exe():
+            return None, "opencode CLI not installed"
+        if name == "DEEPSEEK_FREE":
+            return True, "free access needs no login"        # the zero-price check runs at launch
+        key = "xai" if name == "GROK_SUBSCRIPTION" else "zai-coding-plan"
+        ok = opencode_auth_has(key, need_key=name != "GROK_SUBSCRIPTION")
+        return ok, f"{key} login in opencode's auth file" if ok else f"no {key} login in opencode's auth file"
+    return None, "no check for this lane"
+
+
+def login_state(name, st, t):
+    """-> (ok, why, checked_at): probe_login cached a few minutes in state, so a status call costs one process per lane at most."""
+    c = (st.get("auth") or {}).get(name)
+    if c and t - c.get("at", 0) <= AUTH_TTL and not os.environ.get("DELEGATE_NOCACHE"):
+        return c["ok"], c["why"], c["at"]
+    ok, why = probe_login(name)
+    if ok is not None:
+        update_state(lambda s_: s_.setdefault("auth", {}).__setitem__(name, {"at": t, "ok": ok, "why": why}))
+    return ok, why, t
+
+
+def lane_model(cfg, name):
+    """'model effort' the lane's family gets in the worker role (else the first role that uses the family, else its first model)."""
+    fam = cfg["lanes"][name]["family"]
+    for role in [cfg["roles"].get("worker")] + list(cfg["roles"].values()):
+        for step in (role or {}).get("steps", []):
+            if step.get("on") == fam:
+                return f"{step['model']} {step['effort']}" + (" (planning/review only)" if fam == "openai" and cfg["settings"].get("codex_plan_review_only") else "")
+    return next((m for m, v in cfg["models"].items() if v["family"] == fam), None)
+
+
+def off_reason(name, cfg, login):
+    flag = {"DEEPSEEK_FREE": "deepseek_free_enabled", "ZAI_CODING_SUBSCRIPTION": "zai_coding_enabled"}.get(name)
+    if flag and cfg["settings"].get(flag) is not True:
+        return f"disabled: `route.py config set {flag} true` turns it on"
+    if profile_lanes().get(name) == "declined":
+        return f"declined: `route.py doctor --undecline {name}` brings it back"
+    if login[0] is False:
+        return f"not configured: logged out, run `{LOGIN_CMD[name]}`"
+    return f"not configured: `route.py doctor --lane {name}` sets it up" + (f" ({login[1]})" if login[0] is None and login[1] else "")
+
+
+def classify_out(lane, rec):
+    """Why a lane that is out is out -> logged_out | spend | slow | resting. rec is its state.json entry (older ones have no typed reason)."""
+    r = lane.out_reason
+    text = " ".join([(rec or {}).get("why", "")] + lane.notes)
+    if r == "logged_out" or (r in (None, "error") and LOGIN_RE.search(text)):
+        return "logged_out"
+    if lane.spend_blocked or SPEND_RE.search(text) or (r == "limit" and lane.kind == "credit"):
+        return "spend"
+    if r == "hung":
+        return "slow"
+    return "resting"
+
+
+def limit_words(text, lane):
+    if re.search(r"free usage", text, re.I):
+        return "free usage limit reached"
+    for pat, word in ((r"week|7.?day", "weekly"), (r"5.?hour|five.?hour", "5-hour"), (r"daily|per day|\bday\b", "daily")):
+        if re.search(pat, text, re.I):
+            return f"{word} limit hit"
+    top = max((w for w in lane.windows if w["used"] is not None), key=lambda w: w["used"], default=None)
+    return f"{top['name']} limit hit" if top and top["used"] >= 95 else "usage limit hit"
+
+
+def window_rows(lane, S, t):
+    rows, low = [], []
+    for w in lane.windows:
+        used = w["used"]
+        rows.append({"name": w["name"], "used_pct": None if used is None else round(used, 1), "resets_at": w["resets_at"],
+                     "resets_in_s": None if not w["resets_at"] else max(0, int(w["resets_at"] - t)), "source": w["source"],
+                     "age_s": None if w["at"] is None else max(0, int(t - w["at"]))})
+        if used is None or lane.kind == "credit":
+            continue
+        (gwk, gfv, gname), (cwk, cfv, _) = limits_for(lane, S, False), limits_for(lane, S, True)
+        gate, ceil = (gwk, cwk) if w["span"] > 1440 else (gfv, cfv)
+        if used >= gate:
+            low.append({"window": w["name"], "used_pct": round(used, 1), "limit": ceil if used >= ceil else gate,
+                        "over": "ceiling" if used >= ceil else "gate", "limit_name": "hard ceiling" if used >= ceil else gname})
+    return rows, low
+
+
+def lane_view(name, cfg, lane, st, t, history=(), running=0, login=(None, "", None), off_why=None):
+    """One lane's cockpit row. Pure given its inputs: lane is what gather built (None = disabled or not configured), history the recent finished runs."""
+    S, c = cfg["settings"], cfg["lanes"][name]
+    v = {"id": name, "label": c.get("label") or LABELS.get(name, name), "family": c["family"], "kind": c["kind"], "model": lane_model(cfg, name),
+         "state": "off", "emoji": EMOJI["off"], "reason": off_why or "disabled or not configured", "detail": None,
+         "unlock": {"locked": False, "known": False, "at": None, "in_s": None, "text": None, "why": "not in use"},
+         "windows": [], "low_tokens": [], "meter": c["reader"] != "none",
+         "login": {"ok": login[0], "why": login[1], "checked_at": login[2]}, "running": running}
+    if lane is None:
+        return v
+    v["windows"], v["low_tokens"] = window_rows(lane, S, t)
+    rec = (st.get("out") or {}).get(name)
+    relogin = f"waits for you to log in (`{LOGIN_CMD[name]}`); re-checked every {AUTH_TTL // 60} min"
+    until, why, locked = None, "not locked", False
+    if lane.out:
+        kind = classify_out(lane, rec)
+        text = (rec or {}).get("why") or (lane.notes[0] if lane.notes else "")
+        v["detail"] = text[:160] or None
+        until, locked = lane.out_until, True
+        if kind == "logged_out" or login[0] is False:
+            kind, until, why = "logged_out", None, relogin
+            note = f"logged out: run `{LOGIN_CMD[name]}`"
+        elif kind == "spend":
+            note = "spending limit: " + (text[:70] or "credits used up")
+            why = "a spending limit has no timer: it ends when you top up or the cycle resets"
+        elif kind == "slow":
+            note, why = "hung: no output inside the watchdog window, benched for a while", "the watchdog gave no end time"
+        else:
+            note, why = limit_words(text, lane), "the vendor gave no reset time"
+        v["state"] = kind
+    elif login[0] is False:
+        v["state"], locked, why = "logged_out", True, relogin
+        note = f"logged out: run `{LOGIN_CMD[name]}`"
+    elif not usable(lane, S, True)[0]:               # over the hard ceiling with nothing recorded: resting until that window resets
+        v["state"], locked = "resting", True
+        until, note, why = back_at(lane, S), usable(lane, S, True)[1], "no reset time for the window it is over"
+    else:
+        last = next((h for h in reversed(history) if h.get("lane") == name), None)
+        slow = last if last and last.get("reason") in SLOW_KINDS and t - (last.get("ts") or 0) <= SLOW_WINDOW else None
+        if slow:
+            v["state"], note = "slow", f"hung {fmt_in(t - slow['ts'])} ago ({slow['reason']}), no good run since"
+            why = "not locked: it clears with its next good run"
+        elif login[0] is None or (v["meter"] and not lane.usage_known):
+            v["state"] = "unknown"
+            note = "no read yet: " + (login[1] if login[0] is None and login[1] else (lane.notes[0] if lane.notes else "no usage reading"))
+        else:
+            v["state"] = "ready"
+            note = "ready" + ("" if v["meter"] else ", vendor shows no usage (a limit appears only when hit)")
+            if v["low_tokens"]:
+                lt = v["low_tokens"][0]
+                note = f"ready, low tokens: {lt['window']} {lt['used_pct']:.0f}% is over the {lt['limit_name']} {lt['limit']}%, last choice only"
+    v["emoji"], v["reason"] = EMOJI[v["state"]], note
+    if until and until > t and v["state"] != "logged_out":
+        v["unlock"] = {"locked": True, "known": True, "at": until, "in_s": int(until - t), "text": when(until, t), "why": None}
+    else:
+        v["unlock"] = {"locked": locked, "known": False, "at": None, "in_s": None, "text": None, "why": why}
+    return v
+
+
+def next_worker(cfg, lanes, st, t):
+    """The lane `next worker` would pick now: decide() on a copy, nothing written."""
+    cur = copy.deepcopy(lanes)
+    mark_busy(cur, st, cfg["settings"], t)
+    unattended = not interactive()
+    if unattended:
+        cur = {n: l for n, l in cur.items() if l.kind != "credit"}
+    d = decide("worker", cfg, cur, st, t, {"authored_by": None, "failed": [], "premium": None, "allow_degraded": False,
+                                           "unattended": unattended, "host": False, "cwd": None, "wait_busy": unattended})
+    if d["action"] == "run":
+        return {"action": "run", "lane": d["lane"], "model": d["model"], "effort": d["effort"], "pass": d["pass"], "fallback": d["fallback"]}
+    return {"action": d["action"], "lane": d.get("lane"), "model": None, "effort": None, "say": d.get("say") or d.get("error")}
+
+
+def cockpit(cfg, lanes, st, t):
+    """The cockpit dict: one row per known lane, configured or not, plus the pick `next worker` would make."""
+    import onboard
+    R = sys.modules[__name__]
+    hist = recent_runs(60)
+    live = live_leases(st, t)
+    rows = []
+    for name, c in cfg["lanes"].items():
+        lane = lanes.get(name)
+        login = login_state(name, st, t)
+        off = off_reason(name, cfg, login) if lane is None else None
+        rows.append(lane_view(name, cfg, lane, st, t, hist, sum(1 for x in live.values() if x["lane"] == name), login, off))
+    return {"v": 1, "at": t, "legend": {EMOJI[k]: LEGEND[k] for k in EMOJI}, "next_worker": next_worker(cfg, lanes, st, t), "lanes": rows}
+
+
+def cockpit_text(ck):
+    t, nw = ck["at"], ck["next_worker"]
+    pick = f"{nw['lane']} {nw['model']} {nw['effort']}" if nw["action"] == "run" else f"none ({(nw.get('say') or nw['action'])[:60]})"
+    width = max(len(r["id"]) for r in ck["lanes"])
+    mw = max(len(r["model"] or "-") for r in ck["lanes"])
+    out = [f"delegate lanes, {local(t)}   next worker: {pick}"]
+    for r in ck["lanes"]:
+        out.append(f"{r['emoji']} {r['id']:<{width}}  {(r['model'] or '-'):<{mw}}  {r['reason']}")
+        u = r["unlock"]
+        if u["locked"]:
+            out.append("     " + ("unlocks " + u["text"] if u["known"] else "unlock time unknown: " + u["why"]))
+        for w in r["windows"]:
+            used = "?" if w["used_pct"] is None else f"{w['used_pct']:.0f}%"
+            reset = f", resets {when(w['resets_at'], t)}" if w["resets_at"] and w["resets_at"] > t else ""
+            age = "" if w["age_s"] is None else f", {fmt_in(w['age_s'])} old" if w["age_s"] >= 60 else ", just now"
+            out.append(f"     {w['name']:<6} {used:>4} used{reset}  [{w['source']}{age}]")
+    run = [r for r in ck["lanes"] if r["running"]]
+    if run:
+        out.append("running: " + ", ".join(f"{r['id']} x{r['running']}" for r in run))
+    out.append("  ".join(f"{k} {v}" for k, v in ck["legend"].items()))
+    return out
+
+
 def cmd_status(a, cfg):
     t = now()
     st = load_state()
     lanes = gather(cfg, st, t, parse_json_arg(a.claude_usage))
     publish_lanes(lanes, st, t)
+    ck = cockpit(cfg, lanes, st, t)
     if a.json:
         print(json.dumps({"v": 1, "ts": t,
                           "lanes": {n: {"family": l.family, "kind": l.kind, "out": l.out, "out_until": l.out_until, "reason": l.out_reason if l.out else None, "five": l.five, "week": l.week,
                                         "pace": l.pace, "burn": l.burn, "spend": l.spend, "cap": l.cap, "notes": l.notes} for n, l in lanes.items()},
+                          "cockpit": ck,
                           "running": [{"run_id": k, "lane": v["lane"], "role": v["role"], "task": v.get("task", ""), "started": v["start"], "age_s": int(t - v["start"]),
                                        "pid": v.get("pid"), "worker_pid": v.get("worker_pid")}
                                       for k, v in sorted(live_leases(st, t).items(), key=lambda kv: kv[1]["start"])],
@@ -985,10 +1287,7 @@ def cmd_status(a, cfg):
                           "recent": recent_runs(a.recent),
                           "needs_input": needs_input(lanes)}))
         return 0
-    for n, l in lanes.items():
-        print(f"{n:<20} {l.brief(t)}")
-    for k, v in sorted(live_leases(st, t).items(), key=lambda kv: kv[1]["start"]):
-        print(f"running {v['lane']} {v['role']} {int(t - v['start'])}s{' task ' + v['task'] if v.get('task') else ''}  ({k[:8]})")
+    print("\n".join(cockpit_text(ck)))
     for n in needs_input(lanes):
         print(f"needs input: {n['what']}: {n['how']}")
     return 0
@@ -2429,6 +2728,10 @@ def cmd_config(a, cfg):
 # ----------------------------------------------------------------------------- cli
 
 def main(argv=None):
+    for stream in (sys.stdout, sys.stderr):      # the cockpit prints emoji: a Windows console on cp1252 must not crash on them
+        with contextlib.suppress(Exception):
+            if (stream.encoding or "").lower().replace("-", "") != "utf8":
+                stream.reconfigure(encoding="utf-8", errors="replace")
     ap = argparse.ArgumentParser(prog="route.py", description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = ap.add_subparsers(dest="cmd", required=True)
     s = sub.add_parser("status"); s.add_argument("--claude-usage"); s.add_argument("--json", action="store_true"); s.add_argument("--recent", type=int, default=20)
