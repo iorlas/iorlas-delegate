@@ -950,6 +950,13 @@ echo '{"type":"step_finish","sessionID":"ses_1","part":{"type":"step-finish","to
             self.assertEqual(run("touch made").returncode == 0, write)
             self.assertNotEqual(run("touch /Users/Shared/delegate-probe-x").returncode, 0)        # writable by everyone, outside the sandbox's list
 
+    def test_opencode_shell_is_offline_for_uv_and_network_refusals_are_not_denials(self):
+        sh = self.base / "sh-offline"
+        route.opencode_shell(self.repo, True, sh)
+        self.assertIn("export UV_OFFLINE=1\n", sh.read_text())
+        self.assertTrue(route.network_refusal("error: tcp connect error\n  Operation not permitted (os error 1)"))
+        self.assertFalse(route.network_refusal("cat: /Users/x/.ssh/id_rsa: Operation not permitted"))
+
     @unittest.skipIf(sys.platform != "darwin", "macOS only")
     def test_grok_limit_and_secret_answers(self):
         self.grok_ready()

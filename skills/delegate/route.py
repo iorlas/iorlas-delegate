@@ -1705,6 +1705,11 @@ def opencode_exe():
     return shutil.which("opencode") or next((str(p) for p in [Path.home() / ".opencode" / "bin" / "opencode"] if p.is_file()), None)
 
 
+def network_refusal(outp):
+    """True when a command's output shows it was refused the network (the shell's sandbox blocks it): that is not an owner decision."""
+    return any(x in outp for x in ("tcp connect error", "Network is unreachable", "Failed to connect", "error sending request"))
+
+
 def opencode_shell(cwd, write, path):
     """The $SHELL OpenCode runs commands with: each one under sandbox-exec (no network, no secret paths or .env files, writes only in cwd and temp).
     OpenCode itself stays outside: it needs the network for its model, and macOS cannot nest a sandbox inside another."""
@@ -1719,7 +1724,7 @@ def opencode_shell(cwd, write, path):
             f'(deny file-write* (require-all {keep} (require-not (regex #"^/dev/"))))' + ("" if write else f"(deny file-write* (subpath {q(cwd)}))"))
     xdg = os.environ.get("XDG_CONFIG_HOME")
     head = f"export XDG_CONFIG_HOME={shlex.quote(xdg)}" if xdg else "unset XDG_CONFIG_HOME"      # commands get the user's config root back
-    path.write_text(f"#!/bin/sh\n{head}\nexport SHELL=/bin/zsh\nexec /usr/bin/sandbox-exec -p {shlex.quote(prof)} /bin/zsh \"$@\"\n", encoding="utf-8")
+    path.write_text(f"#!/bin/sh\n{head}\nexport SHELL=/bin/zsh\nexport UV_OFFLINE=1\nexec /usr/bin/sandbox-exec -p {shlex.quote(prof)} /bin/zsh \"$@\"\n", encoding="utf-8")
     path.chmod(0o700)
 
 
@@ -1776,7 +1781,7 @@ def launch_opencode(d, brief, a, rid, t, meta):
             seen["work"] = True
             st = p.get("state") or {}
             inp, outp = st.get("input") or {}, str(st.get("output") or st.get("error") or "")
-            if "Operation not permitted" in outp or "prevents you from using this specific tool call" in outp:
+            if ("Operation not permitted" in outp and not network_refusal(outp)) or "prevents you from using this specific tool call" in outp:
                 seen["denied"].append({"tool": p.get("tool"), "input": inp})
             if p.get("tool") == "bash" and secret_hit(inp.get("command")):      # reported after it ran: the sandbox already refused the read
                 seen["denied"].append({"tool": "bash", "input": inp})
