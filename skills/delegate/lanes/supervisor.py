@@ -15,13 +15,55 @@ LIMITS = {"claude": {"first_event_s": 120, "silence_s": 600},
 CLI_OF_KIND = {"claude_p": "claude", "codex": "codex", "opencode": "opencode"}      # a runner kind (route.how) -> its CLI
 SLEEP_GAP_S = 15       # poll() runs every 0.5 s: a gap this long between two polls is a suspended machine, not a quiet worker
 LONG_GAP_S = 1800      # an inter-event gap longer than this is written to history (role "gap")
-ANSWER_GRACE_S = 120   # codex printed a final agent message or turn.completed: any later event resets this; quiet this long, its tree is stopped (delegate-itn)
-STALL_S = 900          # codex owes a response (no command running) and printed nothing this long: the model stream is stalled, stop it (rollout 01a177fc stalled 22 min)
+ANSWER_GRACE_S = 120   # the worker printed its completion event or final message: any later event resets this; quiet this long, its tree is stopped (delegate-itn, delegate-np7)
+GRACE_OF = {"claude": 5}      # per CLI: Claude's `result` event is an explicit end marker (not a heuristic like a codex agent_message), so its tail is short; others use ANSWER_GRACE_S
+STALL_S = 900          # the worker owes a model response (no tool running) and printed nothing this long: the model stream is stalled, stop it (rollout 01a177fc stalled 22 min).
+                       # Effective bound = min(STALL_S, the CLI's silence_s): claude 600 and opencode 900 already stop earlier or at the same time.
 BEAT_S = 30            # at most one heartbeat callback per this many seconds
 
 
 def limits(cli):
     return dict(LIMITS[cli])
+
+
+def grace_s(cli):
+    return GRACE_OF.get(cli, ANSWER_GRACE_S)
+
+
+class Turn:
+    """One worker's turn as the three launchers see it (Codex exec --json, claude -p stream-json, opencode run --format json): one rule set (delegate-np7).
+    The launcher's on_line maps a harness event to `finished()` (its completion event or final assistant message), `more()` (anything else: the turn goes on) and
+    `tool(id, open_)` (a tool call in flight keeps the long silence limit). `verdict(wd)` -> "answer" once finished and quiet for the grace, "stall" once the model
+    owes a response and the stream has printed nothing for STALL_S, else None. Only the clock is injected."""
+
+    def __init__(self, cli, clock=time.monotonic):
+        self.cli, self.clock = cli, clock
+        self.done_t, self.open, self.stop = None, set(), None
+
+    def finished(self):
+        self.done_t = self.clock()
+
+    def more(self):
+        self.done_t = None
+
+    def tool(self, ident, open_):
+        if ident is not None:
+            (self.open.add if open_ else self.open.discard)(ident)
+
+    def verdict(self, wd):
+        if self.done_t is not None and self.clock() - self.done_t >= grace_s(self.cli):
+            self.stop = "answer"
+        elif wd.events and not self.open and self.done_t is None and wd.idle_s > STALL_S:
+            self.stop = "stall"
+        return self.stop
+
+    def stall_words(self):
+        return f"owed a model response and printed nothing for {STALL_S}s"
+
+
+def tail(out, n=20, width=2000):
+    """The last n raw lines of a worker's stdout, cut to width: what the call record keeps when we stopped the worker."""
+    return [x[:width] for x in out.splitlines()[-n:]]
 
 
 class Watchdog:

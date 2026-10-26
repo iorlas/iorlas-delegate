@@ -49,6 +49,14 @@ def claude(u, cost, credit):
     return a
 
 
+def claude_stream(requests):
+    """The assistant events of a `claude -p` stream (one usage dict per model request, newest wins per message id) -> one usage dict in the result event's shape.
+    Used where the stream ended without its `result` event (we stopped the worker): the requests already made were still paid for."""
+    keys = ("input_tokens", "cache_read_input_tokens", "cache_creation_input_tokens", "output_tokens")
+    rs = [r for r in requests if isinstance(r, dict)]
+    return {k: sum(r.get(k) or 0 for r in rs) for k in keys} if rs else {}
+
+
 def opencode_step(acct, tokens, cost):
     """Fold one opencode step-finish (tokens {input, output, reasoning, cache{read,write}}, cost) into the running acct."""
     c = tokens.get("cache") or {}

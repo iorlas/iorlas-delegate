@@ -2625,7 +2625,8 @@ def launch_codex(d, brief, a, rid, t, meta):
         cmd += (["--output-schema", a.schema] if a.schema else []) + [a.resume, "-"]
     else:
         cmd = [exe] + h["cli"][1:] + ["--json", "-o", str(out_file)] + (["--output-schema", a.schema] if a.schema else []) + ["-"]
-    seen = {"ref": a.resume, "last": "", "tokens": None, "denied": [], "error": "", "transient": "", "work": False, "turns": 0, "net_at": None, "net": False, "done_t": None, "open": set(), "stop": None}
+    seen = {"ref": a.resume, "last": "", "tokens": None, "denied": [], "error": "", "transient": "", "work": False, "turns": 0, "net_at": None, "net": False, }
+    turn = supervisor.Turn("codex")
     if a.resume:
         note_ref(a.resume)
 
@@ -2638,14 +2639,11 @@ def launch_codex(d, brief, a, rid, t, meta):
             return
         kind, it = ev.get("type"), ev.get("item") or {}
         if kind == "turn.completed" or (kind == "item.completed" and it.get("type") == "agent_message"):
-            seen["done_t"] = time.monotonic()       # the answer may be in: poll() stops the tree if nothing else comes within ANSWER_GRACE_S (delegate-itn)
+            turn.finished()         # the answer may be in: poll() stops the tree if nothing else comes within the grace (delegate-itn)
         else:
-            seen["done_t"] = None                   # any later event: the turn goes on
-        if it.get("type") in ("command_execution", "mcp_tool_call", "file_change") and it.get("id") is not None:      # a running tool keeps the long silence limit
-            if kind == "item.started":
-                seen["open"].add(it["id"])
-            elif kind == "item.completed":
-                seen["open"].discard(it["id"])
+            turn.more()             # any later event: the turn goes on
+        if it.get("type") in ("command_execution", "mcp_tool_call", "file_change") and kind in ("item.started", "item.completed"):      # a running tool keeps the long silence limit
+            turn.tool(it.get("id"), kind == "item.started")
         if ev.get("type") == "thread.started" and ev.get("thread_id"):
             seen["ref"] = ev["thread_id"]
             note_ref(seen["ref"])
@@ -2681,19 +2679,12 @@ def launch_codex(d, brief, a, rid, t, meta):
     before = (codex_thread_total(a.resume) or history_cumulative(a.resume)) if a.resume else None
     poll0, tick, dog = worker_watch("codex", d["lane"])
     WORKER_TICK[:] = [tick]
+    base_poll = stream_poll(poll0, turn, dog)
 
     def poll():
         """Codex waits for the network by itself, for as long as it takes. Past NET_GRACE_S of that, one probe: still offline -> stop it now and hand the
         wait to the caller (the thread resumes), instead of holding the slot for the whole silence limit."""
-        if poll0():
-            return True
-        if seen["done_t"] is not None and time.monotonic() - seen["done_t"] >= supervisor.ANSWER_GRACE_S:
-            seen["stop"] = "answer"
-            return True
-        wd = dog["wd"]
-        if wd.events and not seen["open"] and seen["done_t"] is None and wd.idle_s > supervisor.STALL_S:       # the model owes a response and nothing comes (a running command keeps the long silence limit)
-            seen["stop"] = "stall"
-            dog.update(why="hung", kind="stall", words=f"owed a model response and printed nothing for {supervisor.STALL_S}s")
+        if base_poll():
             return True
         if seen["net_at"] is not None and time.monotonic() - seen["net_at"] >= NET_GRACE_S:
             seen["net_at"] = None
@@ -2707,10 +2698,9 @@ def launch_codex(d, brief, a, rid, t, meta):
     with contextlib.suppress(OSError):
         text = out_file.read_text(encoding="utf-8", errors="replace").strip()
         out_file.unlink()
-    if seen["stop"] == "stall" and seen["ref"] and not getattr(a, "stalled_once", False) and load_routing()["settings"].get("codex_resume_after_stall"):
-        return launch_codex(d, "Your previous request stalled and was stopped. Continue and give your final answer.",       # once; off by default: resuming a turn that never closed is untested
-                            argparse.Namespace(**dict(vars(a), resume=seen["ref"], stalled_once=True)), rid, t, meta)
-    final = bool(text) or bool(seen["last"] and (seen["turns"] or seen["stop"] == "answer"))        # the turn finished: codex writes -o only at its end
+    if seen["ref"] and stalled_once_more("codex", turn, dog, a):
+        return launch_codex(d, RESUME_NOTE, argparse.Namespace(**dict(vars(a), resume=seen["ref"], stalled_once=True)), rid, t, meta)       # once; off by default
+    final = bool(text) or bool(seen["last"] and (seen["turns"] or turn.stop == "answer"))        # the turn finished: codex writes -o only at its end
     text = text or seen["last"]
     seen["tokens"] = accounting.per_call(seen["tokens"], before)      # a running total: keep this run's part
     if seen["ref"]:             # the reviewer's tokens are the run's too
@@ -2722,11 +2712,11 @@ def launch_codex(d, brief, a, rid, t, meta):
            "context_k": codex_context_k(seen["ref"]), "started": bool(seen["ref"]), "partial": seen["work"], "answered": final,
            "acct": accounting.codex(seen["tokens"]), "cumulative": seen.get("cumulative")}
     o = classify.classify(rc, seen["error"] or (seen["transient"] if rc != 0 else ""), err, timed_out, seen["work"], dict(watch_fields(res, dog), secret=seen.get("secret")))
-    if seen["stop"] == "answer" and o and o.reason == "killed" and final and not seen["error"] and not timed_out:       # we stopped it after its answer: the answer stands
+    if turn.stop == "answer" and o and o.reason == "killed" and final and not seen["error"] and not timed_out:       # we stopped it after its answer: the answer stands
         o = None
         res["warnings"] = ["answer_done_process_alive"]
-    if dog["why"] == "hung" or seen["stop"] == "stall":        # the raw tail of the stream, so the call record shows what the CLI last said before it was stopped
-        res["stream_tail"] = [x[:2000] for x in out.splitlines()[-20:]]
+    if dog["why"] or turn.stop or timed_out:        # the raw tail of the stream, so the call record shows what the CLI last said before it was stopped
+        res["stream_tail"] = supervisor.tail(out)
     if seen["net"] and (o is None or o.reason == "killed"):       # we stopped it because the network is down
         o = classify.Outcome("network", seen["transient"], "event")
     if o:       # codex's error or stderr, never the model's answer
@@ -2748,6 +2738,7 @@ def opencode_transcript(ref):
     return config_dir() / "opencode-sessions" / (ref + ".json")
 
 
+OC_FINAL_REASONS = ("stop", "end_turn", "end-turn")       # step_finish part.reason of a step that ends the turn (not "tool-calls")
 OC_HUNG_OUT_SECS = 1800       # a lane whose worker printed nothing at all rests this long
 
 
@@ -2825,6 +2816,29 @@ def worker_watch(cli, lane, extra=None):
             return True
         return False
     return poll, wd.touch, state
+
+
+def stream_poll(poll0, turn, dog):
+    """poll for run_proc: `poll0` (limit, silence), then the shared Turn rules: answer-then-grace and stall (lanes/supervisor.py, delegate-np7). The stall is
+    reported as a hung worker of kind "stall"; the answer as turn.stop == "answer" (the launcher keeps the answer)."""
+    def poll():
+        if poll0():
+            return True
+        v = turn.verdict(dog["wd"])
+        if v == "stall":
+            dog.update(why="hung", kind="stall", words=turn.stall_words())
+        return bool(v)
+    return poll
+
+
+def stalled_once_more(cli, turn, dog, a):
+    """True when this run died on a stalled model stream (stall or silence deadline) and the one resume is allowed: setting `<cli>_resume_after_stall`, off by default
+    (resuming a turn that never closed is untested for all three CLIs)."""
+    stalled = turn.stop == "stall" or (dog["why"] == "hung" and dog["kind"] == "silence")
+    return stalled and not getattr(a, "stalled_once", False) and bool(load_routing()["settings"].get(f"{cli}_resume_after_stall"))
+
+
+RESUME_NOTE = "Your previous request stalled and was stopped. Continue and give your final answer."
 
 
 def log_gaps(w, d):
@@ -2954,6 +2968,8 @@ def launch_opencode(d, brief, a, rid, t, meta):
 
     poll, tick, dog = worker_watch("opencode", d["lane"], opencode_log_poll())
     WORKER_TICK[:] = [tick]
+    turn = supervisor.Turn("opencode")
+    poll = stream_poll(poll, turn, dog)
 
     def on_line(line):
         try:
@@ -2968,6 +2984,12 @@ def launch_opencode(d, brief, a, rid, t, meta):
             if agent_runs:
                 agent_runs.run(rid, session=seen["ref"])
         p = ev.get("part") or {}
+        if ev.get("type") == "step_finish" and p.get("reason") in OC_FINAL_REASONS:
+            turn.finished()         # the last step of the turn (a "tool-calls" step is followed by another); a later event resets the grace
+        else:
+            turn.more()
+        if ev.get("type") == "tool_use" and (p.get("callID") or p.get("id")) and (p.get("state") or {}).get("status") in ("pending", "running", "completed", "error"):
+            turn.tool(p.get("callID") or p.get("id"), (p.get("state") or {}).get("status") in ("pending", "running"))      # opencode prints a tool call when it ends: usually no open call is seen
         if ev.get("type") == "step_finish" and isinstance(p.get("tokens"), dict):
             u, c = p["tokens"], p["tokens"].get("cache") or {}
             tk = seen["tokens"] or {"in": 0, "cached": 0, "out": 0}
@@ -3001,6 +3023,8 @@ def launch_opencode(d, brief, a, rid, t, meta):
     finally:
         with contextlib.suppress(OSError):
             shell.unlink()
+    if seen["ref"] and stalled_once_more("opencode", turn, dog, a):
+        return launch_opencode(d, RESUME_NOTE, argparse.Namespace(**dict(vars(a), resume=seen["ref"], stalled_once=True)), rid, t, meta)       # once; off by default
     if seen["ref"]:     # opencode keeps sessions in its database: export one to a file, so `transcript` is a path like the other lanes'
         with contextlib.suppress(OSError, subprocess.TimeoutExpired):
             x = run_tree([exe, "export", seen["ref"]], 60, env=env)
@@ -3015,6 +3039,11 @@ def launch_opencode(d, brief, a, rid, t, meta):
     res["cost"] = (res["acct"] or {}).get("cost_usd") or 0         # opencode's per-step cost where it states one (Grok); zai and free steps carry none
     why = seen["error"] or (err if rc != 0 else "")
     o = classify.classify(rc, why, "", timed_out, seen["work"], dict(watch_fields(res, dog), secret=seen.get("secret")))
+    if turn.stop == "answer" and o and o.reason == "killed" and text and not seen["error"] and not timed_out:       # we stopped it after its last step: the answer stands
+        o = None
+        res["warnings"] = ["answer_done_process_alive"]
+    if dog["why"] or turn.stop or timed_out:        # the raw tail of the stream, so the call record shows what the CLI last said before it was stopped
+        res["stream_tail"] = supervisor.tail(out)
     if o:       # opencode's error event, stderr or log, never the model's answer
         hint = "free OpenCode access refused; no paid credentials will be used" if d["lane"] == "DEEPSEEK_FREE" else "run `opencode auth login` (xAI, SuperGrok Subscription)"
         if d["lane"] == "ZAI_CODING_SUBSCRIPTION":
@@ -3038,9 +3067,6 @@ def repo_instruction_text(cwd, cap=32768):
         if left <= 0:
             break
     return out
-
-
-RESULT_GRACE = 5     # seconds a claude worker may take to exit after its result before it is stopped
 
 
 def launch_claude(d, brief, a, rid, t, cfg, meta):
@@ -3073,37 +3099,64 @@ def launch_claude(d, brief, a, rid, t, cfg, meta):
     note_ref(ref)               # claude takes the session id from us (--session-id): known before the first event
     if agent_runs:
         agent_runs.run(rid, kind="claude-p", session=ref, lane=d["lane"], model=d["model"], cwd=h["cwd"], started=t, status="running", **meta)
-    final, ctx, begun = [], [], []
+    final, ctx, begun, said, streamed = [], [], [], [""], {}
+    turn = supervisor.Turn("claude")
 
     def on_line(line):      # the first result is the answer: claude -p then waits for background tasks and takes another turn on their exit
         with contextlib.suppress(ValueError):
             e = json.loads(line)
-            if isinstance(e, dict) and e.get("type") in ("assistant", "user", "result"):
+            if not isinstance(e, dict):
+                return None
+            kind, msg = e.get("type"), e.get("message") if isinstance(e.get("message"), dict) else {}
+            blocks = [b for b in msg.get("content") or [] if isinstance(b, dict)] if isinstance(msg.get("content"), list) else []
+            if kind in ("assistant", "user", "result"):
                 begun[:] = [True]           # the session exists on disk from its first message
-            if isinstance(e, dict) and e.get("type") == "result" and not final:
-                final.append(e)
-                return RESULT_GRACE
-            if isinstance(e, dict) and e.get("type") == "assistant" and isinstance((e.get("message") or {}).get("usage"), dict):
-                u_ = e["message"]["usage"]       # one model request: its whole input is the context size
-                ctx[:] = [round(((u_.get("input_tokens") or 0) + (u_.get("cache_read_input_tokens") or 0) + (u_.get("cache_creation_input_tokens") or 0)) / 1000, 1)]
+            if kind == "result":
+                if not final:
+                    final.append(e)
+                turn.finished()
+            elif kind == "assistant":
+                for b in blocks:
+                    if b.get("type") == "tool_use":
+                        turn.tool(b.get("id"), True)        # a running tool keeps the long silence limit
+                    elif b.get("type") == "text" and b.get("text"):
+                        said[0] = b["text"]
+                if msg.get("stop_reason") == "end_turn" and not any(b.get("type") == "tool_use" for b in blocks):
+                    turn.finished()         # the final assistant message; a later event resets the grace
+                else:
+                    turn.more()
+                if isinstance(msg.get("usage"), dict):
+                    u_ = msg["usage"]       # one model request: its whole input is the context size
+                    streamed[msg.get("id") or len(streamed)] = u_
+                    ctx[:] = [round(((u_.get("input_tokens") or 0) + (u_.get("cache_read_input_tokens") or 0) + (u_.get("cache_creation_input_tokens") or 0)) / 1000, 1)]
+            else:
+                for b in blocks:
+                    if b.get("type") == "tool_result":
+                        turn.tool(b.get("tool_use_id"), False)
+                turn.more()
         return None
     poll, tick, dog = worker_watch("claude", d["lane"])
     WORKER_TICK[:] = [tick]
-    rc, out, err, timed_out = run_proc(cmd, brief, h["cwd"], child_env(extra), a.timeout, on_line, poll)
+    rc, out, err, timed_out = run_proc(cmd, brief, h["cwd"], child_env(extra), a.timeout, on_line, stream_poll(poll, turn, dog))
     log_gaps(dog, d)
+    if stalled_once_more("claude", turn, dog, a) and begun:
+        return launch_claude(d, RESUME_NOTE, argparse.Namespace(**dict(vars(a), resume=ref, stalled_once=True)), rid, t, cfg, meta)       # once; off by default
     j = final[0] if final else {}
-    if final and not j.get("is_error"):
+    by_message = not final and turn.stop == "answer" and bool(said[0])         # the final assistant message came, the result event never did
+    if (final and not j.get("is_error")) or by_message:
         rc = 0          # stopped by us after answering
-    text = j.get("result") if isinstance(j.get("result"), str) else out.strip()[-2000:]
+    text = j.get("result") if isinstance(j.get("result"), str) else said[0] if by_message else out.strip()[-2000:]
     cost = float(j.get("total_cost_usd") or 0)          # the harness's own figure on every lane, subscription included (study 85)
     if credit and cost > 0:
         ledger_add(cost, d["model"], t)
-    u = j.get("usage") if isinstance(j.get("usage"), dict) else {}
+    u = j.get("usage") if isinstance(j.get("usage"), dict) else accounting.claude_stream(streamed.values())      # no result event: what the stream's requests reported
     res = {"text": text, "ref": j.get("session_id") or ref, "cost": cost, "stderr": err, "tokens": claude_tokens(u),
            "acct": accounting.claude(u, j.get("total_cost_usd"), credit),
            "denied": [{"tool": x.get("tool_name"), "input": x.get("tool_input")} for x in j.get("permission_denials") or []
                       if isinstance(x, dict) and not policy_denial(x, h.get("read_only"))]}
     res.update(turns=j.get("num_turns"), context_k=ctx[0] if ctx else None, started=bool(begun), partial=bool(begun))
+    if dog["why"] or turn.stop or timed_out:        # the raw tail of the stream, so the call record shows what the CLI last said before it was stopped
+        res["stream_tail"] = supervisor.tail(out)
     failed = rc != 0 or bool(j.get("is_error"))
     o = classify.classify(rc or (1 if failed else 0), classify.claude_vendor_error(j), err, timed_out, (j.get("num_turns") or 0) > 1,
                           dict(watch_fields(res, dog), http_status=j.get("api_error_status"))) if failed or timed_out else None
@@ -3113,6 +3166,8 @@ def launch_claude(d, brief, a, rid, t, cfg, meta):
         update_state(lambda s: s.setdefault("out", {}).pop(d["lane"], None))
         data = j.get("structured_output") if isinstance(j.get("structured_output"), (dict, list)) else parse_data(text, a.schema)
         res.update(status="done", data=data)
+        if by_message:
+            res["warnings"] = ["answer_done_process_alive"]
         if final and netprobe.looks_dropped(err):       # the answer was in before the connection broke (ae6v): done, with a note
             res["warnings"] = ["net_after_answer"]
     return res
