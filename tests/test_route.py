@@ -618,6 +618,7 @@ case "$FAKE_MODE" in drop_early|drop_early_twice)       # the connection breaks 
   if [ "$FAKE_MODE" = drop_early_twice ] || [ "$n" = 0 ]; then echo "request failed: error sending request for url (https://chatgpt.com/backend-api)" >&2; exit 1; fi;;
 esac
 echo '{"type":"thread.started","thread_id":"thread-123"}'
+[ "$FAKE_MODE" = answer_alive ] && echo '{"type":"item.completed","item":{"id":"i9","type":"agent_message","text":"{\\"findings\\": []}"}}'
 echo '{"type":"turn.completed","usage":{"input_tokens":100,"cached_input_tokens":40,"output_tokens":7}}'
 case "$FAKE_MODE" in
   drop_early) printf 'second try' > "$out";;
@@ -625,6 +626,7 @@ case "$FAKE_MODE" in
   wait_recover) echo '{"type":"error","message":"Reconnecting... waiting for network (Connection failed: error sending request)"}'
                 echo '{"type":"item.completed","item":{"id":"i3","type":"command_execution","command":"ls","exit_code":0,"status":"completed"}}'; printf 'recovered' > "$out";;
   wait_stuck) echo '{"type":"error","message":"Reconnecting... waiting for network (Connection failed: error sending request)"}'; sleep 300 & echo $! > "$FAKE_PIDFILE"; wait;;
+  answer_alive) sleep 300 & echo $! > "$FAKE_PIDFILE"; wait;;      # the final message and turn.completed are out; the process never exits (delegate-itn)
   ok) printf 'done: %s' "$(echo "$brief" | tail -1)" > "$out";;
   json) printf '{"a": 1}' > "$out";;
   limit) echo "You have hit your usage limit. Try again later." >&2; exit 1;;
@@ -886,6 +888,23 @@ printf '{"type":"result","result":"claude says hi","session_id":"sess-1","total_
         self.assertEqual(r["tokens"], {"in": 73, "cached": 50, "out": 9})    # claude: uncached + cache reads + cache writes
         line = json.loads(route.history_path().read_text().splitlines()[-1])
         self.assertEqual(line["tokens"], r["tokens"])
+
+    def test_answer_done_process_alive_is_done_after_the_grace(self):
+        """delegate-itn: turn.completed after the final agent message, then the process never exits: done after the grace, whole tree stopped."""
+        from lanes import supervisor
+        self.addCleanup(setattr, supervisor, "ANSWER_GRACE_S", supervisor.ANSWER_GRACE_S)
+        supervisor.ANSWER_GRACE_S = 1
+        t0 = time.time()
+        _, r = self.run_it(mode="answer_alive", timeout=0)
+        self.assertLess(time.time() - t0, 40)
+        self.assertEqual((r["status"], r["text"], r["lane"]), ("done", '{"findings": []}', "OPENAI_SUBSCRIPTION"))
+        self.assertEqual(r["warnings"], ["answer_done_process_alive"])
+        self.assertIsNone(r["stop"])
+        self.assertEqual(json.loads(route.history_path().read_text().splitlines()[-1])["warnings"], ["answer_done_process_alive"])
+        self.assertNotIn("OPENAI_SUBSCRIPTION", route.load_state().get("out", {}))
+        time.sleep(0.3)
+        with self.assertRaises(OSError):
+            os.kill(int(Path(os.environ["FAKE_PIDFILE"]).read_text()), 0)
 
     def test_sigterm_on_route_py_stops_the_worker_too(self):
         import signal

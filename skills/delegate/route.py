@@ -2665,6 +2665,9 @@ def launch_codex(d, brief, a, rid, t, meta):
             seen["denied"].append({"tool": "Bash", "input": {"command": item.get("command")}})
             seen["secret"] = item.get("command")
             return True             # codex has no hook under exec: stop the worker before it can use what it read
+        if ev.get("type") == "turn.completed" and seen["last"] and not seen["error"]:
+            seen["done_t"] = time.monotonic()
+            return supervisor.ANSWER_GRACE_S        # the answer is in: the process gets this long to exit, then run_proc stops its tree (delegate-itn)
     if agent_runs:
         agent_runs.run(rid, kind="codex", lane=d["lane"], model=d["model"], cwd=h["cwd"], started=t, status="running", **meta)
     started = time.time()       # wall clock, not now(): it is compared with file times
@@ -2701,6 +2704,10 @@ def launch_codex(d, brief, a, rid, t, meta):
            "context_k": codex_context_k(seen["ref"]), "started": bool(seen["ref"]), "partial": seen["work"], "answered": final,
            "acct": accounting.codex(seen["tokens"]), "cumulative": seen.get("cumulative")}
     o = classify.classify(rc, seen["error"] or (seen["transient"] if rc != 0 else ""), err, timed_out, seen["work"], dict(watch_fields(res, dog), secret=seen.get("secret")))
+    if o and o.reason == "killed" and seen.get("done_t") and not seen["error"] and not timed_out and final \
+            and time.monotonic() - seen["done_t"] >= supervisor.ANSWER_GRACE_S - 1:       # we stopped it after its answer: the answer stands
+        o = None
+        res["warnings"] = ["answer_done_process_alive"]
     if seen["net"] and (o is None or o.reason == "killed"):       # we stopped it because the network is down
         o = classify.Outcome("network", seen["transient"], "event")
     if o:       # codex's error or stderr, never the model's answer
@@ -3451,7 +3458,7 @@ def run_once(a, cfg):
     detail = res.pop("detail", "")
     history_add({"ts": now(), "run_id": rid, "call_id": getattr(a, "call_id", None), "ref": res.get("ref"), **health.row_fields(res.get("outcome"), "", detail or res.get("say"), res.get("retry_after")),
                  "role": a.role, "task": a.task or "", "lane": d["lane"], "model": d["model"], "effort": d["effort"],
-                 "status": res["status"], "reason": res.get("reason"), "host": bool(a.host), "denials": len(res.get("denied") or []), "secs": secs, "cost": res.get("cost", 0), "tokens": res.get("tokens"), "cumulative": res.get("cumulative"),
+                 "status": res["status"], "reason": res.get("reason"), "warnings": res.get("warnings"), "host": bool(a.host), "denials": len(res.get("denied") or []), "secs": secs, "cost": res.get("cost", 0), "tokens": res.get("tokens"), "cumulative": res.get("cumulative"),
                  "five_before": lane.five, "week_before": lane.week, "five_after": five_after, "week_after": week_after,
                  "overlap": sorted(set(taken["peers"]) | set(ends.get("peers", []))), "slots": cap, "transcript": transcript})
     info = transcript_info(transcript, fam, t_from)

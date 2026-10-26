@@ -246,7 +246,7 @@
           },
           {
             "model": "gpt-6.1-sol",
-            "effort": "high",
+            "effort": "medium",
             "on": "openai",
             "mode": "read_only",
             "use": "review",
@@ -256,7 +256,7 @@
         "claude": [
           {
             "model": "gpt-6.1-sol",
-            "effort": "high",
+            "effort": "medium",
             "on": "openai",
             "mode": "read_only",
             "use": "review"
@@ -293,7 +293,7 @@
         "xai": [
           {
             "model": "gpt-6.1-sol",
-            "effort": "high",
+            "effort": "medium",
             "on": "openai",
             "mode": "read_only",
             "use": "review"
@@ -329,7 +329,7 @@
         "unknown": [
           {
             "model": "gpt-6.1-sol",
-            "effort": "high",
+            "effort": "medium",
             "on": "openai",
             "mode": "read_only",
             "use": "review"
@@ -365,7 +365,7 @@
         "deepseek": [
           {
             "model": "gpt-6.1-sol",
-            "effort": "high",
+            "effort": "medium",
             "on": "openai",
             "mode": "read_only",
             "use": "review"
@@ -408,7 +408,7 @@
           },
           {
             "model": "gpt-6.1-sol",
-            "effort": "high",
+            "effort": "medium",
             "on": "openai",
             "mode": "read_only",
             "use": "review"

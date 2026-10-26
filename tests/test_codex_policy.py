@@ -26,6 +26,20 @@ class CodexPolicy(unittest.TestCase):
             self.assertEqual(d['lane'],'OPENAI_SUBSCRIPTION')
             self.assertEqual(d['how']['sandbox'],'read-only')
 
+    def test_reviewer_runs_codex_at_medium_effort_planner_stays_high(self):
+        """delegate-aam: medium on every Codex step of the reviewer role (and in the launched command); planner unchanged."""
+        r=self.cfg['roles']['reviewer']
+        steps=[s for v in r['by_author'].values() for s in v if s['on']=='openai']
+        self.assertTrue(steps)
+        self.assertEqual({s['effort'] for s in steps},{'medium'})
+        ls={'OPENAI_SUBSCRIPTION':lanes()['OPENAI_SUBSCRIPTION']}
+        d=route.decide('reviewer',self.cfg,ls,{},T,self.args)
+        self.assertEqual(d['effort'],'medium')
+        self.assertIn('model_reasoning_effort=medium',d['how']['cli'])
+        p=route.decide('planner',self.cfg,ls,{},T,self.args)
+        self.assertEqual(p['effort'],'high')
+        self.assertIn('model_reasoning_effort=high',p['how']['cli'])
+
     def test_fresh_worker_uses_deepseek_and_falls_back_to_other_non_codex_lanes(self):
         self.cfg['settings']['deepseek_free_enabled']=True
         ls=lanes();ls['DEEPSEEK_FREE']=route.Lane('DEEPSEEK_FREE','deepseek','subscription')
