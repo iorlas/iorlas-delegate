@@ -20,7 +20,7 @@ LOGIN_RE = re.compile(r"not logged in|please (run|use) [`'\"]?\S*\s*login|oauth 
 NETWORK_RE = re.compile(r"ENOTFOUND|ECONNRESET|ECONNREFUSED|ETIMEDOUT|EAI_AGAIN|getaddrinfo|could not resolve host|network is unreachable"
                         r"|cannot connect to api|unable to connect", re.I)
 CODEX_STATUS_RE = re.compile(r'"status":\s*4(?!29)\d\d')          # codex puts the HTTP status inside its error JSON; 429 is a limit, not a bad request
-BAD_REQUEST_RE = re.compile(CODEX_STATUS_RE.pattern + r"|invalid_request_error|invalid_json_schema|Invalid schema for response_format")
+BAD_REQUEST_RE = re.compile(CODEX_STATUS_RE.pattern + r"|invalid_request_error|invalid_json_schema|Invalid schema for response_format|unrecognized arguments:|error: unknown argument", re.I)      # the vendor refused the request itself: schema, or a flag its CLI no longer takes
 RECONNECT_RE = re.compile(r"^\s*Reconnecting\.\.\.\s*(\d+)/(\d+)")        # codex retrying its stream: progress until n == of
 CLAUDE_ERROR_RE = re.compile(r"^(API Error|Credit balance|Invalid API key|Not logged in|Please run /login|Claude (AI )?usage limit|OAuth|Failed to authenticate"
                              r"|Request timed out|Error:)", re.I)       # how `claude -p` words its own failures; anything else in a result is the model talking
@@ -105,7 +105,7 @@ def classify(rc, vendor_err="", stderr="", timed_out=False, work_seen=False, str
 
 
 def facts(reason):
-    """-> the contract row of a reason (scope, permanence, retry kind, health effect, wire), or None for a name contract.json does not list."""
+    """-> the contract row of a reason (scope, permanence, retry kind, health effect), or None for a name contract.json does not list."""
     return CONTRACT["reasons"].get(reason)
 
 
@@ -116,14 +116,14 @@ def benches_pair(reason):
 
 
 def stop_facts(reason, retry_after=None, fix=None):
-    """-> the additive `stop` object an answer carries: {reason, scope, permanence, retry: {kind, at}}. An unknown reason still gets a row
+    """-> the `stop` object an answer carries: {reason, scope, permanence, retry: {kind, at}}. An unknown reason still gets a row
     (open reasons, closed facts): machine / needs_owner / none."""
     row = facts(reason) or {"scope": "machine", "permanence": "needs_owner", "retry": "none"}
     perm, kind = row["permanence"], row["retry"]
     if retry_after and kind in ("none", "predicted"):       # a time the lane ends by itself: transient, whatever the table says for the general case
         perm, kind = "transient", "predicted"
-    elif kind == "predicted":
-        kind = "none"
+    elif kind == "predicted":       # nothing to wait for: a person must act
+        kind, perm = "none", "needs_owner"
     stop = {"reason": reason, "scope": row["scope"], "permanence": perm, "retry": {"kind": kind, "at": retry_after if kind in ("predicted", "poll") else None}}
     if fix:
         stop["fix"] = fix

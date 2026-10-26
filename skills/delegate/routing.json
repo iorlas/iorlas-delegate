@@ -1,5 +1,4 @@
 {
-  "version": 1,
   "settings": {
     "orchestrator_reserve": {
       "weekly": 90,
@@ -156,8 +155,7 @@
           "model": "gpt-6.1-sol",
           "effort": "high",
           "on": "openai",
-          "mode": "read_only",
-          "use": "plan"
+          "mode": "read_only"
         },
         {
           "model": "sonnet-5.5",
@@ -196,8 +194,7 @@
           "model": "gpt-6.1-sol",
           "effort": "medium",
           "on": "openai",
-          "mode": "write",
-          "use": "task"
+          "mode": "write"
         },
         {
           "model": "grok-4.7",
@@ -252,7 +249,6 @@
             "effort": "medium",
             "on": "openai",
             "mode": "read_only",
-            "use": "review",
             "flag": "same_family"
           }
         ],
@@ -261,8 +257,7 @@
             "model": "gpt-6.1-sol",
             "effort": "medium",
             "on": "openai",
-            "mode": "read_only",
-            "use": "review"
+            "mode": "read_only"
           },
           {
             "model": "deepseek-v4.1-flash-free",
@@ -298,8 +293,7 @@
             "model": "gpt-6.1-sol",
             "effort": "medium",
             "on": "openai",
-            "mode": "read_only",
-            "use": "review"
+            "mode": "read_only"
           },
           {
             "model": "sonnet-5.5",
@@ -334,8 +328,7 @@
             "model": "gpt-6.1-sol",
             "effort": "medium",
             "on": "openai",
-            "mode": "read_only",
-            "use": "review"
+            "mode": "read_only"
           },
           {
             "model": "sonnet-5.5",
@@ -370,8 +363,7 @@
             "model": "gpt-6.1-sol",
             "effort": "medium",
             "on": "openai",
-            "mode": "read_only",
-            "use": "review"
+            "mode": "read_only"
           },
           {
             "model": "sonnet-5.5",
@@ -413,8 +405,7 @@
             "model": "gpt-6.1-sol",
             "effort": "medium",
             "on": "openai",
-            "mode": "read_only",
-            "use": "review"
+            "mode": "read_only"
           },
           {
             "model": "sonnet-5.5",
@@ -454,8 +445,7 @@
           "model": "gpt-6.1-sol",
           "effort": "high",
           "on": "openai",
-          "mode": "write",
-          "use": "task"
+          "mode": "write"
         },
         {
           "model": "sonnet-5.5",
@@ -487,8 +477,7 @@
           "model": "gpt-6-luna",
           "effort": "low",
           "on": "openai",
-          "mode": "read_only",
-          "use": "read_only_exec"
+          "mode": "read_only"
         },
         {
           "model": "haiku-5.5",

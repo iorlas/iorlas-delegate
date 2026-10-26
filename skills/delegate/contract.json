@@ -1,6 +1,6 @@
 {
- "contract": 2,
- "about": "Hand-edited with any classifier change. contract 2 is today's worker-run v2 wire; stop/usage/call_id/transcript_info are additive to it. The stop-facts schema that replaces status/next is contract 3 (R20). Reasons are an open list, facts are closed.",
+ "contract": 3,
+ "about": "Hand-edited with any classifier change. contract 3: every answer carries `stop` (null = done, or the agent-tool handoff when `agent_model` is set); no `status`, `next`, `reason`, `retry_after`. Reasons are an open list, facts are closed. A bump means a change to the answer or to the `run` flags the engine passes.",
  "scopes": [
   "bead",
   "caller",
@@ -22,16 +22,17 @@
   "exhausted",
   "breaker"
  ],
+ "denied_kinds": [
+  "policy",
+  "sandbox_limit",
+  "secret"
+ ],
  "reasons": {
   "secrets": {
    "scope": "bead",
    "permanence": "needs_owner",
    "retry": "none",
    "health": "none",
-   "wire": {
-    "status": "failed",
-    "reason": "secrets"
-   },
    "wording": "the worker ran a command on a secret path and was stopped"
   },
   "rate_limited": {
@@ -39,10 +40,6 @@
    "permanence": "transient",
    "retry": "predicted",
    "health": "exhausted",
-   "wire": {
-    "status": "lane_out",
-    "reason": "lane_out"
-   },
    "wording": "the lane hit a usage limit"
   },
   "credit_exhausted": {
@@ -50,10 +47,6 @@
    "permanence": "needs_owner",
    "retry": "none",
    "health": "exhausted",
-   "wire": {
-    "status": "lane_out",
-    "reason": "lane_out"
-   },
    "wording": "the lane is out of credits or hit a spending limit"
   },
   "logged_out": {
@@ -61,10 +54,6 @@
    "permanence": "needs_owner",
    "retry": "none",
    "health": "exhausted",
-   "wire": {
-    "status": "lane_out",
-    "reason": "logged_out"
-   },
    "wording": "the vendor CLI is not logged in"
   },
   "hung": {
@@ -72,10 +61,6 @@
    "permanence": "transient",
    "retry": "predicted",
    "health": "breaker",
-   "wire": {
-    "status": "lane_out",
-    "reason": "hung"
-   },
    "wording": "the worker printed nothing and was stopped"
   },
   "timeout": {
@@ -83,10 +68,6 @@
    "permanence": "transient",
    "retry": "none",
    "health": "none",
-   "wire": {
-    "status": "timeout",
-    "reason": "timeout"
-   },
    "wording": "the worker did not finish within --timeout and was killed"
   },
   "killed": {
@@ -94,10 +75,6 @@
    "permanence": "transient",
    "retry": "none",
    "health": "none",
-   "wire": {
-    "status": "stop",
-    "reason": "vendor_prework"
-   },
    "wording": "the worker was ended by a signal route.py did not send"
   },
   "bad_request": {
@@ -105,10 +82,6 @@
    "permanence": "needs_owner",
    "retry": "none",
    "health": "none",
-   "wire": {
-    "status": "error",
-    "reason": "bad_request"
-   },
    "wording": "the vendor rejected the request itself (schema, flags, arguments)"
   },
   "network": {
@@ -116,10 +89,6 @@
    "permanence": "transient",
    "retry": "poll",
    "health": "none",
-   "wire": {
-    "status": "stop",
-    "reason": "network"
-   },
    "wording": "the vendor could not be reached"
   },
   "vendor_blip": {
@@ -127,10 +96,6 @@
    "permanence": "transient",
    "retry": "poll",
    "health": "breaker",
-   "wire": {
-    "status": "stop",
-    "reason": "vendor_prework"
-   },
    "wording": "the vendor failed before the worker did anything"
   },
   "worker_failed": {
@@ -138,10 +103,6 @@
    "permanence": "transient",
    "retry": "none",
    "health": "breaker",
-   "wire": {
-    "status": "failed",
-    "reason": "worker_failed"
-   },
    "wording": "the worker failed after it started"
   },
   "schema_invalid": {
@@ -149,10 +110,6 @@
    "permanence": "transient",
    "retry": "none",
    "health": "none",
-   "wire": {
-    "status": "failed",
-    "reason": "schema_invalid"
-   },
    "wording": "the answer does not match the schema, after one re-ask"
   },
   "held": {
@@ -160,10 +117,6 @@
    "permanence": "transient",
    "retry": "predicted",
    "health": "none",
-   "wire": {
-    "status": "lane_out",
-    "reason": "lane_out"
-   },
    "wording": "the owner holds the lane for this role until a stated time"
   },
   "busy": {
@@ -171,10 +124,6 @@
    "permanence": "transient",
    "retry": "poll",
    "health": "none",
-   "wire": {
-    "status": "stop",
-    "reason": "busy"
-   },
    "wording": "every slot of the lane is taken"
   },
   "no_lane": {
@@ -182,10 +131,6 @@
    "permanence": "needs_owner",
    "retry": "none",
    "health": "none",
-   "wire": {
-    "status": "stop",
-    "reason": "no_lane"
-   },
    "wording": "no lane can take this role now"
   },
   "duplicate_task": {
@@ -193,10 +138,6 @@
    "permanence": "transient",
    "retry": "poll",
    "health": "none",
-   "wire": {
-    "status": "stop",
-    "reason": "duplicate_task"
-   },
    "wording": "the task already has a running worker"
   },
   "lock": {
@@ -204,10 +145,6 @@
    "permanence": "transient",
    "retry": "poll",
    "health": "none",
-   "wire": {
-    "status": "stop",
-    "reason": "lock"
-   },
    "wording": "the state lock was held too long"
   },
   "caller": {
@@ -215,10 +152,6 @@
    "permanence": "needs_owner",
    "retry": "none",
    "health": "none",
-   "wire": {
-    "status": "error",
-    "reason": "caller"
-   },
    "wording": "the call itself is wrong (empty brief, unknown ref, bad flag)"
   },
   "setup": {
@@ -226,10 +159,6 @@
    "permanence": "needs_owner",
    "retry": "none",
    "health": "none",
-   "wire": {
-    "status": "error",
-    "reason": "setup"
-   },
    "wording": "a CLI or key is missing"
   },
   "crash": {
@@ -237,55 +166,11 @@
    "permanence": "needs_owner",
    "retry": "none",
    "health": "none",
-   "wire": {
-    "status": "error",
-    "reason": "crash"
-   },
    "wording": "route.py itself failed"
   }
  },
- "wire_reasons": {
-  "lane_out": "retry",
-  "busy": "retry",
-  "duplicate_task": "retry",
-  "lock": "retry",
-  "vendor_prework": "retry",
-  "hung": "retry",
-  "network": "retry",
-  "no_lane": "retry",
-  "logged_out": "retry",
-  "setup": "owner",
-  "secrets": "owner",
-  "bad_request": "owner",
-  "crash": "owner",
-  "caller": "fail",
-  "timeout": "fail",
-  "worker_failed": "fail",
-  "schema_invalid": "fail"
- },
- "wire_default": {
-  "lane_out": "rate_limited",
-  "vendor_prework": "vendor_blip",
-  "busy": "busy",
-  "duplicate_task": "duplicate_task",
-  "lock": "lock",
-  "hung": "hung",
-  "network": "network",
-  "no_lane": "no_lane",
-  "logged_out": "logged_out",
-  "setup": "setup",
-  "secrets": "secrets",
-  "bad_request": "bad_request",
-  "crash": "crash",
-  "caller": "caller",
-  "timeout": "timeout",
-  "worker_failed": "worker_failed",
-  "schema_invalid": "schema_invalid"
- },
  "run_args": [
   "--authored-by",
-  "--host",
-  "--no-wait",
   "--failed",
   "--premium",
   "--allow-degraded",
@@ -319,10 +204,7 @@
  "answer_schema": {
   "type": "object",
   "required": [
-   "v",
-   "status",
-   "reason",
-   "next",
+   "contract",
    "data",
    "text",
    "ref",
@@ -342,60 +224,10 @@
    "stop"
   ],
   "properties": {
-   "v": {
+   "contract": {
     "type": "integer",
     "enum": [
-     2
-    ]
-   },
-   "status": {
-    "type": "string",
-    "enum": [
-     "done",
-     "agent",
-     "stop",
-     "lane_out",
-     "error",
-     "failed",
-     "timeout"
-    ]
-   },
-   "reason": {
-    "type": [
-     "string",
-     "null"
-    ],
-    "enum": [
-     null,
-     "bad_request",
-     "busy",
-     "caller",
-     "crash",
-     "duplicate_task",
-     "hung",
-     "lane_out",
-     "lock",
-     "logged_out",
-     "network",
-     "no_lane",
-     "schema_invalid",
-     "secrets",
-     "setup",
-     "timeout",
-     "vendor_prework",
-     "worker_failed"
-    ]
-   },
-   "next": {
-    "type": [
-     "string",
-     "null"
-    ],
-    "enum": [
-     null,
-     "retry",
-     "owner",
-     "fail"
+     3
     ]
    },
    "text": {
@@ -405,7 +237,39 @@
     "type": "string"
    },
    "denied": {
-    "type": "array"
+    "type": "array",
+    "items": {
+     "type": "object",
+     "required": [
+      "kind",
+      "tool"
+     ],
+     "properties": {
+      "kind": {
+       "type": "string",
+       "enum": [
+        "policy",
+        "sandbox_limit",
+        "secret"
+       ]
+      },
+      "tool": {
+       "type": [
+        "string",
+        "null"
+       ]
+      },
+      "path": {
+       "type": [
+        "string",
+        "null"
+       ]
+      },
+      "input": {
+       "type": "object"
+      }
+     }
+    }
    },
    "git_violation": {
     "type": "array"
@@ -419,12 +283,6 @@
    "run_id": {
     "type": [
      "string",
-     "null"
-    ]
-   },
-   "retry_after": {
-    "type": [
-     "number",
      "null"
     ]
    },
@@ -636,8 +494,30 @@
         ]
        }
       }
+     },
+     "ref": {
+      "type": [
+       "string",
+       "null"
+      ]
+     },
+     "resumable": {
+      "type": "boolean"
+     },
+     "partial": {
+      "type": "boolean"
+     },
+     "fix": {
+      "type": "string"
      }
     }
+   },
+   "agent_model": {
+    "type": [
+     "string",
+     "null"
+    ],
+    "description": "set only on the agent-tool handoff (stop is null): the model the orchestrator's Agent tool should run"
    }
   }
  }
