@@ -1504,6 +1504,24 @@ echo '{"type":"step_finish","sessionID":"ses_1","part":{"type":"step-finish","to
         last = json.loads(route.history_path().read_text().splitlines()[-1])
         self.assertEqual((last["outcome"], last["v"], last["model"], len(last["fingerprint"])), ("hung", 1, "gpt-6.1-sol", 12))
 
+    def test_a_gap_over_1800s_is_written_to_history_through_worker_watch_and_the_fold_ignores_it(self):
+        import functools
+        from lanes import health
+        t = [0.0]
+        d = {"lane": "OPENAI_SUBSCRIPTION", "model": "gpt-6.1-sol"}
+        with mock.patch.object(route.supervisor, "Watchdog", functools.partial(route.supervisor.Watchdog, clock=lambda: t[0])):
+            poll, tick, w = route.worker_watch("codex", d["lane"])
+        for at in (5, 1805, 4005):       # gaps of 1800 s (not logged) and 2200 s (logged)
+            t[0] = at
+            tick()
+        self.assertFalse(poll())
+        route.log_gaps(w, d)
+        rows = [json.loads(x) for x in route.history_path().read_text().splitlines()]
+        self.assertEqual([(r["role"], r["lane"], r["model"], r["gap_s"], r["finished"], r["run_id"]) for r in rows],
+                         [("gap", "OPENAI_SUBSCRIPTION", "gpt-6.1-sol", 2200.0, True, None)])
+        self.assertEqual(health.fold(rows)["pairs"], {})
+        route.log_gaps({"wd": None}, d)       # never raises
+
     def test_any_stream_line_counts_as_activity_even_on_stderr(self):
         with mock.patch.dict(route.supervisor.LIMITS["codex"], silence_s=1):      # the fake prints to stderr every 0.4 s for 3 s
             _, r = self.run_it(mode="chatter", timeout=0)

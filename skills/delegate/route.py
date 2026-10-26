@@ -2666,6 +2666,7 @@ def launch_codex(d, brief, a, rid, t, meta):
                 return True
         return False
     rc, out, err, timed_out = run_proc(cmd, " ".join((SECRET_RULE, GIT_RULES, EDIT_RULE, NO_SUBAGENTS_RULE, ESCALATE_RULE, DENIED_RULE)) + "\n\n" + brief, h["cwd"], child_env(), a.timeout, on_line, poll)
+    log_gaps(dog, d)
     text = ""
     with contextlib.suppress(OSError):
         text = out_file.read_text(encoding="utf-8", errors="replace").strip()
@@ -2780,6 +2781,12 @@ def worker_watch(cli, lane, extra=None):
             return True
         return False
     return poll, wd.touch, state
+
+
+def log_gaps(w, d):
+    """After a worker run: one history row per inter-event gap over supervisor.LONG_GAP_S (role "gap", no run_id: the health fold ignores it). Never raises."""
+    with contextlib.suppress(Exception):
+        w["wd"].flush(history_add, d["lane"], d["model"], w["why"] is None)
 
 
 def watch_fields(res, w):
@@ -2945,6 +2952,7 @@ def launch_opencode(d, brief, a, rid, t, meta):
         agent_runs.run(rid, kind="opencode", lane=d["lane"], model=d["model"], cwd=h["cwd"], started=t, status="running", **meta)
     try:
         rc, out, err, timed_out = run_proc(cmd, rules + "\n\n" + brief, h["cwd"], env, a.timeout, on_line, poll)
+        log_gaps(dog, d)
     finally:
         with contextlib.suppress(OSError):
             shell.unlink()
@@ -3036,6 +3044,7 @@ def launch_claude(d, brief, a, rid, t, cfg, meta):
     poll, tick, dog = worker_watch("claude", d["lane"])
     WORKER_TICK[:] = [tick]
     rc, out, err, timed_out = run_proc(cmd, brief, h["cwd"], child_env(extra), a.timeout, on_line, poll)
+    log_gaps(dog, d)
     j = final[0] if final else {}
     if final and not j.get("is_error"):
         rc = 0          # stopped by us after answering
