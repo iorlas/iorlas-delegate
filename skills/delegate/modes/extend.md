@@ -4,7 +4,7 @@ Data is in `routing.json`; code is in `route.py` (decisions, readers, runners) a
 
 ```
 add a model:   routing.json models: {"<key>": {"family": F, "api": "<id>", "agent": "<alias>"}}
-add a role:    routing.json roles: {"<name>": {advance: on_unavailable|on_failure, steps: [{model, effort, on: <family>, mode, cap, use}], stop: "<text>"}}
+add a role:    routing.json roles: {"<name>": {advance: on_unavailable|on_failure, steps: [{model, effort, on: <family>, mode, cap}], stop: "<text>"}}
                optional: by_author {<family>: [steps]}, degraded_needs_consent [steps]
 add a lane:    routing.json lanes: {"<FAMILY_KIND>": {family, kind: subscription|credit, reader, runner, ready, shared_with_orchestrator?}}
                reader  -> a function in route.py READERS that fills the Lane (use, resets, out)

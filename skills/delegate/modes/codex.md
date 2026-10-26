@@ -3,7 +3,7 @@
 GPT-6.1 Sol and GPT-6 Luna on the ChatGPT Plus plan through the Codex CLI. Not Max, not the API credit.
 `route.py run` executes every Codex step with `codex exec --json`: brief on stdin, stdin then closed, timeout kills the process group, a limit refusal marks the lane out, HEAD and branch compared around it. You never build the command.
 
-- Continue earlier work: `--resume REF` (the `ref` of an earlier result); same lane and model, a lane that is out answers `lane_out`.
+- Continue earlier work: `--resume REF` (the `ref` of an earlier result); same lane and model, a lane that is out answers a `stop` (`rate_limited`, `held`, ...).
 - Parallel writers: one directory each, made by you, as `--cwd`.
 - Luna: big allowance, weak (13.6% Terminal-Bench 4.0). Reading and summarising only.
 - Optional, by hand: the Codex plugin (`/codex:review`, `/codex:adversarial-review`, `codex-companion.mjs task --write` in a Bash `run_in_background`). Not `/codex:rescue --background`: jobs stayed queued forever (2026-10-14).
