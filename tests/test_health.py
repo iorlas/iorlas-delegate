@@ -298,8 +298,8 @@ def run_watch(cli, events_at, until, tick=0.5, jump=None):
 class Watchdog(unittest.TestCase):
     def test_limits(self):
         L = supervisor.LIMITS
-        self.assertEqual({c: (L[c]["first_event_s"], L[c]["silence_s"]) for c in L}, {"claude": (120, 600), "codex": (120, 2400), "opencode": (120, 900)})
-        self.assertGreaterEqual(L["codex"]["silence_s"], 2400)         # P7: healthy Codex reasoning gaps up to 2,298 s
+        self.assertEqual({c: (L[c]["first_event_s"], L[c]["silence_s"]) for c in L}, {"claude": (120, 600), "codex": (120, 3600), "opencode": (120, 900)})
+        self.assertGreaterEqual(L["codex"]["silence_s"], 3600)         # P7: healthy Codex reasoning gaps up to 2,298 s
         self.assertNotEqual(L["codex"]["silence_s"], 600)
         self.assertGreaterEqual(L["opencode"]["silence_s"], 900)
 
@@ -311,7 +311,26 @@ class Watchdog(unittest.TestCase):
         self.assertIsNone(run_watch("codex", [5, 5 + 2298], 5 + 2298 + 60)[0])
         at, wd = run_watch("codex", [5], 6000)
         self.assertEqual(wd.why, "silence")
-        self.assertAlmostEqual(at, 5 + 2400, delta=1.0)
+        self.assertAlmostEqual(at, 5 + 3600, delta=1.0)
+
+    def test_codex_3000s_gap_survives_and_is_logged_but_1800s_is_not(self):
+        for gap, logged in ((1800, []), (3000, [3000.0])):
+            at, wd = run_watch("codex", [5, 5 + gap], 5 + gap + 60)
+            self.assertIsNone(at)
+            rows = []
+            wd.flush(rows.append, "OPENAI_SUBSCRIPTION", "gpt", True)
+            self.assertEqual([r["gap_s"] for r in rows], logged)
+            for r in rows:
+                self.assertEqual((r["lane"], r["model"], r["finished"], r["run_id"]), ("OPENAI_SUBSCRIPTION", "gpt", True, None))
+
+    def test_codex_3700s_dead_stream_is_killed_and_logged(self):
+        at, wd = run_watch("codex", [5], 6000)       # run_proc turns this verdict into route.stop_tree (covered in test_route)
+        self.assertEqual(wd.why, "silence")
+        self.assertLess(at, 3700)
+        rows = []
+        wd.flush(rows.append, "L", "m", False)
+        self.assertEqual([(r["finished"], r["gap_s"] > 1800) for r in rows], [(False, True)])
+        wd.flush(lambda r: 1 / 0, "L", "m", False)      # a failing writer never fails the call
 
     def test_claude_silence_600_and_opencode_900(self):
         at, wd = run_watch("claude", [3], 2000)
