@@ -15,7 +15,8 @@ LIMITS = {"claude": {"first_event_s": 120, "silence_s": 600},
 CLI_OF_KIND = {"claude_p": "claude", "codex": "codex", "opencode": "opencode"}      # a runner kind (route.how) -> its CLI
 SLEEP_GAP_S = 15       # poll() runs every 0.5 s: a gap this long between two polls is a suspended machine, not a quiet worker
 LONG_GAP_S = 1800      # an inter-event gap longer than this is written to history (role "gap")
-ANSWER_GRACE_S = 30    # codex printed its final agent message and turn.completed: the process gets this long to exit, then its tree is stopped (delegate-itn)
+ANSWER_GRACE_S = 120   # codex printed a final agent message or turn.completed: any later event resets this; quiet this long, its tree is stopped (delegate-itn)
+STALL_S = 900          # codex owes a response (no command running) and printed nothing this long: the model stream is stalled, stop it (rollout 01a177fc stalled 22 min)
 BEAT_S = 30            # at most one heartbeat callback per this many seconds
 
 

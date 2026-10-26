@@ -297,8 +297,9 @@ def run_watch(cli, events_at, until, tick=0.5, jump=None):
 
 class Watchdog(unittest.TestCase):
     def test_answer_grace_is_30s_and_the_codex_silence_limit_is_unchanged(self):
-        """delegate-itn: the grace after a final answer is 30 s; a stream with no final message still waits the 3600 s silence limit."""
-        self.assertEqual(supervisor.ANSWER_GRACE_S, 30)
+        """delegate-itn: the grace after a final answer is 120 s, a stalled model request 900 s; a stream with no final message still waits the 3600 s silence limit."""
+        self.assertEqual(supervisor.ANSWER_GRACE_S, 120)
+        self.assertEqual(supervisor.STALL_S, 900)
         self.assertEqual(supervisor.LIMITS["codex"]["silence_s"], 3600)
         at, _ = run_watch("codex", [5], 6000)
         self.assertEqual(at, 3605.5)

@@ -618,6 +618,16 @@ case "$FAKE_MODE" in drop_early|drop_early_twice)       # the connection breaks 
   if [ "$FAKE_MODE" = drop_early_twice ] || [ "$n" = 0 ]; then echo "request failed: error sending request for url (https://chatgpt.com/backend-api)" >&2; exit 1; fi;;
 esac
 echo '{"type":"thread.started","thread_id":"thread-123"}'
+hang() { sleep 300 & echo $! > "$FAKE_PIDFILE"; wait; }
+case "$FAKE_MODE" in
+  message_only) echo '{"type":"item.completed","item":{"id":"i9","type":"agent_message","text":"final, no turn.completed"}}'; hang; exit 0;;     # rollout 01a177fc
+  progress_then_work) echo '{"type":"item.completed","item":{"id":"i9","type":"agent_message","text":"progress"}}'; sleep 0.5
+                      echo '{"type":"item.started","item":{"id":"i10","type":"command_execution","command":"make","status":"in_progress"}}'; hang; exit 0;;
+  stall) echo '{"type":"item.completed","item":{"id":"i1","type":"command_execution","command":"ls","exit_code":0,"status":"completed"}}'; hang; exit 0;;
+  tool_open) echo '{"type":"item.started","item":{"id":"i1","type":"command_execution","command":"make","status":"in_progress"}}'; hang; exit 0;;
+  stall_resume) case "$args" in *resume*) printf 'resumed answer' > "$out"; exit 0;; esac
+                echo '{"type":"item.completed","item":{"id":"i1","type":"command_execution","command":"ls","exit_code":0,"status":"completed"}}'; hang; exit 0;;
+esac
 [ "$FAKE_MODE" = answer_alive ] && echo '{"type":"item.completed","item":{"id":"i9","type":"agent_message","text":"{\\"findings\\": []}"}}'
 echo '{"type":"turn.completed","usage":{"input_tokens":100,"cached_input_tokens":40,"output_tokens":7}}'
 case "$FAKE_MODE" in
@@ -905,6 +915,54 @@ printf '{"type":"result","result":"claude says hi","session_id":"sess-1","total_
         time.sleep(0.3)
         with self.assertRaises(OSError):
             os.kill(int(Path(os.environ["FAKE_PIDFILE"]).read_text()), 0)
+
+    def fast_clock(self, grace=1, stall=1):
+        from lanes import supervisor
+        for name, v in (("ANSWER_GRACE_S", grace), ("STALL_S", stall)):
+            self.addCleanup(setattr, supervisor, name, getattr(supervisor, name))
+            setattr(supervisor, name, v)
+
+    def pid_dead(self):
+        time.sleep(0.3)
+        with self.assertRaises(OSError):
+            os.kill(int(Path(os.environ["FAKE_PIDFILE"]).read_text()), 0)
+
+    def test_a_final_agent_message_alone_ends_the_run_after_the_grace(self):
+        """Rollout 01a177fc: the final message arrived and turn.completed never did."""
+        self.fast_clock()
+        t0 = time.time()
+        _, r = self.run_it(mode="message_only", timeout=0)
+        self.assertLess(time.time() - t0, 40)
+        self.assertEqual((r["status"], r["text"], r["warnings"]), ("done", "final, no turn.completed", ["answer_done_process_alive"]))
+        self.pid_dead()
+
+    def test_a_later_event_resets_the_answer_grace(self):
+        self.fast_clock(grace=1, stall=900)
+        _, r = self.run_it(mode="progress_then_work", timeout=4)
+        self.assertEqual(r["status"], "timeout")
+
+    def test_a_stalled_model_request_is_stopped_and_the_stream_tail_is_logged(self):
+        self.fast_clock()
+        _, r = self.run_it(mode="stall", timeout=20)
+        self.assertEqual((r["status"], r["reason"]), ("lane_out", "hung"))
+        row = json.loads(route.history_path().read_text().splitlines()[-1])
+        self.assertTrue(any('"command_execution"' in x for x in row["stream_tail"]))
+        self.pid_dead()
+
+    def test_a_running_command_keeps_the_long_silence_limit(self):
+        self.fast_clock()
+        _, r = self.run_it(mode="tool_open", timeout=4)
+        self.assertEqual(r["status"], "timeout")
+
+    def test_resume_after_a_stall_is_off_by_default_and_runs_once_when_on(self):
+        self.fast_clock()
+        _, r = self.run_it(mode="stall_resume", timeout=20)
+        self.assertEqual(r["reason"], "hung")
+        cfg = route.load_routing()
+        cfg["settings"]["codex_resume_after_stall"] = True
+        with mock.patch.object(route, "load_routing", return_value=cfg):
+            _, r = self.run_it(mode="stall_resume", timeout=20)
+        self.assertEqual((r["status"], r["text"]), ("done", "resumed answer"))
 
     def test_sigterm_on_route_py_stops_the_worker_too(self):
         import signal

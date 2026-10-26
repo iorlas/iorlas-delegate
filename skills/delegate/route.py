@@ -2625,7 +2625,7 @@ def launch_codex(d, brief, a, rid, t, meta):
         cmd += (["--output-schema", a.schema] if a.schema else []) + [a.resume, "-"]
     else:
         cmd = [exe] + h["cli"][1:] + ["--json", "-o", str(out_file)] + (["--output-schema", a.schema] if a.schema else []) + ["-"]
-    seen = {"ref": a.resume, "last": "", "tokens": None, "denied": [], "error": "", "transient": "", "work": False, "turns": 0, "net_at": None, "net": False}
+    seen = {"ref": a.resume, "last": "", "tokens": None, "denied": [], "error": "", "transient": "", "work": False, "turns": 0, "net_at": None, "net": False, "done_t": None, "open": set(), "stop": None}
     if a.resume:
         note_ref(a.resume)
 
@@ -2636,6 +2636,16 @@ def launch_codex(d, brief, a, rid, t, meta):
             return
         if not isinstance(ev, dict):
             return
+        kind, it = ev.get("type"), ev.get("item") or {}
+        if kind == "turn.completed" or (kind == "item.completed" and it.get("type") == "agent_message"):
+            seen["done_t"] = time.monotonic()       # the answer may be in: poll() stops the tree if nothing else comes within ANSWER_GRACE_S (delegate-itn)
+        else:
+            seen["done_t"] = None                   # any later event: the turn goes on
+        if it.get("type") in ("command_execution", "mcp_tool_call", "file_change") and it.get("id") is not None:      # a running tool keeps the long silence limit
+            if kind == "item.started":
+                seen["open"].add(it["id"])
+            elif kind == "item.completed":
+                seen["open"].discard(it["id"])
         if ev.get("type") == "thread.started" and ev.get("thread_id"):
             seen["ref"] = ev["thread_id"]
             note_ref(seen["ref"])
@@ -2665,9 +2675,6 @@ def launch_codex(d, brief, a, rid, t, meta):
             seen["denied"].append({"tool": "Bash", "input": {"command": item.get("command")}})
             seen["secret"] = item.get("command")
             return True             # codex has no hook under exec: stop the worker before it can use what it read
-        if ev.get("type") == "turn.completed" and seen["last"] and not seen["error"]:
-            seen["done_t"] = time.monotonic()
-            return supervisor.ANSWER_GRACE_S        # the answer is in: the process gets this long to exit, then run_proc stops its tree (delegate-itn)
     if agent_runs:
         agent_runs.run(rid, kind="codex", lane=d["lane"], model=d["model"], cwd=h["cwd"], started=t, status="running", **meta)
     started = time.time()       # wall clock, not now(): it is compared with file times
@@ -2679,6 +2686,14 @@ def launch_codex(d, brief, a, rid, t, meta):
         """Codex waits for the network by itself, for as long as it takes. Past NET_GRACE_S of that, one probe: still offline -> stop it now and hand the
         wait to the caller (the thread resumes), instead of holding the slot for the whole silence limit."""
         if poll0():
+            return True
+        if seen["done_t"] is not None and time.monotonic() - seen["done_t"] >= supervisor.ANSWER_GRACE_S:
+            seen["stop"] = "answer"
+            return True
+        wd = dog["wd"]
+        if wd.events and not seen["open"] and seen["done_t"] is None and wd.idle_s > supervisor.STALL_S:       # the model owes a response and nothing comes (a running command keeps the long silence limit)
+            seen["stop"] = "stall"
+            dog.update(why="hung", kind="stall", words=f"owed a model response and printed nothing for {supervisor.STALL_S}s")
             return True
         if seen["net_at"] is not None and time.monotonic() - seen["net_at"] >= NET_GRACE_S:
             seen["net_at"] = None
@@ -2692,7 +2707,10 @@ def launch_codex(d, brief, a, rid, t, meta):
     with contextlib.suppress(OSError):
         text = out_file.read_text(encoding="utf-8", errors="replace").strip()
         out_file.unlink()
-    final = bool(text) or bool(seen["turns"] and seen["last"])        # the turn finished: codex writes -o only at its end
+    if seen["stop"] == "stall" and seen["ref"] and not getattr(a, "stalled_once", False) and load_routing()["settings"].get("codex_resume_after_stall"):
+        return launch_codex(d, "Your previous request stalled and was stopped. Continue and give your final answer.",       # once; off by default: resuming a turn that never closed is untested
+                            argparse.Namespace(**dict(vars(a), resume=seen["ref"], stalled_once=True)), rid, t, meta)
+    final = bool(text) or bool(seen["last"] and (seen["turns"] or seen["stop"] == "answer"))        # the turn finished: codex writes -o only at its end
     text = text or seen["last"]
     seen["tokens"] = accounting.per_call(seen["tokens"], before)      # a running total: keep this run's part
     if seen["ref"]:             # the reviewer's tokens are the run's too
@@ -2704,10 +2722,11 @@ def launch_codex(d, brief, a, rid, t, meta):
            "context_k": codex_context_k(seen["ref"]), "started": bool(seen["ref"]), "partial": seen["work"], "answered": final,
            "acct": accounting.codex(seen["tokens"]), "cumulative": seen.get("cumulative")}
     o = classify.classify(rc, seen["error"] or (seen["transient"] if rc != 0 else ""), err, timed_out, seen["work"], dict(watch_fields(res, dog), secret=seen.get("secret")))
-    if o and o.reason == "killed" and seen.get("done_t") and not seen["error"] and not timed_out and final \
-            and time.monotonic() - seen["done_t"] >= supervisor.ANSWER_GRACE_S - 1:       # we stopped it after its answer: the answer stands
+    if seen["stop"] == "answer" and o and o.reason == "killed" and final and not seen["error"] and not timed_out:       # we stopped it after its answer: the answer stands
         o = None
         res["warnings"] = ["answer_done_process_alive"]
+    if dog["why"] == "hung" or seen["stop"] == "stall":        # the raw tail of the stream, so the call record shows what the CLI last said before it was stopped
+        res["stream_tail"] = [x[:2000] for x in out.splitlines()[-20:]]
     if seen["net"] and (o is None or o.reason == "killed"):       # we stopped it because the network is down
         o = classify.Outcome("network", seen["transient"], "event")
     if o:       # codex's error or stderr, never the model's answer
@@ -3458,7 +3477,7 @@ def run_once(a, cfg):
     detail = res.pop("detail", "")
     history_add({"ts": now(), "run_id": rid, "call_id": getattr(a, "call_id", None), "ref": res.get("ref"), **health.row_fields(res.get("outcome"), "", detail or res.get("say"), res.get("retry_after")),
                  "role": a.role, "task": a.task or "", "lane": d["lane"], "model": d["model"], "effort": d["effort"],
-                 "status": res["status"], "reason": res.get("reason"), "warnings": res.get("warnings"), "host": bool(a.host), "denials": len(res.get("denied") or []), "secs": secs, "cost": res.get("cost", 0), "tokens": res.get("tokens"), "cumulative": res.get("cumulative"),
+                 "status": res["status"], "reason": res.get("reason"), "warnings": res.get("warnings"), "stream_tail": res.pop("stream_tail", None), "host": bool(a.host), "denials": len(res.get("denied") or []), "secs": secs, "cost": res.get("cost", 0), "tokens": res.get("tokens"), "cumulative": res.get("cumulative"),
                  "five_before": lane.five, "week_before": lane.week, "five_after": five_after, "week_after": week_after,
                  "overlap": sorted(set(taken["peers"]) | set(ends.get("peers", []))), "slots": cap, "transcript": transcript})
     info = transcript_info(transcript, fam, t_from)
