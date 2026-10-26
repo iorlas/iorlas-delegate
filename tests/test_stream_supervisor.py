@@ -111,7 +111,7 @@ class Replay(unittest.TestCase):
                 t0 = time.time()
                 r = self.launch(kind, self.fake(kind, lines))
                 self.assertLess(time.time() - t0, 40)
-                self.assertEqual((r["status"], r["text"]), ("done", text), r)
+                self.assertEqual((r.get("outcome"), r["text"]), (None, text), r)
                 self.assertTrue(r["stream_tail"] and lines[-1] in r["stream_tail"][-1], r["stream_tail"])      # the tail is kept on any kill
                 self.assertFalse(self.alive())
                 if kind != "claude":
@@ -119,11 +119,11 @@ class Replay(unittest.TestCase):
 
     def test_a_final_message_without_the_completion_event_ends_the_run_too(self):
         r = self.launch("claude", self.fake("claude", [CLAUDE_TOOL, CLAUDE_TOOL_DONE, CLAUDE_FINAL]))
-        self.assertEqual((r["status"], r["text"], r["warnings"]), ("done", "the final words", ["answer_done_process_alive"]))
+        self.assertEqual((r.get("outcome"), r["text"], r["warnings"]), (None, "the final words", ["answer_done_process_alive"]))
         self.assertEqual(r["tokens"], {"in": 55, "cached": 40, "out": 9})          # no result event: usage folded from the stream's requests
         self.assertEqual((r["acct"]["in_fresh"], r["acct"]["cache_read"], r["acct"]["out"]), (15, 40, 9))
         r = self.launch("codex", self.fake("codex", [CODEX_STARTED, CODEX_MSG]))
-        self.assertEqual((r["status"], r["text"]), ("done", "codex answer"))
+        self.assertEqual((r.get("outcome"), r["text"]), (None, "codex answer"))
         self.assertFalse(self.alive())
 
     def test_a_later_event_resets_the_grace(self):
@@ -133,7 +133,7 @@ class Replay(unittest.TestCase):
         t0 = time.time()
         r = self.launch("claude", str(script))
         self.assertGreaterEqual(time.time() - t0, 1.5)      # the second turn's event at 0.7 s restarted the 1 s grace
-        self.assertEqual((r["status"], r["text"]), ("done", "claude answer"))
+        self.assertEqual((r.get("outcome"), r["text"]), (None, "claude answer"))
 
     def test_a_stalled_stream_is_killed_and_its_tail_logged(self):
         stalls = {"codex": [CODEX_STARTED, CODEX_CMD], "claude": [CLAUDE_TOOL, CLAUDE_TOOL_DONE], "opencode": [OC_STEP_TOOLS]}
@@ -142,7 +142,7 @@ class Replay(unittest.TestCase):
                 t0 = time.time()
                 r = self.launch(kind, self.fake(kind, lines))
                 self.assertLess(time.time() - t0, 40)
-                self.assertEqual((r["status"], r["reason"]), ("lane_out", "hung"), r)
+                self.assertEqual(r["outcome"], "hung", r)
                 self.assertEqual(r["stream_tail"][-1], lines[-1])
                 self.assertFalse(self.alive())
 
@@ -152,7 +152,7 @@ class Replay(unittest.TestCase):
             with self.subTest(kind):
                 self.a.timeout = 4
                 r = self.launch(kind, self.fake(kind, lines))
-                self.assertEqual(r["status"], "timeout")
+                self.assertEqual(r["outcome"], "timeout")
                 self.assertTrue(r["stream_tail"])
                 self.assertFalse(self.alive())
 
@@ -163,14 +163,14 @@ class Replay(unittest.TestCase):
         for kind, (stall, resumed, text) in cases.items():
             with self.subTest(kind):
                 exe = self.fake(kind, stall, resume_lines=resumed)
-                self.assertEqual(self.launch(kind, exe)["reason"], "hung")                  # off by default
+                self.assertEqual(self.launch(kind, exe)["outcome"], "hung")                  # off by default
                 with self.flag_on(f"{kind}_resume_after_stall"):
                     r = self.launch(kind, exe)
-                self.assertEqual((r["status"], r["text"]), ("done", text), r)
+                self.assertEqual((r.get("outcome"), r["text"]), (None, text), r)
                 exe = self.fake(kind, stall)                                                 # a second stall is not resumed again
                 with self.flag_on(f"{kind}_resume_after_stall"):
                     r = self.launch(kind, exe, argparse.Namespace(**dict(vars(self.a), stalled_once=True)))
-                self.assertEqual(r["reason"], "hung")
+                self.assertEqual(r["outcome"], "hung")
 
     def test_turn_rules_with_an_injected_clock(self):
         now = [0.0]

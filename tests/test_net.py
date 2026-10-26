@@ -151,7 +151,7 @@ class RouteNet(unittest.TestCase):
 class NotTheLanesFault(unittest.TestCase):
     def test_network_never_counts_against_a_pair(self):
         self.assertFalse(classify.benches_pair("network"))
-        rows = [{"ts": 1000.0 + i, "run_id": f"r{i}", "task": f"t{i}", "lane": "OPENAI_SUBSCRIPTION", "model": "m", "status": "stop", "reason": "network",
+        rows = [{"ts": 1000.0 + i, "run_id": f"r{i}", "task": f"t{i}", "lane": "OPENAI_SUBSCRIPTION", "model": "m",
                  **health.row_fields("network", "", "error sending request", None)} for i in range(12)]
         st = health.fold(rows)
         v = health.view(st, "OPENAI_SUBSCRIPTION", "m", 1100.0)
@@ -184,7 +184,7 @@ class NotTheLanesFault(unittest.TestCase):
         with mock.patch.object(route, "net_probe", lambda hosts=None: down), mock.patch.object(route, "mark_out") as mark:
             route.settle(res, classify.Outcome("hung", "", "ours"), d, T, "codex", a)
         mark.assert_not_called()
-        self.assertEqual((res["status"], res["reason"], res["resumable"]), ("stop", "network", False))
+        self.assertEqual((res["outcome"], res["resumable"]), ("network", False))
         self.assertNotIn("hung_words", res)
 
 
