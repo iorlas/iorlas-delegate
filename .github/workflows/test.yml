@@ -2,15 +2,24 @@ name: test
 on: [push, pull_request]
 jobs:
   unit:
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
-        python: ["3.8", "3.12"]
-    runs-on: ${{ matrix.os }}
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          python-version: ${{ matrix.python }}
-      - run: python -m unittest discover -s tests -v
+          python-version: "3.12"
+      - run: DELEGATE_CONFIG_DIR="$(mktemp -d)" python -m unittest discover -s tests -v
+
+  # ruff and pyrefly, pinned in mise.toml and run by the same recipes as a local `just check`; nothing here needs a secret.
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: astral-sh/setup-uv@v5
+        with:
+          version: "0.13.0"
+      - uses: extractions/setup-just@v2
+      - run: just lint types

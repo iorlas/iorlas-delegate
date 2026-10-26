@@ -1,0 +1,15 @@
+{
+ "_": "Ratchet for tests/test_rules.py. oversize / oversize_functions list every cap violation that existed at A1, by file; an entry may be lowered or deleted, never added. pyrefly_baseline_errors is the error count in pyrefly-baseline.json; it may only shrink.",
+ "oversize": {
+  "skills/delegate/onboard.py": 433,
+  "skills/delegate/route.py": 2926,
+  "tests/test_route.py": 2051
+ },
+ "oversize_functions": {
+  "skills/delegate/route.py::launch_claude": 103,
+  "skills/delegate/route.py::launch_codex": 115,
+  "skills/delegate/route.py::launch_opencode": 132,
+  "skills/delegate/route.py::run_once": 185
+ },
+ "pyrefly_baseline_errors": 144
+}

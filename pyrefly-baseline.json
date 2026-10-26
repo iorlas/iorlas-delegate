@@ -1,0 +1,1012 @@
+{
+  "errors": [
+    {
+      "column": 30,
+      "path": "skills/delegate/lanes/cockpit.py",
+      "name": "bad-assignment",
+      "concise_description": "`str` is not assignable to dict key `why` with type `None`",
+      "severity": "error"
+    },
+    {
+      "column": 35,
+      "path": "skills/delegate/lanes/cockpit.py",
+      "name": "bad-argument-type",
+      "concise_description": "Keyword argument `usable` with type `Literal[True]` is not assignable to parameter `**kwargs` with type `dict[str, bool | int | Unknown] | dict[str, int | Unknown | None] | list[str] | None` in function `typing.MutableMapping.update`",
+      "severity": "error"
+    },
+    {
+      "column": 35,
+      "path": "skills/delegate/lanes/cockpit.py",
+      "name": "bad-argument-type",
+      "concise_description": "Keyword argument `usable` with type `Literal[False]` is not assignable to parameter `**kwargs` with type `dict[str, bool | int | Unknown] | dict[str, int | Unknown | None] | list[str] | None` in function `typing.MutableMapping.update`",
+      "severity": "error"
+    },
+    {
+      "column": 25,
+      "path": "skills/delegate/lanes/health.py",
+      "name": "unsupported-operation",
+      "concise_description": "Cannot set item in `dict[str, int | tuple[int, int, int]]`",
+      "severity": "error"
+    },
+    {
+      "column": 31,
+      "path": "skills/delegate/lanes/health.py",
+      "name": "bad-argument-type",
+      "concise_description": "Argument `int | tuple[int, int, int]` is not assignable to parameter `iterable` with type `Iterable[@_]` in function `tuple.__new__`",
+      "severity": "error"
+    },
+    {
+      "column": 64,
+      "path": "skills/delegate/lanes/live.py",
+      "name": "no-matching-overload",
+      "concise_description": "No matching overload found for function `posixpath.abspath` called with arguments: (str | Unknown | None)",
+      "severity": "error"
+    },
+    {
+      "column": 35,
+      "path": "skills/delegate/lanes/live.py",
+      "name": "no-matching-overload",
+      "concise_description": "No matching overload found for function `open` called with arguments: (str | Unknown | None, Literal['a'], encoding=Literal['utf-8'])",
+      "severity": "error"
+    },
+    {
+      "column": 23,
+      "path": "skills/delegate/lanes/supervisor.py",
+      "name": "bad-assignment",
+      "concise_description": "`float | Unknown` is not assignable to attribute `done_t` with type `None`",
+      "severity": "error"
+    },
+    {
+      "column": 25,
+      "path": "skills/delegate/lanes/supervisor.py",
+      "name": "bad-assignment",
+      "concise_description": "`Literal['stall']` is not assignable to attribute `stop` with type `None`",
+      "severity": "error"
+    },
+    {
+      "column": 24,
+      "path": "skills/delegate/lanes/supervisor.py",
+      "name": "bad-assignment",
+      "concise_description": "`Literal['first_event']` is not assignable to attribute `why` with type `None`",
+      "severity": "error"
+    },
+    {
+      "column": 24,
+      "path": "skills/delegate/lanes/supervisor.py",
+      "name": "bad-assignment",
+      "concise_description": "`Literal['silence']` is not assignable to attribute `why` with type `None`",
+      "severity": "error"
+    },
+    {
+      "column": 21,
+      "path": "skills/delegate/onboard.py",
+      "name": "bad-argument-type",
+      "concise_description": "Argument `Unknown | None` is not assignable to parameter `key` with type `str` in function `dict.get`",
+      "severity": "error"
+    },
+    {
+      "column": 18,
+      "path": "skills/delegate/onboard.py",
+      "name": "bad-argument-count",
+      "concise_description": "Expected 1 positional argument, got 2 in function `do_codex_cli`",
+      "severity": "error"
+    },
+    {
+      "column": 18,
+      "path": "skills/delegate/onboard.py",
+      "name": "bad-argument-count",
+      "concise_description": "Expected 1 positional argument, got 2 in function `do_codex_plugin`",
+      "severity": "error"
+    },
+    {
+      "column": 18,
+      "path": "skills/delegate/onboard.py",
+      "name": "bad-argument-count",
+      "concise_description": "Expected 1 positional argument, got 2 in function `do_statusline`",
+      "severity": "error"
+    },
+    {
+      "column": 13,
+      "path": "skills/delegate/onboard.py",
+      "name": "bad-override",
+      "concise_description": "Class member `H.log_message` overrides parent class `BaseHTTPRequestHandler` in an inconsistent manner",
+      "severity": "error"
+    },
+    {
+      "column": 9,
+      "path": "skills/delegate/route.py",
+      "name": "missing-attribute",
+      "concise_description": "Object of class `NoneType` has no attribute `write`",
+      "severity": "error"
+    },
+    {
+      "column": 9,
+      "path": "skills/delegate/route.py",
+      "name": "missing-attribute",
+      "concise_description": "Object of class `NoneType` has no attribute `flush`",
+      "severity": "error"
+    },
+    {
+      "column": 20,
+      "path": "skills/delegate/route.py",
+      "name": "missing-attribute",
+      "concise_description": "Object of class `NoneType` has no attribute `readline`",
+      "severity": "error"
+    },
+    {
+      "column": 17,
+      "path": "skills/delegate/route.py",
+      "name": "missing-attribute",
+      "concise_description": "Object of class `NoneType` has no attribute `close`",
+      "severity": "error"
+    },
+    {
+      "column": 63,
+      "path": "skills/delegate/route.py",
+      "name": "unsupported-operation",
+      "concise_description": "`None` is not subscriptable",
+      "severity": "error"
+    },
+    {
+      "column": 71,
+      "path": "skills/delegate/route.py",
+      "name": "unsupported-operation",
+      "concise_description": "`None` is not subscriptable",
+      "severity": "error"
+    },
+    {
+      "column": 68,
+      "path": "skills/delegate/route.py",
+      "name": "unsupported-operation",
+      "concise_description": "`None` is not subscriptable",
+      "severity": "error"
+    },
+    {
+      "column": 76,
+      "path": "skills/delegate/route.py",
+      "name": "unsupported-operation",
+      "concise_description": "`None` is not subscriptable",
+      "severity": "error"
+    },
+    {
+      "column": 36,
+      "path": "skills/delegate/route.py",
+      "name": "bad-argument-count",
+      "concise_description": "Expected 4 positional arguments, got 5",
+      "severity": "error"
+    },
+    {
+      "column": 36,
+      "path": "skills/delegate/route.py",
+      "name": "bad-argument-count",
+      "concise_description": "Expected 4 positional arguments, got 5 in function `read_codex`",
+      "severity": "error"
+    },
+    {
+      "column": 36,
+      "path": "skills/delegate/route.py",
+      "name": "bad-argument-count",
+      "concise_description": "Expected 4 positional arguments, got 5 in function `read_claude_credit`",
+      "severity": "error"
+    },
+    {
+      "column": 37,
+      "path": "skills/delegate/route.py",
+      "name": "unsupported-operation",
+      "concise_description": "`None` is not subscriptable",
+      "severity": "error"
+    },
+    {
+      "column": 23,
+      "path": "skills/delegate/route.py",
+      "name": "unsupported-operation",
+      "concise_description": "`None` is not subscriptable",
+      "severity": "error"
+    },
+    {
+      "column": 21,
+      "path": "skills/delegate/route.py",
+      "name": "bad-argument-type",
+      "concise_description": "Argument `dict[str, None]` is not assignable to parameter `object` with type `dict[str, bool | int]` in function `list.append`",
+      "severity": "error"
+    },
+    {
+      "column": 22,
+      "path": "skills/delegate/route.py",
+      "name": "bad-argument-type",
+      "concise_description": "Argument `list[dict[str, int | str]]` is not assignable to parameter `object` with type `list[dict[str, int]]` in function `list.append`",
+      "severity": "error"
+    },
+    {
+      "column": 76,
+      "path": "skills/delegate/route.py",
+      "name": "bad-assignment",
+      "concise_description": "`int` is not assignable to dict value type `bool | str | None`",
+      "severity": "error"
+    },
+    {
+      "column": 24,
+      "path": "skills/delegate/route.py",
+      "name": "bad-assignment",
+      "concise_description": "`str` is not assignable to dict key `why` with type `None`",
+      "severity": "error"
+    },
+    {
+      "column": 104,
+      "path": "skills/delegate/route.py",
+      "name": "no-matching-overload",
+      "concise_description": "No matching overload found for function `dict.get` called with arguments: (Unknown | None, Literal['rate_limited'])",
+      "severity": "error"
+    },
+    {
+      "column": 13,
+      "path": "skills/delegate/route.py",
+      "name": "missing-attribute",
+      "concise_description": "Object of class `NoneType` has no attribute `write`",
+      "severity": "error"
+    },
+    {
+      "column": 13,
+      "path": "skills/delegate/route.py",
+      "name": "missing-attribute",
+      "concise_description": "Object of class `NoneType` has no attribute `close`",
+      "severity": "error"
+    },
+    {
+      "column": 15,
+      "path": "skills/delegate/route.py",
+      "name": "bad-specialization",
+      "concise_description": "`Unknown | None` is not assignable to upper bound `SupportsDunderGT[Any] | SupportsDunderLT[Any]` of type variable `SupportsRichComparisonT`",
+      "severity": "error"
+    },
+    {
+      "column": 30,
+      "path": "skills/delegate/route.py",
+      "name": "bad-assignment",
+      "concise_description": "`dict[str, Unknown | None]` is not assignable to dict key `tokens` with type `None`",
+      "severity": "error"
+    },
+    {
+      "column": 38,
+      "path": "skills/delegate/route.py",
+      "name": "no-matching-overload",
+      "concise_description": "No matching overload found for function `dict.__init__` called with arguments: (None)",
+      "severity": "error"
+    },
+    {
+      "column": 34,
+      "path": "skills/delegate/route.py",
+      "name": "bad-assignment",
+      "concise_description": "`float` is not assignable to dict key `net_at` with type `None`",
+      "severity": "error"
+    },
+    {
+      "column": 9,
+      "path": "skills/delegate/route.py",
+      "name": "unsupported-operation",
+      "concise_description": "Cannot set item in `list[None]`",
+      "severity": "error"
+    },
+    {
+      "column": 30,
+      "path": "skills/delegate/route.py",
+      "name": "bad-assignment",
+      "concise_description": "`dict[str, int | Unknown]` is not assignable to dict key `tokens` with type `None`",
+      "severity": "error"
+    },
+    {
+      "column": 28,
+      "path": "skills/delegate/route.py",
+      "name": "bad-assignment",
+      "concise_description": "`dict[Unknown, Unknown] | Unknown` is not assignable to dict key `acct` with type `None`",
+      "severity": "error"
+    },
+    {
+      "column": 27,
+      "path": "skills/delegate/route.py",
+      "name": "bad-assignment",
+      "concise_description": "`float` is not assignable to dict key `ctx` with type `None`",
+      "severity": "error"
+    },
+    {
+      "column": 12,
+      "path": "skills/delegate/route.py",
+      "name": "missing-attribute",
+      "concise_description": "Object of type `bool | int | list[Unknown] | str | Unknown | None` has no attribute `strip`",
+      "severity": "error"
+    },
+    {
+      "column": 28,
+      "path": "skills/delegate/route.py",
+      "name": "not-callable",
+      "concise_description": "Expected a callable, got `None`",
+      "severity": "error"
+    },
+    {
+      "column": 28,
+      "path": "skills/delegate/route.py",
+      "name": "no-matching-overload",
+      "concise_description": "No matching overload found for function `dict.__init__` called with arguments: (str | Unknown, **dict[str, Unknown] | dict[Unknown, Unknown])",
+      "severity": "error"
+    },
+    {
+      "column": 29,
+      "path": "skills/delegate/route.py",
+      "name": "unsupported-operation",
+      "concise_description": "`+` is not supported between `list[Unknown]` and `str`",
+      "severity": "error"
+    },
+    {
+      "column": 40,
+      "path": "skills/delegate/route.py",
+      "name": "bad-argument-type",
+      "concise_description": "Keyword argument `secs` with type `float` is not assignable to parameter `**kwargs` with type `str` in function `typing.MutableMapping.update`",
+      "severity": "error"
+    },
+    {
+      "column": 60,
+      "path": "skills/delegate/route.py",
+      "name": "bad-argument-type",
+      "concise_description": "Keyword argument `git_violation` with type `list[str] | list[Unknown]` is not assignable to parameter `**kwargs` with type `str` in function `typing.MutableMapping.update`",
+      "severity": "error"
+    },
+    {
+      "column": 24,
+      "path": "skills/delegate/route.py",
+      "name": "bad-argument-type",
+      "concise_description": "Keyword argument `context` with type `dict[str, list[str]]` is not assignable to parameter `**kwargs` with type `str` in function `typing.MutableMapping.update`",
+      "severity": "error"
+    },
+    {
+      "column": 27,
+      "path": "skills/delegate/route.py",
+      "name": "bad-argument-type",
+      "concise_description": "Keyword argument `transcript` with type `str | None` is not assignable to parameter `**kwargs` with type `str` in function `typing.MutableMapping.update`",
+      "severity": "error"
+    },
+    {
+      "column": 47,
+      "path": "skills/delegate/route.py",
+      "name": "bad-argument-type",
+      "concise_description": "Keyword argument `call_id` with type `Any | None` is not assignable to parameter `**kwargs` with type `str` in function `typing.MutableMapping.update`",
+      "severity": "error"
+    },
+    {
+      "column": 82,
+      "path": "skills/delegate/route.py",
+      "name": "bad-argument-type",
+      "concise_description": "Keyword argument `usage` with type `dict[str, dict[Unknown, Unknown] | float | int | str | Unknown | None]` is not assignable to parameter `**kwargs` with type `str` in function `typing.MutableMapping.update`",
+      "severity": "error"
+    },
+    {
+      "column": 105,
+      "path": "skills/delegate/route.py",
+      "name": "bad-argument-type",
+      "concise_description": "Keyword argument `transcript_info` with type `dict[str, int | str | Unknown] | None` is not assignable to parameter `**kwargs` with type `str` in function `typing.MutableMapping.update`",
+      "severity": "error"
+    },
+    {
+      "column": 17,
+      "path": "skills/delegate/route.py",
+      "name": "missing-attribute",
+      "concise_description": "Object of class `TextIO` has no attribute `reconfigure`",
+      "severity": "error"
+    },
+    {
+      "column": 45,
+      "path": "tests/test_codex_quota.py",
+      "name": "unsupported-operation",
+      "concise_description": "Cannot set item in `_Environ[str]`",
+      "severity": "error"
+    },
+    {
+      "column": 42,
+      "path": "tests/test_codex_quota.py",
+      "name": "bad-assignment",
+      "concise_description": "`dict[str, int]` is not assignable to dict key `secondary` with type `None`",
+      "severity": "error"
+    },
+    {
+      "column": 54,
+      "path": "tests/test_health.py",
+      "name": "unsupported-operation",
+      "concise_description": "`/` is not supported between `tuple[int, int, int]` and `Literal[3600]`",
+      "severity": "error"
+    },
+    {
+      "column": 55,
+      "path": "tests/test_health.py",
+      "name": "missing-attribute",
+      "concise_description": "Object of class `NoneType` has no attribute `reason`",
+      "severity": "error"
+    },
+    {
+      "column": 53,
+      "path": "tests/test_health.py",
+      "name": "bad-argument-type",
+      "concise_description": "Argument `int | Unknown` is not assignable to parameter `obj` with type `Sized` in function `len`",
+      "severity": "error"
+    },
+    {
+      "column": 76,
+      "path": "tests/test_health.py",
+      "name": "bad-argument-type",
+      "concise_description": "Argument `int | Unknown` is not assignable to parameter `obj` with type `Sized` in function `len`",
+      "severity": "error"
+    },
+    {
+      "column": 31,
+      "path": "tests/test_health.py",
+      "name": "no-matching-overload",
+      "concise_description": "No matching overload found for function `unittest.case.TestCase.assertAlmostEqual` called with arguments: (float | None, Literal[3605], delta=float)",
+      "severity": "error"
+    },
+    {
+      "column": 24,
+      "path": "tests/test_health.py",
+      "name": "no-matching-overload",
+      "concise_description": "No matching overload found for function `unittest.case.TestCase.assertLess` called with arguments: (float | None, Literal[3700])",
+      "severity": "error"
+    },
+    {
+      "column": 41,
+      "path": "tests/test_health.py",
+      "name": "bad-argument-type",
+      "concise_description": "Argument `float | None` is not assignable to parameter `number` with type `_SupportsRound1[int]` in function `round`",
+      "severity": "error"
+    },
+    {
+      "column": 41,
+      "path": "tests/test_health.py",
+      "name": "bad-argument-type",
+      "concise_description": "Argument `float | None` is not assignable to parameter `number` with type `_SupportsRound1[int]` in function `round`",
+      "severity": "error"
+    },
+    {
+      "column": 31,
+      "path": "tests/test_health.py",
+      "name": "no-matching-overload",
+      "concise_description": "No matching overload found for function `unittest.case.TestCase.assertAlmostEqual` called with arguments: (float | None, Literal[120], delta=float)",
+      "severity": "error"
+    },
+    {
+      "column": 24,
+      "path": "tests/test_health.py",
+      "name": "unsupported-operation",
+      "concise_description": "`-` is not supported between `None` and `float`",
+      "severity": "error"
+    },
+    {
+      "column": 31,
+      "path": "tests/test_live_events.py",
+      "name": "bad-argument-type",
+      "concise_description": "Argument `Self@LiveFile` is not assignable to parameter `self` with type `Replay` in function `test_stream_supervisor.Replay.launch`",
+      "severity": "error"
+    },
+    {
+      "column": 47,
+      "path": "tests/test_live_events.py",
+      "name": "bad-argument-type",
+      "concise_description": "Argument `Self@LiveFile` is not assignable to parameter `self` with type `Replay` in function `test_stream_supervisor.Replay.fake`",
+      "severity": "error"
+    },
+    {
+      "column": 13,
+      "path": "tests/test_live_events.py",
+      "name": "missing-attribute",
+      "concise_description": "Object of class `LiveFile` has no attribute `base`",
+      "severity": "error"
+    },
+    {
+      "column": 13,
+      "path": "tests/test_live_events.py",
+      "name": "missing-attribute",
+      "concise_description": "Object of class `LiveFile` has no attribute `base`",
+      "severity": "error"
+    },
+    {
+      "column": 13,
+      "path": "tests/test_live_events.py",
+      "name": "missing-attribute",
+      "concise_description": "Object of class `LiveFile` has no attribute `base`",
+      "severity": "error"
+    },
+    {
+      "column": 43,
+      "path": "tests/test_live_events.py",
+      "name": "missing-attribute",
+      "concise_description": "Object of class `LiveFile` has no attribute `base`",
+      "severity": "error"
+    },
+    {
+      "column": 13,
+      "path": "tests/test_live_events.py",
+      "name": "missing-attribute",
+      "concise_description": "Object of class `LiveFile` has no attribute `base`",
+      "severity": "error"
+    },
+    {
+      "column": 30,
+      "path": "tests/test_net.py",
+      "name": "unsupported-operation",
+      "concise_description": "`None` is not subscriptable",
+      "severity": "error"
+    },
+    {
+      "column": 30,
+      "path": "tests/test_net.py",
+      "name": "unsupported-operation",
+      "concise_description": "`None` is not subscriptable",
+      "severity": "error"
+    },
+    {
+      "column": 25,
+      "path": "tests/test_net.py",
+      "name": "unsupported-operation",
+      "concise_description": "`None` is not subscriptable",
+      "severity": "error"
+    },
+    {
+      "column": 41,
+      "path": "tests/test_review_order.py",
+      "name": "bad-argument-type",
+      "concise_description": "Argument `ModuleSpec | None` is not assignable to parameter `spec` with type `ModuleSpec` in function `_frozen_importlib.module_from_spec`",
+      "severity": "error"
+    },
+    {
+      "column": 1,
+      "path": "tests/test_review_order.py",
+      "name": "missing-attribute",
+      "concise_description": "Object of class `NoneType` has no attribute `loader`",
+      "severity": "error"
+    },
+    {
+      "column": 9,
+      "path": "tests/test_review_order.py",
+      "name": "missing-attribute",
+      "concise_description": "Object of class `ModuleType` has no attribute `decision`",
+      "severity": "error"
+    },
+    {
+      "column": 13,
+      "path": "tests/test_review_order.py",
+      "name": "missing-attribute",
+      "concise_description": "Object of class `ModuleType` has no attribute `decision`",
+      "severity": "error"
+    },
+    {
+      "column": 41,
+      "path": "tests/test_route.py",
+      "name": "bad-argument-type",
+      "concise_description": "Argument `ModuleSpec | None` is not assignable to parameter `spec` with type `ModuleSpec` in function `_frozen_importlib.module_from_spec`",
+      "severity": "error"
+    },
+    {
+      "column": 1,
+      "path": "tests/test_route.py",
+      "name": "missing-attribute",
+      "concise_description": "Object of class `NoneType` has no attribute `loader`",
+      "severity": "error"
+    },
+    {
+      "column": 1,
+      "path": "tests/test_route.py",
+      "name": "missing-attribute",
+      "concise_description": "Object of class `ModuleType` has no attribute `REAL_NET_PROBE`",
+      "severity": "error"
+    },
+    {
+      "column": 1,
+      "path": "tests/test_route.py",
+      "name": "missing-attribute",
+      "concise_description": "Object of class `ModuleType` has no attribute `net_probe`",
+      "severity": "error"
+    },
+    {
+      "column": 32,
+      "path": "tests/test_route.py",
+      "name": "bad-assignment",
+      "concise_description": "`(name: Unknown) -> None` is not assignable to attribute `which` with type `Overload[\n  (cmd: StrPath, mode: int = 1, path: PathLike[str] | str | None = None) -> str | None\n  (cmd: bytes, mode: int = 1, path: PathLike[str] | str | None = None) -> bytes | None\n]`",
+      "severity": "error"
+    },
+    {
+      "column": 27,
+      "path": "tests/test_route.py",
+      "name": "unsupported-operation",
+      "concise_description": "`None` is not subscriptable",
+      "severity": "error"
+    },
+    {
+      "column": 41,
+      "path": "tests/test_route.py",
+      "name": "unsupported-operation",
+      "concise_description": "`None` is not subscriptable",
+      "severity": "error"
+    },
+    {
+      "column": 54,
+      "path": "tests/test_route.py",
+      "name": "unsupported-operation",
+      "concise_description": "`None` is not subscriptable",
+      "severity": "error"
+    },
+    {
+      "column": 34,
+      "path": "tests/test_route.py",
+      "name": "bad-argument-type",
+      "concise_description": "Argument `dict[str, list[Unknown]] | dict[str, Unknown] | None` is not assignable to parameter `container` with type `Container | Iterable[Any]` in function `unittest.case.TestCase.assertNotIn`",
+      "severity": "error"
+    },
+    {
+      "column": 37,
+      "path": "tests/test_route.py",
+      "name": "bad-assignment",
+      "concise_description": "`(name: Unknown) -> Literal['/x/codex'] | None` is not assignable to attribute `which` with type `Overload[\n  (cmd: StrPath, mode: int = 1, path: PathLike[str] | str | None = None) -> str | None\n  (cmd: bytes, mode: int = 1, path: PathLike[str] | str | None = None) -> bytes | None\n]`",
+      "severity": "error"
+    },
+    {
+      "column": 37,
+      "path": "tests/test_route.py",
+      "name": "bad-assignment",
+      "concise_description": "`(k: Unknown) -> tuple[Literal[True], Literal['HTTP 200']]` is not assignable to attribute `validate_key` with type `(key: Unknown) -> tuple[Literal[False], str] | tuple[Unknown, str] | tuple[None, str]`",
+      "severity": "error"
+    },
+    {
+      "column": 37,
+      "path": "tests/test_route.py",
+      "name": "bad-assignment",
+      "concise_description": "`(k: Unknown) -> tuple[Literal[True], Literal['HTTP 200']]` is not assignable to attribute `validate_key` with type `(key: Unknown) -> tuple[Literal[False], str] | tuple[Unknown, str] | tuple[None, str]`",
+      "severity": "error"
+    },
+    {
+      "column": 37,
+      "path": "tests/test_route.py",
+      "name": "bad-assignment",
+      "concise_description": "`(k: Unknown) -> tuple[Literal[True], Literal['HTTP 200']]` is not assignable to attribute `validate_key` with type `(key: Unknown) -> tuple[Literal[False], str] | tuple[Unknown, str] | tuple[None, str]`",
+      "severity": "error"
+    },
+    {
+      "column": 17,
+      "path": "tests/test_route.py",
+      "name": "missing-attribute",
+      "concise_description": "Object of class `NoneType` has no attribute `group`",
+      "severity": "error"
+    },
+    {
+      "column": 118,
+      "path": "tests/test_route.py",
+      "name": "bad-argument-type",
+      "concise_description": "Argument `str | None` is not assignable to parameter `*args` with type `PathLike[str] | str` in function `pathlib.Path.__new__`",
+      "severity": "error"
+    },
+    {
+      "column": 37,
+      "path": "tests/test_route.py",
+      "name": "bad-assignment",
+      "concise_description": "`Literal[1]` is not assignable to attribute `ANSWER_GRACE_S` with type `Literal[120]`",
+      "severity": "error"
+    },
+    {
+      "column": 29,
+      "path": "tests/test_route.py",
+      "name": "no-matching-overload",
+      "concise_description": "No matching overload found for function `subprocess.Popen.__init__` called with arguments: (list[str | None], env=dict[str, str], stdin=int, stdout=int, stderr=int)",
+      "severity": "error"
+    },
+    {
+      "column": 9,
+      "path": "tests/test_route.py",
+      "name": "missing-attribute",
+      "concise_description": "Object of class `NoneType` has no attribute `write`",
+      "severity": "error"
+    },
+    {
+      "column": 34,
+      "path": "tests/test_route.py",
+      "name": "missing-attribute",
+      "concise_description": "Object of class `NoneType` has no attribute `close`",
+      "severity": "error"
+    },
+    {
+      "column": 27,
+      "path": "tests/test_route.py",
+      "name": "missing-attribute",
+      "concise_description": "Object of class `NoneType` has no attribute `read`",
+      "severity": "error"
+    },
+    {
+      "column": 54,
+      "path": "tests/test_route.py",
+      "name": "missing-attribute",
+      "concise_description": "Object of class `NoneType` has no attribute `read`",
+      "severity": "error"
+    },
+    {
+      "column": 69,
+      "path": "tests/test_route.py",
+      "name": "missing-attribute",
+      "concise_description": "Object of class `NoneType` has no attribute `read`",
+      "severity": "error"
+    },
+    {
+      "column": 26,
+      "path": "tests/test_route.py",
+      "name": "unbound-name",
+      "concise_description": "`r` may be uninitialized",
+      "severity": "error"
+    },
+    {
+      "column": 9,
+      "path": "tests/test_route.py",
+      "name": "missing-attribute",
+      "concise_description": "Object of class `ModuleType` has no attribute `HERE`",
+      "severity": "error"
+    },
+    {
+      "column": 9,
+      "path": "tests/test_route.py",
+      "name": "missing-attribute",
+      "concise_description": "Object of class `ModuleType` has no attribute `HERE`",
+      "severity": "error"
+    },
+    {
+      "column": 16,
+      "path": "tests/test_route.py",
+      "name": "missing-attribute",
+      "concise_description": "Object of class `NoneType` has no attribute `group`",
+      "severity": "error"
+    },
+    {
+      "column": 41,
+      "path": "tests/test_rules.py",
+      "name": "unsupported-operation",
+      "concise_description": "`+` is not supported between `None` and `Literal[1]`",
+      "severity": "error"
+    },
+    {
+      "column": 45,
+      "path": "tests/test_rules.py",
+      "name": "unsupported-operation",
+      "concise_description": "`+` is not supported between `None` and `Literal[1]`",
+      "severity": "error"
+    },
+    {
+      "column": 27,
+      "path": "tests/test_usage.py",
+      "name": "unsupported-operation",
+      "concise_description": "`None` is not subscriptable",
+      "severity": "error"
+    },
+    {
+      "column": 42,
+      "path": "tests/test_usage.py",
+      "name": "unsupported-operation",
+      "concise_description": "`None` is not subscriptable",
+      "severity": "error"
+    },
+    {
+      "column": 59,
+      "path": "tests/test_usage.py",
+      "name": "unsupported-operation",
+      "concise_description": "`None` is not subscriptable",
+      "severity": "error"
+    },
+    {
+      "column": 77,
+      "path": "tests/test_usage.py",
+      "name": "unsupported-operation",
+      "concise_description": "`None` is not subscriptable",
+      "severity": "error"
+    },
+    {
+      "column": 27,
+      "path": "tests/test_usage.py",
+      "name": "unsupported-operation",
+      "concise_description": "`None` is not subscriptable",
+      "severity": "error"
+    },
+    {
+      "column": 42,
+      "path": "tests/test_usage.py",
+      "name": "unsupported-operation",
+      "concise_description": "`None` is not subscriptable",
+      "severity": "error"
+    },
+    {
+      "column": 60,
+      "path": "tests/test_usage.py",
+      "name": "unsupported-operation",
+      "concise_description": "`None` is not subscriptable",
+      "severity": "error"
+    },
+    {
+      "column": 27,
+      "path": "tests/test_usage.py",
+      "name": "unsupported-operation",
+      "concise_description": "`None` is not subscriptable",
+      "severity": "error"
+    },
+    {
+      "column": 42,
+      "path": "tests/test_usage.py",
+      "name": "unsupported-operation",
+      "concise_description": "`None` is not subscriptable",
+      "severity": "error"
+    },
+    {
+      "column": 59,
+      "path": "tests/test_usage.py",
+      "name": "unsupported-operation",
+      "concise_description": "`None` is not subscriptable",
+      "severity": "error"
+    },
+    {
+      "column": 77,
+      "path": "tests/test_usage.py",
+      "name": "unsupported-operation",
+      "concise_description": "`None` is not subscriptable",
+      "severity": "error"
+    },
+    {
+      "column": 87,
+      "path": "tests/test_usage.py",
+      "name": "unsupported-operation",
+      "concise_description": "`None` is not subscriptable",
+      "severity": "error"
+    },
+    {
+      "column": 102,
+      "path": "tests/test_usage.py",
+      "name": "unsupported-operation",
+      "concise_description": "`None` is not subscriptable",
+      "severity": "error"
+    },
+    {
+      "column": 27,
+      "path": "tests/test_usage.py",
+      "name": "unsupported-operation",
+      "concise_description": "`None` is not subscriptable",
+      "severity": "error"
+    },
+    {
+      "column": 39,
+      "path": "tests/test_usage.py",
+      "name": "unsupported-operation",
+      "concise_description": "`None` is not subscriptable",
+      "severity": "error"
+    },
+    {
+      "column": 56,
+      "path": "tests/test_usage.py",
+      "name": "unsupported-operation",
+      "concise_description": "`None` is not subscriptable",
+      "severity": "error"
+    },
+    {
+      "column": 26,
+      "path": "tests/test_usage.py",
+      "name": "unsupported-operation",
+      "concise_description": "`None` is not subscriptable",
+      "severity": "error"
+    },
+    {
+      "column": 27,
+      "path": "tests/test_usage.py",
+      "name": "unsupported-operation",
+      "concise_description": "`None` is not subscriptable",
+      "severity": "error"
+    },
+    {
+      "column": 42,
+      "path": "tests/test_usage.py",
+      "name": "unsupported-operation",
+      "concise_description": "`None` is not subscriptable",
+      "severity": "error"
+    },
+    {
+      "column": 60,
+      "path": "tests/test_usage.py",
+      "name": "unsupported-operation",
+      "concise_description": "`None` is not subscriptable",
+      "severity": "error"
+    },
+    {
+      "column": 27,
+      "path": "tests/test_usage.py",
+      "name": "unsupported-operation",
+      "concise_description": "`None` is not subscriptable",
+      "severity": "error"
+    },
+    {
+      "column": 42,
+      "path": "tests/test_usage.py",
+      "name": "unsupported-operation",
+      "concise_description": "`None` is not subscriptable",
+      "severity": "error"
+    },
+    {
+      "column": 59,
+      "path": "tests/test_usage.py",
+      "name": "unsupported-operation",
+      "concise_description": "`None` is not subscriptable",
+      "severity": "error"
+    },
+    {
+      "column": 77,
+      "path": "tests/test_usage.py",
+      "name": "unsupported-operation",
+      "concise_description": "`None` is not subscriptable",
+      "severity": "error"
+    },
+    {
+      "column": 87,
+      "path": "tests/test_usage.py",
+      "name": "unsupported-operation",
+      "concise_description": "`None` is not subscriptable",
+      "severity": "error"
+    },
+    {
+      "column": 102,
+      "path": "tests/test_usage.py",
+      "name": "unsupported-operation",
+      "concise_description": "`None` is not subscriptable",
+      "severity": "error"
+    },
+    {
+      "column": 120,
+      "path": "tests/test_usage.py",
+      "name": "unsupported-operation",
+      "concise_description": "`None` is not subscriptable",
+      "severity": "error"
+    },
+    {
+      "column": 27,
+      "path": "tests/test_usage.py",
+      "name": "unsupported-operation",
+      "concise_description": "`None` is not subscriptable",
+      "severity": "error"
+    },
+    {
+      "column": 27,
+      "path": "tests/test_usage.py",
+      "name": "unsupported-operation",
+      "concise_description": "`None` is not subscriptable",
+      "severity": "error"
+    },
+    {
+      "column": 42,
+      "path": "tests/test_usage.py",
+      "name": "unsupported-operation",
+      "concise_description": "`None` is not subscriptable",
+      "severity": "error"
+    },
+    {
+      "column": 60,
+      "path": "tests/test_usage.py",
+      "name": "unsupported-operation",
+      "concise_description": "`None` is not subscriptable",
+      "severity": "error"
+    },
+    {
+      "column": 27,
+      "path": "tests/test_usage.py",
+      "name": "unsupported-operation",
+      "concise_description": "`None` is not subscriptable",
+      "severity": "error"
+    },
+    {
+      "column": 42,
+      "path": "tests/test_usage.py",
+      "name": "unsupported-operation",
+      "concise_description": "`None` is not subscriptable",
+      "severity": "error"
+    },
+    {
+      "column": 45,
+      "path": "tests/test_usage.py",
+      "name": "bad-argument-type",
+      "concise_description": "Argument `str | None` is not assignable to parameter `*args` with type `PathLike[str] | str` in function `pathlib.Path.__new__`",
+      "severity": "error"
+    }
+  ]
+}

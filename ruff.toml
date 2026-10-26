@@ -1,0 +1,24 @@
+# Lint (88 sec 6). `just check` runs `ruff check`; `ruff format` applies to src/ only (see justfile).
+target-version = "py312"
+line-length = 140
+output-format = "concise"
+exclude = [".worktrees", ".slots", ".task", "tests/fixtures", "src/*/_vendor"]
+
+[lint]
+select = ["E", "F", "W", "I", "UP", "B", "C4", "C90", "SIM", "RUF", "PL"]
+ignore = [
+    "PLR0913",  # argument count: deep functions legitimately take many
+    "PLR2004",  # magic values
+    "PLR0917",  # positional-argument count, same reason as PLR0913
+]
+
+[lint.mccabe]
+max-complexity = 12
+
+# The old flat files and their tests predate these rules and are deleted slice by slice (88 D11). Each list is the rule set that fires
+# in those files today, measured at A1; a rule may be removed from a list when its last hit is fixed, never added.
+# src/** has no relaxation: it is held to the full set from its first commit.
+
+[lint.per-file-ignores]
+"skills/**" = ["RUF100", "B007", "B023", "B904", "C408", "C420", "C901", "E402", "E501", "E702", "E731", "E741", "F401", "F841", "I001", "PLC0415", "PLR0911", "PLR0912", "PLR0915", "PLW0603", "PLW1510", "PLW2901", "RUF005", "RUF021", "RUF059", "SIM105", "SIM114", "SIM115", "SIM117", "UP012", "UP017", "UP031"]
+"tests/**" = ["B007", "C408", "C420", "E501", "E701", "E702", "E731", "E741", "F401", "F841", "I001", "PLC0415", "PLW1510", "RUF005", "RUF012", "RUF021", "RUF059", "RUF100", "SIM117", "UP017", "UP031"]
