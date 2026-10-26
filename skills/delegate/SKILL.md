@@ -19,7 +19,7 @@ Roles: planner (plan) · worker (implement) · reviewer (`--authored-by`: family
 | `needs_input` `claude_usage` | `get_usage`; rerun with `--claude-usage '<plan.windows>'` |
 | `notice` | tell the user once |
 
-No Python 3.8+: Agent tool only, no worktree, effort in the brief.
+No Python 3.12+: Agent tool only, no worktree, effort in the brief.
 
 <!-- base-table -->
 | role | agent, in order |

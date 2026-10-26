@@ -11,7 +11,7 @@ claude plugin install iorlas-delegate@iorlas-marketplace
 
 Then, in a Claude Code session, run `/iorlas-delegate:init`. It checks the machine, installs the Codex CLI and plugin, starts the Codex device login (you open a link and enter a code), and tells you the one command to store the API key yourself. A configured machine answers `READY` and reads nothing more.
 
-Requirements: Claude Code. Base mode (Claude sub-agents only) needs nothing else. The router, Codex lane and credit lane need Python 3.8+ (standard library only); the Codex CLI needs Node 18.18+. macOS, Linux, Windows, Docker. In a container, mount `~/.claude` and `~/.codex` as volumes.
+Requirements: Claude Code. Base mode (Claude sub-agents only) needs nothing else. The router, Codex lane and credit lane need Python 3.12+ (standard library only); the Codex CLI needs Node 18.18+. macOS, Linux, Docker. In a container, mount `~/.claude` and `~/.codex` as volumes.
 
 ## Lanes
 
@@ -38,7 +38,7 @@ skills/delegate/onboard.py    readiness checks and setup steps
 skills/delegate/agent_runs.py publishes runs and lane limits as agent-runs v1 (a public contract)
 skills/delegate/routing.json  lanes, models, roles, thresholds
 commands/                     /iorlas-delegate:init, /iorlas-delegate:status (the lane cockpit)
-tests/                        python3 -m unittest discover -s tests   (CI: 3 OS x Python 3.8 and 3.12)
+tests/                        python3 -m unittest discover -s tests   (CI: Ubuntu, Python 3.12)
 ```
 
 Git stays with the coordinator: workers never create branches or worktrees and never commit, merge or push; `run` compares HEAD and branch before and after and reports a change in `git_violation`.

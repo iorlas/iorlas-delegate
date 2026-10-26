@@ -66,9 +66,11 @@ This protocol applies when ending a Beads implementation workflow. It is subordi
 
 ```bash
 python3 -m unittest discover -s tests
+just check        # ruff + pyrefly + the suite (tools pinned in mise.toml; `mise install`)
 ```
 
-CI: Ubuntu, macOS, Windows x Python 3.8 and 3.12.
+CI: Ubuntu, Python 3.12 (suite, plus a `check` job with ruff and pyrefly).
+Caps (tests/test_rules.py): 400 SLOC per file, 80 per function, 800 per test file; the KNOWN_OVERSIZE table (tests/rules_ratchet.json) may only shrink.
 
 ## Architecture Overview
 
@@ -81,5 +83,5 @@ Read `docs/dev/integrations.md`: other tools (the iorlas-task-loop dashboard) re
 
 ## Conventions & Patterns
 
-- Python 3.8+, standard library only; macOS, Linux (also in containers), Windows.
+- Python 3.12+, standard library only at runtime; macOS and Linux (also in containers), POSIX only.
 - Bump `.claude-plugin/plugin.json` and the iorlas-marketplace entry on every release.

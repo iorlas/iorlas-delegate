@@ -42,4 +42,4 @@ Read this before changing anything in this repo. Rules are Denis's; the lessons 
 
 ## Release
 
-Tests green -> CI green on the exact HEAD (3 OS x Python 3.8 and 3.12) -> bump `.claude-plugin/plugin.json` -> same version in `iorlas-marketplace` -> tag `vX.Y.Z` -> `claude plugin marketplace update` and `claude plugin update iorlas-delegate@iorlas-marketplace`; sessions restart to load it.
+Tests green -> CI green on the exact HEAD (Ubuntu, Python 3.12) -> bump `.claude-plugin/plugin.json` -> same version in `iorlas-marketplace` -> tag `vX.Y.Z` -> `claude plugin marketplace update` and `claude plugin update iorlas-delegate@iorlas-marketplace`; sessions restart to load it.

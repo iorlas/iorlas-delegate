@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """delegate router: deterministic lane and step selection for an LLM orchestrator.
 
-Python 3.8+, standard library only. Windows, macOS, Linux, Docker.
+Python 3.12+, standard library only. macOS and Linux (Docker included).
 The model supplies only what the script cannot read itself; the script decides.
 
   route.py status [--claude-usage JSON|@file|-] [--json] [--cheap]
