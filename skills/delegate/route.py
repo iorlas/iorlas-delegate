@@ -2763,9 +2763,12 @@ def opencode_log_dir():
     return Path(os.environ.get("XDG_DATA_HOME") or Path.home() / ".local" / "share") / "opencode" / "log"
 
 
+OPENCODE_ECHO_RE = re.compile(r"\b(?:permission|pattern|input|command|args)=")     # log lines that quote the worker's own tool input
+
+
 def opencode_log_poll():
     """-> (poll, state). poll() is truthy once opencode's own log gained a LIMIT_RE line since launch (it retries a limit forever without exiting);
-    state["why"] is then "limit" and state["msg"] the log line."""
+    lines echoing tool input (`evaluated permission=bash pattern="..."`) never count. state["why"] is then "limit" and state["msg"] the log line."""
     logs = opencode_log_dir()
     state = {"why": None, "msg": ""}
     offs = {}
@@ -2781,7 +2784,7 @@ def opencode_log_poll():
                         fh.seek(off)
                         new = fh.read(size - off).decode("utf-8", "replace")
                     offs[f] = size
-                    m = next((ln for ln in new.splitlines() if classify.LIMIT_RE.search(ln)), None)
+                    m = next((ln for ln in new.splitlines() if classify.LIMIT_RE.search(ln) and not OPENCODE_ECHO_RE.search(ln)), None)
                     if m:
                         state.update(why="limit", msg=m.strip())
                         return True
