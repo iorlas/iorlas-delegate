@@ -303,10 +303,18 @@
   "--call-id"
  ],
  "usage": {
-  "tokens": "in includes cached",
+  "tokens": "in includes cached; also per call, never cumulative: in_fresh (uncached input), cache_read, cache_write (null when the vendor does not report it), out, and cache_write_by_ttl {5m,1h} on claude",
   "turns": "claude num_turns; opencode step_finish count; codex turn.completed count",
   "context_k": "input tokens of the last model request in thousands, null when the vendor does not say",
-  "answer_bytes": "utf-8 length of text"
+  "answer_bytes": "utf-8 length of text",
+  "ref": "the vendor session or thread id the call ran in (same as the top-level ref)",
+  "last_activity_at": "ISO 8601 UTC time the call ended; null without a ref",
+  "warm_until": "last_activity_at + ttl_s: when the vendor prompt cache probably expires. Telemetry only; no routing uses it. null = unknown",
+  "ttl_s": "cache lifetime assumed: claude subscription 3600, claude credit 300, codex 3600; null for opencode lanes",
+  "ttl_source": "vendor_default | observed | unknown",
+  "cost_usd": "what the harness returned for this call (claude total_cost_usd, opencode step cost summed); null when it returns none (codex, zai)",
+  "cost_source": "harness | unknown | free",
+  "accounting": "exact (codex tokens) | estimated (harness-computed cost) | unknown"
  },
  "answer_schema": {
   "type": "object",
@@ -469,7 +477,33 @@
       "type": [
        "object",
        "null"
-      ]
+      ],
+      "properties": {
+       "in_fresh": {
+        "type": [
+         "integer",
+         "null"
+        ]
+       },
+       "cache_read": {
+        "type": [
+         "integer",
+         "null"
+        ]
+       },
+       "cache_write": {
+        "type": [
+         "integer",
+         "null"
+        ]
+       },
+       "out": {
+        "type": [
+         "integer",
+         "null"
+        ]
+       }
+      }
      },
      "cost": {
       "type": "number"
@@ -491,6 +525,60 @@
      },
      "answer_bytes": {
       "type": "integer"
+     },
+     "ref": {
+      "type": [
+       "string",
+       "null"
+      ]
+     },
+     "last_activity_at": {
+      "type": [
+       "string",
+       "null"
+      ]
+     },
+     "warm_until": {
+      "type": [
+       "string",
+       "null"
+      ]
+     },
+     "ttl_s": {
+      "type": [
+       "integer",
+       "null"
+      ]
+     },
+     "ttl_source": {
+      "type": "string",
+      "enum": [
+       "vendor_default",
+       "observed",
+       "unknown"
+      ]
+     },
+     "cost_usd": {
+      "type": [
+       "number",
+       "null"
+      ]
+     },
+     "cost_source": {
+      "type": "string",
+      "enum": [
+       "harness",
+       "unknown",
+       "free"
+      ]
+     },
+     "accounting": {
+      "type": "string",
+      "enum": [
+       "exact",
+       "estimated",
+       "unknown"
+      ]
      }
     }
    },

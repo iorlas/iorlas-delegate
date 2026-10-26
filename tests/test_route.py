@@ -745,7 +745,7 @@ printf '{"type":"result","result":"claude says hi","session_id":"sess-1","total_
         self.assertEqual((code, r["status"], r["lane"]), (0, "lane_out", "OPENAI_SUBSCRIPTION"))
         self.assertGreater(r["retry_after"], 0)
         code, r = self.run_it()
-        self.assertEqual((r["status"], r["lane"], r["family"], r["cost"]), ("done", "CLAUDE_SUBSCRIPTION", "claude", 0))
+        self.assertEqual((r["status"], r["lane"], r["family"], r["cost"]), ("done", "CLAUDE_SUBSCRIPTION", "claude", 0.5))      # the harness's own figure, not zeroed on a subscription
         seen = self.args_seen()
         self.assertIn("--session-id", seen)
         self.assertNotIn("--max-budget-usd", seen)                         # a subscription has no dollar cap
@@ -928,7 +928,7 @@ case "$FAKE_MODE" in
           sleep 30;;
 esac
 echo '{"type":"text","sessionID":"ses_1","part":{"type":"text","text":"grok did it"}}'
-echo '{"type":"step_finish","sessionID":"ses_1","part":{"type":"step-finish","tokens":{"input":10,"output":3,"reasoning":2,"cache":{"read":40,"write":0}}}}'
+echo '{"type":"step_finish","sessionID":"ses_1","part":{"type":"step-finish","cost":0.25,"tokens":{"input":10,"output":3,"reasoning":2,"cache":{"read":40,"write":0}}}}'
 """
 
     def grok_ready(self):
@@ -1072,6 +1072,25 @@ echo '{"type":"step_finish","sessionID":"ses_1","part":{"type":"step-finish","to
         self.assertEqual((r["status"], r["reason"]), ("failed", "secrets"))
         self.assertLess(time.time() - t0, 20)
 
+    @unittest.skipIf(sys.platform != "darwin", "macOS only")
+    def test_grok_step_cost_is_passed_through_per_call(self):
+        self.grok_ready()
+        self.codex_out()
+        _, r = self.run_it()
+        u = r["usage"]
+        self.assertEqual((r["lane"], r["cost"]), ("GROK_SUBSCRIPTION", 0.25))
+        self.assertEqual((u["cost_usd"], u["cost_source"], u["accounting"]), (0.25, "harness", "estimated"))
+        self.assertEqual({k: u["tokens"][k] for k in ("in_fresh", "cache_read", "cache_write", "out")}, {"in_fresh": 10, "cache_read": 40, "cache_write": 0, "out": 5})
+        self.assertEqual((u["ttl_s"], u["warm_until"], u["ttl_source"], u["ref"]), (None, None, "unknown", "ses_1"))      # no known cache window
+
+    def test_claude_subscription_usage_is_per_call_with_the_harness_cost_and_a_1h_window(self):
+        self.codex_out()
+        _, r = self.run_it()
+        u = r["usage"]
+        self.assertEqual((r["lane"], u["cost_usd"], u["cost_source"], u["accounting"]), ("CLAUDE_SUBSCRIPTION", 0.5, "harness", "estimated"))
+        self.assertEqual({k: u["tokens"][k] for k in ("in_fresh", "cache_read", "cache_write", "out")}, {"in_fresh": 3, "cache_read": 50, "cache_write": 20, "out": 9})
+        self.assertEqual((u["ttl_s"], u["ttl_source"], u["ref"]), (3600, "vendor_default", "sess-1"))
+
     def test_host_on_the_claude_lane_runs_the_restricted_classifier_substrate(self):
         self.codex_out()
         _, r = self.run_it("--host")
@@ -1160,14 +1179,22 @@ echo '{"type":"step_finish","sessionID":"ses_1","part":{"type":"step-finish","to
 
     def test_a_resumed_codex_thread_counts_only_this_runs_tokens(self):
         self.run_it()
+        route.history_path().unlink()       # neither a rollout nor a history row: the reported usage stands
         _, r = self.run_it("--resume", "thread-123")
-        self.assertEqual(r["tokens"], {"in": 100, "cached": 40, "out": 7})        # no rollout found: the reported usage stands
+        self.assertEqual(r["tokens"], {"in": 100, "cached": 40, "out": 7})
         d = Path(os.environ["CODEX_HOME"]) / "sessions" / "2026" / "10" / "21"      # lifesim-fld.27.10: five resumes summed to 43M, the thread spent 16M
         d.mkdir(parents=True)
         (d / "rollout-2026-10-21T19-45-28-thread-123.jsonl").write_text(
             '{"type":"event_msg","payload":{"type":"token_count","info":{"total_token_usage":{"input_tokens":60,"cached_input_tokens":30,"output_tokens":4}}}}\n')
         _, r = self.run_it("--resume", "thread-123")
         self.assertEqual(r["tokens"], {"in": 40, "cached": 10, "out": 3})
+
+    def test_a_resume_with_no_rollout_subtracts_the_cumulative_the_history_kept(self):
+        self.run_it()       # first call: the thread total is 100/40/7, recorded in history
+        route.history_add({"ts": route.now(), "ref": "thread-123", "cumulative": {"in": 60, "cached": 30, "out": 4}})
+        _, r = self.run_it("--resume", "thread-123")
+        self.assertEqual(r["tokens"], {"in": 40, "cached": 10, "out": 3})
+        self.assertEqual((r["usage"]["tokens"]["in_fresh"], r["usage"]["tokens"]["cache_read"], r["usage"]["tokens"]["out"]), (30, 10, 3))
 
     def test_a_codex_turn_that_fails_before_any_work_is_a_stop_with_codexs_reason(self):
         _, r = self.run_it(mode="early_error")
@@ -1404,7 +1431,13 @@ echo '{"type":"step_finish","sessionID":"ses_1","part":{"type":"step-finish","to
         (rollout / "rollout-2026-10-21T19-45-28-thread-123.jsonl").write_text("x" * 40)
         _, r = self.run_it("--call-id", "run1#3")
         self.assertEqual((r["call_id"], r["stop"]), ("run1#3", None))
-        self.assertEqual(r["usage"], {"tokens": {"in": 100, "cached": 40, "out": 7}, "cost": 0, "secs": r["secs"], "turns": 1, "context_k": None, "answer_bytes": len(r["text"].encode())})
+        u = r["usage"]
+        self.assertEqual(u["tokens"], {"in": 100, "cached": 40, "out": 7, "in_fresh": 60, "cache_read": 40, "cache_write": None})
+        self.assertEqual((u["cost"], u["secs"], u["turns"], u["context_k"], u["answer_bytes"]), (0, r["secs"], 1, None, len(r["text"].encode())))
+        self.assertEqual((u["ref"], u["cost_usd"], u["cost_source"], u["accounting"], u["ttl_s"], u["ttl_source"]), ("thread-123", None, "unknown", "exact", 3600, "observed"))
+        self.assertIsNotNone(u["last_activity_at"])
+        self.assertGreater(u["warm_until"], u["last_activity_at"])
+        self.assertEqual(json.loads(route.history_path().read_text().splitlines()[-1])["cumulative"], {"in": 100, "cached": 40, "out": 7})
         self.assertEqual((r["transcript_info"]["kind"], r["transcript_info"]["from"], r["transcript_info"]["to"], r["transcript_info"]["bytes"]), ("codex", 0, 40, 40))
         self.assertEqual((r["transcript_status"], r["transcript"]), ("ok", r["transcript_info"]["path"]))
         self.assertEqual(json.loads(route.history_path().read_text().splitlines()[-1])["call_id"], "run1#3")

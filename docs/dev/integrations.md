@@ -103,6 +103,12 @@ https://github.com/iorlas/iorlas-task-loop/blob/main/docs/contracts/worker-run-v
   (`session_meta.payload.parent_thread_id` = the worker's thread; the last `token_count` holds the total); `codex exec --json` never reports them. Since 0.26.0.
 - A resumed Codex thread's `turn.completed` usage is the thread's running total; `exec resume` subtracts the total its rollout file held before
   the run, so each run counts only its own tokens (lifesim-fld.27.10: five resumes logged 43M for a 16M thread).
+- `usage` is per call, never cumulative (delegate-uk0, study 85): `usage.tokens` keeps `in/cached/out` and adds `in_fresh`, `cache_read`, `cache_write` (null where the
+  vendor does not report it: Codex), `out`, and on Claude `cache_write_by_ttl {5m,1h}`. A resumed Codex thread subtracts the earlier cumulative total (its rollout file, else
+  the `cumulative` field of the newest history row for that ref). Cost is what the harness returned, with no price table: Claude `total_cost_usd` on every lane
+  (subscription included; top-level `cost` is no longer zeroed there), Codex `cost_usd: null`/`cost_source: "unknown"`, Grok the summed opencode step `cost`, zai `unknown`,
+  free DeepSeek `0`/`free`. Also `ref`, `last_activity_at`, `warm_until`, `ttl_s`, `ttl_source`, `cost_usd`, `cost_source`, `accounting`. `warm_until` is telemetry
+  (Claude subscription 3600 s, Claude credit 300 s, Codex 3600 s observed, opencode unknown = null): no routing reads it.
 - `stop` (not `error`) answers a state-lock timeout, with `retry_after`; `error` means permanent. A Codex turn that fails (`turn.failed`/`error` event) before any
   work answers `stop` with `retry_after` and Codex's own message (network down, the Mac waking from sleep); after work it is `failed`; an HTTP 4xx other than 429 is `error`.
 - Stopping: on SIGTERM, SIGHUP or Ctrl-C route.py kills the worker's process group before it exits. A SIGKILL on route.py cannot be caught, so

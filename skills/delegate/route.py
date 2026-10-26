@@ -50,7 +50,7 @@ HERE = Path(__file__).resolve().parent
 if str(HERE) not in sys.path:
     sys.path.insert(0, str(HERE))
 from lanes import classify, health, supervisor      # the one outcome ladder (delegate-e05); the health fold and breaker (rdt, a9x); the idle watchdog (go0)
-from lanes import netprobe, profiles                # network facts (4n7); the lane adapter registry (dlz)
+from lanes import netprobe, profiles, usage as accounting                # network facts (4n7); the lane adapter registry (dlz)
 from lanes import cockpit as role_view              # roles{} for status (0sf)
 WEEK_MIN = 7 * 24 * 60
 
@@ -2646,6 +2646,7 @@ def launch_codex(d, brief, a, rid, t, meta):
         if ev.get("type") == "turn.completed" and isinstance(ev.get("usage"), dict):
             u = ev["usage"]
             seen["tokens"] = {"in": u.get("input_tokens"), "cached": u.get("cached_input_tokens"), "out": u.get("output_tokens")}
+            seen["cumulative"] = dict(seen["tokens"])       # the thread's running total on a resume: kept in the history row for the next call
             seen["turns"] += 1
         if ev.get("type") in ("turn.failed", "error"):      # codex's own reason; stderr then holds only transport noise
             msg = str((ev.get("error") or {}).get("message") if ev.get("type") == "turn.failed" else ev.get("message") or "")
@@ -2667,7 +2668,7 @@ def launch_codex(d, brief, a, rid, t, meta):
     if agent_runs:
         agent_runs.run(rid, kind="codex", lane=d["lane"], model=d["model"], cwd=h["cwd"], started=t, status="running", **meta)
     started = time.time()       # wall clock, not now(): it is compared with file times
-    before = codex_thread_total(a.resume) if a.resume else None
+    before = (codex_thread_total(a.resume) or history_cumulative(a.resume)) if a.resume else None
     poll0, tick, dog = worker_watch("codex", d["lane"])
     WORKER_TICK[:] = [tick]
 
@@ -2690,15 +2691,15 @@ def launch_codex(d, brief, a, rid, t, meta):
         out_file.unlink()
     final = bool(text) or bool(seen["turns"] and seen["last"])        # the turn finished: codex writes -o only at its end
     text = text or seen["last"]
-    if before and seen["tokens"] and (seen["tokens"].get("in") or 0) >= before["in"]:      # a running total: keep this run's part
-        seen["tokens"] = {k: max(0, (seen["tokens"].get(k) or 0) - before[k]) for k in before}
+    seen["tokens"] = accounting.per_call(seen["tokens"], before)      # a running total: keep this run's part
     if seen["ref"]:             # the reviewer's tokens are the run's too
         extra, n = codex_child_tokens(seen["ref"], started - 1)
         if n:
             base = seen["tokens"] or {"in": 0, "cached": 0, "out": 0}
             seen["tokens"] = {k: (base.get(k) or 0) + extra[k] for k in extra}
     res = {"text": text, "ref": seen["ref"], "stderr": err, "tokens": seen["tokens"], "denied": seen["denied"], "turns": seen["turns"] or None,
-           "context_k": codex_context_k(seen["ref"]), "started": bool(seen["ref"]), "partial": seen["work"], "answered": final}
+           "context_k": codex_context_k(seen["ref"]), "started": bool(seen["ref"]), "partial": seen["work"], "answered": final,
+           "acct": accounting.codex(seen["tokens"]), "cumulative": seen.get("cumulative")}
     o = classify.classify(rc, seen["error"] or (seen["transient"] if rc != 0 else ""), err, timed_out, seen["work"], dict(watch_fields(res, dog), secret=seen.get("secret")))
     if seen["net"] and (o is None or o.reason == "killed"):       # we stopped it because the network is down
         o = classify.Outcome("network", seen["transient"], "event")
@@ -2921,7 +2922,7 @@ def launch_opencode(d, brief, a, rid, t, meta):
         rules += "\n\n" + repo_instruction_text(h["cwd"])         # opencode reads AGENTS.md itself; CLAUDE.md only through what is turned off
     if a.schema:
         rules += "\n\nYour final message must be only a JSON object matching this JSON Schema:\n" + Path(a.schema).read_text(encoding="utf-8")
-    seen = {"ref": a.resume, "last": "", "tokens": None, "denied": [], "error": "", "work": False, "turns": 0, "ctx": None}
+    seen = {"ref": a.resume, "last": "", "tokens": None, "denied": [], "error": "", "work": False, "turns": 0, "ctx": None, "acct": None}
     if a.resume:
         note_ref(a.resume)
 
@@ -2946,6 +2947,7 @@ def launch_opencode(d, brief, a, rid, t, meta):
             tk = seen["tokens"] or {"in": 0, "cached": 0, "out": 0}
             seen["tokens"] = {"in": tk["in"] + (u.get("input") or 0) + (c.get("read") or 0) + (c.get("write") or 0), "cached": tk["cached"] + (c.get("read") or 0),
                               "out": tk["out"] + (u.get("output") or 0) + (u.get("reasoning") or 0)}
+            seen["acct"] = accounting.opencode_step(seen["acct"], u, p.get("cost"))
             seen["turns"] += 1
             seen["ctx"] = round(((u.get("input") or 0) + (c.get("read") or 0) + (c.get("write") or 0)) / 1000, 1)
         if ev.get("type") == "text":
@@ -2983,7 +2985,8 @@ def launch_opencode(d, brief, a, rid, t, meta):
                 private(f)
     text = seen["last"].strip()
     res = {"text": text, "ref": seen["ref"], "stderr": err, "tokens": seen["tokens"], "denied": seen["denied"], "turns": seen["turns"] or None, "context_k": seen["ctx"],
-           "started": bool(seen["ref"]), "partial": seen["work"]}       # no `answered`: opencode has no resume-tested finished-answer signal (62-spikes-resume.md)
+           "started": bool(seen["ref"]), "partial": seen["work"], "acct": accounting.opencode_close(seen["acct"], d["lane"])}       # no `answered`: opencode has no resume-tested finished-answer signal (62-spikes-resume.md)
+    res["cost"] = (res["acct"] or {}).get("cost_usd") or 0         # opencode's per-step cost where it states one (Grok); zai and free steps carry none
     why = seen["error"] or (err if rc != 0 else "")
     o = classify.classify(rc, why, "", timed_out, seen["work"], dict(watch_fields(res, dog), secret=seen.get("secret")))
     if o:       # opencode's error event, stderr or log, never the model's answer
@@ -3066,11 +3069,12 @@ def launch_claude(d, brief, a, rid, t, cfg, meta):
     if final and not j.get("is_error"):
         rc = 0          # stopped by us after answering
     text = j.get("result") if isinstance(j.get("result"), str) else out.strip()[-2000:]
-    cost = float(j.get("total_cost_usd") or 0) if credit else 0.0
+    cost = float(j.get("total_cost_usd") or 0)          # the harness's own figure on every lane, subscription included (study 85)
     if credit and cost > 0:
         ledger_add(cost, d["model"], t)
     u = j.get("usage") if isinstance(j.get("usage"), dict) else {}
     res = {"text": text, "ref": j.get("session_id") or ref, "cost": cost, "stderr": err, "tokens": claude_tokens(u),
+           "acct": accounting.claude(u, j.get("total_cost_usd"), credit),
            "denied": [{"tool": x.get("tool_name"), "input": x.get("tool_input")} for x in j.get("permission_denials") or []
                       if isinstance(x, dict) and not policy_denial(x, h.get("read_only"))]}
     res.update(turns=j.get("num_turns"), context_k=ctx[0] if ctx else None, started=bool(begun), partial=bool(begun))
@@ -3151,7 +3155,7 @@ def result(status, reason=None, outcome=None, **kw):
     r = {"v": 2, "status": status, "reason": reason, "next": nxt, "data": None, "text": "", "ref": None, "lane": None, "model": None, "effort": None, "family": None,
          "flag": None, "cost": 0, "tokens": None, "denied": [], "secs": 0, "run_id": None, "transcript": None, "retry_after": None, "say": "", "git_violation": [],
          "call_id": None, "transcript_info": None, "transcript_status": None, "stop": stop,      # additive to v2 (contract.json): the typed facts behind reason/next
-         "usage": {"tokens": None, "cost": 0, "secs": 0, "turns": None, "context_k": None, "answer_bytes": 0}}
+         "usage": {"tokens": None, "cost": 0, "secs": 0, "turns": None, "context_k": None, "answer_bytes": 0, **accounting.fields(None, None, 0)}}
     r.update(kw)
     return r
 
@@ -3183,6 +3187,14 @@ def history_add(rec):
             with open(p, "a", encoding="utf-8") as f:
                 f.write(json.dumps(rec) + "\n")
             private(p)
+
+
+def history_cumulative(ref):
+    """The thread total the newest history row for `ref` recorded: where the rollout file is gone, a resume still knows what came before."""
+    with contextlib.suppress(Exception):
+        rows = [json.loads(ln) for ln in history_path().read_text(encoding="utf-8", errors="replace").splitlines()[-2000:] if ref in ln]
+        return accounting.last_cumulative(rows, ref)
+    return None
 
 
 def lane_use(cfg, name, t):
@@ -3405,6 +3417,9 @@ def run_once(a, cfg):
                                argparse.Namespace(**dict(vars(a), resume=res["ref"])))
                 tok = [x for x in (res.get("tokens"), again.get("tokens")) if x]
                 again["tokens"] = {k: sum(x.get(k) or 0 for x in tok) for k in ("in", "cached", "out")} if tok else None
+                again["acct"] = accounting.merge(res.get("acct"), again.get("acct"))
+                again["cost"] = (res.get("cost") or 0) + (again.get("cost") or 0)
+                again["cumulative"] = again.get("cumulative") or res.get("cumulative")
                 again["denied"] = (res.get("denied") or []) + (again.get("denied") or [])
                 res = again
                 why = None if res["status"] != "done" else "the answer is not JSON" if res.get("data") is None else schema_problem(res["data"], schema)
@@ -3436,12 +3451,15 @@ def run_once(a, cfg):
     detail = res.pop("detail", "")
     history_add({"ts": now(), "run_id": rid, "call_id": getattr(a, "call_id", None), "ref": res.get("ref"), **health.row_fields(res.get("outcome"), "", detail or res.get("say"), res.get("retry_after")),
                  "role": a.role, "task": a.task or "", "lane": d["lane"], "model": d["model"], "effort": d["effort"],
-                 "status": res["status"], "reason": res.get("reason"), "host": bool(a.host), "denials": len(res.get("denied") or []), "secs": secs, "cost": res.get("cost", 0), "tokens": res.get("tokens"),
+                 "status": res["status"], "reason": res.get("reason"), "host": bool(a.host), "denials": len(res.get("denied") or []), "secs": secs, "cost": res.get("cost", 0), "tokens": res.get("tokens"), "cumulative": res.get("cumulative"),
                  "five_before": lane.five, "week_before": lane.week, "five_after": five_after, "week_after": week_after,
                  "overlap": sorted(set(taken["peers"]) | set(ends.get("peers", []))), "slots": cap, "transcript": transcript})
     info = transcript_info(transcript, fam, t_from)
-    usage = {"tokens": res.get("tokens"), "cost": res.get("cost", 0), "secs": secs, "turns": res.pop("turns", None), "context_k": res.pop("context_k", None),
-             "answer_bytes": len((res.get("text") or "").encode("utf-8"))}
+    ac = res.pop("acct", None)
+    res.pop("cumulative", None)
+    usage = {"tokens": dict(res["tokens"], **accounting.token_fields(ac)) if res.get("tokens") else None, "cost": res.get("cost", 0), "secs": secs,
+             "turns": res.pop("turns", None), "context_k": res.pop("context_k", None), "answer_bytes": len((res.get("text") or "").encode("utf-8")),
+             **accounting.fields(ac, res.get("ref"), time.time())}
     if res.get("warnings"):      # the launcher's own (net_after_answer) join the router's
         extra["warnings"] = list(extra.get("warnings") or []) + res.pop("warnings")
     res.update(**who, run_id=rid, secs=secs, git_violation=git_changes(git_before, git_state(cwd)),
