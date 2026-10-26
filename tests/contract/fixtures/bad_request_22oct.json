@@ -5,11 +5,6 @@
  "lane": "OPENAI_SUBSCRIPTION",
  "real": "history rows are real; vendor text is the engine's copy of delegate's say, cut at 300 chars (the HTTP status tail is lost), so evidence is shorter than the original error",
  "expected_reason": "bad_request",
- "expected_wire": {
-  "status": "error",
-  "reason": "bad_request",
-  "next": "owner"
- },
  "benches_pair": false,
  "rows": [
   {
@@ -20,9 +15,8 @@
     "role": "reviewer",
     "lane": "OPENAI_SUBSCRIPTION",
     "model": "gpt-6.1-sol",
-    "status": "error",
-    "reason": "bad_request",
-    "secs": 12.2
+    "secs": 12.2,
+    "outcome": "bad_request"
    },
    "source": "engine/lifesim-log-20261022-225135.jsonl:62",
    "evidence": {
@@ -42,9 +36,8 @@
     "role": "worker",
     "lane": "OPENAI_SUBSCRIPTION",
     "model": "gpt-6.1-sol",
-    "status": "error",
-    "reason": "bad_request",
-    "secs": 16.8
+    "secs": 16.8,
+    "outcome": "bad_request"
    },
    "source": "engine/lifesim-sz3-20261022-225656.jsonl:17",
    "evidence": {
@@ -64,9 +57,8 @@
     "role": "reviewer",
     "lane": "OPENAI_SUBSCRIPTION",
     "model": "gpt-6.1-sol",
-    "status": "error",
-    "reason": "bad_request",
-    "secs": 11.2
+    "secs": 11.2,
+    "outcome": "bad_request"
    },
    "source": "engine/lifesim-yxbb.7-20261022-230139.jsonl:20",
    "evidence": {
@@ -86,9 +78,8 @@
     "role": "worker",
     "lane": "OPENAI_SUBSCRIPTION",
     "model": "gpt-6.1-sol",
-    "status": "error",
-    "reason": "bad_request",
-    "secs": 7.8
+    "secs": 7.8,
+    "outcome": "bad_request"
    },
    "source": "engine/lifesim-yxbb.7-20261022-230139.jsonl:20",
    "evidence": {
@@ -108,9 +99,8 @@
     "role": "worker",
     "lane": "OPENAI_SUBSCRIPTION",
     "model": "gpt-6.1-sol",
-    "status": "error",
-    "reason": "bad_request",
-    "secs": 14.9
+    "secs": 14.9,
+    "outcome": "bad_request"
    },
    "source": "engine/lifesim-fld.25.15-20261022-230429.jsonl:20",
    "evidence": {
@@ -130,9 +120,8 @@
     "role": "worker",
     "lane": "OPENAI_SUBSCRIPTION",
     "model": "gpt-6.1-sol",
-    "status": "error",
-    "reason": "bad_request",
-    "secs": 19.1
+    "secs": 19.1,
+    "outcome": "bad_request"
    },
    "source": "engine/lifesim-d5f.44-20261022-230457.jsonl:32",
    "evidence": {
@@ -152,9 +141,8 @@
     "role": "worker",
     "lane": "OPENAI_SUBSCRIPTION",
     "model": "gpt-6.1-sol",
-    "status": "error",
-    "reason": "bad_request",
-    "secs": 13.4
+    "secs": 13.4,
+    "outcome": "bad_request"
    },
    "source": "engine/lifesim-iqad-20261022-230715.jsonl:22",
    "evidence": {
@@ -174,9 +162,8 @@
     "role": "worker",
     "lane": "OPENAI_SUBSCRIPTION",
     "model": "gpt-6.1-sol",
-    "status": "error",
-    "reason": "bad_request",
-    "secs": 12.5
+    "secs": 12.5,
+    "outcome": "bad_request"
    },
    "source": "engine/lifesim-d5f.51-20261022-230859.jsonl:17",
    "evidence": {
@@ -196,9 +183,8 @@
     "role": "worker",
     "lane": "OPENAI_SUBSCRIPTION",
     "model": "gpt-6.1-sol",
-    "status": "error",
-    "reason": "bad_request",
-    "secs": 9.8
+    "secs": 9.8,
+    "outcome": "bad_request"
    },
    "source": "engine/lifesim-fld.25.19-20261022-230949.jsonl:27",
    "evidence": {
@@ -218,9 +204,8 @@
     "role": "worker",
     "lane": "OPENAI_SUBSCRIPTION",
     "model": "gpt-6.1-sol",
-    "status": "error",
-    "reason": "bad_request",
-    "secs": 18.8
+    "secs": 18.8,
+    "outcome": "bad_request"
    },
    "source": "engine/lifesim-d5f.61-20261022-231121.jsonl:20",
    "evidence": {
@@ -240,9 +225,8 @@
     "role": "worker",
     "lane": "OPENAI_SUBSCRIPTION",
     "model": "gpt-6.1-sol",
-    "status": "error",
-    "reason": "bad_request",
-    "secs": 17.3
+    "secs": 17.3,
+    "outcome": "bad_request"
    },
    "source": "engine/lifesim-5ban.12-20261022-231332.jsonl:17",
    "evidence": {
@@ -262,9 +246,8 @@
     "role": "worker",
     "lane": "OPENAI_SUBSCRIPTION",
     "model": "gpt-6.1-sol",
-    "status": "error",
-    "reason": "bad_request",
-    "secs": 14.5
+    "secs": 14.5,
+    "outcome": "bad_request"
    },
    "source": "engine/lifesim-gfr.39-20261022-231441.jsonl:19",
    "evidence": {
@@ -284,9 +267,8 @@
     "role": "worker",
     "lane": "OPENAI_SUBSCRIPTION",
     "model": "gpt-6.1-sol",
-    "status": "error",
-    "reason": "bad_request",
-    "secs": 18.0
+    "secs": 18.0,
+    "outcome": "bad_request"
    },
    "source": "engine/lifesim-5ban.14-20261022-231548.jsonl:23",
    "evidence": {
@@ -306,9 +288,8 @@
     "role": "worker",
     "lane": "OPENAI_SUBSCRIPTION",
     "model": "gpt-6.1-sol",
-    "status": "error",
-    "reason": "bad_request",
-    "secs": 11.1
+    "secs": 11.1,
+    "outcome": "bad_request"
    },
    "source": "engine/lifesim-gqzz-20261022-231823.jsonl:17",
    "evidence": {
@@ -328,9 +309,8 @@
     "role": "worker",
     "lane": "OPENAI_SUBSCRIPTION",
     "model": "gpt-6.1-sol",
-    "status": "error",
-    "reason": "bad_request",
-    "secs": 11.4
+    "secs": 11.4,
+    "outcome": "bad_request"
    },
    "source": "engine/lifesim-5ban.16-20261022-231941.jsonl:17",
    "evidence": {
@@ -350,9 +330,8 @@
     "role": "worker",
     "lane": "OPENAI_SUBSCRIPTION",
     "model": "gpt-6.1-sol",
-    "status": "error",
-    "reason": "bad_request",
-    "secs": 7.3
+    "secs": 7.3,
+    "outcome": "bad_request"
    },
    "source": "engine/lifesim-5ban.17-20261022-232217.jsonl:17",
    "evidence": {
@@ -372,9 +351,8 @@
     "role": "worker",
     "lane": "OPENAI_SUBSCRIPTION",
     "model": "gpt-6.1-sol",
-    "status": "error",
-    "reason": "bad_request",
-    "secs": 14.3
+    "secs": 14.3,
+    "outcome": "bad_request"
    },
    "source": "engine/lifesim-y7ll-20261022-232259.jsonl:19",
    "evidence": {
@@ -394,9 +372,8 @@
     "role": "worker",
     "lane": "OPENAI_SUBSCRIPTION",
     "model": "gpt-6.1-sol",
-    "status": "error",
-    "reason": "bad_request",
-    "secs": 13.4
+    "secs": 13.4,
+    "outcome": "bad_request"
    },
    "source": "engine/lifesim-5ban.18-20261022-232505.jsonl:17",
    "evidence": {
@@ -416,9 +393,8 @@
     "role": "worker",
     "lane": "OPENAI_SUBSCRIPTION",
     "model": "gpt-6.1-sol",
-    "status": "error",
-    "reason": "bad_request",
-    "secs": 16.4
+    "secs": 16.4,
+    "outcome": "bad_request"
    },
    "source": "engine/lifesim-f2by-20261022-232620.jsonl:26",
    "evidence": {
@@ -438,9 +414,8 @@
     "role": "worker",
     "lane": "OPENAI_SUBSCRIPTION",
     "model": "gpt-6.1-sol",
-    "status": "error",
-    "reason": "bad_request",
-    "secs": 14.9
+    "secs": 14.9,
+    "outcome": "bad_request"
    },
    "source": "engine/lifesim-5ban.19-20261022-232743.jsonl:17",
    "evidence": {
@@ -460,9 +435,8 @@
     "role": "worker",
     "lane": "OPENAI_SUBSCRIPTION",
     "model": "gpt-6.1-sol",
-    "status": "error",
-    "reason": "bad_request",
-    "secs": 22.5
+    "secs": 22.5,
+    "outcome": "bad_request"
    },
    "source": "engine/lifesim-md1f-20261022-233005.jsonl:19",
    "evidence": {
@@ -482,9 +456,8 @@
     "role": "worker",
     "lane": "OPENAI_SUBSCRIPTION",
     "model": "gpt-6.1-sol",
-    "status": "error",
-    "reason": "bad_request",
-    "secs": 17.0
+    "secs": 17.0,
+    "outcome": "bad_request"
    },
    "source": "engine/lifesim-5ban.20-20261022-233044.jsonl:17",
    "evidence": {
@@ -504,9 +477,8 @@
     "role": "worker",
     "lane": "OPENAI_SUBSCRIPTION",
     "model": "gpt-6.1-sol",
-    "status": "error",
-    "reason": "bad_request",
-    "secs": 8.6
+    "secs": 8.6,
+    "outcome": "bad_request"
    },
    "source": "engine/lifesim-o45k-20261022-233240.jsonl:18",
    "evidence": {
@@ -526,9 +498,8 @@
     "role": "worker",
     "lane": "OPENAI_SUBSCRIPTION",
     "model": "gpt-6.1-sol",
-    "status": "error",
-    "reason": "bad_request",
-    "secs": 18.1
+    "secs": 18.1,
+    "outcome": "bad_request"
    },
    "source": "engine/lifesim-5ban.22-20261022-233321.jsonl:17",
    "evidence": {
@@ -548,9 +519,8 @@
     "role": "worker",
     "lane": "OPENAI_SUBSCRIPTION",
     "model": "gpt-6.1-sol",
-    "status": "error",
-    "reason": "bad_request",
-    "secs": 14.8
+    "secs": 14.8,
+    "outcome": "bad_request"
    },
    "source": "engine/lifesim-5ban.26-20261022-233630.jsonl:17",
    "evidence": {
@@ -570,9 +540,8 @@
     "role": "worker",
     "lane": "OPENAI_SUBSCRIPTION",
     "model": "gpt-6.1-sol",
-    "status": "error",
-    "reason": "bad_request",
-    "secs": 17.4
+    "secs": 17.4,
+    "outcome": "bad_request"
    },
    "source": "engine/lifesim-22b3-20261022-233653.jsonl:19",
    "evidence": {
@@ -592,9 +561,8 @@
     "role": "worker",
     "lane": "OPENAI_SUBSCRIPTION",
     "model": "gpt-6.1-sol",
-    "status": "error",
-    "reason": "bad_request",
-    "secs": 10.7
+    "secs": 10.7,
+    "outcome": "bad_request"
    },
    "source": "engine/lifesim-40jy-20261022-234030.jsonl:28",
    "evidence": {
@@ -614,9 +582,8 @@
     "role": "worker",
     "lane": "OPENAI_SUBSCRIPTION",
     "model": "gpt-6.1-sol",
-    "status": "error",
-    "reason": "bad_request",
-    "secs": 12.9
+    "secs": 12.9,
+    "outcome": "bad_request"
    },
    "source": "engine/lifesim-5ban.27-20261022-234037.jsonl:23",
    "evidence": {
@@ -636,9 +603,8 @@
     "role": "worker",
     "lane": "OPENAI_SUBSCRIPTION",
     "model": "gpt-6.1-sol",
-    "status": "error",
-    "reason": "bad_request",
-    "secs": 18.1
+    "secs": 18.1,
+    "outcome": "bad_request"
    },
    "source": "engine/lifesim-5ban.28-20261022-234409.jsonl:17",
    "evidence": {
@@ -658,9 +624,8 @@
     "role": "worker",
     "lane": "OPENAI_SUBSCRIPTION",
     "model": "gpt-6.1-sol",
-    "status": "error",
-    "reason": "bad_request",
-    "secs": 13.6
+    "secs": 13.6,
+    "outcome": "bad_request"
    },
    "source": "engine/lifesim-fdyo-20261022-234415.jsonl:23",
    "evidence": {
@@ -680,9 +645,8 @@
     "role": "worker",
     "lane": "OPENAI_SUBSCRIPTION",
     "model": "gpt-6.1-sol",
-    "status": "error",
-    "reason": "bad_request",
-    "secs": 12.0
+    "secs": 12.0,
+    "outcome": "bad_request"
    },
    "source": "engine/lifesim-5ban.30-20261022-234703.jsonl:17",
    "evidence": {
@@ -702,9 +666,8 @@
     "role": "worker",
     "lane": "OPENAI_SUBSCRIPTION",
     "model": "gpt-6.1-sol",
-    "status": "error",
-    "reason": "bad_request",
-    "secs": 13.3
+    "secs": 13.3,
+    "outcome": "bad_request"
    },
    "source": "engine/lifesim-l4ow-20261022-234925.jsonl:17",
    "evidence": {
@@ -724,9 +687,8 @@
     "role": "worker",
     "lane": "OPENAI_SUBSCRIPTION",
     "model": "gpt-6.1-sol",
-    "status": "error",
-    "reason": "bad_request",
-    "secs": 20.9
+    "secs": 20.9,
+    "outcome": "bad_request"
    },
    "source": "engine/lifesim-5ban.31-20261022-235022.jsonl:17",
    "evidence": {
@@ -746,9 +708,8 @@
     "role": "worker",
     "lane": "OPENAI_SUBSCRIPTION",
     "model": "gpt-6.1-sol",
-    "status": "error",
-    "reason": "bad_request",
-    "secs": 9.8
+    "secs": 9.8,
+    "outcome": "bad_request"
    },
    "source": "engine/lifesim-o67g-20261022-235154.jsonl:23",
    "evidence": {
@@ -768,9 +729,8 @@
     "role": "worker",
     "lane": "OPENAI_SUBSCRIPTION",
     "model": "gpt-6.1-sol",
-    "status": "error",
-    "reason": "bad_request",
-    "secs": 10.2
+    "secs": 10.2,
+    "outcome": "bad_request"
    },
    "source": "engine/lifesim-6pld-20261022-235405.jsonl:17",
    "evidence": {
@@ -790,9 +750,8 @@
     "role": "worker",
     "lane": "OPENAI_SUBSCRIPTION",
     "model": "gpt-6.1-sol",
-    "status": "error",
-    "reason": "bad_request",
-    "secs": 9.2
+    "secs": 9.2,
+    "outcome": "bad_request"
    },
    "source": "engine/lifesim-se15-20261022-235512.jsonl:17",
    "evidence": {
@@ -812,9 +771,8 @@
     "role": "worker",
     "lane": "OPENAI_SUBSCRIPTION",
     "model": "gpt-6.1-sol",
-    "status": "error",
-    "reason": "bad_request",
-    "secs": 8.4
+    "secs": 8.4,
+    "outcome": "bad_request"
    },
    "source": "engine/lifesim-9akx-20261022-235708.jsonl:17",
    "evidence": {
@@ -834,9 +792,8 @@
     "role": "worker",
     "lane": "OPENAI_SUBSCRIPTION",
     "model": "gpt-6.1-sol",
-    "status": "error",
-    "reason": "bad_request",
-    "secs": 9.0
+    "secs": 9.0,
+    "outcome": "bad_request"
    },
    "source": "engine/lifesim-22v.38-20261023-000019.jsonl:17",
    "evidence": {
@@ -856,9 +813,8 @@
     "role": "worker",
     "lane": "OPENAI_SUBSCRIPTION",
     "model": "gpt-6.1-sol",
-    "status": "error",
-    "reason": "bad_request",
-    "secs": 12.2
+    "secs": 12.2,
+    "outcome": "bad_request"
    },
    "source": "engine/lifesim-6au9-20261023-000200.jsonl:17",
    "evidence": {
@@ -878,9 +834,8 @@
     "role": "worker",
     "lane": "OPENAI_SUBSCRIPTION",
     "model": "gpt-6.1-sol",
-    "status": "error",
-    "reason": "bad_request",
-    "secs": 11.7
+    "secs": 11.7,
+    "outcome": "bad_request"
    },
    "source": "engine/lifesim-jva-20261023-000303.jsonl:17",
    "evidence": {
@@ -900,9 +855,8 @@
     "role": "worker",
     "lane": "OPENAI_SUBSCRIPTION",
     "model": "gpt-6.1-sol",
-    "status": "error",
-    "reason": "bad_request",
-    "secs": 19.9
+    "secs": 19.9,
+    "outcome": "bad_request"
    },
    "source": "engine/lifesim-cd4n-20261023-000440.jsonl:17",
    "evidence": {
@@ -922,9 +876,8 @@
     "role": "worker",
     "lane": "OPENAI_SUBSCRIPTION",
     "model": "gpt-6.1-sol",
-    "status": "error",
-    "reason": "bad_request",
-    "secs": 9.2
+    "secs": 9.2,
+    "outcome": "bad_request"
    },
    "source": "engine/lifesim-r0yc-20261023-000547.jsonl:17",
    "evidence": {
@@ -944,9 +897,8 @@
     "role": "worker",
     "lane": "OPENAI_SUBSCRIPTION",
     "model": "gpt-6.1-sol",
-    "status": "error",
-    "reason": "bad_request",
-    "secs": 15.3
+    "secs": 15.3,
+    "outcome": "bad_request"
    },
    "source": "engine/lifesim-gfr.22-20261023-000712.jsonl:17",
    "evidence": {
@@ -966,9 +918,8 @@
     "role": "worker",
     "lane": "OPENAI_SUBSCRIPTION",
     "model": "gpt-6.1-sol",
-    "status": "error",
-    "reason": "bad_request",
-    "secs": 9.1
+    "secs": 9.1,
+    "outcome": "bad_request"
    },
    "source": "engine/lifesim-3i2-20261023-000857.jsonl:17",
    "evidence": {
@@ -988,9 +939,8 @@
     "role": "worker",
     "lane": "OPENAI_SUBSCRIPTION",
     "model": "gpt-6.1-sol",
-    "status": "error",
-    "reason": "bad_request",
-    "secs": 8.9
+    "secs": 8.9,
+    "outcome": "bad_request"
    },
    "source": "engine/lifesim-i52t-20261023-000932.jsonl:18",
    "evidence": {
@@ -1010,9 +960,8 @@
     "role": "worker",
     "lane": "OPENAI_SUBSCRIPTION",
     "model": "gpt-6.1-sol",
-    "status": "error",
-    "reason": "bad_request",
-    "secs": 11.7
+    "secs": 11.7,
+    "outcome": "bad_request"
    },
    "source": "engine/lifesim-21l-20261023-001137.jsonl:17",
    "evidence": {
@@ -1032,9 +981,8 @@
     "role": "worker",
     "lane": "OPENAI_SUBSCRIPTION",
     "model": "gpt-6.1-sol",
-    "status": "error",
-    "reason": "bad_request",
-    "secs": 12.7
+    "secs": 12.7,
+    "outcome": "bad_request"
    },
    "source": "engine/lifesim-qu7h-20261023-001208.jsonl:24",
    "evidence": {
@@ -1054,9 +1002,8 @@
     "role": "worker",
     "lane": "OPENAI_SUBSCRIPTION",
     "model": "gpt-6.1-sol",
-    "status": "error",
-    "reason": "bad_request",
-    "secs": 10.1
+    "secs": 10.1,
+    "outcome": "bad_request"
    },
    "source": "engine/lifesim-rl4s-20261023-001454.jsonl:17",
    "evidence": {
@@ -1076,9 +1023,8 @@
     "role": "worker",
     "lane": "OPENAI_SUBSCRIPTION",
     "model": "gpt-6.1-sol",
-    "status": "error",
-    "reason": "bad_request",
-    "secs": 13.1
+    "secs": 13.1,
+    "outcome": "bad_request"
    },
    "source": "engine/lifesim-d5f.32-20261023-001538.jsonl:24",
    "evidence": {
@@ -1098,9 +1044,8 @@
     "role": "worker",
     "lane": "OPENAI_SUBSCRIPTION",
     "model": "gpt-6.1-sol",
-    "status": "error",
-    "reason": "bad_request",
-    "secs": 30.2
+    "secs": 30.2,
+    "outcome": "bad_request"
    },
    "source": "engine/lifesim-w5ni-20261023-001701.jsonl:25",
    "evidence": {
@@ -1120,9 +1065,8 @@
     "role": "worker",
     "lane": "OPENAI_SUBSCRIPTION",
     "model": "gpt-6.1-sol",
-    "status": "error",
-    "reason": "bad_request",
-    "secs": 9.1
+    "secs": 9.1,
+    "outcome": "bad_request"
    },
    "source": "engine/lifesim-h1fw-20261023-001837.jsonl:17",
    "evidence": {
@@ -1142,9 +1086,8 @@
     "role": "worker",
     "lane": "OPENAI_SUBSCRIPTION",
     "model": "gpt-6.1-sol",
-    "status": "error",
-    "reason": "bad_request",
-    "secs": 10.7
+    "secs": 10.7,
+    "outcome": "bad_request"
    },
    "source": "engine/lifesim-kh1s-20261023-002013.jsonl:17",
    "evidence": {
@@ -1164,9 +1107,8 @@
     "role": "worker",
     "lane": "OPENAI_SUBSCRIPTION",
     "model": "gpt-6.1-sol",
-    "status": "error",
-    "reason": "bad_request",
-    "secs": 7.1
+    "secs": 7.1,
+    "outcome": "bad_request"
    },
    "source": "engine/lifesim-xea5-20261023-002049.jsonl:17",
    "evidence": {
@@ -1178,5 +1120,11 @@
     "structured": {}
    }
   }
- ]
+ ],
+ "expected_stop": {
+  "reason": "bad_request",
+  "scope": "caller",
+  "permanence": "needs_owner",
+  "retry_kind": "none"
+ }
 }

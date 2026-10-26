@@ -4,11 +4,6 @@
  "cli": "opencode",
  "real": "ZAI log lines and state text real; the DeepSeek line is quoted from the failure study",
  "expected_reason": "rate_limited",
- "expected_wire": {
-  "status": "lane_out",
-  "reason": "lane_out",
-  "next": "retry"
- },
  "rows": [
   {
    "id": "opencode.log:38957",
@@ -68,5 +63,11 @@
     }
    }
   }
- ]
+ ],
+ "expected_stop": {
+  "reason": "rate_limited",
+  "scope": "lane",
+  "permanence": "transient",
+  "retry_kind": "predicted"
+ }
 }

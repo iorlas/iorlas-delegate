@@ -5,11 +5,6 @@
  "lane": "CLAUDE_CREDIT",
  "real": "reconstructed: state.json keeps delegate's why ('credit balance too low'), the CLI's own wording is 'Credit balance is too low'",
  "expected_reason": "credit_exhausted",
- "expected_wire": {
-  "status": "lane_out",
-  "reason": "lane_out",
-  "next": "retry"
- },
  "rows": [
   {
    "id": "state.json:out.CLAUDE_CREDIT",
@@ -23,5 +18,11 @@
     "structured": {}
    }
   }
- ]
+ ],
+ "expected_stop": {
+  "reason": "credit_exhausted",
+  "scope": "lane",
+  "permanence": "needs_owner",
+  "retry_kind": "none"
+ }
 }
