@@ -176,8 +176,9 @@ class ReviewOrder(unittest.TestCase):
     def test_only_claude_up_gets_sonnet_never_opus(self):
         d = review("openai", "claude")
         self.assertEqual((d["action"], d["model"]), ("run", "sonnet-5.5"))
-        for role in ("planner", "hard"):                                    # roles whose only Claude rung was Opus now stop
-            self.assertEqual(review("openai", "claude", role=role)["action"], "stop", role)
+        for role in ("planner", "hard"):                                    # their Claude rung is Sonnet, never Opus
+            d = review("openai", "claude", role=role)
+            self.assertEqual((d["action"], d["model"]), ("run", "sonnet-5.5"), role)
 
     def test_opus_only_config_returns_no_lane_with_a_reason(self):
         cfg = copy.deepcopy(CFG)

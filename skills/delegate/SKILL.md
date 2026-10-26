@@ -24,10 +24,10 @@ No Python 3.8+: Agent tool only, no worktree, effort in the brief.
 <!-- base-table -->
 | role | agent, in order |
 |---|---|
-| planner | opus medium |
+| planner | sonnet high |
 | worker | sonnet medium |
 | reviewer | sonnet medium |
-| hard | opus low > opus medium |
+| hard | sonnet high |
 | light | haiku low > sonnet low |
 <!-- /base-table -->
 

@@ -115,8 +115,7 @@ class SecondPass(unittest.TestCase):
     def test_relaxed_never_changes_model_floor(self):
         ls = lanes(openai={"out": True, "out_until": T + 1}, credit={"out": True, "out_until": T + 99}, sub={"week": 92})
         d = decide("planner", ls)
-        self.assertEqual(d["action"], "stop")                       # Opus never runs in the loop (delegate-pnz): no Claude rung left for the planner
-        self.assertNotEqual(d.get("model"), "opus-5.5")
+        self.assertEqual((d["model"], d["effort"]), ("sonnet-5.5", "high"))     # Opus never runs in the loop (delegate-pnz): Sonnet is the planner's Claude rung
 
     def test_normal_relaxed_beats_degraded_strict(self):
         ls = lanes(openai={"out": True, "out_until": T + 1}, credit={"out": True, "out_until": T + 99}, sub={"week": 92})
@@ -141,8 +140,9 @@ class Roles(unittest.TestCase):
     def test_hard_escalates_on_failure_only(self):
         ls = lanes()
         self.assertEqual(decide("hard", ls)["model"], "gpt-6.1-sol")
-        for failed in ([0], [0, 1], [0, 1, 2]):                     # the Opus rungs are skipped in the loop (delegate-pnz)
-            self.assertEqual(decide("hard", ls, failed=failed)["action"], "stop")
+        d = decide("hard", ls, failed=[0])                          # Claude Sonnet is the last rung; Opus is never routed in the loop (delegate-pnz)
+        self.assertEqual((d["model"], d["effort"]), ("sonnet-5.5", "high"))
+        self.assertEqual(decide("hard", ls, failed=[0, 1])["action"], "stop")
 
     def test_reviewer_prefers_the_other_family_and_authored_by_is_optional(self):
         self.assertEqual(decide("reviewer", lanes())["model"], "gpt-6.1-sol")                 # no author given: Codex first (the most room), no claim of independence
@@ -789,15 +789,15 @@ printf '{"type":"result","result":"claude says hi","session_id":"sess-1","total_
         self.assertNotIn("needs_input", r)
         route.update_state(lambda s: s.pop("out"))
         self.codex_out()
-        _, r = self.run_it(role="planner")                                 # Opus never plans in the loop (delegate-pnz): Codex down means stop, no ask when unattended
-        self.assertEqual(r["status"], "stop")
-        self.assertNotIn("ask_user", r)
+        _, r = self.run_it(role="planner")                                 # no Agent tool here: the subscription runs claude -p (Sonnet; Opus never plans in the loop)
+        self.assertNotEqual(r["status"], "agent")
+        self.assertEqual((r["status"], r["lane"]), ("done", "CLAUDE_SUBSCRIPTION"))
 
     def test_interactive_session_gets_the_agent_step_and_the_consent_question(self):
         self.codex_out()                                                    # Codex plans first, Claude only when it is down
         _, r = self.run_it(role="planner", unattended=False)
-        self.assertEqual(r["status"], "stop")                               # no Opus planner rung: the consent question offers the degraded Sonnet
-        self.assertEqual(r["ask_user"]["options"], ["sonnet-5.5 high"])
+        self.assertEqual((r["status"], r["lane"], r["agent_model"]), ("agent", "CLAUDE_SUBSCRIPTION", "sonnet"))
+        self.assertIn("coordinator", r["brief_prefix"])
         route.update_state(lambda s: s.setdefault("out", {}).update(
             {n: {"until": route.now() + 3600, "why": "t"} for n in ("OPENAI_SUBSCRIPTION", "CLAUDE_SUBSCRIPTION")}))
         _, r = self.run_it(role="planner", unattended=False)

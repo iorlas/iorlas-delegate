@@ -150,29 +150,23 @@
       "advance": "on_unavailable",
       "steps": [
         {
-          "model": "opus-5.5",
-          "effort": "medium",
-          "on": "claude",
-          "cap": 3
-        },
-        {
           "model": "gpt-6.1-sol",
           "effort": "high",
           "on": "openai",
           "mode": "read_only",
           "use": "plan"
-        }
-      ],
-      "degraded_needs_consent": [
-        {
-          "model": "opus-5.5",
-          "effort": "low",
-          "on": "claude",
-          "cap": 3
         },
         {
           "model": "sonnet-5.5",
           "effort": "high",
+          "on": "claude",
+          "cap": 2
+        }
+      ],
+      "degraded_needs_consent": [
+        {
+          "model": "sonnet-5.5",
+          "effort": "low",
           "on": "claude",
           "cap": 2
         }
@@ -461,18 +455,11 @@
           "use": "task"
         },
         {
-          "model": "opus-5.5",
-          "effort": "low",
+          "model": "sonnet-5.5",
+          "effort": "high",
           "on": "claude",
           "mode": "write",
           "cap": 3
-        },
-        {
-          "model": "opus-5.5",
-          "effort": "medium",
-          "on": "claude",
-          "mode": "write",
-          "cap": 5
         }
       ],
       "stop": "Every rung was tried or is unavailable. Report what was tried; if a rung needed more than a couple of tries the plan or the split is wrong. Fable only if the user says so."
