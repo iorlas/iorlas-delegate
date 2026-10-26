@@ -89,9 +89,9 @@ def _outcome(row):
         return "release"
     if row.get("run_id") is None:
         return None
-    if row.get("status") == "done":
+    if row.get("done"):
         return "done"
-    o = row.get("outcome") or (row.get("reason") if row.get("reason") in classify.CONTRACT["reasons"] else None)
+    o = row.get("outcome")
     return o if o and classify.benches_pair(o) and (o in LANE_KINDS or o in BREAKER) else None
 
 
