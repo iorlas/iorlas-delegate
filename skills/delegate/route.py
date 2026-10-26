@@ -49,7 +49,7 @@ except ImportError:  # pragma: no cover
 HERE = Path(__file__).resolve().parent
 if str(HERE) not in sys.path:
     sys.path.insert(0, str(HERE))
-from lanes import classify, health, supervisor      # the one outcome ladder (delegate-e05); the health fold and breaker (rdt, a9x); the idle watchdog (go0)
+from lanes import classify, health, live as livemod, supervisor      # the one outcome ladder (delegate-e05); the health fold and breaker (rdt, a9x); the idle watchdog (go0)
 from lanes import netprobe, profiles, usage as accounting                # network facts (4n7); the lane adapter registry (dlz)
 from lanes import cockpit as role_view              # roles{} for status (0sf)
 WEEK_MIN = 7 * 24 * 60
@@ -2266,6 +2266,20 @@ def note_ref(ref):
             cb(ref)
 
 
+def live_for(cli, d, a):
+    """The live event file writer for this launch (a no-op unless DELEGATE_LIVE_FILE is set); its start event goes out once the process has a pid."""
+    lv = livemod.Live(cli)
+    lv.start(lane=d.get("lane"), model=d.get("model"), effort=d.get("effort"), role=d.get("role") or getattr(a, "role", None))
+    WORKER_STARTED.append(lv.started)
+    return lv
+
+
+def live_end(lv, turn, dog, timed_out, rc, cost=None):
+    with contextlib.suppress(ValueError):
+        WORKER_STARTED.remove(lv.started)
+    lv.end(livemod.end_status(timed_out, dog["why"], turn.stop, rc), cost)
+
+
 def run_proc(cmd, text, cwd, env, timeout, on_line=None, poll=None):
     """-> (returncode, stdout, stderr, timed_out). Own process group; the timeout kills the group; stdin carries `text` then closes; UTF-8, errors replaced.
     `on_line(line)` returning True stops the worker now; a number stops it that many seconds later unless it exits first.
@@ -2627,6 +2641,7 @@ def launch_codex(d, brief, a, rid, t, meta):
         cmd = [exe] + h["cli"][1:] + ["--json", "-o", str(out_file)] + (["--output-schema", a.schema] if a.schema else []) + ["-"]
     seen = {"ref": a.resume, "last": "", "tokens": None, "denied": [], "error": "", "transient": "", "work": False, "turns": 0, "net_at": None, "net": False, }
     turn = supervisor.Turn("codex")
+    live = live_for("codex", d, a)
     if a.resume:
         note_ref(a.resume)
 
@@ -2637,6 +2652,7 @@ def launch_codex(d, brief, a, rid, t, meta):
             return
         if not isinstance(ev, dict):
             return
+        live.feed(ev)
         kind, it = ev.get("type"), ev.get("item") or {}
         if kind == "turn.completed" or (kind == "item.completed" and it.get("type") == "agent_message"):
             turn.finished()         # the answer may be in: poll() stops the tree if nothing else comes within the grace (delegate-itn)
@@ -2679,7 +2695,7 @@ def launch_codex(d, brief, a, rid, t, meta):
     before = (codex_thread_total(a.resume) or history_cumulative(a.resume)) if a.resume else None
     poll0, tick, dog = worker_watch("codex", d["lane"])
     WORKER_TICK[:] = [tick]
-    base_poll = stream_poll(poll0, turn, dog)
+    base_poll = stream_poll(poll0, turn, dog, live)
 
     def poll():
         """Codex waits for the network by itself, for as long as it takes. Past NET_GRACE_S of that, one probe: still offline -> stop it now and hand the
@@ -2693,6 +2709,7 @@ def launch_codex(d, brief, a, rid, t, meta):
                 return True
         return False
     rc, out, err, timed_out = run_proc(cmd, " ".join((SECRET_RULE, GIT_RULES, EDIT_RULE, NO_SUBAGENTS_RULE, ESCALATE_RULE, DENIED_RULE)) + "\n\n" + brief, h["cwd"], child_env(), a.timeout, on_line, poll)
+    live_end(live, turn, dog, timed_out, rc)
     log_gaps(dog, d)
     text = ""
     with contextlib.suppress(OSError):
@@ -2818,12 +2835,14 @@ def worker_watch(cli, lane, extra=None):
     return poll, wd.touch, state
 
 
-def stream_poll(poll0, turn, dog):
+def stream_poll(poll0, turn, dog, live=None):
     """poll for run_proc: `poll0` (limit, silence), then the shared Turn rules: answer-then-grace and stall (lanes/supervisor.py, delegate-np7). The stall is
     reported as a hung worker of kind "stall"; the answer as turn.stop == "answer" (the launcher keeps the answer)."""
     def poll():
         if poll0():
             return True
+        if live:
+            live.poll(dog["wd"].idle_s)
         v = turn.verdict(dog["wd"])
         if v == "stall":
             dog.update(why="hung", kind="stall", words=turn.stall_words())
@@ -2969,7 +2988,8 @@ def launch_opencode(d, brief, a, rid, t, meta):
     poll, tick, dog = worker_watch("opencode", d["lane"], opencode_log_poll())
     WORKER_TICK[:] = [tick]
     turn = supervisor.Turn("opencode")
-    poll = stream_poll(poll, turn, dog)
+    live = live_for("opencode", d, a)
+    poll = stream_poll(poll, turn, dog, live)
 
     def on_line(line):
         try:
@@ -2978,6 +2998,7 @@ def launch_opencode(d, brief, a, rid, t, meta):
             return None
         if not isinstance(ev, dict):
             return None
+        live.feed(ev)
         if ev.get("sessionID") and not seen["ref"]:
             seen["ref"] = ev["sessionID"]
             note_ref(seen["ref"])
@@ -3019,6 +3040,7 @@ def launch_opencode(d, brief, a, rid, t, meta):
         agent_runs.run(rid, kind="opencode", lane=d["lane"], model=d["model"], cwd=h["cwd"], started=t, status="running", **meta)
     try:
         rc, out, err, timed_out = run_proc(cmd, rules + "\n\n" + brief, h["cwd"], env, a.timeout, on_line, poll)
+        live_end(live, turn, dog, timed_out, rc)
         log_gaps(dog, d)
     finally:
         with contextlib.suppress(OSError):
@@ -3101,12 +3123,14 @@ def launch_claude(d, brief, a, rid, t, cfg, meta):
         agent_runs.run(rid, kind="claude-p", session=ref, lane=d["lane"], model=d["model"], cwd=h["cwd"], started=t, status="running", **meta)
     final, ctx, begun, said, streamed = [], [], [], [""], {}
     turn = supervisor.Turn("claude")
+    live = live_for("claude", d, a)
 
     def on_line(line):      # the first result is the answer: claude -p then waits for background tasks and takes another turn on their exit
         with contextlib.suppress(ValueError):
             e = json.loads(line)
             if not isinstance(e, dict):
                 return None
+            live.feed(e)
             kind, msg = e.get("type"), e.get("message") if isinstance(e.get("message"), dict) else {}
             blocks = [b for b in msg.get("content") or [] if isinstance(b, dict)] if isinstance(msg.get("content"), list) else []
             if kind in ("assistant", "user", "result"):
@@ -3137,7 +3161,8 @@ def launch_claude(d, brief, a, rid, t, cfg, meta):
         return None
     poll, tick, dog = worker_watch("claude", d["lane"])
     WORKER_TICK[:] = [tick]
-    rc, out, err, timed_out = run_proc(cmd, brief, h["cwd"], child_env(extra), a.timeout, on_line, stream_poll(poll, turn, dog))
+    rc, out, err, timed_out = run_proc(cmd, brief, h["cwd"], child_env(extra), a.timeout, on_line, stream_poll(poll, turn, dog, live))
+    live_end(live, turn, dog, timed_out, rc, float((final[0] if final else {}).get("total_cost_usd") or 0) or None)
     log_gaps(dog, d)
     if stalled_once_more("claude", turn, dog, a) and begun:
         return launch_claude(d, RESUME_NOTE, argparse.Namespace(**dict(vars(a), resume=ref, stalled_once=True)), rid, t, cfg, meta)       # once; off by default

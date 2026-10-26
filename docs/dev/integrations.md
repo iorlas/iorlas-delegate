@@ -167,3 +167,11 @@ also include `by_author` scenarios. Planning degradation still requires consent;
 normal chains. This is a preview: limits can change before dispatch and resumed threads stay on their own lane.
 Consumers must tolerate a missing snapshot from older delegate installations. No credentials, private configuration
 or account subscription tier are exported; a configured login is not proof of a particular paid plan.
+
+### Live event file (0.40.13)
+
+With `DELEGATE_LIVE_FILE=<path>` set for a `route.py run`, every worker launch appends one JSON object per line to that path (parents created, flushed per
+line); unset, nothing is written. `{"t": epoch, "k": kind, ...}`. Kinds: `start` (harness, lane, model, effort, role, pid), `cmd` (id, text <= 2000, cwd if known) /
+`cmd_end` (id, exit, out = last 1500 chars, secs), `tool` / `tool_end` (same, non-shell tools; text = name + main arg), `msg` (<= 2000), `think` (<= 500),
+`tokens` (in, cached, out), `stall` (secs; at 60 s of silence, then every 60 s), `end` (status done|timeout|killed|error, secs, cost_usd), `raw` (type name
+of an unmapped event, never its payload). A write error warns once on stderr and stops the feed; the call is unaffected. Code: `skills/delegate/lanes/live.py`.
