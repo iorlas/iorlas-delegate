@@ -12,9 +12,8 @@
     "role": "reviewer",
     "lane": "CLAUDE_SUBSCRIPTION",
     "model": "sonnet-5.5",
-    "status": "done",
-    "reason": null,
-    "secs": 20.7
+    "secs": 20.7,
+    "done": true
    },
    "source": "history.jsonl",
    "evidence": {
@@ -35,9 +34,8 @@
     "role": "planner",
     "lane": "CLAUDE_SUBSCRIPTION",
     "model": "opus-5.5",
-    "status": "done",
-    "reason": null,
-    "secs": 59.8
+    "secs": 59.8,
+    "done": true
    },
    "source": "history.jsonl",
    "evidence": {
@@ -58,9 +56,8 @@
     "role": "worker",
     "lane": "CLAUDE_SUBSCRIPTION",
     "model": "sonnet-5.5",
-    "status": "done",
-    "reason": null,
-    "secs": 73.0
+    "secs": 73.0,
+    "done": true
    },
    "source": "history.jsonl",
    "evidence": {
@@ -81,9 +78,8 @@
     "role": "worker",
     "lane": "CLAUDE_SUBSCRIPTION",
     "model": "sonnet-5.5",
-    "status": "done",
-    "reason": null,
-    "secs": 53.1
+    "secs": 53.1,
+    "done": true
    },
    "source": "history.jsonl",
    "evidence": {
@@ -104,9 +100,8 @@
     "role": "worker",
     "lane": "CLAUDE_SUBSCRIPTION",
     "model": "sonnet-5.5",
-    "status": "done",
-    "reason": null,
-    "secs": 56.3
+    "secs": 56.3,
+    "done": true
    },
    "source": "history.jsonl",
    "evidence": {
@@ -127,9 +122,8 @@
     "role": "reviewer",
     "lane": "CLAUDE_SUBSCRIPTION",
     "model": "sonnet-5.5",
-    "status": "done",
-    "reason": null,
-    "secs": 13.5
+    "secs": 13.5,
+    "done": true
    },
    "source": "history.jsonl",
    "evidence": {
@@ -150,9 +144,8 @@
     "role": "reviewer",
     "lane": "CLAUDE_SUBSCRIPTION",
     "model": "sonnet-5.5",
-    "status": "done",
-    "reason": null,
-    "secs": 57.8
+    "secs": 57.8,
+    "done": true
    },
    "source": "history.jsonl",
    "evidence": {
@@ -173,9 +166,8 @@
     "role": "planner",
     "lane": "CLAUDE_SUBSCRIPTION",
     "model": "opus-5.5",
-    "status": "done",
-    "reason": null,
-    "secs": 89.5
+    "secs": 89.5,
+    "done": true
    },
    "source": "history.jsonl",
    "evidence": {
@@ -196,9 +188,8 @@
     "role": "reviewer",
     "lane": "CLAUDE_SUBSCRIPTION",
     "model": "sonnet-5.5",
-    "status": "done",
-    "reason": null,
-    "secs": 24.2
+    "secs": 24.2,
+    "done": true
    },
    "source": "history.jsonl",
    "evidence": {
@@ -219,9 +210,8 @@
     "role": "worker",
     "lane": "CLAUDE_SUBSCRIPTION",
     "model": "sonnet-5.5",
-    "status": "done",
-    "reason": null,
-    "secs": 24.4
+    "secs": 24.4,
+    "done": true
    },
    "source": "history.jsonl",
    "evidence": {
@@ -242,9 +232,8 @@
     "role": "worker",
     "lane": "CLAUDE_SUBSCRIPTION",
     "model": "sonnet-5.5",
-    "status": "done",
-    "reason": null,
-    "secs": 813.1
+    "secs": 813.1,
+    "done": true
    },
    "source": "history.jsonl",
    "evidence": {
@@ -265,9 +254,8 @@
     "role": "planner",
     "lane": "CLAUDE_SUBSCRIPTION",
     "model": "opus-5.5",
-    "status": "done",
-    "reason": null,
-    "secs": 128.0
+    "secs": 128.0,
+    "done": true
    },
    "source": "history.jsonl",
    "evidence": {
@@ -288,9 +276,8 @@
     "role": "reviewer",
     "lane": "CLAUDE_SUBSCRIPTION",
     "model": "sonnet-5.5",
-    "status": "done",
-    "reason": null,
-    "secs": 26.4
+    "secs": 26.4,
+    "done": true
    },
    "source": "history.jsonl",
    "evidence": {
@@ -311,9 +298,8 @@
     "role": "worker",
     "lane": "CLAUDE_SUBSCRIPTION",
     "model": "sonnet-5.5",
-    "status": "done",
-    "reason": null,
-    "secs": 16.4
+    "secs": 16.4,
+    "done": true
    },
    "source": "history.jsonl",
    "evidence": {
@@ -334,9 +320,8 @@
     "role": "reviewer",
     "lane": "CLAUDE_SUBSCRIPTION",
     "model": "sonnet-5.5",
-    "status": "done",
-    "reason": null,
-    "secs": 26.0
+    "secs": 26.0,
+    "done": true
    },
    "source": "history.jsonl",
    "evidence": {
@@ -357,9 +342,8 @@
     "role": "worker",
     "lane": "CLAUDE_SUBSCRIPTION",
     "model": "sonnet-5.5",
-    "status": "done",
-    "reason": null,
-    "secs": 175.9
+    "secs": 175.9,
+    "done": true
    },
    "source": "history.jsonl",
    "evidence": {
@@ -380,9 +364,8 @@
     "role": "planner",
     "lane": "CLAUDE_SUBSCRIPTION",
     "model": "opus-5.5",
-    "status": "done",
-    "reason": null,
-    "secs": 47.5
+    "secs": 47.5,
+    "done": true
    },
    "source": "history.jsonl",
    "evidence": {
@@ -403,9 +386,8 @@
     "role": "worker",
     "lane": "CLAUDE_SUBSCRIPTION",
     "model": "sonnet-5.5",
-    "status": "done",
-    "reason": null,
-    "secs": 20.2
+    "secs": 20.2,
+    "done": true
    },
    "source": "history.jsonl",
    "evidence": {
@@ -426,9 +408,8 @@
     "role": "worker",
     "lane": "CLAUDE_SUBSCRIPTION",
     "model": "sonnet-5.5",
-    "status": "done",
-    "reason": null,
-    "secs": 74.5
+    "secs": 74.5,
+    "done": true
    },
    "source": "history.jsonl",
    "evidence": {
@@ -449,9 +430,8 @@
     "role": "worker",
     "lane": "CLAUDE_SUBSCRIPTION",
     "model": "sonnet-5.5",
-    "status": "done",
-    "reason": null,
-    "secs": 18.2
+    "secs": 18.2,
+    "done": true
    },
    "source": "history.jsonl",
    "evidence": {
@@ -472,9 +452,8 @@
     "role": "worker",
     "lane": "CLAUDE_SUBSCRIPTION",
     "model": "sonnet-5.5",
-    "status": "done",
-    "reason": null,
-    "secs": 209.5
+    "secs": 209.5,
+    "done": true
    },
    "source": "history.jsonl",
    "evidence": {
@@ -495,9 +474,8 @@
     "role": "reviewer",
     "lane": "CLAUDE_SUBSCRIPTION",
     "model": "sonnet-5.5",
-    "status": "done",
-    "reason": null,
-    "secs": 27.5
+    "secs": 27.5,
+    "done": true
    },
    "source": "history.jsonl",
    "evidence": {
@@ -518,9 +496,8 @@
     "role": "worker",
     "lane": "CLAUDE_SUBSCRIPTION",
     "model": "sonnet-5.5",
-    "status": "done",
-    "reason": null,
-    "secs": 14.1
+    "secs": 14.1,
+    "done": true
    },
    "source": "history.jsonl",
    "evidence": {
@@ -541,9 +518,8 @@
     "role": "reviewer",
     "lane": "CLAUDE_SUBSCRIPTION",
     "model": "sonnet-5.5",
-    "status": "done",
-    "reason": null,
-    "secs": 19.7
+    "secs": 19.7,
+    "done": true
    },
    "source": "history.jsonl",
    "evidence": {
@@ -564,9 +540,8 @@
     "role": "worker",
     "lane": "CLAUDE_SUBSCRIPTION",
     "model": "sonnet-5.5",
-    "status": "done",
-    "reason": null,
-    "secs": 10.1
+    "secs": 10.1,
+    "done": true
    },
    "source": "history.jsonl",
    "evidence": {
@@ -587,9 +562,8 @@
     "role": "worker",
     "lane": "CLAUDE_SUBSCRIPTION",
     "model": "sonnet-5.5",
-    "status": "done",
-    "reason": null,
-    "secs": 35.7
+    "secs": 35.7,
+    "done": true
    },
    "source": "history.jsonl",
    "evidence": {
@@ -610,9 +584,8 @@
     "role": "reviewer",
     "lane": "CLAUDE_SUBSCRIPTION",
     "model": "sonnet-5.5",
-    "status": "done",
-    "reason": null,
-    "secs": 26.0
+    "secs": 26.0,
+    "done": true
    },
    "source": "history.jsonl",
    "evidence": {
@@ -633,9 +606,8 @@
     "role": "reviewer",
     "lane": "CLAUDE_SUBSCRIPTION",
     "model": "sonnet-5.5",
-    "status": "done",
-    "reason": null,
-    "secs": 23.5
+    "secs": 23.5,
+    "done": true
    },
    "source": "history.jsonl",
    "evidence": {
@@ -656,9 +628,8 @@
     "role": "planner",
     "lane": "CLAUDE_SUBSCRIPTION",
     "model": "opus-5.5",
-    "status": "done",
-    "reason": null,
-    "secs": 35.9
+    "secs": 35.9,
+    "done": true
    },
    "source": "history.jsonl",
    "evidence": {
@@ -679,9 +650,8 @@
     "role": "worker",
     "lane": "CLAUDE_SUBSCRIPTION",
     "model": "sonnet-5.5",
-    "status": "done",
-    "reason": null,
-    "secs": 18.7
+    "secs": 18.7,
+    "done": true
    },
    "source": "history.jsonl",
    "evidence": {
@@ -702,9 +672,8 @@
     "role": "reviewer",
     "lane": "CLAUDE_SUBSCRIPTION",
     "model": "sonnet-5.5",
-    "status": "done",
-    "reason": null,
-    "secs": 17.3
+    "secs": 17.3,
+    "done": true
    },
    "source": "history.jsonl",
    "evidence": {
@@ -725,9 +694,8 @@
     "role": "worker",
     "lane": "CLAUDE_SUBSCRIPTION",
     "model": "sonnet-5.5",
-    "status": "done",
-    "reason": null,
-    "secs": 10.3
+    "secs": 10.3,
+    "done": true
    },
    "source": "history.jsonl",
    "evidence": {
@@ -748,9 +716,8 @@
     "role": "reviewer",
     "lane": "CLAUDE_SUBSCRIPTION",
     "model": "sonnet-5.5",
-    "status": "done",
-    "reason": null,
-    "secs": 14.3
+    "secs": 14.3,
+    "done": true
    },
    "source": "history.jsonl",
    "evidence": {
@@ -771,9 +738,8 @@
     "role": "worker",
     "lane": "CLAUDE_SUBSCRIPTION",
     "model": "sonnet-5.5",
-    "status": "done",
-    "reason": null,
-    "secs": 9.3
+    "secs": 9.3,
+    "done": true
    },
    "source": "history.jsonl",
    "evidence": {
@@ -794,9 +760,8 @@
     "role": "planner",
     "lane": "CLAUDE_SUBSCRIPTION",
     "model": "opus-5.5",
-    "status": "done",
-    "reason": null,
-    "secs": 44.2
+    "secs": 44.2,
+    "done": true
    },
    "source": "history.jsonl",
    "evidence": {
@@ -817,9 +782,8 @@
     "role": "worker",
     "lane": "CLAUDE_SUBSCRIPTION",
     "model": "sonnet-5.5",
-    "status": "done",
-    "reason": null,
-    "secs": 122.7
+    "secs": 122.7,
+    "done": true
    },
    "source": "history.jsonl",
    "evidence": {
@@ -840,9 +804,8 @@
     "role": "worker",
     "lane": "CLAUDE_SUBSCRIPTION",
     "model": "sonnet-5.5",
-    "status": "done",
-    "reason": null,
-    "secs": 13.9
+    "secs": 13.9,
+    "done": true
    },
    "source": "history.jsonl",
    "evidence": {
@@ -863,9 +826,8 @@
     "role": "reviewer",
     "lane": "CLAUDE_SUBSCRIPTION",
     "model": "sonnet-5.5",
-    "status": "done",
-    "reason": null,
-    "secs": 33.1
+    "secs": 33.1,
+    "done": true
    },
    "source": "history.jsonl",
    "evidence": {
@@ -886,9 +848,8 @@
     "role": "worker",
     "lane": "CLAUDE_SUBSCRIPTION",
     "model": "sonnet-5.5",
-    "status": "done",
-    "reason": null,
-    "secs": 19.8
+    "secs": 19.8,
+    "done": true
    },
    "source": "history.jsonl",
    "evidence": {
@@ -909,9 +870,8 @@
     "role": "reviewer",
     "lane": "CLAUDE_SUBSCRIPTION",
     "model": "sonnet-5.5",
-    "status": "done",
-    "reason": null,
-    "secs": 15.8
+    "secs": 15.8,
+    "done": true
    },
    "source": "history.jsonl",
    "evidence": {
@@ -932,9 +892,8 @@
     "role": "planner",
     "lane": "CLAUDE_SUBSCRIPTION",
     "model": "opus-5.5",
-    "status": "done",
-    "reason": null,
-    "secs": 113.5
+    "secs": 113.5,
+    "done": true
    },
    "source": "history.jsonl",
    "evidence": {
@@ -955,9 +914,8 @@
     "role": "worker",
     "lane": "CLAUDE_SUBSCRIPTION",
     "model": "sonnet-5.5",
-    "status": "done",
-    "reason": null,
-    "secs": 327.8
+    "secs": 327.8,
+    "done": true
    },
    "source": "history.jsonl",
    "evidence": {
@@ -978,9 +936,8 @@
     "role": "worker",
     "lane": "CLAUDE_SUBSCRIPTION",
     "model": "sonnet-5.5",
-    "status": "done",
-    "reason": null,
-    "secs": 116.0
+    "secs": 116.0,
+    "done": true
    },
    "source": "history.jsonl",
    "evidence": {
@@ -1001,9 +958,8 @@
     "role": "worker",
     "lane": "CLAUDE_SUBSCRIPTION",
     "model": "sonnet-5.5",
-    "status": "done",
-    "reason": null,
-    "secs": 22.9
+    "secs": 22.9,
+    "done": true
    },
    "source": "history.jsonl",
    "evidence": {
@@ -1024,9 +980,8 @@
     "role": "reviewer",
     "lane": "CLAUDE_SUBSCRIPTION",
     "model": "sonnet-5.5",
-    "status": "done",
-    "reason": null,
-    "secs": 20.8
+    "secs": 20.8,
+    "done": true
    },
    "source": "history.jsonl",
    "evidence": {
@@ -1047,9 +1002,8 @@
     "role": "planner",
     "lane": "CLAUDE_SUBSCRIPTION",
     "model": "opus-5.5",
-    "status": "done",
-    "reason": null,
-    "secs": 55.3
+    "secs": 55.3,
+    "done": true
    },
    "source": "history.jsonl",
    "evidence": {
@@ -1070,9 +1024,8 @@
     "role": "worker",
     "lane": "CLAUDE_SUBSCRIPTION",
     "model": "sonnet-5.5",
-    "status": "done",
-    "reason": null,
-    "secs": 41.1
+    "secs": 41.1,
+    "done": true
    },
    "source": "history.jsonl",
    "evidence": {
@@ -1093,9 +1046,8 @@
     "role": "reviewer",
     "lane": "CLAUDE_SUBSCRIPTION",
     "model": "sonnet-5.5",
-    "status": "done",
-    "reason": null,
-    "secs": 15.1
+    "secs": 15.1,
+    "done": true
    },
    "source": "history.jsonl",
    "evidence": {
@@ -1116,9 +1068,8 @@
     "role": "worker",
     "lane": "CLAUDE_SUBSCRIPTION",
     "model": "sonnet-5.5",
-    "status": "done",
-    "reason": null,
-    "secs": 51.1
+    "secs": 51.1,
+    "done": true
    },
    "source": "history.jsonl",
    "evidence": {
@@ -1139,9 +1090,8 @@
     "role": "worker",
     "lane": "CLAUDE_SUBSCRIPTION",
     "model": "sonnet-5.5",
-    "status": "done",
-    "reason": null,
-    "secs": 13.8
+    "secs": 13.8,
+    "done": true
    },
    "source": "history.jsonl",
    "evidence": {
@@ -1162,9 +1112,8 @@
     "role": "reviewer",
     "lane": "CLAUDE_SUBSCRIPTION",
     "model": "sonnet-5.5",
-    "status": "done",
-    "reason": null,
-    "secs": 46.9
+    "secs": 46.9,
+    "done": true
    },
    "source": "history.jsonl",
    "evidence": {
@@ -1185,9 +1134,8 @@
     "role": "worker",
     "lane": "CLAUDE_SUBSCRIPTION",
     "model": "sonnet-5.5",
-    "status": "done",
-    "reason": null,
-    "secs": 203.2
+    "secs": 203.2,
+    "done": true
    },
    "source": "history.jsonl",
    "evidence": {
@@ -1208,9 +1156,8 @@
     "role": "planner",
     "lane": "CLAUDE_SUBSCRIPTION",
     "model": "opus-5.5",
-    "status": "done",
-    "reason": null,
-    "secs": 55.4
+    "secs": 55.4,
+    "done": true
    },
    "source": "history.jsonl",
    "evidence": {
@@ -1231,9 +1178,8 @@
     "role": "planner",
     "lane": "CLAUDE_SUBSCRIPTION",
     "model": "opus-5.5",
-    "status": "done",
-    "reason": null,
-    "secs": 21.2
+    "secs": 21.2,
+    "done": true
    },
    "source": "history.jsonl",
    "evidence": {
@@ -1254,9 +1200,8 @@
     "role": "worker",
     "lane": "CLAUDE_SUBSCRIPTION",
     "model": "sonnet-5.5",
-    "status": "done",
-    "reason": null,
-    "secs": 22.7
+    "secs": 22.7,
+    "done": true
    },
    "source": "history.jsonl",
    "evidence": {
@@ -1277,9 +1222,8 @@
     "role": "worker",
     "lane": "CLAUDE_SUBSCRIPTION",
     "model": "sonnet-5.5",
-    "status": "done",
-    "reason": null,
-    "secs": 39.6
+    "secs": 39.6,
+    "done": true
    },
    "source": "history.jsonl",
    "evidence": {
@@ -1300,9 +1244,8 @@
     "role": "planner",
     "lane": "CLAUDE_SUBSCRIPTION",
     "model": "opus-5.5",
-    "status": "done",
-    "reason": null,
-    "secs": 61.5
+    "secs": 61.5,
+    "done": true
    },
    "source": "history.jsonl",
    "evidence": {
@@ -1323,9 +1266,8 @@
     "role": "worker",
     "lane": "CLAUDE_SUBSCRIPTION",
     "model": "sonnet-5.5",
-    "status": "done",
-    "reason": null,
-    "secs": 131.2
+    "secs": 131.2,
+    "done": true
    },
    "source": "history.jsonl",
    "evidence": {
@@ -1346,9 +1288,8 @@
     "role": "reviewer",
     "lane": "CLAUDE_SUBSCRIPTION",
     "model": "sonnet-5.5",
-    "status": "done",
-    "reason": null,
-    "secs": 36.6
+    "secs": 36.6,
+    "done": true
    },
    "source": "history.jsonl",
    "evidence": {
@@ -1369,9 +1310,8 @@
     "role": "worker",
     "lane": "CLAUDE_SUBSCRIPTION",
     "model": "sonnet-5.5",
-    "status": "done",
-    "reason": null,
-    "secs": 40.3
+    "secs": 40.3,
+    "done": true
    },
    "source": "history.jsonl",
    "evidence": {
@@ -1392,9 +1332,8 @@
     "role": "reviewer",
     "lane": "CLAUDE_SUBSCRIPTION",
     "model": "sonnet-5.5",
-    "status": "done",
-    "reason": null,
-    "secs": 22.9
+    "secs": 22.9,
+    "done": true
    },
    "source": "history.jsonl",
    "evidence": {
@@ -1415,9 +1354,8 @@
     "role": "reviewer",
     "lane": "CLAUDE_SUBSCRIPTION",
     "model": "sonnet-5.5",
-    "status": "done",
-    "reason": null,
-    "secs": 42.1
+    "secs": 42.1,
+    "done": true
    },
    "source": "history.jsonl",
    "evidence": {
@@ -1438,9 +1376,8 @@
     "role": "worker",
     "lane": "CLAUDE_SUBSCRIPTION",
     "model": "sonnet-5.5",
-    "status": "done",
-    "reason": null,
-    "secs": 14.5
+    "secs": 14.5,
+    "done": true
    },
    "source": "history.jsonl",
    "evidence": {
@@ -1461,9 +1398,8 @@
     "role": "reviewer",
     "lane": "CLAUDE_SUBSCRIPTION",
     "model": "sonnet-5.5",
-    "status": "done",
-    "reason": null,
-    "secs": 12.4
+    "secs": 12.4,
+    "done": true
    },
    "source": "history.jsonl",
    "evidence": {
@@ -1484,9 +1420,8 @@
     "role": "reviewer",
     "lane": "CLAUDE_SUBSCRIPTION",
     "model": "sonnet-5.5",
-    "status": "done",
-    "reason": null,
-    "secs": 43.9
+    "secs": 43.9,
+    "done": true
    },
    "source": "history.jsonl",
    "evidence": {
@@ -1507,9 +1442,8 @@
     "role": "reviewer",
     "lane": "CLAUDE_SUBSCRIPTION",
     "model": "sonnet-5.5",
-    "status": "done",
-    "reason": null,
-    "secs": 11.8
+    "secs": 11.8,
+    "done": true
    },
    "source": "history.jsonl",
    "evidence": {
@@ -1530,9 +1464,8 @@
     "role": "planner",
     "lane": "CLAUDE_SUBSCRIPTION",
     "model": "opus-5.5",
-    "status": "done",
-    "reason": null,
-    "secs": 86.3
+    "secs": 86.3,
+    "done": true
    },
    "source": "history.jsonl",
    "evidence": {
@@ -1553,9 +1486,8 @@
     "role": "worker",
     "lane": "CLAUDE_SUBSCRIPTION",
     "model": "sonnet-5.5",
-    "status": "done",
-    "reason": null,
-    "secs": 151.2
+    "secs": 151.2,
+    "done": true
    },
    "source": "history.jsonl",
    "evidence": {
@@ -1576,9 +1508,8 @@
     "role": "planner",
     "lane": "CLAUDE_SUBSCRIPTION",
     "model": "opus-5.5",
-    "status": "done",
-    "reason": null,
-    "secs": 94.1
+    "secs": 94.1,
+    "done": true
    },
    "source": "history.jsonl",
    "evidence": {
@@ -1599,9 +1530,8 @@
     "role": "planner",
     "lane": "CLAUDE_SUBSCRIPTION",
     "model": "opus-5.5",
-    "status": "done",
-    "reason": null,
-    "secs": 28.2
+    "secs": 28.2,
+    "done": true
    },
    "source": "history.jsonl",
    "evidence": {
@@ -1622,9 +1552,8 @@
     "role": "worker",
     "lane": "CLAUDE_SUBSCRIPTION",
     "model": "sonnet-5.5",
-    "status": "done",
-    "reason": null,
-    "secs": 122.4
+    "secs": 122.4,
+    "done": true
    },
    "source": "history.jsonl",
    "evidence": {
@@ -1645,9 +1574,8 @@
     "role": "reviewer",
     "lane": "CLAUDE_SUBSCRIPTION",
     "model": "sonnet-5.5",
-    "status": "done",
-    "reason": null,
-    "secs": 9.4
+    "secs": 9.4,
+    "done": true
    },
    "source": "history.jsonl",
    "evidence": {
@@ -1668,9 +1596,8 @@
     "role": "worker",
     "lane": "CLAUDE_SUBSCRIPTION",
     "model": "sonnet-5.5",
-    "status": "done",
-    "reason": null,
-    "secs": 13.2
+    "secs": 13.2,
+    "done": true
    },
    "source": "history.jsonl",
    "evidence": {
@@ -1691,9 +1618,8 @@
     "role": "worker",
     "lane": "CLAUDE_SUBSCRIPTION",
     "model": "sonnet-5.5",
-    "status": "done",
-    "reason": null,
-    "secs": 18.2
+    "secs": 18.2,
+    "done": true
    },
    "source": "history.jsonl",
    "evidence": {
@@ -1714,9 +1640,8 @@
     "role": "worker",
     "lane": "CLAUDE_SUBSCRIPTION",
     "model": "sonnet-5.5",
-    "status": "done",
-    "reason": null,
-    "secs": 9.7
+    "secs": 9.7,
+    "done": true
    },
    "source": "history.jsonl",
    "evidence": {
@@ -1737,9 +1662,8 @@
     "role": "worker",
     "lane": "CLAUDE_SUBSCRIPTION",
     "model": "sonnet-5.5",
-    "status": "done",
-    "reason": null,
-    "secs": 10.6
+    "secs": 10.6,
+    "done": true
    },
    "source": "history.jsonl",
    "evidence": {
@@ -1760,9 +1684,8 @@
     "role": "worker",
     "lane": "CLAUDE_SUBSCRIPTION",
     "model": "sonnet-5.5",
-    "status": "done",
-    "reason": null,
-    "secs": 9.9
+    "secs": 9.9,
+    "done": true
    },
    "source": "history.jsonl",
    "evidence": {
@@ -1783,9 +1706,8 @@
     "role": "planner",
     "lane": "CLAUDE_SUBSCRIPTION",
     "model": "opus-5.5",
-    "status": "done",
-    "reason": null,
-    "secs": 63.2
+    "secs": 63.2,
+    "done": true
    },
    "source": "history.jsonl",
    "evidence": {
@@ -1806,9 +1728,8 @@
     "role": "planner",
     "lane": "CLAUDE_SUBSCRIPTION",
     "model": "opus-5.5",
-    "status": "done",
-    "reason": null,
-    "secs": 28.7
+    "secs": 28.7,
+    "done": true
    },
    "source": "history.jsonl",
    "evidence": {
@@ -1829,9 +1750,8 @@
     "role": "worker",
     "lane": "CLAUDE_SUBSCRIPTION",
     "model": "sonnet-5.5",
-    "status": "done",
-    "reason": null,
-    "secs": 49.2
+    "secs": 49.2,
+    "done": true
    },
    "source": "history.jsonl",
    "evidence": {
@@ -1852,9 +1772,8 @@
     "role": "worker",
     "lane": "CLAUDE_SUBSCRIPTION",
     "model": "sonnet-5.5",
-    "status": "done",
-    "reason": null,
-    "secs": 11.9
+    "secs": 11.9,
+    "done": true
    },
    "source": "history.jsonl",
    "evidence": {
@@ -1875,9 +1794,8 @@
     "role": "planner",
     "lane": "CLAUDE_SUBSCRIPTION",
     "model": "opus-5.5",
-    "status": "done",
-    "reason": null,
-    "secs": 92.3
+    "secs": 92.3,
+    "done": true
    },
    "source": "history.jsonl",
    "evidence": {
@@ -1898,9 +1816,8 @@
     "role": "worker",
     "lane": "CLAUDE_SUBSCRIPTION",
     "model": "sonnet-5.5",
-    "status": "done",
-    "reason": null,
-    "secs": 64.4
+    "secs": 64.4,
+    "done": true
    },
    "source": "history.jsonl",
    "evidence": {
@@ -1921,9 +1838,8 @@
     "role": "reviewer",
     "lane": "CLAUDE_SUBSCRIPTION",
     "model": "sonnet-5.5",
-    "status": "done",
-    "reason": null,
-    "secs": 12.3
+    "secs": 12.3,
+    "done": true
    },
    "source": "history.jsonl",
    "evidence": {
@@ -1944,9 +1860,8 @@
     "role": "worker",
     "lane": "CLAUDE_SUBSCRIPTION",
     "model": "sonnet-5.5",
-    "status": "done",
-    "reason": null,
-    "secs": 24.5
+    "secs": 24.5,
+    "done": true
    },
    "source": "history.jsonl",
    "evidence": {
@@ -1967,9 +1882,8 @@
     "role": "worker",
     "lane": "CLAUDE_SUBSCRIPTION",
     "model": "sonnet-5.5",
-    "status": "done",
-    "reason": null,
-    "secs": 13.2
+    "secs": 13.2,
+    "done": true
    },
    "source": "history.jsonl",
    "evidence": {
@@ -1990,9 +1904,8 @@
     "role": "worker",
     "lane": "CLAUDE_SUBSCRIPTION",
     "model": "sonnet-5.5",
-    "status": "done",
-    "reason": null,
-    "secs": 10.7
+    "secs": 10.7,
+    "done": true
    },
    "source": "history.jsonl",
    "evidence": {
@@ -2013,9 +1926,8 @@
     "role": "planner",
     "lane": "CLAUDE_SUBSCRIPTION",
     "model": "opus-5.5",
-    "status": "done",
-    "reason": null,
-    "secs": 56.1
+    "secs": 56.1,
+    "done": true
    },
    "source": "history.jsonl",
    "evidence": {
@@ -2036,9 +1948,8 @@
     "role": "worker",
     "lane": "CLAUDE_SUBSCRIPTION",
     "model": "sonnet-5.5",
-    "status": "done",
-    "reason": null,
-    "secs": 27.6
+    "secs": 27.6,
+    "done": true
    },
    "source": "history.jsonl",
    "evidence": {
@@ -2059,9 +1970,8 @@
     "role": "worker",
     "lane": "CLAUDE_SUBSCRIPTION",
     "model": "sonnet-5.5",
-    "status": "done",
-    "reason": null,
-    "secs": 32.3
+    "secs": 32.3,
+    "done": true
    },
    "source": "history.jsonl",
    "evidence": {
@@ -2082,9 +1992,8 @@
     "role": "reviewer",
     "lane": "CLAUDE_SUBSCRIPTION",
     "model": "sonnet-5.5",
-    "status": "done",
-    "reason": null,
-    "secs": 48.2
+    "secs": 48.2,
+    "done": true
    },
    "source": "history.jsonl",
    "evidence": {
@@ -2105,9 +2014,8 @@
     "role": "worker",
     "lane": "CLAUDE_SUBSCRIPTION",
     "model": "sonnet-5.5",
-    "status": "done",
-    "reason": null,
-    "secs": 17.9
+    "secs": 17.9,
+    "done": true
    },
    "source": "history.jsonl",
    "evidence": {
@@ -2128,9 +2036,8 @@
     "role": "worker",
     "lane": "CLAUDE_SUBSCRIPTION",
     "model": "sonnet-5.5",
-    "status": "done",
-    "reason": null,
-    "secs": 160.0
+    "secs": 160.0,
+    "done": true
    },
    "source": "history.jsonl",
    "evidence": {
@@ -2151,9 +2058,8 @@
     "role": "worker",
     "lane": "CLAUDE_SUBSCRIPTION",
     "model": "sonnet-5.5",
-    "status": "done",
-    "reason": null,
-    "secs": 22.5
+    "secs": 22.5,
+    "done": true
    },
    "source": "history.jsonl",
    "evidence": {
@@ -2174,9 +2080,8 @@
     "role": "planner",
     "lane": "CLAUDE_SUBSCRIPTION",
     "model": "opus-5.5",
-    "status": "done",
-    "reason": null,
-    "secs": 126.7
+    "secs": 126.7,
+    "done": true
    },
    "source": "history.jsonl",
    "evidence": {
@@ -2197,9 +2102,8 @@
     "role": "worker",
     "lane": "CLAUDE_SUBSCRIPTION",
     "model": "sonnet-5.5",
-    "status": "done",
-    "reason": null,
-    "secs": 225.8
+    "secs": 225.8,
+    "done": true
    },
    "source": "history.jsonl",
    "evidence": {
@@ -2220,9 +2124,8 @@
     "role": "reviewer",
     "lane": "CLAUDE_SUBSCRIPTION",
     "model": "sonnet-5.5",
-    "status": "done",
-    "reason": null,
-    "secs": 21.8
+    "secs": 21.8,
+    "done": true
    },
    "source": "history.jsonl",
    "evidence": {
@@ -2243,9 +2146,8 @@
     "role": "worker",
     "lane": "CLAUDE_SUBSCRIPTION",
     "model": "sonnet-5.5",
-    "status": "done",
-    "reason": null,
-    "secs": 24.0
+    "secs": 24.0,
+    "done": true
    },
    "source": "history.jsonl",
    "evidence": {
@@ -2266,9 +2168,8 @@
     "role": "reviewer",
     "lane": "CLAUDE_SUBSCRIPTION",
     "model": "sonnet-5.5",
-    "status": "done",
-    "reason": null,
-    "secs": 27.6
+    "secs": 27.6,
+    "done": true
    },
    "source": "history.jsonl",
    "evidence": {
@@ -2289,9 +2190,8 @@
     "role": "worker",
     "lane": "CLAUDE_SUBSCRIPTION",
     "model": "sonnet-5.5",
-    "status": "done",
-    "reason": null,
-    "secs": 68.2
+    "secs": 68.2,
+    "done": true
    },
    "source": "history.jsonl",
    "evidence": {
@@ -2312,9 +2212,8 @@
     "role": "reviewer",
     "lane": "CLAUDE_SUBSCRIPTION",
     "model": "sonnet-5.5",
-    "status": "done",
-    "reason": null,
-    "secs": 11.2
+    "secs": 11.2,
+    "done": true
    },
    "source": "history.jsonl",
    "evidence": {
@@ -2335,9 +2234,8 @@
     "role": "reviewer",
     "lane": "CLAUDE_SUBSCRIPTION",
     "model": "sonnet-5.5",
-    "status": "done",
-    "reason": null,
-    "secs": 22.5
+    "secs": 22.5,
+    "done": true
    },
    "source": "history.jsonl",
    "evidence": {
@@ -2358,9 +2256,8 @@
     "role": "reviewer",
     "lane": "CLAUDE_SUBSCRIPTION",
     "model": "sonnet-5.5",
-    "status": "done",
-    "reason": null,
-    "secs": 43.7
+    "secs": 43.7,
+    "done": true
    },
    "source": "history.jsonl",
    "evidence": {
@@ -2381,9 +2278,8 @@
     "role": "planner",
     "lane": "CLAUDE_SUBSCRIPTION",
     "model": "opus-5.5",
-    "status": "done",
-    "reason": null,
-    "secs": 35.8
+    "secs": 35.8,
+    "done": true
    },
    "source": "history.jsonl",
    "evidence": {
@@ -2404,9 +2300,8 @@
     "role": "reviewer",
     "lane": "CLAUDE_SUBSCRIPTION",
     "model": "sonnet-5.5",
-    "status": "done",
-    "reason": null,
-    "secs": 27.2
+    "secs": 27.2,
+    "done": true
    },
    "source": "history.jsonl",
    "evidence": {
@@ -2427,9 +2322,8 @@
     "role": "worker",
     "lane": "CLAUDE_SUBSCRIPTION",
     "model": "sonnet-5.5",
-    "status": "done",
-    "reason": null,
-    "secs": 26.7
+    "secs": 26.7,
+    "done": true
    },
    "source": "history.jsonl",
    "evidence": {
@@ -2450,9 +2344,8 @@
     "role": "planner",
     "lane": "CLAUDE_SUBSCRIPTION",
     "model": "opus-5.5",
-    "status": "done",
-    "reason": null,
-    "secs": 86.7
+    "secs": 86.7,
+    "done": true
    },
    "source": "history.jsonl",
    "evidence": {
@@ -2473,9 +2366,8 @@
     "role": "worker",
     "lane": "CLAUDE_SUBSCRIPTION",
     "model": "sonnet-5.5",
-    "status": "done",
-    "reason": null,
-    "secs": 57.2
+    "secs": 57.2,
+    "done": true
    },
    "source": "history.jsonl",
    "evidence": {
@@ -2496,9 +2388,8 @@
     "role": "reviewer",
     "lane": "OPENAI_SUBSCRIPTION",
     "model": "gpt-6.1-sol",
-    "status": "error",
-    "reason": "bad_request",
-    "secs": 12.2
+    "secs": 12.2,
+    "outcome": "bad_request"
    },
    "source": "engine/lifesim-log-20261022-225135.jsonl:62",
    "evidence": {
@@ -2519,9 +2410,8 @@
     "role": "planner",
     "lane": "CLAUDE_SUBSCRIPTION",
     "model": "opus-5.5",
-    "status": "done",
-    "reason": null,
-    "secs": 57.8
+    "secs": 57.8,
+    "done": true
    },
    "source": "history.jsonl",
    "evidence": {
@@ -2542,9 +2432,8 @@
     "role": "worker",
     "lane": "OPENAI_SUBSCRIPTION",
     "model": "gpt-6.1-sol",
-    "status": "error",
-    "reason": "bad_request",
-    "secs": 16.8
+    "secs": 16.8,
+    "outcome": "bad_request"
    },
    "source": "engine/lifesim-sz3-20261022-225656.jsonl:17",
    "evidence": {
@@ -2565,9 +2454,8 @@
     "role": "planner",
     "lane": "CLAUDE_SUBSCRIPTION",
     "model": "opus-5.5",
-    "status": "done",
-    "reason": null,
-    "secs": 30.0
+    "secs": 30.0,
+    "done": true
    },
    "source": "history.jsonl",
    "evidence": {
@@ -2588,9 +2476,8 @@
     "role": "planner",
     "lane": "CLAUDE_SUBSCRIPTION",
     "model": "opus-5.5",
-    "status": "done",
-    "reason": null,
-    "secs": 29.3
+    "secs": 29.3,
+    "done": true
    },
    "source": "history.jsonl",
    "evidence": {
@@ -2611,9 +2498,8 @@
     "role": "reviewer",
     "lane": "OPENAI_SUBSCRIPTION",
     "model": "gpt-6.1-sol",
-    "status": "error",
-    "reason": "bad_request",
-    "secs": 11.2
+    "secs": 11.2,
+    "outcome": "bad_request"
    },
    "source": "engine/lifesim-yxbb.7-20261022-230139.jsonl:20",
    "evidence": {
@@ -2634,9 +2520,8 @@
     "role": "worker",
     "lane": "OPENAI_SUBSCRIPTION",
     "model": "gpt-6.1-sol",
-    "status": "error",
-    "reason": "bad_request",
-    "secs": 7.8
+    "secs": 7.8,
+    "outcome": "bad_request"
    },
    "source": "engine/lifesim-yxbb.7-20261022-230139.jsonl:20",
    "evidence": {
@@ -2657,9 +2542,8 @@
     "role": "planner",
     "lane": "CLAUDE_SUBSCRIPTION",
     "model": "opus-5.5",
-    "status": "done",
-    "reason": null,
-    "secs": 57.4
+    "secs": 57.4,
+    "done": true
    },
    "source": "history.jsonl",
    "evidence": {
@@ -2680,9 +2564,8 @@
     "role": "worker",
     "lane": "OPENAI_SUBSCRIPTION",
     "model": "gpt-6.1-sol",
-    "status": "error",
-    "reason": "bad_request",
-    "secs": 14.9
+    "secs": 14.9,
+    "outcome": "bad_request"
    },
    "source": "engine/lifesim-fld.25.15-20261022-230429.jsonl:20",
    "evidence": {
@@ -2703,9 +2586,8 @@
     "role": "planner",
     "lane": "CLAUDE_SUBSCRIPTION",
     "model": "opus-5.5",
-    "status": "done",
-    "reason": null,
-    "secs": 107.7
+    "secs": 107.7,
+    "done": true
    },
    "source": "history.jsonl",
    "evidence": {
@@ -2726,9 +2608,8 @@
     "role": "planner",
     "lane": "CLAUDE_SUBSCRIPTION",
     "model": "opus-5.5",
-    "status": "done",
-    "reason": null,
-    "secs": 30.8
+    "secs": 30.8,
+    "done": true
    },
    "source": "history.jsonl",
    "evidence": {
@@ -2749,9 +2630,8 @@
     "role": "worker",
     "lane": "OPENAI_SUBSCRIPTION",
     "model": "gpt-6.1-sol",
-    "status": "error",
-    "reason": "bad_request",
-    "secs": 19.1
+    "secs": 19.1,
+    "outcome": "bad_request"
    },
    "source": "engine/lifesim-d5f.44-20261022-230457.jsonl:32",
    "evidence": {
@@ -2772,9 +2652,8 @@
     "role": "planner",
     "lane": "CLAUDE_SUBSCRIPTION",
     "model": "opus-5.5",
-    "status": "done",
-    "reason": null,
-    "secs": 53.4
+    "secs": 53.4,
+    "done": true
    },
    "source": "history.jsonl",
    "evidence": {
@@ -2795,9 +2674,8 @@
     "role": "planner",
     "lane": "CLAUDE_SUBSCRIPTION",
     "model": "opus-5.5",
-    "status": "done",
-    "reason": null,
-    "secs": 71.8
+    "secs": 71.8,
+    "done": true
    },
    "source": "history.jsonl",
    "evidence": {
@@ -2818,9 +2696,8 @@
     "role": "worker",
     "lane": "OPENAI_SUBSCRIPTION",
     "model": "gpt-6.1-sol",
-    "status": "error",
-    "reason": "bad_request",
-    "secs": 13.4
+    "secs": 13.4,
+    "outcome": "bad_request"
    },
    "source": "engine/lifesim-iqad-20261022-230715.jsonl:22",
    "evidence": {
@@ -2841,9 +2718,8 @@
     "role": "planner",
     "lane": "CLAUDE_SUBSCRIPTION",
     "model": "opus-5.5",
-    "status": "done",
-    "reason": null,
-    "secs": 71.0
+    "secs": 71.0,
+    "done": true
    },
    "source": "history.jsonl",
    "evidence": {
@@ -2864,9 +2740,8 @@
     "role": "worker",
     "lane": "OPENAI_SUBSCRIPTION",
     "model": "gpt-6.1-sol",
-    "status": "error",
-    "reason": "bad_request",
-    "secs": 12.5
+    "secs": 12.5,
+    "outcome": "bad_request"
    },
    "source": "engine/lifesim-d5f.51-20261022-230859.jsonl:17",
    "evidence": {
@@ -2887,9 +2762,8 @@
     "role": "planner",
     "lane": "CLAUDE_SUBSCRIPTION",
     "model": "opus-5.5",
-    "status": "done",
-    "reason": null,
-    "secs": 108.6
+    "secs": 108.6,
+    "done": true
    },
    "source": "history.jsonl",
    "evidence": {
@@ -2910,9 +2784,8 @@
     "role": "planner",
     "lane": "CLAUDE_SUBSCRIPTION",
     "model": "opus-5.5",
-    "status": "done",
-    "reason": null,
-    "secs": 30.2
+    "secs": 30.2,
+    "done": true
    },
    "source": "history.jsonl",
    "evidence": {
@@ -2933,9 +2806,8 @@
     "role": "worker",
     "lane": "OPENAI_SUBSCRIPTION",
     "model": "gpt-6.1-sol",
-    "status": "error",
-    "reason": "bad_request",
-    "secs": 9.8
+    "secs": 9.8,
+    "outcome": "bad_request"
    },
    "source": "engine/lifesim-fld.25.19-20261022-230949.jsonl:27",
    "evidence": {
@@ -2956,9 +2828,8 @@
     "role": "planner",
     "lane": "CLAUDE_SUBSCRIPTION",
     "model": "opus-5.5",
-    "status": "done",
-    "reason": null,
-    "secs": 105.8
+    "secs": 105.8,
+    "done": true
    },
    "source": "history.jsonl",
    "evidence": {
@@ -2979,9 +2850,8 @@
     "role": "worker",
     "lane": "OPENAI_SUBSCRIPTION",
     "model": "gpt-6.1-sol",
-    "status": "error",
-    "reason": "bad_request",
-    "secs": 18.8
+    "secs": 18.8,
+    "outcome": "bad_request"
    },
    "source": "engine/lifesim-d5f.61-20261022-231121.jsonl:20",
    "evidence": {
@@ -3002,9 +2872,8 @@
     "role": "planner",
     "lane": "CLAUDE_SUBSCRIPTION",
     "model": "opus-5.5",
-    "status": "done",
-    "reason": null,
-    "secs": 48.2
+    "secs": 48.2,
+    "done": true
    },
    "source": "history.jsonl",
    "evidence": {
@@ -3025,9 +2894,8 @@
     "role": "worker",
     "lane": "OPENAI_SUBSCRIPTION",
     "model": "gpt-6.1-sol",
-    "status": "error",
-    "reason": "bad_request",
-    "secs": 17.3
+    "secs": 17.3,
+    "outcome": "bad_request"
    },
    "source": "engine/lifesim-5ban.12-20261022-231332.jsonl:17",
    "evidence": {
@@ -3048,9 +2916,8 @@
     "role": "planner",
     "lane": "CLAUDE_SUBSCRIPTION",
     "model": "opus-5.5",
-    "status": "done",
-    "reason": null,
-    "secs": 137.2
+    "secs": 137.2,
+    "done": true
    },
    "source": "history.jsonl",
    "evidence": {
@@ -3071,9 +2938,8 @@
     "role": "worker",
     "lane": "OPENAI_SUBSCRIPTION",
     "model": "gpt-6.1-sol",
-    "status": "error",
-    "reason": "bad_request",
-    "secs": 14.5
+    "secs": 14.5,
+    "outcome": "bad_request"
    },
    "source": "engine/lifesim-gfr.39-20261022-231441.jsonl:19",
    "evidence": {
@@ -3094,9 +2960,8 @@
     "role": "planner",
     "lane": "CLAUDE_SUBSCRIPTION",
     "model": "opus-5.5",
-    "status": "done",
-    "reason": null,
-    "secs": 113.3
+    "secs": 113.3,
+    "done": true
    },
    "source": "history.jsonl",
    "evidence": {
@@ -3117,9 +2982,8 @@
     "role": "planner",
     "lane": "CLAUDE_SUBSCRIPTION",
     "model": "opus-5.5",
-    "status": "done",
-    "reason": null,
-    "secs": 31.3
+    "secs": 31.3,
+    "done": true
    },
    "source": "history.jsonl",
    "evidence": {
@@ -3140,9 +3004,8 @@
     "role": "worker",
     "lane": "OPENAI_SUBSCRIPTION",
     "model": "gpt-6.1-sol",
-    "status": "error",
-    "reason": "bad_request",
-    "secs": 18.0
+    "secs": 18.0,
+    "outcome": "bad_request"
    },
    "source": "engine/lifesim-5ban.14-20261022-231548.jsonl:23",
    "evidence": {
@@ -3163,9 +3026,8 @@
     "role": "planner",
     "lane": "CLAUDE_SUBSCRIPTION",
     "model": "opus-5.5",
-    "status": "done",
-    "reason": null,
-    "secs": 139.9
+    "secs": 139.9,
+    "done": true
    },
    "source": "history.jsonl",
    "evidence": {
@@ -3186,9 +3048,8 @@
     "role": "planner",
     "lane": "CLAUDE_SUBSCRIPTION",
     "model": "opus-5.5",
-    "status": "done",
-    "reason": null,
-    "secs": 67.1
+    "secs": 67.1,
+    "done": true
    },
    "source": "history.jsonl",
    "evidence": {
@@ -3209,9 +3070,8 @@
     "role": "worker",
     "lane": "OPENAI_SUBSCRIPTION",
     "model": "gpt-6.1-sol",
-    "status": "error",
-    "reason": "bad_request",
-    "secs": 11.1
+    "secs": 11.1,
+    "outcome": "bad_request"
    },
    "source": "engine/lifesim-gqzz-20261022-231823.jsonl:17",
    "evidence": {
@@ -3232,9 +3092,8 @@
     "role": "worker",
     "lane": "OPENAI_SUBSCRIPTION",
     "model": "gpt-6.1-sol",
-    "status": "error",
-    "reason": "bad_request",
-    "secs": 11.4
+    "secs": 11.4,
+    "outcome": "bad_request"
    },
    "source": "engine/lifesim-5ban.16-20261022-231941.jsonl:17",
    "evidence": {
@@ -3255,9 +3114,8 @@
     "role": "planner",
     "lane": "CLAUDE_SUBSCRIPTION",
     "model": "opus-5.5",
-    "status": "done",
-    "reason": null,
-    "secs": 89.0
+    "secs": 89.0,
+    "done": true
    },
    "source": "history.jsonl",
    "evidence": {
@@ -3278,9 +3136,8 @@
     "role": "worker",
     "lane": "OPENAI_SUBSCRIPTION",
     "model": "gpt-6.1-sol",
-    "status": "error",
-    "reason": "bad_request",
-    "secs": 7.3
+    "secs": 7.3,
+    "outcome": "bad_request"
    },
    "source": "engine/lifesim-5ban.17-20261022-232217.jsonl:17",
    "evidence": {
@@ -3301,9 +3158,8 @@
     "role": "planner",
     "lane": "CLAUDE_SUBSCRIPTION",
     "model": "opus-5.5",
-    "status": "done",
-    "reason": null,
-    "secs": 94.1
+    "secs": 94.1,
+    "done": true
    },
    "source": "history.jsonl",
    "evidence": {
@@ -3324,9 +3180,8 @@
     "role": "worker",
     "lane": "OPENAI_SUBSCRIPTION",
     "model": "gpt-6.1-sol",
-    "status": "error",
-    "reason": "bad_request",
-    "secs": 14.3
+    "secs": 14.3,
+    "outcome": "bad_request"
    },
    "source": "engine/lifesim-y7ll-20261022-232259.jsonl:19",
    "evidence": {
@@ -3347,9 +3202,8 @@
     "role": "planner",
     "lane": "CLAUDE_SUBSCRIPTION",
     "model": "opus-5.5",
-    "status": "done",
-    "reason": null,
-    "secs": 82.3
+    "secs": 82.3,
+    "done": true
    },
    "source": "history.jsonl",
    "evidence": {
@@ -3370,9 +3224,8 @@
     "role": "worker",
     "lane": "OPENAI_SUBSCRIPTION",
     "model": "gpt-6.1-sol",
-    "status": "error",
-    "reason": "bad_request",
-    "secs": 13.4
+    "secs": 13.4,
+    "outcome": "bad_request"
    },
    "source": "engine/lifesim-5ban.18-20261022-232505.jsonl:17",
    "evidence": {
@@ -3393,9 +3246,8 @@
     "role": "planner",
     "lane": "CLAUDE_SUBSCRIPTION",
     "model": "opus-5.5",
-    "status": "done",
-    "reason": null,
-    "secs": 144.1
+    "secs": 144.1,
+    "done": true
    },
    "source": "history.jsonl",
    "evidence": {
@@ -3416,9 +3268,8 @@
     "role": "worker",
     "lane": "OPENAI_SUBSCRIPTION",
     "model": "gpt-6.1-sol",
-    "status": "error",
-    "reason": "bad_request",
-    "secs": 16.4
+    "secs": 16.4,
+    "outcome": "bad_request"
    },
    "source": "engine/lifesim-f2by-20261022-232620.jsonl:26",
    "evidence": {
@@ -3439,9 +3290,8 @@
     "role": "planner",
     "lane": "CLAUDE_SUBSCRIPTION",
     "model": "opus-5.5",
-    "status": "done",
-    "reason": null,
-    "secs": 85.4
+    "secs": 85.4,
+    "done": true
    },
    "source": "history.jsonl",
    "evidence": {
@@ -3462,9 +3312,8 @@
     "role": "worker",
     "lane": "OPENAI_SUBSCRIPTION",
     "model": "gpt-6.1-sol",
-    "status": "error",
-    "reason": "bad_request",
-    "secs": 14.9
+    "secs": 14.9,
+    "outcome": "bad_request"
    },
    "source": "engine/lifesim-5ban.19-20261022-232743.jsonl:17",
    "evidence": {
@@ -3485,9 +3334,8 @@
     "role": "planner",
     "lane": "CLAUDE_SUBSCRIPTION",
     "model": "opus-5.5",
-    "status": "done",
-    "reason": null,
-    "secs": 57.4
+    "secs": 57.4,
+    "done": true
    },
    "source": "history.jsonl",
    "evidence": {
@@ -3508,9 +3356,8 @@
     "role": "worker",
     "lane": "OPENAI_SUBSCRIPTION",
     "model": "gpt-6.1-sol",
-    "status": "error",
-    "reason": "bad_request",
-    "secs": 22.5
+    "secs": 22.5,
+    "outcome": "bad_request"
    },
    "source": "engine/lifesim-md1f-20261022-233005.jsonl:19",
    "evidence": {
@@ -3531,9 +3378,8 @@
     "role": "planner",
     "lane": "CLAUDE_SUBSCRIPTION",
     "model": "opus-5.5",
-    "status": "done",
-    "reason": null,
-    "secs": 75.8
+    "secs": 75.8,
+    "done": true
    },
    "source": "history.jsonl",
    "evidence": {
@@ -3554,9 +3400,8 @@
     "role": "worker",
     "lane": "OPENAI_SUBSCRIPTION",
     "model": "gpt-6.1-sol",
-    "status": "error",
-    "reason": "bad_request",
-    "secs": 17.0
+    "secs": 17.0,
+    "outcome": "bad_request"
    },
    "source": "engine/lifesim-5ban.20-20261022-233044.jsonl:17",
    "evidence": {
@@ -3577,9 +3422,8 @@
     "role": "planner",
     "lane": "CLAUDE_SUBSCRIPTION",
     "model": "opus-5.5",
-    "status": "done",
-    "reason": null,
-    "secs": 97.8
+    "secs": 97.8,
+    "done": true
    },
    "source": "history.jsonl",
    "evidence": {
@@ -3600,9 +3444,8 @@
     "role": "planner",
     "lane": "CLAUDE_SUBSCRIPTION",
     "model": "opus-5.5",
-    "status": "done",
-    "reason": null,
-    "secs": 145.0
+    "secs": 145.0,
+    "done": true
    },
    "source": "history.jsonl",
    "evidence": {
@@ -3623,9 +3466,8 @@
     "role": "worker",
     "lane": "OPENAI_SUBSCRIPTION",
     "model": "gpt-6.1-sol",
-    "status": "error",
-    "reason": "bad_request",
-    "secs": 8.6
+    "secs": 8.6,
+    "outcome": "bad_request"
    },
    "source": "engine/lifesim-o45k-20261022-233240.jsonl:18",
    "evidence": {
@@ -3646,9 +3488,8 @@
     "role": "worker",
     "lane": "OPENAI_SUBSCRIPTION",
     "model": "gpt-6.1-sol",
-    "status": "error",
-    "reason": "bad_request",
-    "secs": 18.1
+    "secs": 18.1,
+    "outcome": "bad_request"
    },
    "source": "engine/lifesim-5ban.22-20261022-233321.jsonl:17",
    "evidence": {
@@ -3669,9 +3510,8 @@
     "role": "planner",
     "lane": "CLAUDE_SUBSCRIPTION",
     "model": "opus-5.5",
-    "status": "done",
-    "reason": null,
-    "secs": 124.6
+    "secs": 124.6,
+    "done": true
    },
    "source": "history.jsonl",
    "evidence": {
@@ -3692,9 +3532,8 @@
     "role": "planner",
     "lane": "CLAUDE_SUBSCRIPTION",
     "model": "opus-5.5",
-    "status": "done",
-    "reason": null,
-    "secs": 110.3
+    "secs": 110.3,
+    "done": true
    },
    "source": "history.jsonl",
    "evidence": {
@@ -3715,9 +3554,8 @@
     "role": "worker",
     "lane": "OPENAI_SUBSCRIPTION",
     "model": "gpt-6.1-sol",
-    "status": "error",
-    "reason": "bad_request",
-    "secs": 14.8
+    "secs": 14.8,
+    "outcome": "bad_request"
    },
    "source": "engine/lifesim-5ban.26-20261022-233630.jsonl:17",
    "evidence": {
@@ -3738,9 +3576,8 @@
     "role": "worker",
     "lane": "OPENAI_SUBSCRIPTION",
     "model": "gpt-6.1-sol",
-    "status": "error",
-    "reason": "bad_request",
-    "secs": 17.4
+    "secs": 17.4,
+    "outcome": "bad_request"
    },
    "source": "engine/lifesim-22b3-20261022-233653.jsonl:19",
    "evidence": {
@@ -3761,9 +3598,8 @@
     "role": "planner",
     "lane": "CLAUDE_SUBSCRIPTION",
     "model": "opus-5.5",
-    "status": "done",
-    "reason": null,
-    "secs": 75.3
+    "secs": 75.3,
+    "done": true
    },
    "source": "history.jsonl",
    "evidence": {
@@ -3784,9 +3620,8 @@
     "role": "planner",
     "lane": "CLAUDE_SUBSCRIPTION",
     "model": "opus-5.5",
-    "status": "done",
-    "reason": null,
-    "secs": 77.1
+    "secs": 77.1,
+    "done": true
    },
    "source": "history.jsonl",
    "evidence": {
@@ -3807,9 +3642,8 @@
     "role": "planner",
     "lane": "CLAUDE_SUBSCRIPTION",
     "model": "opus-5.5",
-    "status": "done",
-    "reason": null,
-    "secs": 33.9
+    "secs": 33.9,
+    "done": true
    },
    "source": "history.jsonl",
    "evidence": {
@@ -3830,9 +3664,8 @@
     "role": "planner",
     "lane": "CLAUDE_SUBSCRIPTION",
     "model": "opus-5.5",
-    "status": "done",
-    "reason": null,
-    "secs": 23.1
+    "secs": 23.1,
+    "done": true
    },
    "source": "history.jsonl",
    "evidence": {
@@ -3853,9 +3686,8 @@
     "role": "worker",
     "lane": "OPENAI_SUBSCRIPTION",
     "model": "gpt-6.1-sol",
-    "status": "error",
-    "reason": "bad_request",
-    "secs": 10.7
+    "secs": 10.7,
+    "outcome": "bad_request"
    },
    "source": "engine/lifesim-40jy-20261022-234030.jsonl:28",
    "evidence": {
@@ -3876,9 +3708,8 @@
     "role": "worker",
     "lane": "OPENAI_SUBSCRIPTION",
     "model": "gpt-6.1-sol",
-    "status": "error",
-    "reason": "bad_request",
-    "secs": 12.9
+    "secs": 12.9,
+    "outcome": "bad_request"
    },
    "source": "engine/lifesim-5ban.27-20261022-234037.jsonl:23",
    "evidence": {
@@ -3899,9 +3730,8 @@
     "role": "planner",
     "lane": "CLAUDE_SUBSCRIPTION",
     "model": "opus-5.5",
-    "status": "done",
-    "reason": null,
-    "secs": 75.8
+    "secs": 75.8,
+    "done": true
    },
    "source": "history.jsonl",
    "evidence": {
@@ -3922,9 +3752,8 @@
     "role": "worker",
     "lane": "OPENAI_SUBSCRIPTION",
     "model": "gpt-6.1-sol",
-    "status": "error",
-    "reason": "bad_request",
-    "secs": 18.1
+    "secs": 18.1,
+    "outcome": "bad_request"
    },
    "source": "engine/lifesim-5ban.28-20261022-234409.jsonl:17",
    "evidence": {
@@ -3945,9 +3774,8 @@
     "role": "planner",
     "lane": "CLAUDE_SUBSCRIPTION",
     "model": "opus-5.5",
-    "status": "done",
-    "reason": null,
-    "secs": 191.9
+    "secs": 191.9,
+    "done": true
    },
    "source": "history.jsonl",
    "evidence": {
@@ -3968,9 +3796,8 @@
     "role": "planner",
     "lane": "CLAUDE_SUBSCRIPTION",
     "model": "opus-5.5",
-    "status": "done",
-    "reason": null,
-    "secs": 38.1
+    "secs": 38.1,
+    "done": true
    },
    "source": "history.jsonl",
    "evidence": {
@@ -3991,9 +3818,8 @@
     "role": "worker",
     "lane": "OPENAI_SUBSCRIPTION",
     "model": "gpt-6.1-sol",
-    "status": "error",
-    "reason": "bad_request",
-    "secs": 13.6
+    "secs": 13.6,
+    "outcome": "bad_request"
    },
    "source": "engine/lifesim-fdyo-20261022-234415.jsonl:23",
    "evidence": {
@@ -4014,9 +3840,8 @@
     "role": "planner",
     "lane": "CLAUDE_SUBSCRIPTION",
     "model": "opus-5.5",
-    "status": "done",
-    "reason": null,
-    "secs": 103.0
+    "secs": 103.0,
+    "done": true
    },
    "source": "history.jsonl",
    "evidence": {
@@ -4037,9 +3862,8 @@
     "role": "worker",
     "lane": "OPENAI_SUBSCRIPTION",
     "model": "gpt-6.1-sol",
-    "status": "error",
-    "reason": "bad_request",
-    "secs": 12.0
+    "secs": 12.0,
+    "outcome": "bad_request"
    },
    "source": "engine/lifesim-5ban.30-20261022-234703.jsonl:17",
    "evidence": {
@@ -4060,9 +3884,8 @@
     "role": "planner",
     "lane": "CLAUDE_SUBSCRIPTION",
     "model": "opus-5.5",
-    "status": "done",
-    "reason": null,
-    "secs": 76.9
+    "secs": 76.9,
+    "done": true
    },
    "source": "history.jsonl",
    "evidence": {
@@ -4083,9 +3906,8 @@
     "role": "worker",
     "lane": "OPENAI_SUBSCRIPTION",
     "model": "gpt-6.1-sol",
-    "status": "error",
-    "reason": "bad_request",
-    "secs": 13.3
+    "secs": 13.3,
+    "outcome": "bad_request"
    },
    "source": "engine/lifesim-l4ow-20261022-234925.jsonl:17",
    "evidence": {
@@ -4106,9 +3928,8 @@
     "role": "planner",
     "lane": "CLAUDE_SUBSCRIPTION",
     "model": "opus-5.5",
-    "status": "done",
-    "reason": null,
-    "secs": 127.2
+    "secs": 127.2,
+    "done": true
    },
    "source": "history.jsonl",
    "evidence": {
@@ -4129,9 +3950,8 @@
     "role": "worker",
     "lane": "OPENAI_SUBSCRIPTION",
     "model": "gpt-6.1-sol",
-    "status": "error",
-    "reason": "bad_request",
-    "secs": 20.9
+    "secs": 20.9,
+    "outcome": "bad_request"
    },
    "source": "engine/lifesim-5ban.31-20261022-235022.jsonl:17",
    "evidence": {
@@ -4152,9 +3972,8 @@
     "role": "planner",
     "lane": "CLAUDE_SUBSCRIPTION",
     "model": "opus-5.5",
-    "status": "done",
-    "reason": null,
-    "secs": 91.8
+    "secs": 91.8,
+    "done": true
    },
    "source": "history.jsonl",
    "evidence": {
@@ -4175,9 +3994,8 @@
     "role": "planner",
     "lane": "CLAUDE_SUBSCRIPTION",
     "model": "opus-5.5",
-    "status": "done",
-    "reason": null,
-    "secs": 32.1
+    "secs": 32.1,
+    "done": true
    },
    "source": "history.jsonl",
    "evidence": {
@@ -4198,9 +4016,8 @@
     "role": "worker",
     "lane": "OPENAI_SUBSCRIPTION",
     "model": "gpt-6.1-sol",
-    "status": "error",
-    "reason": "bad_request",
-    "secs": 9.8
+    "secs": 9.8,
+    "outcome": "bad_request"
    },
    "source": "engine/lifesim-o67g-20261022-235154.jsonl:23",
    "evidence": {
@@ -4221,9 +4038,8 @@
     "role": "planner",
     "lane": "CLAUDE_SUBSCRIPTION",
     "model": "opus-5.5",
-    "status": "done",
-    "reason": null,
-    "secs": 105.8
+    "secs": 105.8,
+    "done": true
    },
    "source": "history.jsonl",
    "evidence": {
@@ -4244,9 +4060,8 @@
     "role": "worker",
     "lane": "OPENAI_SUBSCRIPTION",
     "model": "gpt-6.1-sol",
-    "status": "error",
-    "reason": "bad_request",
-    "secs": 10.2
+    "secs": 10.2,
+    "outcome": "bad_request"
    },
    "source": "engine/lifesim-6pld-20261022-235405.jsonl:17",
    "evidence": {
@@ -4267,9 +4082,8 @@
     "role": "planner",
     "lane": "CLAUDE_SUBSCRIPTION",
     "model": "opus-5.5",
-    "status": "done",
-    "reason": null,
-    "secs": 69.7
+    "secs": 69.7,
+    "done": true
    },
    "source": "history.jsonl",
    "evidence": {
@@ -4290,9 +4104,8 @@
     "role": "worker",
     "lane": "OPENAI_SUBSCRIPTION",
     "model": "gpt-6.1-sol",
-    "status": "error",
-    "reason": "bad_request",
-    "secs": 9.2
+    "secs": 9.2,
+    "outcome": "bad_request"
    },
    "source": "engine/lifesim-se15-20261022-235512.jsonl:17",
    "evidence": {
@@ -4313,9 +4126,8 @@
     "role": "planner",
     "lane": "CLAUDE_SUBSCRIPTION",
     "model": "opus-5.5",
-    "status": "done",
-    "reason": null,
-    "secs": 92.6
+    "secs": 92.6,
+    "done": true
    },
    "source": "history.jsonl",
    "evidence": {
@@ -4336,9 +4148,8 @@
     "role": "worker",
     "lane": "OPENAI_SUBSCRIPTION",
     "model": "gpt-6.1-sol",
-    "status": "error",
-    "reason": "bad_request",
-    "secs": 8.4
+    "secs": 8.4,
+    "outcome": "bad_request"
    },
    "source": "engine/lifesim-9akx-20261022-235708.jsonl:17",
    "evidence": {
@@ -4359,9 +4170,8 @@
     "role": "planner",
     "lane": "CLAUDE_SUBSCRIPTION",
     "model": "opus-5.5",
-    "status": "done",
-    "reason": null,
-    "secs": 166.1
+    "secs": 166.1,
+    "done": true
    },
    "source": "history.jsonl",
    "evidence": {
@@ -4382,9 +4192,8 @@
     "role": "planner",
     "lane": "CLAUDE_SUBSCRIPTION",
     "model": "opus-5.5",
-    "status": "done",
-    "reason": null,
-    "secs": 32.0
+    "secs": 32.0,
+    "done": true
    },
    "source": "history.jsonl",
    "evidence": {
@@ -4405,9 +4214,8 @@
     "role": "planner",
     "lane": "CLAUDE_SUBSCRIPTION",
     "model": "opus-5.5",
-    "status": "done",
-    "reason": null,
-    "secs": 93.6
+    "secs": 93.6,
+    "done": true
    },
    "source": "history.jsonl",
    "evidence": {
@@ -4428,9 +4236,8 @@
     "role": "worker",
     "lane": "OPENAI_SUBSCRIPTION",
     "model": "gpt-6.1-sol",
-    "status": "error",
-    "reason": "bad_request",
-    "secs": 9.0
+    "secs": 9.0,
+    "outcome": "bad_request"
    },
    "source": "engine/lifesim-22v.38-20261023-000019.jsonl:17",
    "evidence": {
@@ -4451,9 +4258,8 @@
     "role": "planner",
     "lane": "CLAUDE_SUBSCRIPTION",
     "model": "opus-5.5",
-    "status": "done",
-    "reason": null,
-    "secs": 79.4
+    "secs": 79.4,
+    "done": true
    },
    "source": "history.jsonl",
    "evidence": {
@@ -4474,9 +4280,8 @@
     "role": "worker",
     "lane": "OPENAI_SUBSCRIPTION",
     "model": "gpt-6.1-sol",
-    "status": "error",
-    "reason": "bad_request",
-    "secs": 12.2
+    "secs": 12.2,
+    "outcome": "bad_request"
    },
    "source": "engine/lifesim-6au9-20261023-000200.jsonl:17",
    "evidence": {
@@ -4497,9 +4302,8 @@
     "role": "planner",
     "lane": "CLAUDE_SUBSCRIPTION",
     "model": "opus-5.5",
-    "status": "done",
-    "reason": null,
-    "secs": 81.9
+    "secs": 81.9,
+    "done": true
    },
    "source": "history.jsonl",
    "evidence": {
@@ -4520,9 +4324,8 @@
     "role": "worker",
     "lane": "OPENAI_SUBSCRIPTION",
     "model": "gpt-6.1-sol",
-    "status": "error",
-    "reason": "bad_request",
-    "secs": 11.7
+    "secs": 11.7,
+    "outcome": "bad_request"
    },
    "source": "engine/lifesim-jva-20261023-000303.jsonl:17",
    "evidence": {
@@ -4543,9 +4346,8 @@
     "role": "planner",
     "lane": "CLAUDE_SUBSCRIPTION",
     "model": "opus-5.5",
-    "status": "done",
-    "reason": null,
-    "secs": 69.1
+    "secs": 69.1,
+    "done": true
    },
    "source": "history.jsonl",
    "evidence": {
@@ -4566,9 +4368,8 @@
     "role": "worker",
     "lane": "OPENAI_SUBSCRIPTION",
     "model": "gpt-6.1-sol",
-    "status": "error",
-    "reason": "bad_request",
-    "secs": 19.9
+    "secs": 19.9,
+    "outcome": "bad_request"
    },
    "source": "engine/lifesim-cd4n-20261023-000440.jsonl:17",
    "evidence": {
@@ -4589,9 +4390,8 @@
     "role": "planner",
     "lane": "CLAUDE_SUBSCRIPTION",
     "model": "opus-5.5",
-    "status": "done",
-    "reason": null,
-    "secs": 113.5
+    "secs": 113.5,
+    "done": true
    },
    "source": "history.jsonl",
    "evidence": {
@@ -4612,9 +4412,8 @@
     "role": "worker",
     "lane": "OPENAI_SUBSCRIPTION",
     "model": "gpt-6.1-sol",
-    "status": "error",
-    "reason": "bad_request",
-    "secs": 9.2
+    "secs": 9.2,
+    "outcome": "bad_request"
    },
    "source": "engine/lifesim-r0yc-20261023-000547.jsonl:17",
    "evidence": {
@@ -4635,9 +4434,8 @@
     "role": "planner",
     "lane": "CLAUDE_SUBSCRIPTION",
     "model": "opus-5.5",
-    "status": "done",
-    "reason": null,
-    "secs": 50.3
+    "secs": 50.3,
+    "done": true
    },
    "source": "history.jsonl",
    "evidence": {
@@ -4658,9 +4456,8 @@
     "role": "worker",
     "lane": "OPENAI_SUBSCRIPTION",
     "model": "gpt-6.1-sol",
-    "status": "error",
-    "reason": "bad_request",
-    "secs": 15.3
+    "secs": 15.3,
+    "outcome": "bad_request"
    },
    "source": "engine/lifesim-gfr.22-20261023-000712.jsonl:17",
    "evidence": {
@@ -4681,9 +4478,8 @@
     "role": "planner",
     "lane": "CLAUDE_SUBSCRIPTION",
     "model": "opus-5.5",
-    "status": "done",
-    "reason": null,
-    "secs": 82.1
+    "secs": 82.1,
+    "done": true
    },
    "source": "history.jsonl",
    "evidence": {
@@ -4704,9 +4500,8 @@
     "role": "worker",
     "lane": "OPENAI_SUBSCRIPTION",
     "model": "gpt-6.1-sol",
-    "status": "error",
-    "reason": "bad_request",
-    "secs": 9.1
+    "secs": 9.1,
+    "outcome": "bad_request"
    },
    "source": "engine/lifesim-3i2-20261023-000857.jsonl:17",
    "evidence": {
@@ -4727,9 +4522,8 @@
     "role": "planner",
     "lane": "CLAUDE_SUBSCRIPTION",
     "model": "opus-5.5",
-    "status": "done",
-    "reason": null,
-    "secs": 83.1
+    "secs": 83.1,
+    "done": true
    },
    "source": "history.jsonl",
    "evidence": {
@@ -4750,9 +4544,8 @@
     "role": "worker",
     "lane": "OPENAI_SUBSCRIPTION",
     "model": "gpt-6.1-sol",
-    "status": "error",
-    "reason": "bad_request",
-    "secs": 8.9
+    "secs": 8.9,
+    "outcome": "bad_request"
    },
    "source": "engine/lifesim-i52t-20261023-000932.jsonl:18",
    "evidence": {
@@ -4773,9 +4566,8 @@
     "role": "planner",
     "lane": "CLAUDE_SUBSCRIPTION",
     "model": "opus-5.5",
-    "status": "done",
-    "reason": null,
-    "secs": 52.6
+    "secs": 52.6,
+    "done": true
    },
    "source": "history.jsonl",
    "evidence": {
@@ -4796,9 +4588,8 @@
     "role": "planner",
     "lane": "CLAUDE_SUBSCRIPTION",
     "model": "opus-5.5",
-    "status": "done",
-    "reason": null,
-    "secs": 82.3
+    "secs": 82.3,
+    "done": true
    },
    "source": "history.jsonl",
    "evidence": {
@@ -4819,9 +4610,8 @@
     "role": "worker",
     "lane": "OPENAI_SUBSCRIPTION",
     "model": "gpt-6.1-sol",
-    "status": "error",
-    "reason": "bad_request",
-    "secs": 11.7
+    "secs": 11.7,
+    "outcome": "bad_request"
    },
    "source": "engine/lifesim-21l-20261023-001137.jsonl:17",
    "evidence": {
@@ -4842,9 +4632,8 @@
     "role": "planner",
     "lane": "CLAUDE_SUBSCRIPTION",
     "model": "opus-5.5",
-    "status": "done",
-    "reason": null,
-    "secs": 22.8
+    "secs": 22.8,
+    "done": true
    },
    "source": "history.jsonl",
    "evidence": {
@@ -4865,9 +4654,8 @@
     "role": "worker",
     "lane": "OPENAI_SUBSCRIPTION",
     "model": "gpt-6.1-sol",
-    "status": "error",
-    "reason": "bad_request",
-    "secs": 12.7
+    "secs": 12.7,
+    "outcome": "bad_request"
    },
    "source": "engine/lifesim-qu7h-20261023-001208.jsonl:24",
    "evidence": {
@@ -4888,9 +4676,8 @@
     "role": "planner",
     "lane": "CLAUDE_SUBSCRIPTION",
     "model": "opus-5.5",
-    "status": "done",
-    "reason": null,
-    "secs": 48.0
+    "secs": 48.0,
+    "done": true
    },
    "source": "history.jsonl",
    "evidence": {
@@ -4911,9 +4698,8 @@
     "role": "worker",
     "lane": "OPENAI_SUBSCRIPTION",
     "model": "gpt-6.1-sol",
-    "status": "error",
-    "reason": "bad_request",
-    "secs": 10.1
+    "secs": 10.1,
+    "outcome": "bad_request"
    },
    "source": "engine/lifesim-rl4s-20261023-001454.jsonl:17",
    "evidence": {
@@ -4934,9 +4720,8 @@
     "role": "planner",
     "lane": "CLAUDE_SUBSCRIPTION",
     "model": "opus-5.5",
-    "status": "done",
-    "reason": null,
-    "secs": 87.9
+    "secs": 87.9,
+    "done": true
    },
    "source": "history.jsonl",
    "evidence": {
@@ -4957,9 +4742,8 @@
     "role": "planner",
     "lane": "CLAUDE_SUBSCRIPTION",
     "model": "opus-5.5",
-    "status": "done",
-    "reason": null,
-    "secs": 28.6
+    "secs": 28.6,
+    "done": true
    },
    "source": "history.jsonl",
    "evidence": {
@@ -4980,9 +4764,8 @@
     "role": "worker",
     "lane": "OPENAI_SUBSCRIPTION",
     "model": "gpt-6.1-sol",
-    "status": "error",
-    "reason": "bad_request",
-    "secs": 13.1
+    "secs": 13.1,
+    "outcome": "bad_request"
    },
    "source": "engine/lifesim-d5f.32-20261023-001538.jsonl:24",
    "evidence": {
@@ -5003,9 +4786,8 @@
     "role": "planner",
     "lane": "CLAUDE_SUBSCRIPTION",
     "model": "opus-5.5",
-    "status": "done",
-    "reason": null,
-    "secs": 79.1
+    "secs": 79.1,
+    "done": true
    },
    "source": "history.jsonl",
    "evidence": {
@@ -5026,9 +4808,8 @@
     "role": "planner",
     "lane": "CLAUDE_SUBSCRIPTION",
     "model": "opus-5.5",
-    "status": "done",
-    "reason": null,
-    "secs": 22.9
+    "secs": 22.9,
+    "done": true
    },
    "source": "history.jsonl",
    "evidence": {
@@ -5049,9 +4830,8 @@
     "role": "worker",
     "lane": "OPENAI_SUBSCRIPTION",
     "model": "gpt-6.1-sol",
-    "status": "error",
-    "reason": "bad_request",
-    "secs": 30.2
+    "secs": 30.2,
+    "outcome": "bad_request"
    },
    "source": "engine/lifesim-w5ni-20261023-001701.jsonl:25",
    "evidence": {
@@ -5072,9 +4852,8 @@
     "role": "planner",
     "lane": "CLAUDE_SUBSCRIPTION",
     "model": "opus-5.5",
-    "status": "done",
-    "reason": null,
-    "secs": 72.8
+    "secs": 72.8,
+    "done": true
    },
    "source": "history.jsonl",
    "evidence": {
@@ -5095,9 +4874,8 @@
     "role": "worker",
     "lane": "OPENAI_SUBSCRIPTION",
     "model": "gpt-6.1-sol",
-    "status": "error",
-    "reason": "bad_request",
-    "secs": 9.1
+    "secs": 9.1,
+    "outcome": "bad_request"
    },
    "source": "engine/lifesim-h1fw-20261023-001837.jsonl:17",
    "evidence": {
@@ -5118,9 +4896,8 @@
     "role": "planner",
     "lane": "CLAUDE_SUBSCRIPTION",
     "model": "opus-5.5",
-    "status": "done",
-    "reason": null,
-    "secs": 36.6
+    "secs": 36.6,
+    "done": true
    },
    "source": "history.jsonl",
    "evidence": {
@@ -5141,9 +4918,8 @@
     "role": "worker",
     "lane": "OPENAI_SUBSCRIPTION",
     "model": "gpt-6.1-sol",
-    "status": "error",
-    "reason": "bad_request",
-    "secs": 10.7
+    "secs": 10.7,
+    "outcome": "bad_request"
    },
    "source": "engine/lifesim-kh1s-20261023-002013.jsonl:17",
    "evidence": {
@@ -5164,9 +4940,8 @@
     "role": "planner",
     "lane": "CLAUDE_SUBSCRIPTION",
     "model": "opus-5.5",
-    "status": "done",
-    "reason": null,
-    "secs": 113.1
+    "secs": 113.1,
+    "done": true
    },
    "source": "history.jsonl",
    "evidence": {
@@ -5187,9 +4962,8 @@
     "role": "worker",
     "lane": "OPENAI_SUBSCRIPTION",
     "model": "gpt-6.1-sol",
-    "status": "error",
-    "reason": "bad_request",
-    "secs": 7.1
+    "secs": 7.1,
+    "outcome": "bad_request"
    },
    "source": "engine/lifesim-xea5-20261023-002049.jsonl:17",
    "evidence": {
@@ -5210,9 +4984,8 @@
     "role": "worker",
     "lane": "OPENAI_SUBSCRIPTION",
     "model": "gpt-6.1-sol",
-    "status": "done",
-    "reason": null,
-    "secs": 53.2
+    "secs": 53.2,
+    "done": true
    },
    "source": "history.jsonl",
    "evidence": {
@@ -5233,9 +5006,8 @@
     "role": "reviewer",
     "lane": "CLAUDE_SUBSCRIPTION",
     "model": "sonnet-5.5",
-    "status": "done",
-    "reason": null,
-    "secs": 9.1
+    "secs": 9.1,
+    "done": true
    },
    "source": "history.jsonl",
    "evidence": {
@@ -5256,9 +5028,8 @@
     "role": "worker",
     "lane": "OPENAI_SUBSCRIPTION",
     "model": "gpt-6.1-sol",
-    "status": "done",
-    "reason": null,
-    "secs": 81.0
+    "secs": 81.0,
+    "done": true
    },
    "source": "history.jsonl",
    "evidence": {
@@ -5279,9 +5050,8 @@
     "role": "worker",
     "lane": "OPENAI_SUBSCRIPTION",
     "model": "gpt-6.1-sol",
-    "status": "done",
-    "reason": null,
-    "secs": 147.0
+    "secs": 147.0,
+    "done": true
    },
    "source": "history.jsonl",
    "evidence": {
@@ -5302,9 +5072,8 @@
     "role": "worker",
     "lane": "OPENAI_SUBSCRIPTION",
     "model": "gpt-6.1-sol",
-    "status": "done",
-    "reason": null,
-    "secs": 218.1
+    "secs": 218.1,
+    "done": true
    },
    "source": "history.jsonl",
    "evidence": {
@@ -5325,9 +5094,8 @@
     "role": "reviewer",
     "lane": "CLAUDE_SUBSCRIPTION",
     "model": "sonnet-5.5",
-    "status": "done",
-    "reason": null,
-    "secs": 20.0
+    "secs": 20.0,
+    "done": true
    },
    "source": "history.jsonl",
    "evidence": {
@@ -5348,9 +5116,8 @@
     "role": "worker",
     "lane": "OPENAI_SUBSCRIPTION",
     "model": "gpt-6.1-sol",
-    "status": "done",
-    "reason": null,
-    "secs": 186.2
+    "secs": 186.2,
+    "done": true
    },
    "source": "history.jsonl",
    "evidence": {
@@ -5371,9 +5138,8 @@
     "role": "reviewer",
     "lane": "CLAUDE_SUBSCRIPTION",
     "model": "sonnet-5.5",
-    "status": "done",
-    "reason": null,
-    "secs": 17.5
+    "secs": 17.5,
+    "done": true
    },
    "source": "history.jsonl",
    "evidence": {
@@ -5394,9 +5160,8 @@
     "role": "worker",
     "lane": "OPENAI_SUBSCRIPTION",
     "model": "gpt-6.1-sol",
-    "status": "done",
-    "reason": null,
-    "secs": 57.3
+    "secs": 57.3,
+    "done": true
    },
    "source": "history.jsonl",
    "evidence": {
@@ -5417,9 +5182,8 @@
     "role": "worker",
     "lane": "OPENAI_SUBSCRIPTION",
     "model": "gpt-6.1-sol",
-    "status": "done",
-    "reason": null,
-    "secs": 31.6
+    "secs": 31.6,
+    "done": true
    },
    "source": "history.jsonl",
    "evidence": {
@@ -5440,9 +5204,8 @@
     "role": "reviewer",
     "lane": "CLAUDE_SUBSCRIPTION",
     "model": "sonnet-5.5",
-    "status": "done",
-    "reason": null,
-    "secs": 19.9
+    "secs": 19.9,
+    "done": true
    },
    "source": "history.jsonl",
    "evidence": {
@@ -5463,9 +5226,8 @@
     "role": "planner",
     "lane": "CLAUDE_SUBSCRIPTION",
     "model": "opus-5.5",
-    "status": "done",
-    "reason": null,
-    "secs": 38.9
+    "secs": 38.9,
+    "done": true
    },
    "source": "history.jsonl",
    "evidence": {
@@ -5486,9 +5248,8 @@
     "role": "worker",
     "lane": "OPENAI_SUBSCRIPTION",
     "model": "gpt-6.1-sol",
-    "status": "done",
-    "reason": null,
-    "secs": 272.4
+    "secs": 272.4,
+    "done": true
    },
    "source": "history.jsonl",
    "evidence": {
@@ -5509,9 +5270,8 @@
     "role": "worker",
     "lane": "OPENAI_SUBSCRIPTION",
     "model": "gpt-6.1-sol",
-    "status": "done",
-    "reason": null,
-    "secs": 273.0
+    "secs": 273.0,
+    "done": true
    },
    "source": "history.jsonl",
    "evidence": {
@@ -5532,9 +5292,8 @@
     "role": "reviewer",
     "lane": "CLAUDE_SUBSCRIPTION",
     "model": "sonnet-5.5",
-    "status": "done",
-    "reason": null,
-    "secs": 17.2
+    "secs": 17.2,
+    "done": true
    },
    "source": "history.jsonl",
    "evidence": {
@@ -5555,9 +5314,8 @@
     "role": "reviewer",
     "lane": "CLAUDE_SUBSCRIPTION",
     "model": "sonnet-5.5",
-    "status": "done",
-    "reason": null,
-    "secs": 16.4
+    "secs": 16.4,
+    "done": true
    },
    "source": "history.jsonl",
    "evidence": {
@@ -5578,9 +5336,8 @@
     "role": "worker",
     "lane": "OPENAI_SUBSCRIPTION",
     "model": "gpt-6.1-sol",
-    "status": "done",
-    "reason": null,
-    "secs": 85.7
+    "secs": 85.7,
+    "done": true
    },
    "source": "history.jsonl",
    "evidence": {
@@ -5601,9 +5358,8 @@
     "role": "worker",
     "lane": "OPENAI_SUBSCRIPTION",
     "model": "gpt-6.1-sol",
-    "status": "done",
-    "reason": null,
-    "secs": 49.7
+    "secs": 49.7,
+    "done": true
    },
    "source": "history.jsonl",
    "evidence": {
@@ -5624,9 +5380,8 @@
     "role": "worker",
     "lane": "OPENAI_SUBSCRIPTION",
     "model": "gpt-6.1-sol",
-    "status": "done",
-    "reason": null,
-    "secs": 34.4
+    "secs": 34.4,
+    "done": true
    },
    "source": "history.jsonl",
    "evidence": {
@@ -5647,9 +5402,8 @@
     "role": "worker",
     "lane": "OPENAI_SUBSCRIPTION",
     "model": "gpt-6.1-sol",
-    "status": "done",
-    "reason": null,
-    "secs": 74.2
+    "secs": 74.2,
+    "done": true
    },
    "source": "history.jsonl",
    "evidence": {
@@ -5670,9 +5424,8 @@
     "role": "worker",
     "lane": "OPENAI_SUBSCRIPTION",
     "model": "gpt-6.1-sol",
-    "status": "done",
-    "reason": null,
-    "secs": 25.7
+    "secs": 25.7,
+    "done": true
    },
    "source": "history.jsonl",
    "evidence": {
@@ -5693,9 +5446,8 @@
     "role": "worker",
     "lane": "OPENAI_SUBSCRIPTION",
     "model": "gpt-6.1-sol",
-    "status": "done",
-    "reason": null,
-    "secs": 52.5
+    "secs": 52.5,
+    "done": true
    },
    "source": "history.jsonl",
    "evidence": {
@@ -5716,9 +5468,8 @@
     "role": "reviewer",
     "lane": "CLAUDE_SUBSCRIPTION",
     "model": "sonnet-5.5",
-    "status": "done",
-    "reason": null,
-    "secs": 14.6
+    "secs": 14.6,
+    "done": true
    },
    "source": "history.jsonl",
    "evidence": {
@@ -5739,9 +5490,8 @@
     "role": "worker",
     "lane": "OPENAI_SUBSCRIPTION",
     "model": "gpt-6.1-sol",
-    "status": "done",
-    "reason": null,
-    "secs": 53.7
+    "secs": 53.7,
+    "done": true
    },
    "source": "history.jsonl",
    "evidence": {
@@ -5762,9 +5512,8 @@
     "role": "reviewer",
     "lane": "CLAUDE_SUBSCRIPTION",
     "model": "sonnet-5.5",
-    "status": "done",
-    "reason": null,
-    "secs": 15.3
+    "secs": 15.3,
+    "done": true
    },
    "source": "history.jsonl",
    "evidence": {
@@ -5785,9 +5534,8 @@
     "role": "worker",
     "lane": "OPENAI_SUBSCRIPTION",
     "model": "gpt-6.1-sol",
-    "status": "done",
-    "reason": null,
-    "secs": 27.1
+    "secs": 27.1,
+    "done": true
    },
    "source": "history.jsonl",
    "evidence": {
@@ -5808,9 +5556,8 @@
     "role": "worker",
     "lane": "OPENAI_SUBSCRIPTION",
     "model": "gpt-6.1-sol",
-    "status": "done",
-    "reason": null,
-    "secs": 77.4
+    "secs": 77.4,
+    "done": true
    },
    "source": "history.jsonl",
    "evidence": {
@@ -5831,9 +5578,8 @@
     "role": "reviewer",
     "lane": "CLAUDE_SUBSCRIPTION",
     "model": "sonnet-5.5",
-    "status": "done",
-    "reason": null,
-    "secs": 17.7
+    "secs": 17.7,
+    "done": true
    },
    "source": "history.jsonl",
    "evidence": {
@@ -5854,9 +5600,8 @@
     "role": "worker",
     "lane": "OPENAI_SUBSCRIPTION",
     "model": "gpt-6.1-sol",
-    "status": "done",
-    "reason": null,
-    "secs": 34.9
+    "secs": 34.9,
+    "done": true
    },
    "source": "history.jsonl",
    "evidence": {
@@ -5877,9 +5622,8 @@
     "role": "worker",
     "lane": "OPENAI_SUBSCRIPTION",
     "model": "gpt-6.1-sol",
-    "status": "done",
-    "reason": null,
-    "secs": 94.0
+    "secs": 94.0,
+    "done": true
    },
    "source": "history.jsonl",
    "evidence": {
@@ -5900,9 +5644,8 @@
     "role": "reviewer",
     "lane": "CLAUDE_SUBSCRIPTION",
     "model": "sonnet-5.5",
-    "status": "done",
-    "reason": null,
-    "secs": 20.9
+    "secs": 20.9,
+    "done": true
    },
    "source": "history.jsonl",
    "evidence": {
@@ -5923,9 +5666,8 @@
     "role": "planner",
     "lane": "CLAUDE_SUBSCRIPTION",
     "model": "opus-5.5",
-    "status": "done",
-    "reason": null,
-    "secs": 37.2
+    "secs": 37.2,
+    "done": true
    },
    "source": "history.jsonl",
    "evidence": {
@@ -5946,9 +5688,8 @@
     "role": "planner",
     "lane": "CLAUDE_SUBSCRIPTION",
     "model": "opus-5.5",
-    "status": "done",
-    "reason": null,
-    "secs": 46.5
+    "secs": 46.5,
+    "done": true
    },
    "source": "history.jsonl",
    "evidence": {
@@ -5969,9 +5710,8 @@
     "role": "worker",
     "lane": "OPENAI_SUBSCRIPTION",
     "model": "gpt-6.1-sol",
-    "status": "done",
-    "reason": null,
-    "secs": 35.7
+    "secs": 35.7,
+    "done": true
    },
    "source": "history.jsonl",
    "evidence": {
@@ -5992,9 +5732,8 @@
     "role": "reviewer",
     "lane": "CLAUDE_SUBSCRIPTION",
     "model": "sonnet-5.5",
-    "status": "done",
-    "reason": null,
-    "secs": 16.6
+    "secs": 16.6,
+    "done": true
    },
    "source": "history.jsonl",
    "evidence": {
@@ -6015,9 +5754,8 @@
     "role": "worker",
     "lane": "OPENAI_SUBSCRIPTION",
     "model": "gpt-6.1-sol",
-    "status": "done",
-    "reason": null,
-    "secs": 178.6
+    "secs": 178.6,
+    "done": true
    },
    "source": "history.jsonl",
    "evidence": {
@@ -6038,9 +5776,8 @@
     "role": "reviewer",
     "lane": "CLAUDE_SUBSCRIPTION",
     "model": "sonnet-5.5",
-    "status": "done",
-    "reason": null,
-    "secs": 12.2
+    "secs": 12.2,
+    "done": true
    },
    "source": "history.jsonl",
    "evidence": {
@@ -6061,9 +5798,8 @@
     "role": "reviewer",
     "lane": "CLAUDE_SUBSCRIPTION",
     "model": "sonnet-5.5",
-    "status": "done",
-    "reason": null,
-    "secs": 7.3
+    "secs": 7.3,
+    "done": true
    },
    "source": "history.jsonl",
    "evidence": {
@@ -6084,9 +5820,8 @@
     "role": "worker",
     "lane": "OPENAI_SUBSCRIPTION",
     "model": "gpt-6.1-sol",
-    "status": "done",
-    "reason": null,
-    "secs": 28.5
+    "secs": 28.5,
+    "done": true
    },
    "source": "history.jsonl",
    "evidence": {
@@ -6107,9 +5842,8 @@
     "role": "worker",
     "lane": "OPENAI_SUBSCRIPTION",
     "model": "gpt-6.1-sol",
-    "status": "done",
-    "reason": null,
-    "secs": 35.6
+    "secs": 35.6,
+    "done": true
    },
    "source": "history.jsonl",
    "evidence": {
@@ -6130,9 +5864,8 @@
     "role": "worker",
     "lane": "OPENAI_SUBSCRIPTION",
     "model": "gpt-6.1-sol",
-    "status": "done",
-    "reason": null,
-    "secs": 122.4
+    "secs": 122.4,
+    "done": true
    },
    "source": "history.jsonl",
    "evidence": {
@@ -6153,9 +5886,8 @@
     "role": "worker",
     "lane": "OPENAI_SUBSCRIPTION",
     "model": "gpt-6.1-sol",
-    "status": "done",
-    "reason": null,
-    "secs": 37.5
+    "secs": 37.5,
+    "done": true
    },
    "source": "history.jsonl",
    "evidence": {

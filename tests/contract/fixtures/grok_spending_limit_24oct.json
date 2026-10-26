@@ -5,11 +5,6 @@
  "lane": "GROK_SUBSCRIPTION",
  "real": "vendor text real (engine warn lines, cut at 160 chars)",
  "expected_reason": "credit_exhausted",
- "expected_wire": {
-  "status": "lane_out",
-  "reason": "lane_out",
-  "next": "owner"
- },
  "benches_pair": true,
  "rows": [
   {
@@ -1722,5 +1717,11 @@
     "structured": {}
    }
   }
- ]
+ ],
+ "expected_stop": {
+  "reason": "credit_exhausted",
+  "scope": "lane",
+  "permanence": "needs_owner",
+  "retry_kind": "none"
+ }
 }

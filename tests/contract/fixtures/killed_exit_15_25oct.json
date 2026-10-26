@@ -5,11 +5,6 @@
  "lane": "DEEPSEEK_FREE",
  "real": "rc and the empty error are real (engine text 'opencode exited -15 without an error:')",
  "expected_reason": "killed",
- "expected_wire": {
-  "status": "stop",
-  "reason": "vendor_prework",
-  "next": "retry"
- },
  "rows": [
   {
    "id": "lifesim-d5f.39-20261025-014458.jsonl:527",
@@ -326,5 +321,11 @@
     "structured": {}
    }
   }
- ]
+ ],
+ "expected_stop": {
+  "reason": "killed",
+  "scope": "machine",
+  "permanence": "transient",
+  "retry_kind": "none"
+ }
 }

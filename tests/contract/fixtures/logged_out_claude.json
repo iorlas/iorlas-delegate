@@ -5,11 +5,6 @@
  "lane": "CLAUDE_SUBSCRIPTION",
  "real": "text real (engine copy of delegate's say); the channel (stderr) follows the fake claude of tests/test_route.py",
  "expected_reason": "logged_out",
- "expected_wire": {
-  "status": "lane_out",
-  "reason": "logged_out",
-  "next": "retry"
- },
  "rows": [
   {
    "id": "lifesim-rl2t-20261019-082300.jsonl:10",
@@ -101,5 +96,11 @@
     "structured": {}
    }
   }
- ]
+ ],
+ "expected_stop": {
+  "reason": "logged_out",
+  "scope": "lane",
+  "permanence": "needs_owner",
+  "retry_kind": "none"
+ }
 }

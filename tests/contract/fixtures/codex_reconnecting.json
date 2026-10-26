@@ -5,11 +5,6 @@
  "lane": "OPENAI_SUBSCRIPTION",
  "real": "text real; exit code assumed 1 and work_seen true (the old answer was worker_failed, not vendor_prework)",
  "expected_reason": "worker_failed",
- "expected_wire": {
-  "status": "failed",
-  "reason": "worker_failed",
-  "next": "fail"
- },
  "rows": [
   {
    "id": "lifesim-fld.27.12-20261024-062234.jsonl:220",
@@ -86,5 +81,11 @@
     "structured": {}
    }
   }
- ]
+ ],
+ "expected_stop": {
+  "reason": "worker_failed",
+  "scope": "bead",
+  "permanence": "transient",
+  "retry_kind": "none"
+ }
 }

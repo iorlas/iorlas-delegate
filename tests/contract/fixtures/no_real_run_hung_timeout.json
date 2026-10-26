@@ -18,9 +18,11 @@
      "watchdog": "hung"
     }
    },
-   "wire": {
-    "status": "lane_out",
-    "reason": "hung"
+   "expected_stop": {
+    "reason": "hung",
+    "scope": "model",
+    "permanence": "transient",
+    "retry_kind": "predicted"
    }
   },
   {
@@ -36,9 +38,11 @@
     "work_seen": false,
     "structured": {}
    },
-   "wire": {
-    "status": "timeout",
-    "reason": "timeout"
+   "expected_stop": {
+    "reason": "timeout",
+    "scope": "bead",
+    "permanence": "transient",
+    "retry_kind": "none"
    }
   }
  ]
