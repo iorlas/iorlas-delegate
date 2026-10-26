@@ -9,6 +9,7 @@ The model supplies only what the script cannot read itself; the script decides.
                      [--claude-usage JSON|@file|-] [--cwd DIR] [--verbose]
   route.py run ROLE [--cwd DIR] [--brief FILE] [--schema FILE] [--resume REF] [--cap USD] [--timeout SEC] [--unattended] [--host] [--authored-by W] [--failed I,J] [--premium] [--allow-degraded]
                     [--claude-usage JSON] [--parent SESSION] [--task ID] [--title T]    brief on stdin; one JSON object on stdout, exit 0 (see docs/dev/integrations.md)
+  route.py net [--lane L] [--host H ...]    is the machine online? stdlib sockets, no quota, answers in under 3 s: {up, why, hosts}
   route.py report --lane LANE --event out|ok [--until EPOCH|ISO] [--message TEXT]
   route.py capture-limits [--print]  (status line JSON on stdin)
   route.py doctor [--lane L] [--next] [--fix ID] [--decline L] [--undecline L] [--ack ID] [--deep] [--json] [--quiet]   the one setup command: what each lane needs, and how to act on it
@@ -49,6 +50,8 @@ HERE = Path(__file__).resolve().parent
 if str(HERE) not in sys.path:
     sys.path.insert(0, str(HERE))
 from lanes import classify, health, supervisor      # the one outcome ladder (delegate-e05); the health fold and breaker (rdt, a9x); the idle watchdog (go0)
+from lanes import netprobe, profiles                # network facts (4n7); the lane adapter registry (dlz)
+from lanes import cockpit as role_view              # roles{} for status (0sf)
 WEEK_MIN = 7 * 24 * 60
 
 
@@ -1566,7 +1569,42 @@ def status_payload(cfg, lanes, ck, st, t, recent):
             "routing": routing_snapshot(cfg, lanes, st, t),
             "recent": recent_runs(recent),
             "needs_input": needs_input(lanes), "holds": hold_rows(cfg, st, t), "asks": settle_holds(lanes, st, t)[0],
-            "health": health_rows(cfg, lanes, st, t)}
+            "health": health_rows(cfg, lanes, st, t), **roles_payload(cfg, lanes, st, t)}
+
+
+def net_cache_path():
+    return config_dir() / "net.json"
+
+
+def roles_payload(cfg, lanes, st, t):
+    """roles{} (usable and net per role) and network{} for status --json; the probe is read from its cache, never run here."""
+    cached = netprobe.load(str(net_cache_path()))
+    return {"roles": role_view.roles_view(cfg, lanes, st, t, decide, cached), "network": network_view(cached, t)}
+
+
+def network_view(cached, t):
+    return dict(netprobe.view(cached, [], t), why=(cached or {}).get("why"))
+
+
+def net_probe(hosts=None):
+    """-> one probe (lanes/netprobe.py), stored in the net cache. Sockets only: no process, no vendor call, no quota."""
+    res = netprobe.probe(hosts)
+    netprobe.record(str(net_cache_path()), res)
+    return res
+
+
+def net_up(lane=None):
+    """True when `lane`'s vendor hosts (else all of them) are reachable now. The one question the outcome ladder asks when a failure names no cause."""
+    return bool(net_probe(list(profiles.hosts_of(lane)) or None)["up"])
+
+
+def cmd_net(a):
+    """route.py net: the probe, as one JSON object. Exit 0 whenever it printed."""
+    hosts = list(a.host or []) or list(profiles.hosts_of(a.lane)) or list(profiles.all_hosts()) + list(netprobe.NEUTRAL)
+    res = net_probe(hosts)
+    cached = netprobe.load(str(net_cache_path())) or {}
+    print(json.dumps({"v": 1, "up": res["up"], "ip_up": res["ip_up"], "why": res["why"], "ms": res["ms"], "hosts": res["hosts"], "at": res["at"], "since": cached.get("since")}))
+    return 0
 
 
 def health_rows(cfg, lanes, st, t):
@@ -1618,6 +1656,8 @@ def cmd_status_cheap(a, cfg):
     out.update(v=1, cheap=True, ts=t, age_s=int(t - at) if isinstance(at, (int, float)) else None, running=running_rows(st, t), holds=hold_rows(cfg, st, t),
                auth={n: {"ok": c.get("ok"), "why": c.get("why"), "age_s": int(t - c.get("at", 0))} for n, c in read_auth_cache().items() if isinstance(c, dict)})
     out.setdefault("lanes", {})
+    cached = netprobe.load(str(net_cache_path()))       # a file, not a socket: cheap opens no connection
+    out.update(roles=role_view.refresh(snap.get("roles"), out["holds"], cached, t), network=network_view(cached, t))
     print(json.dumps(out) if a.json else "\n".join(f"{n}: {c['ok']} ({c['age_s']}s old)" for n, c in out["auth"].items()) + f"\nrunning: {len(out['running'])}  snapshot age: {out['age_s']}s")
     return 0
 
@@ -2198,7 +2238,15 @@ def child_env(extra=None):
 
 
 WORKER_TICK = []           # the idle watchdog's touch(): run_proc calls it for every line the worker prints (launchers set it before run_proc)
+REF_SEEN = []              # callbacks run with the vendor session id the moment the vendor reveals it (run_once registers one per run)
 WORKER_STARTED = []        # callbacks run with the worker's pid right after it starts (run_once registers one per run)
+
+
+def note_ref(ref):
+    """The vendor named its session: tell run_once now (it stores the ref and prints it), not when the call ends, so a killed route.py still leaves the ref."""
+    for cb in REF_SEEN:
+        with contextlib.suppress(Exception):
+            cb(ref)
 
 
 def run_proc(cmd, text, cwd, env, timeout, on_line=None, poll=None):
@@ -2458,12 +2506,28 @@ def codex_thread_total(thread):
 CREDIT_PROBE = 6 * 3600      # a lane out of credits with no stated end is looked at again after this long
 
 
+NET_AMBIGUOUS = ("worker_failed", "vendor_blip", "hung")     # failures that name no cause of their own: the network may be it
+
+
+def net_pass(o, d):
+    """-> `o`, or the network outcome when it was the network (A2.5). classify.py trusts network words only before the worker did anything, and a
+    silent hang is only a network drop if the net is down: so a failure with no cause of its own is checked against the words of a dropped
+    connection and then against one probe (<= 3 s, sockets only). Limits, logins, bad requests, secrets and timeouts are never second-guessed."""
+    if o.reason in NET_AMBIGUOUS and (netprobe.looks_dropped(o.detail) or not net_up(d["lane"])):
+        return classify.Outcome("network", o.detail, o.source)
+    return o
+
+
 def settle(res, o, d, t, who, a, rc=None, tail="", reset=None, credit_until=None, login=None):
     """Apply a classified outcome (lanes/classify.py) to the answer and, for a lane-scoped reason, to the lane's state. The one place all three
     launchers end in. `reset` -> default end of a limit when the message names no time; `credit_until` -> the end of a credit cycle, when known;
     `login` -> (hint stored with the lane, text of the answer with {why})."""
+    o = net_pass(o, d)
     r, why, lane = o.reason, o.detail.strip(), d["lane"]
     soon = lambda: now() + random.randint(60, 120)
+    answered = res.pop("answered", False)
+    if r != "hung":
+        res.pop("hung_words", None), res.pop("hung_kind", None)
     res["outcome"] = r
     res["detail"] = why[:240]           # run_once moves it into history.jsonl (`say`); it never reaches the wire
     if r == "secrets":
@@ -2495,8 +2559,12 @@ def settle(res, o, d, t, who, a, rc=None, tail="", reset=None, credit_until=None
         res.update(status="lane_out", reason="logged_out", retry_after=now() + 60, say=say.format(why=why[-200:].strip()))
     elif r == "bad_request":
         res.update(status="error", reason="bad_request", say=f"{who} rejected the request: {why[:300]}")
-    elif r == "network":
-        res.update(status="stop", reason="network", retry_after=soon(), say=f"{who} could not reach its service: {why[-200:].strip()}")
+    elif r == "network" and answered:         # the final answer was captured before the connection dropped (ae6v): the work is done, say so
+        update_state(lambda s: s.setdefault("out", {}).pop(lane, None))
+        res.update(status="done", outcome=None, data=parse_data(res.get("text") or "", a.schema), warnings=["net_after_answer"], detail="")
+    elif r == "network":      # not a lane fault: nothing is marked out, the pair is not counted, and the caller decides when to resume (`resumable`, `ref`)
+        res.update(status="stop", reason="network", retry_after=soon(), resumable=bool(res.get("ref") and res.get("started")), partial=bool(res.get("partial")),
+                   say=f"{who} could not reach its service: {why[-200:].strip()}")
     elif r == "killed":
         res.update(status="stop", reason="vendor_prework", retry_after=soon(), say=f"{who} was ended by a signal it did not get from route.py ({why}); retry")
     elif r == "vendor_blip":
@@ -2540,7 +2608,9 @@ def launch_codex(d, brief, a, rid, t, meta):
         cmd += (["--output-schema", a.schema] if a.schema else []) + [a.resume, "-"]
     else:
         cmd = [exe] + h["cli"][1:] + ["--json", "-o", str(out_file)] + (["--output-schema", a.schema] if a.schema else []) + ["-"]
-    seen = {"ref": a.resume, "last": "", "tokens": None, "denied": [], "error": "", "transient": "", "work": False, "turns": 0}
+    seen = {"ref": a.resume, "last": "", "tokens": None, "denied": [], "error": "", "transient": "", "work": False, "turns": 0, "net_at": None, "net": False}
+    if a.resume:
+        note_ref(a.resume)
 
     def on_line(line):
         try:
@@ -2551,15 +2621,21 @@ def launch_codex(d, brief, a, rid, t, meta):
             return
         if ev.get("type") == "thread.started" and ev.get("thread_id"):
             seen["ref"] = ev["thread_id"]
+            note_ref(seen["ref"])
             if agent_runs:
                 agent_runs.run(rid, thread=seen["ref"])
+        if ev.get("type", "").startswith(("item.", "turn.")) and ev.get("type") != "turn.failed":
+            seen["net_at"] = None           # the stream moves again: the wait for the network is over
         if ev.get("type") == "turn.completed" and isinstance(ev.get("usage"), dict):
             u = ev["usage"]
             seen["tokens"] = {"in": u.get("input_tokens"), "cached": u.get("cached_input_tokens"), "out": u.get("output_tokens")}
             seen["turns"] += 1
         if ev.get("type") in ("turn.failed", "error"):      # codex's own reason; stderr then holds only transport noise
             msg = str((ev.get("error") or {}).get("message") if ev.get("type") == "turn.failed" else ev.get("message") or "")
-            seen["transient" if classify.transient(msg) else "error"] = msg        # "Reconnecting... 2/5" is progress, not a failure
+            wait = netprobe.waiting(msg)
+            seen["transient" if classify.transient(msg) or wait else "error"] = msg        # "Reconnecting... 2/5" and "...waiting for network" are progress, not a failure
+            if wait:
+                seen["net_at"] = time.monotonic()
         item = ev.get("item") or {}
         if ev.get("type") == "item.completed" and item.get("type") in ("command_execution", "file_change", "agent_message", "mcp_tool_call"):
             seen["work"] = True
@@ -2575,13 +2651,26 @@ def launch_codex(d, brief, a, rid, t, meta):
         agent_runs.run(rid, kind="codex", lane=d["lane"], model=d["model"], cwd=h["cwd"], started=t, status="running", **meta)
     started = time.time()       # wall clock, not now(): it is compared with file times
     before = codex_thread_total(a.resume) if a.resume else None
-    poll, tick, dog = worker_watch("codex", d["lane"])
+    poll0, tick, dog = worker_watch("codex", d["lane"])
     WORKER_TICK[:] = [tick]
+
+    def poll():
+        """Codex waits for the network by itself, for as long as it takes. Past NET_GRACE_S of that, one probe: still offline -> stop it now and hand the
+        wait to the caller (the thread resumes), instead of holding the slot for the whole silence limit."""
+        if poll0():
+            return True
+        if seen["net_at"] is not None and time.monotonic() - seen["net_at"] >= NET_GRACE_S:
+            seen["net_at"] = None
+            if not net_up(d["lane"]):
+                seen["net"] = True
+                return True
+        return False
     rc, out, err, timed_out = run_proc(cmd, " ".join((SECRET_RULE, GIT_RULES, EDIT_RULE, NO_SUBAGENTS_RULE, ESCALATE_RULE, DENIED_RULE)) + "\n\n" + brief, h["cwd"], child_env(), a.timeout, on_line, poll)
     text = ""
     with contextlib.suppress(OSError):
         text = out_file.read_text(encoding="utf-8", errors="replace").strip()
         out_file.unlink()
+    final = bool(text) or bool(seen["turns"] and seen["last"])        # the turn finished: codex writes -o only at its end
     text = text or seen["last"]
     if before and seen["tokens"] and (seen["tokens"].get("in") or 0) >= before["in"]:      # a running total: keep this run's part
         seen["tokens"] = {k: max(0, (seen["tokens"].get(k) or 0) - before[k]) for k in before}
@@ -2591,8 +2680,10 @@ def launch_codex(d, brief, a, rid, t, meta):
             base = seen["tokens"] or {"in": 0, "cached": 0, "out": 0}
             seen["tokens"] = {k: (base.get(k) or 0) + extra[k] for k in extra}
     res = {"text": text, "ref": seen["ref"], "stderr": err, "tokens": seen["tokens"], "denied": seen["denied"], "turns": seen["turns"] or None,
-           "context_k": codex_context_k(seen["ref"])}
+           "context_k": codex_context_k(seen["ref"]), "started": bool(seen["ref"]), "partial": seen["work"], "answered": final}
     o = classify.classify(rc, seen["error"] or (seen["transient"] if rc != 0 else ""), err, timed_out, seen["work"], dict(watch_fields(res, dog), secret=seen.get("secret")))
+    if seen["net"] and (o is None or o.reason == "killed"):       # we stopped it because the network is down
+        o = classify.Outcome("network", seen["transient"], "event")
     if o:       # codex's error or stderr, never the model's answer
         settle(res, o, d, t, "codex", a, rc, err or text, reset=lambda: codex_reset_now(t),
                login=("logged out: run `codex login`", f"codex is not logged in: {{why}} (route.py doctor --lane {d['lane']})"))
@@ -2664,6 +2755,9 @@ def lane_gone_poll(lane, since):
             return True
         return False
     return poll, state
+
+
+NET_GRACE_S = 15        # how long a worker may say "waiting for network" before one probe decides whether to stop it
 
 
 def worker_watch(cli, lane, extra=None):
@@ -2804,6 +2898,8 @@ def launch_opencode(d, brief, a, rid, t, meta):
     if a.schema:
         rules += "\n\nYour final message must be only a JSON object matching this JSON Schema:\n" + Path(a.schema).read_text(encoding="utf-8")
     seen = {"ref": a.resume, "last": "", "tokens": None, "denied": [], "error": "", "work": False, "turns": 0, "ctx": None}
+    if a.resume:
+        note_ref(a.resume)
 
     poll, tick, dog = worker_watch("opencode", d["lane"], opencode_log_poll())
     WORKER_TICK[:] = [tick]
@@ -2817,6 +2913,9 @@ def launch_opencode(d, brief, a, rid, t, meta):
             return None
         if ev.get("sessionID") and not seen["ref"]:
             seen["ref"] = ev["sessionID"]
+            note_ref(seen["ref"])
+            if agent_runs:
+                agent_runs.run(rid, session=seen["ref"])
         p = ev.get("part") or {}
         if ev.get("type") == "step_finish" and isinstance(p.get("tokens"), dict):
             u, c = p["tokens"], p["tokens"].get("cache") or {}
@@ -2858,7 +2957,8 @@ def launch_opencode(d, brief, a, rid, t, meta):
                 f.write_text(x.stdout, encoding="utf-8")
                 private(f)
     text = seen["last"].strip()
-    res = {"text": text, "ref": seen["ref"], "stderr": err, "tokens": seen["tokens"], "denied": seen["denied"], "turns": seen["turns"] or None, "context_k": seen["ctx"]}
+    res = {"text": text, "ref": seen["ref"], "stderr": err, "tokens": seen["tokens"], "denied": seen["denied"], "turns": seen["turns"] or None, "context_k": seen["ctx"],
+           "started": bool(seen["ref"]), "partial": seen["work"]}       # no `answered`: opencode has no resume-tested finished-answer signal (62-spikes-resume.md)
     why = seen["error"] or (err if rc != 0 else "")
     o = classify.classify(rc, why, "", timed_out, seen["work"], dict(watch_fields(res, dog), secret=seen.get("secret")))
     if o:       # opencode's error event, stderr or log, never the model's answer
@@ -2916,13 +3016,16 @@ def launch_claude(d, brief, a, rid, t, cfg, meta):
     if a.schema:
         cmd += ["--json-schema", Path(a.schema).read_text(encoding="utf-8")]
     ref = a.resume or rid
+    note_ref(ref)               # claude takes the session id from us (--session-id): known before the first event
     if agent_runs:
         agent_runs.run(rid, kind="claude-p", session=ref, lane=d["lane"], model=d["model"], cwd=h["cwd"], started=t, status="running", **meta)
-    final, ctx = [], []
+    final, ctx, begun = [], [], []
 
     def on_line(line):      # the first result is the answer: claude -p then waits for background tasks and takes another turn on their exit
         with contextlib.suppress(ValueError):
             e = json.loads(line)
+            if isinstance(e, dict) and e.get("type") in ("assistant", "user", "result"):
+                begun[:] = [True]           # the session exists on disk from its first message
             if isinstance(e, dict) and e.get("type") == "result" and not final:
                 final.append(e)
                 return RESULT_GRACE
@@ -2944,7 +3047,7 @@ def launch_claude(d, brief, a, rid, t, cfg, meta):
     res = {"text": text, "ref": j.get("session_id") or ref, "cost": cost, "stderr": err, "tokens": claude_tokens(u),
            "denied": [{"tool": x.get("tool_name"), "input": x.get("tool_input")} for x in j.get("permission_denials") or []
                       if isinstance(x, dict) and not policy_denial(x, h.get("read_only"))]}
-    res.update(turns=j.get("num_turns"), context_k=ctx[0] if ctx else None)
+    res.update(turns=j.get("num_turns"), context_k=ctx[0] if ctx else None, started=bool(begun), partial=bool(begun))
     failed = rc != 0 or bool(j.get("is_error"))
     o = classify.classify(rc or (1 if failed else 0), classify.claude_vendor_error(j), err, timed_out, (j.get("num_turns") or 0) > 1,
                           dict(watch_fields(res, dog), http_status=j.get("api_error_status"))) if failed or timed_out else None
@@ -2954,6 +3057,8 @@ def launch_claude(d, brief, a, rid, t, cfg, meta):
         update_state(lambda s: s.setdefault("out", {}).pop(d["lane"], None))
         data = j.get("structured_output") if isinstance(j.get("structured_output"), (dict, list)) else parse_data(text, a.schema)
         res.update(status="done", data=data)
+        if final and netprobe.looks_dropped(err):       # the answer was in before the connection broke (ae6v): done, with a note
+            res["warnings"] = ["net_after_answer"]
     return res
 
 
@@ -2972,9 +3077,10 @@ def claude_tokens(u):
             "cached": cached, "out": u.get("output_tokens")}
 
 
-LAUNCHERS = {"codex": lambda d, b, a, rid, t, cfg, meta: launch_codex(d, b, a, rid, t, meta),
-             "opencode": lambda d, b, a, rid, t, cfg, meta: launch_opencode(d, b, a, rid, t, meta),
-             "claude_p": launch_claude}      # by how()'s `kind`; an unknown kind is a setup error, not a silent `claude -p`
+profiles.register("codex", "codex", "codex", lambda d, b, a, rid, t, cfg, meta: launch_codex(d, b, a, rid, t, meta))
+profiles.register("opencode", "opencode", "opencode", lambda d, b, a, rid, t, cfg, meta: launch_opencode(d, b, a, rid, t, meta), resume="untested")
+profiles.register("claude_p", "claude", "claude", launch_claude)
+LAUNCHERS = profiles.launchers()      # by how()'s `kind`; an unknown kind is a setup error, not a silent `claude -p`
 
 
 def transcript_info(path, family, start=0):
@@ -3011,6 +3117,11 @@ def result(status, reason=None, outcome=None, **kw):
             nxt = "owner"
         outcome = outcome or classify.CONTRACT["wire_default"][reason]
         stop = classify.stop_facts(outcome, None if reason == "logged_out" else kw.get("retry_after"))      # logged_out's retry_after is a wire courtesy, not a time it ends
+    resumable, partial = kw.pop("resumable", None), kw.pop("partial", None)
+    if stop is not None:       # ref on every outcome that has one; resumable/partial say whether the vendor session can be continued and whether work was done
+        stop["ref"] = kw.get("ref")
+        if outcome == "network":
+            stop.update(resumable=bool(resumable), partial=bool(partial))
     r = {"v": 2, "status": status, "reason": reason, "next": nxt, "data": None, "text": "", "ref": None, "lane": None, "model": None, "effort": None, "family": None,
          "flag": None, "cost": 0, "tokens": None, "denied": [], "secs": 0, "run_id": None, "transcript": None, "retry_after": None, "say": "", "git_violation": [],
          "call_id": None, "transcript_info": None, "transcript_status": None, "stop": stop,      # additive to v2 (contract.json): the typed facts behind reason/next
@@ -3224,6 +3335,28 @@ def run_once(a, cfg):
                 st["leases"][rid]["last_event"] = wall
         update_state(stamp)
     WORKER_BEAT[:] = [stamp_beat]
+    ref_rec = {"lane": d["lane"], "model": d["model"], "effort": d["effort"], "mode": d["mode"], "cap": d.get("cap"), "host": bool(a.host),
+               "rung": d.get("rung"), "fallback": d.get("fallback"), "fallback_reason": d.get("fallback_reason"), "first_lane": d.get("first_lane")}
+
+    def keep_ref(ref):
+        """Remember the ref for `--resume` whatever the outcome."""
+        def keep(s):
+            refs = s.setdefault("refs", {})
+            refs[ref] = ref_rec
+            for k in list(refs)[:-200]:
+                refs.pop(k)
+        update_state(keep)
+
+    def ref_seen(ref):
+        """The vendor revealed its session id: store it, stamp the lease, and print it on stderr (the engine reads `delegate: ref=`) before any work is lost."""
+        keep_ref(ref)
+        print(f"delegate: ref={ref} run_id={rid}", file=sys.stderr, flush=True)
+
+        def stamp(st):
+            if rid in (st.get("leases") or {}):
+                st["leases"][rid]["ref"] = ref
+        update_state(stamp)
+    REF_SEEN[:] = [ref_seen]
     meta = {"parent_session": a.parent or "", "title": a.title or brief.strip().splitlines()[0][:120]}
     if a.task:
         meta["task"] = a.task
@@ -3234,6 +3367,10 @@ def run_once(a, cfg):
     try:
         res = canary(launch, d, rid, a) if canary_due else None      # the one probe before full traffic; None = it passed
         res = res or launch(brief, a)
+        if res.get("reason") == "network" and res["status"] == "stop" and not res.pop("started", False) and net_up(d["lane"]):
+            res = launch(brief, a)      # dropped before the vendor had a session and the net is back: nothing to resume, nothing lost, so run it again, once
+        res.pop("started", None)
+        res.pop("answered", None)
         if res["status"] == "done" and a.schema:     # delegate enforces the schema: one re-ask in the same thread, then schema_invalid
             schema = json.loads(Path(a.schema).read_text(encoding="utf-8"))
             why = "the answer is not JSON" if res.get("data") is None else schema_problem(res["data"], schema)
@@ -3264,21 +3401,14 @@ def run_once(a, cfg):
         write_auth(d["lane"], True, "a worker run succeeded", now())
     if agent_runs:
         agent_runs.run(rid, ended=now(), status="completed" if res["status"] == "done" else "failed", transcript=find_transcript(res.get("ref"), fam))
-    if res.get("ref") and res["status"] == "done":
-        rec = {"lane": d["lane"], "model": d["model"], "effort": d["effort"], "mode": d["mode"], "cap": d.get("cap"), "host": bool(a.host),
-               "rung": d.get("rung"), "fallback": d.get("fallback"), "fallback_reason": d.get("fallback_reason"), "first_lane": d.get("first_lane")}
-
-        def keep(s):
-            refs = s.setdefault("refs", {})
-            refs[res["ref"]] = rec
-            for k in list(refs)[:-200]:
-                refs.pop(k)
-        update_state(keep)
+    if res.get("ref"):          # every outcome: a stop, a failure and a timeout can all be resumed
+        with contextlib.suppress(Exception):
+            keep_ref(res["ref"])
     secs = round(time.time() - t0, 1)
     five_after, week_after = lane_use(cfg, d["lane"], now())
     transcript = find_transcript(res.get("ref"), fam)
     detail = res.pop("detail", "")
-    history_add({"ts": now(), "run_id": rid, "call_id": getattr(a, "call_id", None), **health.row_fields(res.get("outcome"), "", detail or res.get("say"), res.get("retry_after")),
+    history_add({"ts": now(), "run_id": rid, "call_id": getattr(a, "call_id", None), "ref": res.get("ref"), **health.row_fields(res.get("outcome"), "", detail or res.get("say"), res.get("retry_after")),
                  "role": a.role, "task": a.task or "", "lane": d["lane"], "model": d["model"], "effort": d["effort"],
                  "status": res["status"], "reason": res.get("reason"), "host": bool(a.host), "denials": len(res.get("denied") or []), "secs": secs, "cost": res.get("cost", 0), "tokens": res.get("tokens"),
                  "five_before": lane.five, "week_before": lane.week, "five_after": five_after, "week_after": week_after,
@@ -3286,6 +3416,8 @@ def run_once(a, cfg):
     info = transcript_info(transcript, fam, t_from)
     usage = {"tokens": res.get("tokens"), "cost": res.get("cost", 0), "secs": secs, "turns": res.pop("turns", None), "context_k": res.pop("context_k", None),
              "answer_bytes": len((res.get("text") or "").encode("utf-8"))}
+    if res.get("warnings"):      # the launcher's own (net_after_answer) join the router's
+        extra["warnings"] = list(extra.get("warnings") or []) + res.pop("warnings")
     res.update(**who, run_id=rid, secs=secs, git_violation=git_changes(git_before, git_state(cwd)),
                context={"instructions": [str(f) for f in repo_instructions(cwd)], "env_keys": sorted(child_env().keys())},
                transcript=transcript, call_id=getattr(a, "call_id", None), usage=usage, transcript_info=info,
@@ -3369,6 +3501,7 @@ def main(argv=None):
     sk = sub.add_parser("set-key"); sk.add_argument("--stdin", action="store_true"); sk.add_argument("--force", action="store_true")
     sk.add_argument("--web", action="store_true"); sk.add_argument("--host", default="127.0.0.1"); sk.add_argument("--port", type=int, default=0); sk.add_argument("--timeout", type=int, default=300)
     sub.add_parser("guard").add_argument("--read-only", action="store_true")
+    nt = sub.add_parser("net", help="is the machine online? stdlib sockets, no quota"); nt.add_argument("--lane"); nt.add_argument("--host", action="append", help="a host or host:port; repeatable")
     sub.add_parser("contract").add_argument("--json", action="store_true")
     cf = sub.add_parser("config"); cf.add_argument("action", choices=["set", "show"]); cf.add_argument("key", nargs="?"); cf.add_argument("value", nargs="?")
     ru = sub.add_parser("run"); ru.add_argument("role"); ru.add_argument("--authored-by"); ru.add_argument("--host", action="store_true"); ru.add_argument("--no-wait", action="store_true"); ru.add_argument("--failed", default="")
@@ -3387,6 +3520,8 @@ def main(argv=None):
     UNATTENDED = getattr(a, "unattended", False)
     if a.cmd == "guard":        # a hook: no config, no state
         return cmd_guard(a)
+    if a.cmd == "net":
+        return cmd_net(a)
     with contextlib.suppress(Exception):
         migrate_legacy_hold(now())      # a codex_plan_review_only flag left in config.json becomes a hold with an end
     cfg = load_routing()

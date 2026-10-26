@@ -19,6 +19,8 @@ route = importlib.util.module_from_spec(spec)
 sys.modules["route"] = route
 spec.loader.exec_module(route)
 
+route.REAL_NET_PROBE = route.net_probe
+route.net_probe = lambda hosts=None: {"up": True, "ip_up": True, "why": "ok", "ms": 1, "hosts": {}, "at": time.time()}     # tests open no socket; tests/test_net.py swaps it per case
 os.environ["DELEGATE_CONFIG_DIR"] = tempfile.mkdtemp()      # tests never touch a real config; classes that need their own set one
 T = 1_000_000_000.0   # a fixed "now"
 CFG = json.loads((ROOT / "skills" / "delegate" / "routing.json").read_text(encoding="utf-8"))
@@ -41,6 +43,10 @@ def decide(role, ls, st=None, **args):
     a = {"authored_by": None, "failed": [], "premium": None, "allow_degraded": False}
     a.update(args)
     return route.decide(role, copy.deepcopy(CFG), ls, st or {}, T, a)
+
+
+def health_mod():
+    return route.health
 
 
 def argparse_ns(role, **kw):
@@ -609,9 +615,18 @@ out=""; args="$*"
 while [ $# -gt 0 ]; do case "$1" in -o) out="$2"; shift;; esac; shift; done
 brief=$(cat)
 echo "$args" >> "$FAKE_ARGS"; env | sort > "$FAKE_ENV"; printf '%s' "$brief" > "$FAKE_ARGS.brief"
+case "$FAKE_MODE" in drop_early|drop_early_twice)       # the connection breaks before the vendor says anything; drop_early works on the second launch
+  n=$(cat "$FAKE_ARGS.n" 2>/dev/null || echo 0); echo $((n+1)) > "$FAKE_ARGS.n"
+  if [ "$FAKE_MODE" = drop_early_twice ] || [ "$n" = 0 ]; then echo "request failed: error sending request for url (https://chatgpt.com/backend-api)" >&2; exit 1; fi;;
+esac
 echo '{"type":"thread.started","thread_id":"thread-123"}'
 echo '{"type":"turn.completed","usage":{"input_tokens":100,"cached_input_tokens":40,"output_tokens":7}}'
 case "$FAKE_MODE" in
+  drop_early) printf 'second try' > "$out";;
+  ae6v) printf 'the final answer' > "$out"; echo '{"type":"turn.failed","error":{"message":"stream disconnected before completion: websocket closed by server"}}'; exit 1;;
+  wait_recover) echo '{"type":"error","message":"Reconnecting... waiting for network (Connection failed: error sending request)"}'
+                echo '{"type":"item.completed","item":{"id":"i3","type":"command_execution","command":"ls","exit_code":0,"status":"completed"}}'; printf 'recovered' > "$out";;
+  wait_stuck) echo '{"type":"error","message":"Reconnecting... waiting for network (Connection failed: error sending request)"}'; sleep 300 & echo $! > "$FAKE_PIDFILE"; wait;;
   ok) printf 'done: %s' "$(echo "$brief" | tail -1)" > "$out";;
   json) printf '{"a": 1}' > "$out";;
   limit) echo "You have hit your usage limit. Try again later." >&2; exit 1;;
@@ -647,6 +662,10 @@ if [ "$FAKE_MODE" = logout ]; then echo "Failed to authenticate: OAuth session e
 if [ "$FAKE_MODE" = bghang ]; then
   echo '{"type":"result","result":"answered","session_id":"sess-2","is_error":false}'
   set -m; sleep 61 & echo $! > "$FAKE_PIDFILE"; wait; exit 0
+fi
+if [ "$FAKE_MODE" = ae6v ]; then
+  printf '{"type":"assistant","message":{"usage":{"input_tokens":1}}}\n{"type":"result","result":"all done","session_id":"sess-7","is_error":false,"num_turns":2}'
+  echo "read ECONNRESET" >&2; exit 1
 fi
 if [ "$FAKE_MODE" = net ]; then printf '{"type":"result","result":"API Error: getaddrinfo ENOTFOUND api.anthropic.com","is_error":true,"num_turns":1}'; exit 1; fi
 if [ "$FAKE_MODE" = denied ]; then
@@ -1166,11 +1185,14 @@ echo '{"type":"step_finish","sessionID":"ses_1","part":{"type":"step-finish","to
         self.assertEqual(r["status"], "error")
         self.assertIn("model not supported", r["say"])
 
-    def test_a_codex_turn_that_fails_after_work_is_failed_with_codexs_reason(self):
+    def test_a_codex_stream_that_drops_after_work_is_a_network_stop_with_the_ref(self):
+        """R17: was `failed worker_failed` (it benched the pair); a dropped stream is the network's, and the thread can be resumed."""
         _, r = self.run_it(mode="late_error")
-        self.assertEqual(r["status"], "failed")
+        self.assertEqual((r["status"], r["reason"]), ("stop", "network"))
         self.assertIn("stream disconnected", r["say"])
         self.assertNotIn("Transport", r["say"])
+        self.assertEqual(r["ref"], "thread-123")
+        self.assertEqual({k: r["stop"][k] for k in ("reason", "resumable", "partial", "ref")}, {"reason": "network", "resumable": True, "partial": True, "ref": "thread-123"})
 
     def test_a_codex_command_on_a_secret_path_stops_the_worker(self):
         t = time.time()
@@ -1230,7 +1252,7 @@ echo '{"type":"step_finish","sessionID":"ses_1","part":{"type":"step-finish","to
 
     def test_v2_every_answer_names_reason_and_next(self):
         cases = {"early_error": ("stop", "vendor_prework", "retry"), "bad_request": ("error", "bad_request", "owner"),
-                 "late_error": ("failed", "worker_failed", "fail"), "secret": ("failed", "secrets", "owner"),
+                 "late_error": ("stop", "network", "retry"), "secret": ("failed", "secrets", "owner"),
                  "logout": ("lane_out", "logged_out", "retry"), "net": ("stop", "network", "retry"), "ok": ("done", None, None)}
         for mode, want in cases.items():
             _, r = self.run_it(mode=mode)
@@ -1249,6 +1271,79 @@ echo '{"type":"step_finish","sessionID":"ses_1","part":{"type":"step-finish","to
         route.update_state(lambda s: s.pop("out", None))
         _, r = self.run_it(mode="net")
         self.assertEqual((r["status"], r["reason"], r["next"]), ("stop", "network", "retry"))
+
+    def launches(self):
+        return int(Path(os.environ["FAKE_ARGS"] + ".n").read_text())
+
+    def test_a_drop_before_the_first_event_relaunches_once(self):
+        _, r = self.run_it(mode="drop_early")
+        self.assertEqual((r["status"], r["text"]), ("done", "second try"))
+        self.assertEqual(self.launches(), 2)
+
+    def test_two_drops_before_the_first_event_stop_with_network_and_launch_no_third_time(self):
+        _, r = self.run_it(mode="drop_early_twice")
+        self.assertEqual((r["status"], r["reason"]), ("stop", "network"))
+        self.assertEqual(self.launches(), 2)
+        self.assertFalse(r["stop"]["resumable"])
+        self.assertFalse(r["stop"]["partial"])
+        self.assertNotIn("OPENAI_SUBSCRIPTION", route.load_state().get("out", {}))      # the network is not the lane's fault
+
+    def test_a_drop_with_the_net_still_down_is_not_relaunched_in_the_call(self):
+        with mock.patch.object(route, "net_probe", lambda hosts=None: {"up": False, "ip_up": False, "why": "offline", "ms": 1, "hosts": {}, "at": time.time()}):
+            _, r = self.run_it(mode="drop_early")
+        self.assertEqual((r["status"], r["reason"]), ("stop", "network"))
+        self.assertEqual(self.launches(), 1)         # no in-call wait or retry loop: the engine decides
+
+    def test_a_dropped_stream_keeps_the_ref_in_the_answer_the_stop_and_the_refs_table(self):
+        _, r = self.run_it(mode="late_error")
+        self.assertEqual((r["ref"], r["stop"]["ref"]), ("thread-123", "thread-123"))
+        self.assertIn("thread-123", route.load_state()["refs"])         # a later --resume finds the lane that made it
+        row = json.loads(Path(route.history_path()).read_text().splitlines()[-1])
+        self.assertEqual((row["outcome"], row["ref"]), ("network", "thread-123"))
+
+    def test_every_stop_that_has_a_ref_carries_it(self):
+        _, r = self.run_it(mode="limit")
+        self.assertEqual((r["status"], r["ref"]), ("lane_out", "thread-123"))
+        self.assertEqual(r["stop"]["ref"], "thread-123")
+
+    def test_network_stops_never_bench_the_pair(self):
+        for _ in range(5):
+            _, r = self.run_it(mode="late_error", unattended=True)
+            self.assertEqual(r["reason"], "network")
+        rows = health_mod().read_rows(route.history_path())
+        st = health_mod().fold(rows)
+        self.assertTrue(health_mod().view(st, "OPENAI_SUBSCRIPTION", r["model"], time.time())["usable"])
+        self.assertEqual(st["pairs"], {})
+        _, r = self.run_it()
+        self.assertEqual(r["status"], "done")
+
+    def test_the_final_answer_then_a_drop_is_done_with_a_warning_codex(self):
+        """ae6v: the answer file is written, then the connection breaks."""
+        _, r = self.run_it(mode="ae6v")
+        self.assertEqual((r["status"], r["text"]), ("done", "the final answer"))
+        self.assertEqual(r["warnings"], ["net_after_answer"])
+        self.assertIsNone(r["stop"])
+        self.assertNotIn("OPENAI_SUBSCRIPTION", route.load_state().get("out", {}))
+
+    def test_the_final_answer_then_a_drop_is_done_with_a_warning_claude(self):
+        self.codex_out()
+        _, r = self.run_it(mode="ae6v")
+        self.assertEqual((r["status"], r["text"], r["ref"]), ("done", "all done", "sess-7"))
+        self.assertEqual(r["warnings"], ["net_after_answer"])
+
+    def test_codex_waiting_for_the_network_and_recovering_is_a_finished_run(self):
+        _, r = self.run_it(mode="wait_recover")
+        self.assertEqual((r["status"], r["text"]), ("done", "recovered"))
+
+    def test_codex_stuck_waiting_for_the_network_is_stopped_after_one_probe_and_handed_back(self):
+        down = lambda hosts=None: {"up": False, "ip_up": False, "why": "offline", "ms": 1, "hosts": {}, "at": time.time()}
+        t0 = time.time()
+        with mock.patch.object(route, "net_probe", down), mock.patch.object(route, "NET_GRACE_S", 1):
+            _, r = self.run_it(mode="wait_stuck", timeout=60)
+        self.assertLess(time.time() - t0, 25)
+        self.assertEqual((r["status"], r["reason"], r["ref"]), ("stop", "network", "thread-123"))
+        self.assertTrue(r["stop"]["resumable"])
+        self.assertIsNone(route.proc_start(int(Path(os.environ["FAKE_PIDFILE"]).read_text())))
 
     def test_a_claude_worker_waiting_on_a_background_task_is_stopped_after_its_answer(self):
         self.codex_out()
@@ -1323,7 +1418,7 @@ echo '{"type":"step_finish","sessionID":"ses_1","part":{"type":"step-finish","to
         self.assertEqual((r2["call_id"], r2["transcript_info"]["from"], r2["transcript_info"]["bytes"]), (None, 40, 0))      # the window this call wrote
         self.assertIsNone(route.schema_problem(r, schema))
         for mode, reason in (("bad_request", "bad_request"), ("limit", "rate_limited"), ("logout", "logged_out"), ("early_error", "vendor_blip"), ("net", "network"),
-                             ("late_error", "worker_failed"), ("secret", "secrets")):
+                             ("late_error", "network"), ("secret", "secrets")):
             route.update_state(lambda st: st.pop("out", None))
             _, r = self.run_it(mode=mode)
             self.assertEqual(r["stop"]["reason"], reason, mode)
