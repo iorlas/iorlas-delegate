@@ -963,6 +963,17 @@ def codex_step_allowed(role_name, step, cfg):
     return family != "openai" or (role_name in ("planner", "reviewer") and step.get("mode", "read_only") == "read_only")
 
 
+def loop_barred(step, role, cfg):
+    """Why the loop never runs this step, else None: its model is explicit-call-only (models[m].loop false, Opus), or the role bars its family (reviewer: xai)."""
+    m = cfg["models"].get(step.get("model")) or {}
+    if m.get("loop") is False:
+        return f"{step.get('model')} is never routed in the loop (explicit user call only)"
+    fam = m.get("family") or step.get("on")
+    if fam in (role.get("exclude_families") or []):
+        return f"{fam} is excluded from this role"
+    return None
+
+
 def build_tiers(role, cfg, args, role_name=None):
     """-> list of tiers; each tier is a list of steps tried strict then relaxed before the next tier."""
     steps = list(role.get("steps") or [])
@@ -983,7 +994,9 @@ def build_tiers(role, cfg, args, role_name=None):
         steps = [dict(step)] + steps
     if role_name is None:
         role_name = next((name for name, value in cfg["roles"].items() if value == role), None)
-    steps = [s for s in steps if codex_step_allowed(role_name, s, cfg)]
+    steps = [s for s in steps if codex_step_allowed(role_name, s, cfg) and not loop_barred(s, role, cfg)]
+    if role.get("order") == "cost":         # cheapest configured model first inside a tier (stable: ties keep the listed order)
+        steps.sort(key=lambda s: (cfg["models"].get(s.get("model")) or {}).get("cost", 1000))
     steps = [dict(s, idx=i) for i, s in enumerate(steps)]
     if role["advance"] == "on_failure":
         failed = args.get("failed") or []
@@ -999,7 +1012,7 @@ def build_tiers(role, cfg, args, role_name=None):
         tiers += [[s for s in part if s.get("flag") not in LATE_FLAGS], [s for s in part if s.get("flag") in LATE_FLAGS]]
     tiers = [x for x in tiers if x]
     if args.get("allow_degraded") and role.get("degraded_needs_consent"):
-        tiers.append([dict(s, flag="degraded_with_consent", idx=len(steps) + i) for i, s in enumerate(role["degraded_needs_consent"]) if codex_step_allowed(role_name, s, cfg)])
+        tiers.append([dict(s, flag="degraded_with_consent", idx=len(steps) + i) for i, s in enumerate(role["degraded_needs_consent"]) if codex_step_allowed(role_name, s, cfg) and not loop_barred(s, role, cfg)])
     return tiers
 
 
@@ -1079,10 +1092,14 @@ def decide(role_name, cfg, lanes, st, t, args):
     resets = {l.name: local(l.out_until) for l in lanes.values() if l.out and l.out_until}
     resets.update({f"{l.name}/{m}": local(b["until"]) for l in lanes.values() for m, b in l.benched.items()})
     stop = {"action": "stop", "role": role_name, "say": role["stop"], "resets": resets, "trace": trace}
-    consent = role.get("degraded_needs_consent")
+    barred = sorted({why for x in [*(role.get("steps") or []), *(sx for v in (role.get("by_author") or {}).values() for sx in v)] if (why := loop_barred(x, role, cfg))})
+    if barred and not tiers:
+        stop["reason"] = "loop_excluded"
+        stop["say"] = f"{role['stop']} Nothing is left to route: " + "; ".join(barred) + "."
+    consent = [s for s in role.get("degraded_needs_consent") or [] if not loop_barred(s, role, cfg)]
     if consent and not args.get("allow_degraded"):
         stop["ask_user"] = {"question": "No adequate model is available. Run a degraded option?",
-                            "options": [f"{s['model']} {s['effort']}" for s in consent],
+                            "options": [f"{s['model']} {s['effort']}" for s in consent if not loop_barred(s, role, cfg)],
                             "then": f"route.py next {role_name} --allow-degraded"}
     return stop
 

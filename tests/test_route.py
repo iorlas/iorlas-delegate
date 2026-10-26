@@ -115,7 +115,8 @@ class SecondPass(unittest.TestCase):
     def test_relaxed_never_changes_model_floor(self):
         ls = lanes(openai={"out": True, "out_until": T + 1}, credit={"out": True, "out_until": T + 99}, sub={"week": 92})
         d = decide("planner", ls)
-        self.assertEqual((d["model"], d["effort"]), ("opus-5.5", "medium"))
+        self.assertEqual(d["action"], "stop")                       # Opus never runs in the loop (delegate-pnz): no Claude rung left for the planner
+        self.assertNotEqual(d.get("model"), "opus-5.5")
 
     def test_normal_relaxed_beats_degraded_strict(self):
         ls = lanes(openai={"out": True, "out_until": T + 1}, credit={"out": True, "out_until": T + 99}, sub={"week": 92})
@@ -140,11 +141,8 @@ class Roles(unittest.TestCase):
     def test_hard_escalates_on_failure_only(self):
         ls = lanes()
         self.assertEqual(decide("hard", ls)["model"], "gpt-6.1-sol")
-        d = decide("hard", ls, failed=[0])
-        self.assertEqual((d["model"], d["effort"]), ("opus-5.5", "low"))
-        d = decide("hard", ls, failed=[0, 1])
-        self.assertEqual((d["model"], d["effort"]), ("opus-5.5", "medium"))
-        self.assertEqual(decide("hard", ls, failed=[0, 1, 2])["action"], "stop")
+        for failed in ([0], [0, 1], [0, 1, 2]):                     # the Opus rungs are skipped in the loop (delegate-pnz)
+            self.assertEqual(decide("hard", ls, failed=failed)["action"], "stop")
 
     def test_reviewer_prefers_the_other_family_and_authored_by_is_optional(self):
         self.assertEqual(decide("reviewer", lanes())["model"], "gpt-6.1-sol")                 # no author given: Codex first (the most room), no claim of independence
@@ -167,8 +165,8 @@ class Roles(unittest.TestCase):
 
     def test_every_reviewer_list_reaches_every_family(self):
         for who, steps in CFG["roles"]["reviewer"]["by_author"].items():
-            self.assertEqual({s["on"] for s in steps}, {"openai", "claude", "xai", "deepseek", "zai"}, who)
-            if who != "unknown":
+            self.assertEqual({s["on"] for s in steps}, {"openai", "claude", "deepseek", "zai"}, who)      # Grok never reviews (delegate-qjw)
+            if who not in ("unknown", "xai"):
                 fam = who
                 self.assertEqual(steps[-1]["flag"], "same_family", who)
                 self.assertEqual(steps[-1]["on"], fam, who)
@@ -177,7 +175,7 @@ class Roles(unittest.TestCase):
         out = {"out": True, "out_until": T + 3600}
         grok = route.Lane("GROK_SUBSCRIPTION", "xai", "subscription")
         cases = {"openai": lambda: lanes(sub=out, credit=out), "claude": lambda: lanes(openai=out),
-                 "xai": lambda: lanes(openai=out, sub=out, credit=out)}
+                 }
         for who, mk in cases.items():
             ls = mk()
             if who != "xai":
@@ -187,7 +185,7 @@ class Roles(unittest.TestCase):
                 ls["GROK_SUBSCRIPTION"] = grok
             d = decide("reviewer", ls, authored_by=who)
             self.assertEqual((d["action"], d["flag"]), ("run", "same_family"), who)
-            self.assertEqual(d["lane"].split("_")[0], {"openai": "OPENAI", "claude": "CLAUDE", "xai": "GROK"}[who], who)
+            self.assertEqual(d["lane"].split("_")[0], {"openai": "OPENAI", "claude": "CLAUDE"}[who], who)
             self.assertIn(f"reviewing {who}'s work with {who}: no other family is up", d["warning"], who)
             ud = decide("reviewer", ls, authored_by=who, unattended=True, allow_degraded=True)      # no consent step exists for review
             self.assertEqual((ud["action"], ud["flag"]), ("run", "same_family"), who)
@@ -791,15 +789,15 @@ printf '{"type":"result","result":"claude says hi","session_id":"sess-1","total_
         self.assertNotIn("needs_input", r)
         route.update_state(lambda s: s.pop("out"))
         self.codex_out()
-        _, r = self.run_it(role="planner")                                 # no Agent tool here: the subscription runs claude -p
-        self.assertNotEqual(r["status"], "agent")
-        self.assertEqual((r["status"], r["lane"]), ("done", "CLAUDE_SUBSCRIPTION"))
+        _, r = self.run_it(role="planner")                                 # Opus never plans in the loop (delegate-pnz): Codex down means stop, no ask when unattended
+        self.assertEqual(r["status"], "stop")
+        self.assertNotIn("ask_user", r)
 
     def test_interactive_session_gets_the_agent_step_and_the_consent_question(self):
         self.codex_out()                                                    # Codex plans first, Claude only when it is down
         _, r = self.run_it(role="planner", unattended=False)
-        self.assertEqual((r["status"], r["lane"], r["agent_model"]), ("agent", "CLAUDE_SUBSCRIPTION", "opus"))
-        self.assertIn("coordinator", r["brief_prefix"])
+        self.assertEqual(r["status"], "stop")                               # no Opus planner rung: the consent question offers the degraded Sonnet
+        self.assertEqual(r["ask_user"]["options"], ["sonnet-5.5 high"])
         route.update_state(lambda s: s.setdefault("out", {}).update(
             {n: {"until": route.now() + 3600, "why": "t"} for n in ("OPENAI_SUBSCRIPTION", "CLAUDE_SUBSCRIPTION")}))
         _, r = self.run_it(role="planner", unattended=False)
@@ -1007,12 +1005,9 @@ echo '{"type":"step_finish","sessionID":"ses_1","part":{"type":"step-finish","to
         perm = json.loads(next(l for l in env.splitlines() if l.startswith("OPENCODE_CONFIG_CONTENT="))[len("OPENCODE_CONFIG_CONTENT="):])["permission"]
         self.assertEqual((perm["webfetch"], perm["task"], perm["read"]["*.env"], "edit" in perm), ("deny", "deny", "deny", False))
         self.assertIn("Every command runs in a sandbox", Path(os.environ["FAKE_ARGS"] + ".brief").read_text())
-        _, r = self.run_it("--authored-by", "openai", role="reviewer")
-        self.assertEqual(r["lane"], "GROK_SUBSCRIPTION")
-        env = Path(os.environ["FAKE_ENV"]).read_text()
-        self.assertIn('"edit": "deny"', env)
-        _, r = self.run_it("--authored-by", "xai", role="reviewer")
-        self.assertEqual(r["lane"], "GROK_SUBSCRIPTION")                    # no other non-Claude lane is up, and Claude is last (delegate-m86): Grok reviews Grok
+        for who in ("openai", "xai"):                                       # Grok never reviews (delegate-qjw): with only Grok up the reviewer is Claude Sonnet
+            _, r = self.run_it("--authored-by", who, role="reviewer")
+            self.assertNotEqual(r["lane"], "GROK_SUBSCRIPTION", who)
 
     @unittest.skipIf(sys.platform != "darwin", "macOS only")
     def test_the_grok_shell_has_no_network_secrets_or_writes_outside_cwd(self):

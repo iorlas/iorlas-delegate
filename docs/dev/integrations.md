@@ -126,8 +126,12 @@ https://github.com/iorlas/iorlas-task-loop/blob/main/docs/contracts/worker-run-v
 - `history.jsonl` (config dir, private; rotated: lines older than 14 days are dropped once it passes 1 MB): one line per finished run: role, task, lane, model, effort, status, secs, cost, tokens, 5-hour and weekly use before and after, ids of runs
   that overlapped it, slots. For calibration; never the brief. Not part of the contract.
 - `route.py status --claude-usage '<get_usage plan.windows JSON>'` is part of the contract: it stores the reading for later `run`s. Keep that command and input shape, or bump `v`.
-- `reviewer`: `--authored-by openai|claude|xai` is optional (the family that wrote the diff; `xai` since 0.36.0). Another family reviews first (Codex wherever it is another family and for unknown authors, Grok for Codex's work, since 0.37.0); order is: another non-Claude family, then the author's own non-Claude family, then Claude last (every role keeps Claude last, delegate-m86/jx2); the same-family review
+- `reviewer`: `--authored-by openai|claude|xai|deepseek|zai` is optional (the family that wrote the diff). Order (delegate-qjw, delegate-pnz): Codex first wherever it is another family; then the other non-Claude
+  families, cheapest first by the `cost` configured per model in `routing.json` (roles with `"order": "cost"`; never by name); then the author's own non-Claude family; then Claude Sonnet last. The same-family review
   comes back with `flag: "same_family"` and a one-line `warning` (stderr, and in the `run` result; since 0.38.0), never needing consent; with no reviewer at all the answer is `stop`, never an exception.
+  Grok/opencode (family `xai`) never reviews, even when it is the only lane up (the role's `exclude_families`; study 81: 74% of review tokens, same send-back rate as Sonnet, ~10x wall time); it still routes for worker.
+- Claude Opus never runs in the loop, for any role: models with `"loop": false` in `routing.json` (opus-5.5) are dropped from every chain and every consent list. A role left with no rung answers
+  `stop` with `reason: "loop_excluded"` and a `say` naming the excluded model. Opus stays a model an explicit user call outside the loop may pick (the router never chooses it).
 - Everything else (`next`, `doctor`, flags not listed above, `state.json`, `routing.json`, mode files) is private and may change in any release. Changing
   the contract above means changing the spec in iorlas-task-loop first.
 

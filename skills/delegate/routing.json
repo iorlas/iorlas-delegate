@@ -45,46 +45,57 @@
     "opus-5.5": {
       "family": "claude",
       "api": "claude-opus-5-5",
-      "agent": "opus"
+      "agent": "opus",
+      "cost": 90,
+      "loop": false
     },
     "sonnet-5.5": {
       "family": "claude",
       "api": "claude-sonnet-5-5",
-      "agent": "sonnet"
+      "agent": "sonnet",
+      "cost": 20
     },
     "haiku-5.5": {
       "family": "claude",
       "api": "claude-haiku-5-5",
-      "agent": "haiku"
+      "agent": "haiku",
+      "cost": 10
     },
     "fable-5.1": {
       "family": "claude",
       "api": "claude-fable-5-1",
-      "agent": "fable"
+      "agent": "fable",
+      "cost": 100
     },
     "gpt-6.1-sol": {
       "family": "openai",
-      "api": "gpt-6.1-sol"
+      "api": "gpt-6.1-sol",
+      "cost": 1
     },
     "gpt-6-luna": {
       "family": "openai",
-      "api": "gpt-6-luna"
+      "api": "gpt-6-luna",
+      "cost": 1
     },
     "grok-4.7": {
       "family": "xai",
-      "api": "xai/grok-4.7"
+      "api": "xai/grok-4.7",
+      "cost": 4
     },
     "deepseek-v4.1-flash-free": {
       "family": "deepseek",
-      "api": "opencode/deepseek-v4.1-flash-free"
+      "api": "opencode/deepseek-v4.1-flash-free",
+      "cost": 3
     },
     "glm-5.3": {
       "family": "zai",
-      "api": "zai-coding-plan/glm-5.3"
+      "api": "zai-coding-plan/glm-5.3",
+      "cost": 2
     },
     "glm-5.3-flash": {
       "family": "zai",
-      "api": "zai-coding-plan/glm-5.3-flash"
+      "api": "zai-coding-plan/glm-5.3-flash",
+      "cost": 2
     }
   },
   "lanes": {
@@ -208,16 +219,10 @@
       "stop": "No worker lane is available. Hold the task; a few lines the orchestrator may write itself."
     },
     "reviewer": {
-      "about": "verify, review a diff. Prefer a different family than the author (--authored-by openai|claude|xai|deepseek|zai, optional); order: another non-Claude family, then the author's own non-Claude family (flagged same_family, never blocks), then Claude last. Codex reviews first wherever it is another family (the Pro Lite plan since 2026-10-23 has the room, and it saves the Claude limit); Grok reviews Codex's work. Always rerun the acceptance check.",
+      "about": "verify, review a diff. Prefer a different family than the author (--authored-by openai|claude|xai|deepseek|zai, optional); order: Codex, then the other non-Claude families (cheapest configured model cost first), then the author's own non-Claude family (flagged same_family, never blocks), then Claude Sonnet last. Grok/opencode never reviews (study 81: 74% of review tokens, same send-back rate as Sonnet, ~10x wall time); it stays on for other roles. Claude Opus never runs in the loop. Always rerun the acceptance check.",
       "advance": "on_unavailable",
       "by_author": {
         "openai": [
-          {
-            "model": "grok-4.7",
-            "effort": "medium",
-            "on": "xai",
-            "mode": "read_only"
-          },
           {
             "model": "sonnet-5.5",
             "effort": "medium",
@@ -261,12 +266,6 @@
             "on": "openai",
             "mode": "read_only",
             "use": "review"
-          },
-          {
-            "model": "grok-4.7",
-            "effort": "medium",
-            "on": "xai",
-            "mode": "read_only"
           },
           {
             "model": "deepseek-v4.1-flash-free",
@@ -331,13 +330,6 @@
             "mode": "read_only",
             "cap": 2,
             "flag": "degraded"
-          },
-          {
-            "model": "grok-4.7",
-            "effort": "medium",
-            "on": "xai",
-            "mode": "read_only",
-            "flag": "same_family"
           }
         ],
         "unknown": [
@@ -347,12 +339,6 @@
             "on": "openai",
             "mode": "read_only",
             "use": "review"
-          },
-          {
-            "model": "grok-4.7",
-            "effort": "medium",
-            "on": "xai",
-            "mode": "read_only"
           },
           {
             "model": "sonnet-5.5",
@@ -389,12 +375,6 @@
             "on": "openai",
             "mode": "read_only",
             "use": "review"
-          },
-          {
-            "model": "grok-4.7",
-            "effort": "medium",
-            "on": "xai",
-            "mode": "read_only"
           },
           {
             "model": "sonnet-5.5",
@@ -440,12 +420,6 @@
             "use": "review"
           },
           {
-            "model": "grok-4.7",
-            "effort": "medium",
-            "on": "xai",
-            "mode": "read_only"
-          },
-          {
             "model": "sonnet-5.5",
             "effort": "medium",
             "on": "claude",
@@ -469,7 +443,11 @@
           }
         ]
       },
-      "stop": "No reviewer is available. Mark the diff unreviewed; the orchestrator reads it only if small or risk-flagged."
+      "stop": "No reviewer is available. Mark the diff unreviewed; the orchestrator reads it only if small or risk-flagged.",
+      "order": "cost",
+      "exclude_families": [
+        "xai"
+      ]
     },
     "hard": {
       "about": "two workers failed it, or it needs real design reasoning inside the code. Split into short subtasks; only the failed subtask climbs. Pass the indexes of steps that ran and failed with --failed.",
