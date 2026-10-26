@@ -17,10 +17,10 @@ def fixture(name):
     return json.loads((FIX / f"{name}.json").read_text(encoding="utf-8"))
 
 
-def row(ts, lane="L", model="m", outcome=None, task=None, say="", until=None, status=None, **kw):
+def row(ts, lane="L", model="m", outcome=None, task=None, say="", until=None, **kw):
     """A history row as route.run_once writes it."""
     r = {"ts": ts, "run_id": kw.pop("run_id", f"r{ts}"), "task": task or f"t{ts}", "lane": lane, "model": model,
-         "status": status or ("done" if outcome is None else "failed"), "outcome": outcome, "say": say, "until": until}
+         "done": outcome is None, "outcome": outcome, "say": say, "until": until}
     r.update(health.row_fields(outcome, "event", say, until) if outcome else {})
     r.update(kw)
     return r

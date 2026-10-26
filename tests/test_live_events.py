@@ -54,7 +54,7 @@ class LiveFile(unittest.TestCase):
     def test_codex(self):
         f = self.base / "sub" / "dir" / "live.jsonl"        # parent dirs are created
         r = self.run_kind("codex", CODEX, f)
-        self.assertEqual(r["status"], "done")
+        self.assertIsNone(r.get("outcome"))
         ev = self.events(f)
         self.assertEqual([e["k"] for e in ev], ["start", "cmd", "cmd_end", "tool", "tool_end", "think", "msg", "raw", "tokens", "end"])
         self.assertEqual((ev[1]["id"], ev[2]["id"], ev[2]["exit"], ev[2]["out"]), ("c1", "c1", 0, "a b"))
@@ -69,7 +69,7 @@ class LiveFile(unittest.TestCase):
 
     def test_claude(self):
         f = self.base / "live.jsonl"
-        self.assertEqual(self.run_kind("claude", CLAUDE, f)["status"], "done")
+        self.assertIsNone(self.run_kind("claude", CLAUDE, f).get("outcome"))
         ev = self.events(f)
         self.assertEqual([e["k"] for e in ev], ["start", "cmd", "tool", "tokens", "cmd_end", "tool_end", "msg", "tokens", "end"])
         self.assertEqual((ev[1]["id"], ev[1]["text"], ev[4]["id"], ev[4]["out"]), ("tu1", "ls", "tu1", "a b"))
@@ -78,7 +78,7 @@ class LiveFile(unittest.TestCase):
 
     def test_opencode(self):
         f = self.base / "live.jsonl"
-        self.assertEqual(self.run_kind("opencode", OPENCODE, f)["status"], "done")
+        self.assertIsNone(self.run_kind("opencode", OPENCODE, f).get("outcome"))
         ev = self.events(f)
         self.assertEqual([e["k"] for e in ev], ["start", "cmd", "cmd_end", "tool", "tool_end", "tokens", "msg", "tokens", "end"])
         self.assertEqual((ev[1]["id"], ev[2]["id"], ev[2]["exit"], ev[2]["secs"]), ("o1", "o1", 0, 0.5))
@@ -87,7 +87,7 @@ class LiveFile(unittest.TestCase):
     def test_env_unset_writes_nothing(self):
         for kind, lines in (("codex", CODEX), ("claude", CLAUDE), ("opencode", OPENCODE)):
             with self.subTest(kind):
-                self.assertEqual(self.run_kind(kind, lines, None)["status"], "done")
+                self.assertIsNone(self.run_kind(kind, lines, None).get("outcome"))
         self.assertEqual([p.name for p in self.base.rglob("*.jsonl")], [])
 
     def test_a_stall_is_emitted_at_60_s_then_every_60_s(self):

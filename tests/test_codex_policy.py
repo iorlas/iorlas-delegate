@@ -49,10 +49,10 @@ class CodexPolicy(unittest.TestCase):
 
     def test_saved_codex_writer_is_refused_without_disabling_the_review_lane(self):
         a=argparse_ns('worker',resume='old-writer')
-        st={'refs':{'old-writer':{'lane':'OPENAI_SUBSCRIPTION','model':'gpt-6.1-sol','mode':'write','effort':'medium','host':False}}}
+        st={'refs':{'old-writer':{'lane':'OPENAI_SUBSCRIPTION','model':'gpt-6.1-sol','mode':'write','effort':'medium'}}}
         with patch.object(route,'load_state',return_value=st), patch.object(route,'gather',return_value=lanes()), patch.object(route,'publish_lanes'), patch.object(route,'mark_busy'), patch.object(route,'mark_out') as mark:
             d,ls,_,_=route.decision(a,self.cfg)
-        self.assertEqual(d['action'],'lane_out')
+        self.assertEqual((d['action'],d['outcome']),('stop','held'))
         self.assertIn('paused',d['say'])
         self.assertFalse(ls['OPENAI_SUBSCRIPTION'].out)
         mark.assert_not_called()
@@ -62,7 +62,7 @@ class CodexPolicy(unittest.TestCase):
             d={'role':role,'how':{'sandbox':sandbox}}
             with patch.object(route,'load_routing',return_value=self.cfg),patch.object(route,'run_proc') as launch:
                 result=route.launch_codex(d,'brief',SimpleNamespace(role=role),'rid',T,{})
-                self.assertEqual(result['status'],'lane_out')
+                self.assertEqual(result['outcome'],'held')
                 launch.assert_not_called()
 
     def test_snapshot_matches_the_pause_and_identifies_codex_restriction(self):

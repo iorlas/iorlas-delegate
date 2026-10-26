@@ -56,7 +56,7 @@ class ZaiTests(unittest.TestCase):
         d=dict(lane='ZAI_CODING_SUBSCRIPTION',model='glm-5.3',effort='high',how=dict(model='zai-coding-plan/glm-5.3',cwd='/tmp',write=False))
         a=SimpleNamespace(resume=None,schema=None,timeout=10)
         with tempfile.TemporaryDirectory() as tmp, patch.object(route,'config_dir',return_value=Path(tmp)), patch.object(route,'opencode_exe',return_value='opencode'),patch.object(route.sys,'platform','darwin'),patch.object(route,'opencode_shell'),patch.object(route,'run_proc',return_value=(0,'','',False)) as run,patch.object(route,'agent_runs',None),patch.object(route,'child_env',return_value={'OPENCODE_AUTH_JSON':'override','OPENCODE_CONFIG':'override','ZHIPU_API_KEY':'override'}):
-            self.assertEqual(route.launch_opencode(d,'OK',a,'test1234',1,{})['status'],'done')
+            self.assertEqual(route.launch_opencode(d,'OK',a,'test1234',1,{}).get('outcome'),None)
             # Inspect the actual child process environment.
             env=run.call_args.args[3]
             self.assertEqual(json.loads(env['OPENCODE_CONFIG_CONTENT'])['enabled_providers'],['zai-coding-plan'])
@@ -64,7 +64,7 @@ class ZaiTests(unittest.TestCase):
             self.assertNotIn('OPENCODE_AUTH_JSON',env)
             d['how']['model']='zai/glm-5.3'
             run.reset_mock()
-            self.assertEqual(route.launch_opencode(d,'OK',a,'test1234',1,{})['reason'],'setup')
+            self.assertEqual(route.launch_opencode(d,'OK',a,'test1234',1,{})['outcome'],'setup')
             run.assert_not_called()
 
     def test_dashboard_inventory_exposes_subscription(self):

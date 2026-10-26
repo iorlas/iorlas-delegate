@@ -71,8 +71,8 @@ class DeepSeekTests(unittest.TestCase):
                 self.assertNotIn('OPENCODE_AUTH_JSON', env)
                 self.assertEqual(env['XDG_DATA_HOME'], str(Path(tmp) / 'opencode-free-data'))
                 if valid:
-                    self.assertEqual(result['status'], 'done')
+                    self.assertIsNone(result.get('outcome'))
                     self.assertIn('opencode/deepseek-v4.1-flash-free', run.call_args.args[0])
                 else:
-                    self.assertEqual(result['status'], 'lane_out')
+                    self.assertEqual(result['outcome'], 'rate_limited')
                     run.assert_not_called()

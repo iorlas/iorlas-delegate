@@ -102,11 +102,11 @@ class Emoji(unittest.TestCase):
         self.assertEqual(v["unlock"]["in_s"], 1800)
 
     def test_a_recent_hang_with_no_good_run_since_is_slow_but_not_locked(self):
-        hist = [{"lane": "GROK_SUBSCRIPTION", "status": "done", "reason": None, "ts": T - 5 * HOUR},
-                {"lane": "GROK_SUBSCRIPTION", "status": "lane_out", "reason": "hung", "ts": T - 600}]
+        hist = [{"lane": "GROK_SUBSCRIPTION", "done": True, "outcome": None, "ts": T - 5 * HOUR},
+                {"lane": "GROK_SUBSCRIPTION", "outcome": "hung", "ts": T - 600}]
         v = view("GROK_SUBSCRIPTION", lane("GROK_SUBSCRIPTION"), history=hist)
         self.assertEqual((v["state"], v["emoji"], v["unlock"]["locked"]), ("slow", "🐢", False))
-        hist.append({"lane": "GROK_SUBSCRIPTION", "status": "done", "reason": None, "ts": T - 60})
+        hist.append({"lane": "GROK_SUBSCRIPTION", "done": True, "outcome": None, "ts": T - 60})
         self.assertEqual(view("GROK_SUBSCRIPTION", lane("GROK_SUBSCRIPTION"), history=hist)["state"], "ready")
 
     def test_disabled_and_not_configured(self):
@@ -248,7 +248,7 @@ class Command(unittest.TestCase):
         row = next(r for r in ck["lanes"] if r["id"] == "DEEPSEEK_FREE")
         self.assertEqual((row["state"], row["unlock"]["in_s"]), ("resting", 3 * HOUR))
         self.assertIn("unlocks " + row["unlock"]["text"], text)
-        for k in ("lanes", "running", "routing", "recent", "needs_input"):
+        for k in ("lanes", "running", "routing", "needs_input"):
             self.assertIn(k, data)
         self.assertIn(ck["next_worker"]["action"], ("run", "stop"))
 
