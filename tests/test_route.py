@@ -1,4 +1,5 @@
 """Deterministic tests for the delegate router. Run: python -m unittest discover -s tests"""
+import hermetic  # noqa: F401  (a home of its own for every test)
 import copy
 import datetime as dt
 import importlib.util
@@ -1069,7 +1070,7 @@ echo '{"type":"step_finish","sessionID":"ses_1","part":{"type":"step-finish","co
         (log / "opencode.log").write_text("old: Free usage limit reached\n")        # before launch: ignored
         self.grok_ready()
         self.codex_out()
-        with mock.patch.dict(route.supervisor.LIMITS["opencode"], first_event_s=1):
+        with mock.patch.dict(route.supervisor.LIMITS["opencode"], first_event_s=20):
             _, r = self.run_it(timeout=0)
         self.assertEqual((r["stop"], r["text"]), (None, "grok did it"))
         self.assertNotIn("GROK_SUBSCRIPTION", route.load_state().get("out", {}))
@@ -1579,7 +1580,7 @@ echo '{"type":"step_finish","sessionID":"ses_1","part":{"type":"step-finish","co
                 for i in range(n)]
 
     def test_codex_that_goes_quiet_is_stopped_through_the_tree_kill_and_the_lane_is_not_marked_out(self):
-        with mock.patch.dict(route.supervisor.LIMITS["codex"], silence_s=1), mock.patch.object(route, "stop_tree", wraps=route.stop_tree) as st:
+        with mock.patch.dict(route.supervisor.LIMITS["codex"], silence_s=1), mock.patch.object(route.reaper, "stop_tree", wraps=route.reaper.stop_tree) as st:
             t0 = time.time()
             _, r = self.run_it(mode="hang", timeout=0)
         self.assertLess(time.time() - t0, 15)
@@ -2310,7 +2311,7 @@ class WatchdogProc(unittest.TestCase):
         with mock.patch.dict(route.supervisor.LIMITS["codex"], **limits):
             poll, tick, state = route.worker_watch("codex", "OPENAI_SUBSCRIPTION")
         route.WORKER_TICK[:] = [tick]
-        with mock.patch.object(route, "stop_tree", wraps=route.stop_tree) as st:
+        with mock.patch.object(route.reaper, "stop_tree", wraps=route.reaper.stop_tree) as st:
             t0 = time.time()
             rc, out, err, timed_out = route.run_proc([sys.executable, "-c", code], "", None, dict(os.environ), None, None, poll)
         return rc, state, st, time.time() - t0

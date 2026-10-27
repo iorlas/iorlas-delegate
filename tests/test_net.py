@@ -1,5 +1,6 @@
 """Network facts (delegate-4n7, delegate-0sf, delegate-dlz): the probe, the words of a dropped connection, network never benching a pair,
 roles{} in status --json --cheap, and the adapter registry."""
+import hermetic  # noqa: F401  (a home of its own for every test)
 import contextlib
 import io
 import json

@@ -52,6 +52,10 @@ if str(HERE) not in sys.path:
 from lanes import classify, health, live as livemod, supervisor      # the one outcome ladder (delegate-e05); the health fold and breaker (rdt, a9x); the idle watchdog (go0)
 from lanes import netprobe, profiles, usage as accounting                # network facts (4n7); the lane adapter registry (dlz)
 from lanes import cockpit as role_view              # roles{} for status (0sf)
+from lanes import reaper                            # a worker dies with its call: process-tree stop with a survivor report (own)
+import contracts, osproc                            # the typed request/answer; the one module that lists processes
+proc_start, pid_alive, descendants = osproc.proc_start, osproc.alive, osproc.descendants
+stop_tree, kill_tree = reaper.stop_tree, reaper.kill_tree
 WEEK_MIN = 7 * 24 * 60
 
 
@@ -1727,17 +1731,6 @@ def lease_counts(st, t, lane):
     return {"live": len(mine), "suspect": sum(1 for v in mine if suspect(v, t))}
 
 
-def proc_start(pid):
-    """The process's start time as ps prints it, or None when it is gone (POSIX only): with the pid it names one process, not a reused pid."""
-    if os.name == "nt" or not pid:
-        return None
-    with contextlib.suppress(Exception):
-        r = subprocess.run(["ps", "-o", "stat=,lstart=", "-p", str(int(pid))], capture_output=True, text=True, timeout=5)
-        stat, _, start = r.stdout.strip().partition(" ")
-        return None if not stat or stat.startswith("Z") else start.strip() or None      # a zombie has exited
-    return None
-
-
 def orphan(v):
     """True when the lease's route.py process is gone (pid plus start time: an expired lease alone may be a laptop waking up) but its worker
     is still running: a SIGKILL on route.py leaves the worker, which is its own process group, editing the tree."""
@@ -2144,92 +2137,6 @@ def publish_lanes(lanes, st, t):
 
 # ----------------------------------------------------------------------------- run: one step, end to end, one JSON answer
 
-
-
-def descendants(pid):
-    """Every live process below `pid` (POSIX), by parent links."""
-    with contextlib.suppress(Exception):
-        r = subprocess.run(["ps", "-A", "-o", "pid=,ppid="], capture_output=True, text=True, timeout=5)
-        kids = {}
-        for ln in r.stdout.splitlines():
-            c, _, par = ln.strip().partition(" ")
-            kids.setdefault(int(par), []).append(int(c))
-        out, todo = [], [pid]
-        while todo:
-            for c in kids.get(todo.pop(), []):
-                out.append(c)
-                todo.append(c)
-        return out
-    return []
-
-
-def pid_alive(pid):
-    """True while the pid is a live, non-zombie process (POSIX; Windows answers False: taskkill /T does the whole job there)."""
-    if os.name == "nt":
-        return False
-    try:
-        os.kill(pid, 0)
-    except ProcessLookupError:
-        return False
-    except OSError:
-        return True
-    st = ""
-    with contextlib.suppress(Exception):
-        st = subprocess.run(["ps", "-o", "stat=", "-p", str(pid)], capture_output=True, text=True, timeout=5).stdout.strip()
-    return not st.startswith("Z")
-
-
-def stop_tree(pid, grace=0, done=None):
-    """Stop `pid` and everything below it, however deep and whatever session or group each descendant sits in (the Codex CLI is a node
-    shim whose native child may sit in a group of its own and ignore SIGTERM; Claude's background shells likewise). Only this tree, found
-    by parent links: never a pattern. Windows: `taskkill /T /F /PID`. POSIX: with `grace`, SIGTERM first and wait up to `grace` seconds
-    for `done()`; then SIGKILL every pid and group collected, re-collecting until nothing below is left (a dead parent orphans its
-    children, so the pids are remembered from before the first signal). -> True when nothing is left."""
-    if os.name == "nt":
-        with contextlib.suppress(Exception):
-            subprocess.run(["taskkill", "/T", "/F", "/PID", str(pid)], capture_output=True)
-        return True
-    me, mygroup = os.getpid(), os.getpgrp()
-    known = {pid}
-    groups = set()
-
-    def collect():
-        for c in [pid] + descendants(pid):
-            known.add(c)
-        for c in list(known):
-            with contextlib.suppress(OSError):
-                groups.add(os.getpgid(c))
-        groups.discard(mygroup)
-        known.discard(me)
-
-    def sweep(sig):
-        for g in groups:
-            with contextlib.suppress(OSError):
-                os.killpg(g, sig)
-        for c in known:
-            with contextlib.suppress(OSError):
-                os.kill(c, sig)
-    collect()
-    if grace:
-        sweep(signal.SIGTERM)
-        end = time.time() + grace
-        while time.time() < end and not (done() if done else not any(pid_alive(c) for c in known)):
-            time.sleep(0.2)
-    for _ in range(5):
-        collect()
-        sweep(signal.SIGKILL)
-        time.sleep(0.05)
-        if not any(pid_alive(c) for c in known):
-            return True
-    return not any(pid_alive(c) for c in known)
-
-
-def kill_tree(p):
-    """Kill the worker `p` (a Popen) and its whole tree: killing only the codex wrapper leaves the vendor binary running."""
-    with contextlib.suppress(Exception):
-        stop_tree(p.pid)
-    with contextlib.suppress(Exception):
-        p.kill()
 
 
 def run_tree(cmd, timeout, **kw):
@@ -2817,6 +2724,7 @@ def lane_gone_poll(lane, since):
     return poll, state
 
 
+IDLE_S = None           # run --idle: seconds of silence before the worker is hung (None = the CLI's limit in lanes/supervisor.py)
 NET_GRACE_S = 15        # how long a worker may say "waiting for network" before one probe decides whether to stop it
 
 
@@ -2825,7 +2733,7 @@ def worker_watch(cli, lane, extra=None):
     hung (no first line within first_event_s, silence longer than the CLI's silence_s: lanes/supervisor.py). `tick` is for every line printed.
     state["why"] ends as "limit" | "hung"; "kind" says which deadline; "words" is the sentence for the answer; "msg" the limit line."""
     lim = supervisor.limits(cli)
-    wd = supervisor.Watchdog(lim["first_event_s"], lim["silence_s"], beat=WORKER_BEAT[0] if WORKER_BEAT else None)
+    wd = supervisor.Watchdog(lim["first_event_s"], IDLE_S or lim["silence_s"], beat=WORKER_BEAT[0] if WORKER_BEAT else None)
     gone, gstate = lane_gone_poll(lane, time.time())
     state = {"why": None, "msg": "", "kind": None, "words": "", "wd": wd}
     polls = [(gone, gstate)] + ([extra] if extra else [])
@@ -3399,7 +3307,7 @@ def run_once(a, cfg):
     d["limit_reset"] = min((r for _, r in resets if r and r > t), default=None)     # a guess: the soonest reset (too early costs one refused call, too late days)
     cap, taken = slots(lane, S), {}
     canary_due = bool(lane.canary.get(d["model"])) and h["kind"] in LAUNCHERS
-    silence_s = supervisor.LIMITS[supervisor.CLI_OF_KIND[h["kind"]]]["silence_s"]
+    silence_s = IDLE_S or supervisor.LIMITS[supervisor.CLI_OF_KIND[h["kind"]]]["silence_s"]
 
     def claim(st):      # the authoritative count: inside the lock, never from the snapshot decision() read
         live = live_leases(st, now())
@@ -3513,6 +3421,10 @@ def run_once(a, cfg):
                 res.update(outcome="schema_invalid", say=f"the answer does not match the schema: {why}")
     except Exception as e:      # a launcher bug is an error object, not a stack trace
         res = {"outcome": "crash", "say": f"{type(e).__name__}: {e}"}
+    except SystemExit as e:     # SIGTERM / SIGHUP to this process: run_proc stopped the worker's tree first; the caller still gets a typed answer
+        if not isinstance(e.code, int) or e.code <= 128:
+            raise
+        res = {"outcome": "killed", "say": f"route.py got signal {e.code - 128}; its worker was stopped first"}
     finally:
         beat.set()
 
@@ -3553,7 +3465,10 @@ def run_once(a, cfg):
                context={"instructions": [str(f) for f in repo_instructions(cwd)], "env_keys": sorted(child_env().keys())},
                transcript=transcript, call_id=getattr(a, "call_id", None), usage=usage, transcript_info=info,
                transcript_status="ok" if info else "ref_unresolvable" if res.get("ref") else "died_before_session_id", **extra)
-    return emit(result(res.pop("outcome", None), **res))
+    wk = reaper.worker_end(res.get("outcome"))
+    if wk.survivors and res.get("outcome") is None:      # a done answer must not hide a worker still running
+        res.update(outcome="worker_survived", say="worker pids outlived SIGTERM and SIGKILL: " + ", ".join(str(x.pid) for x in wk.survivors))
+    return emit(result(res.pop("outcome", None), worker=wk.wire(), **res))
 
 
 # ----------------------------------------------------------------------------- onboarding commands (code in onboard.py)
@@ -3650,7 +3565,7 @@ def main(argv=None):
     cf = sub.add_parser("config"); cf.add_argument("action", choices=["set", "show"]); cf.add_argument("key", nargs="?"); cf.add_argument("value", nargs="?")
     ru = sub.add_parser("run"); ru.add_argument("role"); ru.add_argument("--authored-by"); ru.add_argument("--failed", default="")
     ru.add_argument("--premium", nargs="?", const="claude", metavar="FAMILY"); ru.add_argument("--allow-degraded", action="store_true")
-    ru.add_argument("--claude-usage"); ru.add_argument("--cwd"); ru.add_argument("--brief"); ru.add_argument("--timeout", type=int, help="seconds; none by default"); ru.add_argument("--unattended", action="store_true")
+    ru.add_argument("--claude-usage"); ru.add_argument("--cwd"); ru.add_argument("--brief"); ru.add_argument("--timeout", type=int, help="seconds; none by default"); ru.add_argument("--idle", type=int, help="seconds without worker output before it is hung; default per CLI"); ru.add_argument("--unattended", action="store_true")
     ru.add_argument("--schema"); ru.add_argument("--resume"); ru.add_argument("--cap", type=float); ru.add_argument("--parent"); ru.add_argument("--task"); ru.add_argument("--title")
     ru.add_argument("--call-id", help="the caller's id for this call: echoed in the answer and written to history.jsonl, the key that joins the caller's record to ours")
     ho = sub.add_parser("hold", help="stop a lane for some roles until a time; --until is mandatory"); ho.add_argument("lane"); ho.add_argument("--until"); ho.add_argument("--roles")
@@ -3660,8 +3575,9 @@ def main(argv=None):
     sub.add_parser("release", help="end a hold early (by id or lane)").add_argument("target")
     sub.add_parser("holds", help="every hold in force, with holder and expiry")
     a = ap.parse_args(argv)
-    global UNATTENDED
+    global UNATTENDED, IDLE_S
     UNATTENDED = getattr(a, "unattended", False)
+    IDLE_S = getattr(a, "idle", None)
     if a.cmd == "guard":        # a hook: no config, no state
         return cmd_guard(a)
     if a.cmd == "net":

@@ -1,4 +1,5 @@
 """The outcome ladder (skills/delegate/lanes/classify.py) and contract.json, replayed on fixtures taken from real runs (tests/contract/fixtures)."""
+import hermetic  # noqa: F401  (a home of its own for every test)
 import argparse
 import json
 import tempfile

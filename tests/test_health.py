@@ -1,4 +1,5 @@
 """Lane health fold, breaker, canary and idle watchdog (R15: delegate-rdt, -a9x, -go0). Run: python -m unittest discover -s tests"""
+import hermetic  # noqa: F401  (a home of its own for every test)
 import json
 import sys
 import tempfile

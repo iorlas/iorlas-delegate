@@ -1,5 +1,6 @@
 """DELEGATE_LIVE_FILE: the live event file for a dashboard. Fixture streams per harness replayed through the real launchers (a fake CLI prints them
 and never exits); assert the kinds in order and the cmd / cmd_end id pairs. Env unset: no file."""
+import hermetic  # noqa: F401  (a home of its own for every test)
 import json
 import os
 import sys

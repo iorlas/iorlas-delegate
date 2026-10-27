@@ -1,4 +1,5 @@
 """Per-call usage and cost accounting (delegate-uk0, study 85)."""
+import hermetic  # noqa: F401  (a home of its own for every test)
 import json
 import os
 import tempfile

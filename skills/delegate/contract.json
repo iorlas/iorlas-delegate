@@ -77,6 +77,13 @@
    "health": "none",
    "wording": "the worker was ended by a signal route.py did not send"
   },
+  "worker_survived": {
+   "scope": "machine",
+   "permanence": "needs_owner",
+   "retry": "none",
+   "health": "none",
+   "wording": "a worker process outlived SIGTERM and SIGKILL (pids in worker.survivors)"
+  },
   "bad_request": {
    "scope": "caller",
    "permanence": "needs_owner",
@@ -178,6 +185,7 @@
   "--cwd",
   "--brief",
   "--timeout",
+  "--idle",
   "--unattended",
   "--schema",
   "--resume",
@@ -518,6 +526,10 @@
      "null"
     ],
     "description": "set only on the agent-tool handoff (stop is null): the model the orchestrator's Agent tool should run"
+   },
+   "worker": {
+    "type": "object",
+    "about": "how the worker's life ended: end ok|error|timeout|worker_survived, stopped, term_sent, kill_sent, waited_s, survivors[{pid,start}]; absent when no worker was launched"
    }
   }
  }

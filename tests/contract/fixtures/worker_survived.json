@@ -1,0 +1,19 @@
+{
+ "fixture": 1,
+ "scenario": "a worker process outlived SIGTERM and SIGKILL after the delegate stopped it: no vendor evidence, delegate's own reaper measured it (tests/test_own_contract.py makes the real one)",
+ "real": false,
+ "rows": [
+  {
+   "id": "worker_survived",
+   "synthetic": true,
+   "source": "delegate-own: lanes/reaper.py survivor report",
+   "expected_reason": "worker_survived",
+   "expected_stop": {
+    "reason": "worker_survived",
+    "scope": "machine",
+    "permanence": "needs_owner",
+    "retry_kind": "none"
+   }
+  }
+ ]
+}
