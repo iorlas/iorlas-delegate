@@ -171,3 +171,10 @@ line); unset, nothing is written. `{"t": epoch, "k": kind, ...}`. Kinds: `start`
 `cmd_end` (id, exit, out = last 1500 chars, secs), `tool` / `tool_end` (same, non-shell tools; text = name + main arg), `msg` (<= 2000), `think` (<= 500),
 `tokens` (in, cached, out), `stall` (secs; at 60 s of silence, then every 60 s), `end` (status done|timeout|killed|error, secs, cost_usd), `raw` (type name
 of an unmapped event, never its payload). A write error warns once on stderr and stops the feed; the call is unaffected. Code: `skills/delegate/lanes/live.py`.
+
+## 6. The worker's life belongs to delegate (OWN)
+
+- A run answer carries `worker` = `{end: ok|error|timeout|worker_survived, stopped, term_sent, kill_sent, waited_s, survivors[{pid,start}]}` (typed in `skills/delegate/contracts.py`, which task-loop vendors; `RunRequest.argv()` is the flag list, `RunResult.parse()` the reader).
+- Before delegate exits it stops the worker's whole tree (`lanes/reaper.py`): SIGTERM, `DELEGATE_STOP_GRACE` s (5), SIGKILL, re-look. A pid still alive after that is a survivor; a done answer with a survivor becomes stop reason `worker_survived`.
+- SIGTERM/SIGHUP to `route.py run` stops the tree first, then answers `killed` with exit 0. `run --idle N` sets the silence limit (default per CLI, `lanes/supervisor.py`); the live JSONL (`DELEGATE_LIVE_FILE`) is unchanged.
+- `osproc.py` is the only module that lists processes (/proc on Linux, `ps` on macOS; Windows answers "nothing found"). Tests: `python dev/suite.py` (sharded units, per-test home via `tests/hermetic.py`), `python dev/suite.py --contract` (real processes, fake agent `tests/fakes/fake_agent.py`).
