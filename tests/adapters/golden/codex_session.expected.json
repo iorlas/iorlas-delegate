@@ -1,0 +1,135 @@
+{
+ "events": [
+  [
+   {
+    "event": "Started",
+    "ref": "th-1"
+   }
+  ],
+  [],
+  [
+   {
+    "event": "Cmd",
+    "id": "c1",
+    "text": "ls",
+    "cwd": null
+   }
+  ],
+  [],
+  [
+   {
+    "event": "CmdEnd",
+    "id": "c1",
+    "text": "ls",
+    "exit": 0,
+    "out": "a b",
+    "secs": null
+   }
+  ],
+  [
+   {
+    "event": "Tool",
+    "id": "f1",
+    "name": "edit",
+    "arg": "x.py, y.py",
+    "prov": false
+   }
+  ],
+  [
+   {
+    "event": "ToolEnd",
+    "id": "f1",
+    "name": "edit",
+    "arg": "x.py, y.py",
+    "out": null,
+    "secs": null
+   }
+  ],
+  [
+   {
+    "event": "Tool",
+    "id": "m1",
+    "name": "docs.search",
+    "arg": "",
+    "prov": false
+   }
+  ],
+  [
+   {
+    "event": "ToolEnd",
+    "id": "m1",
+    "name": "docs.search",
+    "arg": "",
+    "out": null,
+    "secs": null
+   }
+  ],
+  [
+   {
+    "event": "ToolEnd",
+    "id": "w1",
+    "name": "web",
+    "arg": "python match",
+    "out": null,
+    "secs": null
+   }
+  ],
+  [
+   {
+    "event": "Think",
+    "text": "plan the change"
+   }
+  ],
+  [],
+  [
+   {
+    "event": "Msg",
+    "text": "done"
+   }
+  ],
+  [
+   {
+    "event": "Unknown",
+    "type": "item.completed"
+   }
+  ],
+  [
+   {
+    "event": "Unknown",
+    "type": "weird.event"
+   }
+  ],
+  [],
+  [
+   {
+    "event": "TurnDone",
+    "usage": {
+     "in_": 100,
+     "cached": 40,
+     "out": 7,
+     "cache_write": null
+    }
+   }
+  ]
+ ],
+ "evidence": {
+  "ref": "th-1",
+  "last": "done",
+  "tokens": {
+   "in": 100,
+   "cached": 40,
+   "out": 7
+  },
+  "cumulative": {
+   "in": 100,
+   "cached": 40,
+   "out": 7
+  },
+  "turns": 1,
+  "work": true,
+  "error": "",
+  "transient": "",
+  "net_at": null,
+  "declined": []
+ }
+}

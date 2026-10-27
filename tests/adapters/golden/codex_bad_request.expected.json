@@ -1,0 +1,24 @@
+{
+ "events": [
+  [
+   {
+    "event": "HarnessError",
+    "text": "{\"type\": \"error\", \"status\": 400, \"error\": {\"message\": \"model not supported\"}}",
+    "http_status": 400,
+    "kind": "error"
+   }
+  ]
+ ],
+ "evidence": {
+  "ref": null,
+  "last": "",
+  "tokens": null,
+  "cumulative": null,
+  "turns": 0,
+  "work": false,
+  "error": "{\"type\": \"error\", \"status\": 400, \"error\": {\"message\": \"model not supported\"}}",
+  "transient": "",
+  "net_at": null,
+  "declined": []
+ }
+}

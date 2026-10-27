@@ -1,0 +1,51 @@
+[
+ {
+  "v": 1,
+  "pid": 4242,
+  "pgid": 4242,
+  "run_id": "rid"
+ },
+ {
+  "k": "start",
+  "t": 101.0,
+  "harness": "codex",
+  "pid": 4242,
+  "lane": "OPENAI_SUBSCRIPTION",
+  "model": "m",
+  "effort": "high",
+  "role": "worker"
+ },
+ {
+  "k": "retry",
+  "t": 102.0,
+  "n": 1,
+  "of": 5,
+  "why": "Reconnecting... 1/5 (request timed out)"
+ },
+ {
+  "k": "retry",
+  "t": 103.0,
+  "n": 2,
+  "of": 5,
+  "why": "Reconnecting... 2/5 (stream disconnected before completion: idle timeout waiting for websocket)"
+ },
+ {
+  "k": "cmd_start",
+  "t": 105.0,
+  "id": "i3",
+  "text": "ls"
+ },
+ {
+  "k": "cmd_end",
+  "t": 107.0,
+  "id": "i3",
+  "exit": 0,
+  "secs": 2.0
+ },
+ {
+  "k": "end",
+  "t": 108.0,
+  "status": "done",
+  "secs": 9.0
+ }
+]

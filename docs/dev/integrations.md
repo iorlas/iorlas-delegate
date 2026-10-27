@@ -152,29 +152,22 @@ as a script, with no Claude session behind it. The contract is `skills/delegate/
 Tests: `tests/test_route.py`, class `AgentRuns` (the records' shape). Keep it green or replace it with an equivalent.
 
 
-### Dashboard routing snapshot
-
-`route.py status --json` (v1) optionally includes `routing` (v1): `at`, `caller: unattended`,
-`lanes` (id, label, family, billing, enabled, available, reason, unattended, until, five/week used percentages, model names),
-and `roles` (id, about, advance, selected, chain). `selected` is the current fresh-call decision under the same
-unattended rules, busy-slot limits and usage gates as `run`; it never starts a worker. Credit lanes are inventory
-only for unattended callers. `chain` contains ordered model/effort/family/mode/flag/rung/lanes steps; reviews
-also include `by_author` scenarios. Planning degradation still requires consent; premium models are not part of
-normal chains. This is a preview: limits can change before dispatch and resumed threads stay on their own lane.
-No credentials, private configuration
-or account subscription tier are exported; a configured login is not proof of a particular paid plan.
-
 ### Live event file
 
 With `DELEGATE_LIVE_FILE=<path>` set for a `route.py run`, every worker launch appends one JSON object per line to that path (parents created, flushed per
-line); unset, nothing is written. `{"t": epoch, "k": kind, ...}`. Kinds: `start` (harness, lane, model, effort, role, pid), `cmd` (id, text <= 2000, cwd if known) /
-`cmd_end` (id, exit, out = last 1500 chars, secs), `tool` / `tool_end` (same, non-shell tools; text = name + main arg), `msg` (<= 2000), `think` (<= 500),
-`tokens` (in, cached, out), `stall` (secs; at 60 s of silence, then every 60 s), `end` (status done|timeout|killed|error, secs, cost_usd), `raw` (type name
-of an unmapped event, never its payload). A write error warns once on stderr and stops the feed; the call is unaffected. Code: `skills/delegate/lanes/live.py`.
+line); unset, nothing is written. Records: `src/delegate/contracts/live.py`; writer: `src/delegate/app/publish.py` (`LiveSink`).
+- Line 1 is `WorkerStarted` `{v: 1, pid, pgid, run_id}` (no `k`): where the first worker is. A later worker in the same file (the schema re-ask) writes only its `start`.
+- Every other line is `{"t": epoch, "k": kind, ...}`. Kinds: `start` (harness, pid, lane, model, effort, role), `cmd_start` (id, text <= 2000, cwd, prov) /
+`cmd_end` (id, exit, out = last 1500 chars, secs), `tool_start` / `tool_end` (same, non-shell tools; text = name + main arg), `msg` (<= 2000), `think` (<= 500),
+`tokens` (in, cached, out), `stall` (secs; at 60 s of silence, then every 60 s), `retry` (n, of, why: the harness is retrying by itself, Codex "Reconnecting... 2/5" or HTTP 429),
+`end` (status done|timeout|killed|error, secs, cost_usd), `raw` (type name of an unmapped event, never its payload). _start/_end pairs match by `id`. A value the
+harness did not give is left out, not null (`cmd_end.exit` null = unknown).
+- A write error warns once on stderr and stops the feed; the file stops growing at 20 MB (only `end` still goes out); the call is unaffected. Codex's events come from its
+harness class (`adapters/harness/codex.py`, parsed once); Claude's and OpenCode's from `skills/delegate/lanes/live.py` until their harness classes land.
 
 ## 6. The worker's life belongs to delegate (OWN)
 
-- A run answer carries `worker` = `{end: ok|error|timeout|worker_survived, stopped, term_sent, kill_sent, waited_s, survivors[{pid,start}]}` (typed in `skills/delegate/contracts.py`, which task-loop vendors; `RunRequest.argv()` is the flag list, `RunResult.parse()` the reader).
+- A run answer carries `worker` = `{end: ok|error|timeout|worker_survived, stopped, term_sent, kill_sent, waited_s, survivors[{pid,start}]}` (typed in `src/delegate/contracts/wire.py`; `RunRequest.to_argv()` is the flag list, `RunResult` the answer, `contract.json`'s `answer_schema` is generated from it by `dev/gen_contract.py`). It also names the process: `pid`, `pgid`, `start`. The answer carries `exit_code`, `first_error` and `ask_kind` when there is one.
 - Before delegate exits it stops the worker's whole tree (`lanes/reaper.py`): SIGTERM, `DELEGATE_STOP_GRACE` s (5), SIGKILL, re-look. A pid still alive after that is a survivor; a done answer with a survivor becomes stop reason `worker_survived`.
 - SIGTERM/SIGHUP to `route.py run` stops the tree first, then answers `killed` with exit 0. `run --idle N` sets the silence limit (default per CLI, `lanes/supervisor.py`); the live JSONL (`DELEGATE_LIVE_FILE`) is unchanged.
 - `osproc.py` is the only module that lists processes (/proc on Linux, `ps` on macOS; Windows answers "nothing found"). Tests: `python dev/suite.py` (sharded units, per-test home via `tests/hermetic.py`), `python dev/suite.py --contract` (real processes, fake agent `tests/fakes/fake_agent.py`).

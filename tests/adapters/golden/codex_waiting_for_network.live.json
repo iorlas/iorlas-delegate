@@ -1,0 +1,24 @@
+[
+ {
+  "v": 1,
+  "pid": 4242,
+  "pgid": 4242,
+  "run_id": "rid"
+ },
+ {
+  "k": "start",
+  "t": 101.0,
+  "harness": "codex",
+  "pid": 4242,
+  "lane": "OPENAI_SUBSCRIPTION",
+  "model": "m",
+  "effort": "high",
+  "role": "worker"
+ },
+ {
+  "k": "end",
+  "t": 102.0,
+  "status": "done",
+  "secs": 3.0
+ }
+]

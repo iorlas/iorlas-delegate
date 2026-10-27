@@ -11,6 +11,7 @@ from unittest import mock
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "skills" / "delegate"))
 import test_stream_supervisor as tss           # noqa: E402
+from delegate.adapters.harness.codex import CodexHarness   # noqa: E402
 from delegate.app.publish import LiveSink, end_status      # noqa: E402
 
 j = tss.j
@@ -72,6 +73,16 @@ class LiveFile(unittest.TestCase):
         self.assertEqual((sorted(first), first["pid"] == ev[0]["pid"], first["pgid"], first["run_id"]), (["pgid", "pid", "run_id", "v"], True, first["pid"], "rid12345"))
         self.assertEqual(ev[-1]["status"], "done")
         self.assertTrue(all(isinstance(e["t"], float) for e in ev))
+
+    def test_codex_lines_are_parsed_once_for_the_live_file_the_turn_and_the_evidence(self):
+        f = self.base / "live.jsonl"
+        real = CodexHarness.parse_line
+        with mock.patch.object(CodexHarness, "parse_line", autospec=True, side_effect=real) as parse:
+            r = self.run_kind("codex", CODEX, f)
+        self.assertIsNone(r.get("outcome"))
+        self.assertEqual(parse.call_count, len(CODEX))
+        self.assertEqual((r["tokens"], r["ref"]), ({"in": 100, "cached": 40, "out": 7}, "th-1"))
+        self.assertEqual(self.events(f)[1]["k"], "cmd_start")
 
     def test_claude(self):
         f = self.base / "live.jsonl"

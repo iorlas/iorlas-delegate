@@ -1,0 +1,46 @@
+{
+ "events": [
+  [
+   {
+    "event": "Started",
+    "ref": "th-4"
+   }
+  ],
+  [
+   {
+    "event": "Reconnecting",
+    "n": 4,
+    "of": 5,
+    "text": "Reconnecting... 4/5 (websocket closed by server)"
+   }
+  ],
+  [
+   {
+    "event": "HarnessError",
+    "text": "Reconnecting... 5/5 (websocket closed by server before response.completed)",
+    "http_status": null,
+    "kind": "error"
+   }
+  ],
+  [
+   {
+    "event": "HarnessError",
+    "text": "stream disconnected before completion: websocket closed by server",
+    "http_status": null,
+    "kind": "error"
+   }
+  ]
+ ],
+ "evidence": {
+  "ref": "th-4",
+  "last": "",
+  "tokens": null,
+  "cumulative": null,
+  "turns": 0,
+  "work": false,
+  "error": "stream disconnected before completion: websocket closed by server",
+  "transient": "Reconnecting... 4/5 (websocket closed by server)",
+  "net_at": null,
+  "declined": []
+ }
+}

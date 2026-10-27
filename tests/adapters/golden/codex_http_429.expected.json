@@ -1,0 +1,24 @@
+{
+ "events": [
+  [
+   {
+    "event": "HarnessError",
+    "text": "exceeded retry limit, last status: 429 Too Many Requests",
+    "http_status": 429,
+    "kind": "error"
+   }
+  ]
+ ],
+ "evidence": {
+  "ref": null,
+  "last": "",
+  "tokens": null,
+  "cumulative": null,
+  "turns": 0,
+  "work": false,
+  "error": "exceeded retry limit, last status: 429 Too Many Requests",
+  "transient": "",
+  "net_at": null,
+  "declined": []
+ }
+}

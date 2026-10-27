@@ -1,0 +1,2 @@
+{"type": "thread.started", "thread_id": "th-3"}
+{"type": "error", "message": "Reconnecting... waiting for network (Connection failed: error sending request)"}

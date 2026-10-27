@@ -1,0 +1,48 @@
+{
+ "events": [
+  [
+   {
+    "event": "Started",
+    "ref": "th-2"
+   }
+  ],
+  [
+   {
+    "event": "Reconnecting",
+    "n": 1,
+    "of": 5,
+    "text": "Reconnecting... 1/5 (request timed out)"
+   }
+  ],
+  [
+   {
+    "event": "Reconnecting",
+    "n": 2,
+    "of": 5,
+    "text": "Reconnecting... 2/5 (stream disconnected before completion: idle timeout waiting for websocket)"
+   }
+  ],
+  [
+   {
+    "event": "CmdEnd",
+    "id": "i3",
+    "text": "ls",
+    "exit": 0,
+    "out": null,
+    "secs": null
+   }
+  ]
+ ],
+ "evidence": {
+  "ref": "th-2",
+  "last": "",
+  "tokens": null,
+  "cumulative": null,
+  "turns": 0,
+  "work": true,
+  "error": "",
+  "transient": "Reconnecting... 2/5 (stream disconnected before completion: idle timeout waiting for websocket)",
+  "net_at": null,
+  "declined": []
+ }
+}

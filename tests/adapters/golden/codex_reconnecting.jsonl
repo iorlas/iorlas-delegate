@@ -1,0 +1,4 @@
+{"type": "thread.started", "thread_id": "th-2"}
+{"type": "error", "message": "Reconnecting... 1/5 (request timed out)"}
+{"type": "error", "message": "Reconnecting... 2/5 (stream disconnected before completion: idle timeout waiting for websocket)"}
+{"type": "item.completed", "item": {"id": "i3", "type": "command_execution", "command": "ls", "exit_code": 0, "status": "completed"}}

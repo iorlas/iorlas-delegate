@@ -1,0 +1,101 @@
+[
+ {
+  "v": 1,
+  "pid": 4242,
+  "pgid": 4242,
+  "run_id": "rid"
+ },
+ {
+  "k": "start",
+  "t": 101.0,
+  "harness": "codex",
+  "pid": 4242,
+  "lane": "OPENAI_SUBSCRIPTION",
+  "model": "m",
+  "effort": "high",
+  "role": "worker"
+ },
+ {
+  "k": "cmd_start",
+  "t": 103.0,
+  "id": "c1",
+  "text": "ls"
+ },
+ {
+  "k": "cmd_end",
+  "t": 105.0,
+  "id": "c1",
+  "exit": 0,
+  "secs": 2.0,
+  "out": "a b"
+ },
+ {
+  "k": "tool_start",
+  "t": 107.0,
+  "id": "f1",
+  "text": "edit x.py, y.py"
+ },
+ {
+  "k": "tool_end",
+  "t": 109.0,
+  "id": "f1",
+  "secs": 2.0
+ },
+ {
+  "k": "tool_start",
+  "t": 111.0,
+  "id": "m1",
+  "text": "docs.search"
+ },
+ {
+  "k": "tool_end",
+  "t": 113.0,
+  "id": "m1",
+  "secs": 2.0
+ },
+ {
+  "k": "tool_start",
+  "t": 115.0,
+  "id": "w1",
+  "text": "web python match"
+ },
+ {
+  "k": "tool_end",
+  "t": 117.0,
+  "id": "w1",
+  "secs": 2.0
+ },
+ {
+  "k": "think",
+  "t": 118.0,
+  "text": "plan the change"
+ },
+ {
+  "k": "msg",
+  "t": 119.0,
+  "text": "done"
+ },
+ {
+  "k": "raw",
+  "t": 120.0,
+  "type": "item.completed"
+ },
+ {
+  "k": "raw",
+  "t": 121.0,
+  "type": "weird.event"
+ },
+ {
+  "k": "tokens",
+  "t": 122.0,
+  "in": 100,
+  "cached": 40,
+  "out": 7
+ },
+ {
+  "k": "end",
+  "t": 123.0,
+  "status": "done",
+  "secs": 24.0
+ }
+]

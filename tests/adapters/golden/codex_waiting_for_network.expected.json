@@ -1,0 +1,28 @@
+{
+ "events": [
+  [
+   {
+    "event": "Started",
+    "ref": "th-3"
+   }
+  ],
+  [
+   {
+    "event": "WaitingForNetwork",
+    "text": "Reconnecting... waiting for network (Connection failed: error sending request)"
+   }
+  ]
+ ],
+ "evidence": {
+  "ref": "th-3",
+  "last": "",
+  "tokens": null,
+  "cumulative": null,
+  "turns": 0,
+  "work": false,
+  "error": "",
+  "transient": "Reconnecting... waiting for network (Connection failed: error sending request)",
+  "net_at": 5.0,
+  "declined": []
+ }
+}

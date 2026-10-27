@@ -1,0 +1,4 @@
+{"type": "thread.started", "thread_id": "th-4"}
+{"type": "error", "message": "Reconnecting... 4/5 (websocket closed by server)"}
+{"type": "error", "message": "Reconnecting... 5/5 (websocket closed by server before response.completed)"}
+{"type": "turn.failed", "error": {"message": "stream disconnected before completion: websocket closed by server"}}
