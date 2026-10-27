@@ -1,0 +1,48 @@
+{
+ "call_id": null,
+ "contract": 3,
+ "cost": 0,
+ "data": null,
+ "denied": [],
+ "effort": null,
+ "family": null,
+ "flag": null,
+ "git_violation": [],
+ "lane": null,
+ "model": null,
+ "ref": null,
+ "run_id": null,
+ "say": "No adequate reasoning model is available now.",
+ "secs": 0,
+ "stop": {
+  "permanence": "transient",
+  "reason": "no_lane",
+  "ref": null,
+  "retry": {
+   "at": 1793148228.1432786,
+   "kind": "predicted"
+  },
+  "scope": "machine"
+ },
+ "text": "",
+ "tokens": null,
+ "transcript": null,
+ "transcript_info": null,
+ "transcript_status": "not_launched",
+ "usage": {
+  "accounting": "unknown",
+  "answer_bytes": 0,
+  "context_k": null,
+  "cost": 0,
+  "cost_source": "unknown",
+  "cost_usd": null,
+  "last_activity_at": null,
+  "ref": null,
+  "secs": 0,
+  "tokens": null,
+  "ttl_s": null,
+  "ttl_source": "unknown",
+  "turns": null,
+  "warm_until": null
+ }
+}

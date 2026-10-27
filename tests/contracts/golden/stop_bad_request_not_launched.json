@@ -1,0 +1,49 @@
+{
+ "call_id": null,
+ "contract": 3,
+ "cost": 0,
+ "data": null,
+ "denied": [],
+ "effort": null,
+ "family": null,
+ "flag": null,
+ "git_violation": [],
+ "lane": null,
+ "model": null,
+ "ref": null,
+ "run_id": null,
+ "say": "route.py: unrecognized arguments: --nope",
+ "secs": 0,
+ "stop": {
+  "fix": "update task-loop or delegate: unrecognized arguments: --nope",
+  "permanence": "needs_owner",
+  "reason": "bad_request",
+  "ref": null,
+  "retry": {
+   "at": null,
+   "kind": "none"
+  },
+  "scope": "caller"
+ },
+ "text": "",
+ "tokens": null,
+ "transcript": null,
+ "transcript_info": null,
+ "transcript_status": null,
+ "usage": {
+  "accounting": "unknown",
+  "answer_bytes": 0,
+  "context_k": null,
+  "cost": 0,
+  "cost_source": "unknown",
+  "cost_usd": null,
+  "last_activity_at": null,
+  "ref": null,
+  "secs": 0,
+  "tokens": null,
+  "ttl_s": null,
+  "ttl_source": "unknown",
+  "turns": null,
+  "warm_until": null
+ }
+}

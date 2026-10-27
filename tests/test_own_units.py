@@ -9,7 +9,8 @@ from unittest import mock
 
 from test_route import route, ROOT, CFG
 
-import contracts, osproc               # noqa: E402  (route put skills/delegate on sys.path)
+import osproc                          # noqa: E402  (route put skills/delegate and src/ on sys.path)
+from delegate.contracts import wire    # noqa: E402
 from lanes import reaper               # noqa: E402
 
 
@@ -55,26 +56,13 @@ class OsProc(unittest.TestCase):
 
 class Contract(unittest.TestCase):
     def test_request_flags_are_flags_of_run(self):
-        req = contracts.RunRequest("writer", "b.md", "/w", schema_file="s.json", resume="r1", authored_by="x", timeout_s=60, idle_s=30,
-                                   parent="p", task="t", title="T", call_id="c1", live_file="/l.jsonl")
-        flags = {a for a in req.argv("route.py") if a.startswith("--")}
+        req = wire.RunRequest(role="writer", brief_file="b.md", cwd="/w", schema_file="s.json", resume="r1", authored_by="x", timeout_s=60, idle_s=30,
+                              parent="p", task="t", title="T", call_id="c1", live_file="/l.jsonl")
+        flags = {a for a in req.to_argv("route.py") if a.startswith("--")}
         self.assertLessEqual(flags, set(json.loads((ROOT / "skills/delegate/contract.json").read_text())["run_args"]))
         self.assertIn("--idle", flags)
         self.assertEqual(req.env(), {"DELEGATE_LIVE_FILE": "/l.jsonl"})
-        self.assertNotIn("--resume", contracts.RunRequest("w", "b", "/w").argv("route.py"))
-
-    def test_answer_parses_with_and_without_a_worker(self):
-        ok = contracts.RunResult.parse({"contract": 3, "stop": None, "text": "hi", "secs": 2, "cost": 0.5})
-        self.assertEqual((ok.reason, ok.worker.end, ok.text), (None, "ok", "hi"))
-        bad = contracts.RunResult.parse({"contract": 3, "stop": {"reason": "worker_survived"}, "worker": {
-            "end": "worker_survived", "stopped": True, "kill_sent": True, "survivors": [{"pid": 7, "start": "9"}]}})
-        self.assertEqual((bad.reason, bad.worker.survivors), ("worker_survived", [contracts.Survivor(7, "9")]))
-        with self.assertRaises(ValueError):
-            contracts.RunResult.parse({"contract": 2})
-
-    def test_the_contracts_file_stands_alone(self):
-        src = (ROOT / "skills/delegate/contracts.py").read_text()
-        self.assertEqual([l for l in src.splitlines() if l.startswith(("import ", "from ")) and "dataclass" not in l and "typing" not in l], ["import sys"])
+        self.assertNotIn("--resume", wire.RunRequest(role="w", brief_file="b", cwd="/w").to_argv("route.py"))
 
 
 class WorkerField(unittest.TestCase):
@@ -85,7 +73,7 @@ class WorkerField(unittest.TestCase):
         self.assertEqual([reaper.worker_end(o).end for o in (None, "timeout", "hung", "worker_failed")], ["ok", "timeout", "error", "error"])
 
     def test_a_survivor_beats_every_outcome(self):
-        reaper.REPORTS.append(contracts.WorkerEnd(contracts.END_SURVIVED, stopped=True, survivors=[contracts.Survivor(5)]))
+        reaper.REPORTS.append(wire.WorkerEnd(end=wire.END_SURVIVED, stopped=True, survivors=[wire.Survivor(pid=5)]))
         self.assertEqual([reaper.worker_end(o).end for o in (None, "timeout")], ["worker_survived"] * 2)
 
     def test_reason_worker_survived_is_declared_with_facts(self):

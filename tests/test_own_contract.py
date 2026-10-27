@@ -14,7 +14,8 @@ from unittest import mock
 from test_route import route, ROOT
 
 sys.path.insert(0, str(ROOT / "skills" / "delegate"))
-import contracts, osproc               # noqa: E402
+import osproc                          # noqa: E402
+from delegate.contracts import codec, wire    # noqa: E402
 from lanes import reaper, supervisor   # noqa: E402
 
 FAKE = str(Path(__file__).resolve().parent / "fakes" / "fake_agent.py")
@@ -69,7 +70,7 @@ class RealProcesses(unittest.TestCase):
         rep = reaper.kill_tree(p, grace=1)
         p.wait()
         self.assertTrue(dead(child), "the child in its own session survived")
-        self.assertEqual((rep.end, rep.survivors, rep.term_sent, rep.kill_sent), (contracts.END_OK, [], True, True))
+        self.assertEqual((rep.end, rep.survivors, rep.term_sent, rep.kill_sent), (wire.END_OK, [], True, True))
 
     def test_sigkill_escalation_when_sigterm_is_ignored(self):
         p = self.start("hang")
@@ -91,11 +92,11 @@ class RealProcesses(unittest.TestCase):
         pid = p.pid
         with mock.patch.object(osproc, "alive", side_effect=lambda x: x == pid):      # a pid the kernel will not let go
             rep = reaper.kill_tree(p, grace=0)
-        self.assertEqual(rep.end, contracts.END_SURVIVED)
+        self.assertEqual(rep.end, wire.END_SURVIVED)
         self.assertEqual([s.pid for s in rep.survivors], [pid])
         end = reaper.worker_end(None)
-        self.assertEqual((end.end, [s.pid for s in end.survivors]), (contracts.END_SURVIVED, [pid]))
-        self.assertEqual(contracts.WorkerEnd.parse(end.wire()), end)
+        self.assertEqual((end.end, [s.pid for s in end.survivors]), (wire.END_SURVIVED, [pid]))
+        self.assertEqual(codec.from_json(wire.WorkerEnd, codec.to_json(end)), end)
 
     def run_fake(self, scenario, timeout=0, poll=None):
         route.WORKER_STARTED[:] = [lambda pid: self.__dict__.setdefault("pid", pid)]
@@ -107,7 +108,7 @@ class RealProcesses(unittest.TestCase):
         self.assertEqual((rc, timed_out), (0, False))
         self.assertEqual(json.loads(out.splitlines()[-1])["result"], "fake answer")
         end = reaper.worker_end(None)
-        self.assertEqual((end.end, end.stopped), (contracts.END_OK, False))
+        self.assertEqual((end.end, end.stopped), (wire.END_OK, False))
 
     def test_call_timeout_stops_a_worker_that_ignores_sigterm(self):
         t0 = time.time()
@@ -115,7 +116,7 @@ class RealProcesses(unittest.TestCase):
         self.assertTrue(timed_out)
         self.assertLess(time.time() - t0, 20)
         end = reaper.worker_end("timeout")
-        self.assertEqual((end.end, end.stopped, end.survivors), (contracts.END_TIMEOUT, True, []))
+        self.assertEqual((end.end, end.stopped, end.survivors), (wire.END_TIMEOUT, True, []))
         self.assertTrue(dead(wait_pid(self.pidfile)))
         self.assertTrue(dead(self.pid))
 

@@ -1,0 +1,53 @@
+{
+ "call_id": null,
+ "contract": 3,
+ "cost": 0,
+ "data": null,
+ "denied": [],
+ "effort": "medium",
+ "fallback": false,
+ "fallback_reason": null,
+ "family": "openai",
+ "first_lane": null,
+ "flag": null,
+ "git_violation": [],
+ "lane": "OPENAI_SUBSCRIPTION",
+ "model": "gpt-6.1-sol",
+ "notice": "not set up: CLAUDE_CREDIT, GROK_SUBSCRIPTION (doctor --lane NAME to set up, doctor --decline NAME to hide)",
+ "ref": null,
+ "run_id": null,
+ "rung": 0,
+ "say": "task T-1 already has a running worker",
+ "secs": 0,
+ "stop": {
+  "permanence": "transient",
+  "reason": "duplicate_task",
+  "ref": null,
+  "retry": {
+   "at": 1793144699.0890152,
+   "kind": "poll"
+  },
+  "scope": "bead"
+ },
+ "text": "",
+ "tokens": null,
+ "transcript": null,
+ "transcript_info": null,
+ "transcript_status": "not_launched",
+ "usage": {
+  "accounting": "unknown",
+  "answer_bytes": 0,
+  "context_k": null,
+  "cost": 0,
+  "cost_source": "unknown",
+  "cost_usd": null,
+  "last_activity_at": null,
+  "ref": null,
+  "secs": 0,
+  "tokens": null,
+  "ttl_s": null,
+  "ttl_source": "unknown",
+  "turns": null,
+  "warm_until": null
+ }
+}

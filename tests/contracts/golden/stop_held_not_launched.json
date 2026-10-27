@@ -1,0 +1,48 @@
+{
+ "call_id": "c#9",
+ "contract": 3,
+ "cost": 0,
+ "data": null,
+ "denied": [],
+ "effort": null,
+ "family": null,
+ "flag": null,
+ "git_violation": [],
+ "lane": "OPENAI_SUBSCRIPTION",
+ "model": null,
+ "ref": null,
+ "run_id": null,
+ "say": "OPENAI_SUBSCRIPTION is on hold, held: owner until Wed 28 Oct 00:43 (x). Continue with a fresh writer on another lane; existing file changes remain in the working directory.",
+ "secs": 0,
+ "stop": {
+  "permanence": "transient",
+  "reason": "held",
+  "ref": null,
+  "retry": {
+   "at": 1793148230.5133426,
+   "kind": "predicted"
+  },
+  "scope": "lane"
+ },
+ "text": "",
+ "tokens": null,
+ "transcript": null,
+ "transcript_info": null,
+ "transcript_status": "not_launched",
+ "usage": {
+  "accounting": "unknown",
+  "answer_bytes": 0,
+  "context_k": null,
+  "cost": 0,
+  "cost_source": "unknown",
+  "cost_usd": null,
+  "last_activity_at": null,
+  "ref": null,
+  "secs": 0,
+  "tokens": null,
+  "ttl_s": null,
+  "ttl_source": "unknown",
+  "turns": null,
+  "warm_until": null
+ }
+}

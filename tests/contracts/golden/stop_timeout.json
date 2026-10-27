@@ -1,0 +1,69 @@
+{
+ "call_id": null,
+ "context": {
+  "env_keys": [
+   "DELEGATE_DEPTH",
+   "HOME",
+   "PATH"
+  ],
+  "instructions": []
+ },
+ "contract": 3,
+ "cost": 0,
+ "data": null,
+ "denied": [],
+ "effort": "medium",
+ "fallback": false,
+ "fallback_reason": null,
+ "family": "openai",
+ "first_lane": null,
+ "flag": null,
+ "git_violation": [],
+ "lane": "OPENAI_SUBSCRIPTION",
+ "model": "gpt-6.1-sol",
+ "notice": "not set up: CLAUDE_CREDIT, GROK_SUBSCRIPTION (doctor --lane NAME to set up, doctor --decline NAME to hide)",
+ "ref": "thread-123",
+ "run_id": "c6a746fd-7fc3-4706-aab6-47a284403ba9",
+ "rung": 0,
+ "say": "codex did not finish within 4s and was killed",
+ "secs": 4.1,
+ "stop": {
+  "permanence": "transient",
+  "reason": "timeout",
+  "ref": "thread-123",
+  "retry": {
+   "at": null,
+   "kind": "none"
+  },
+  "scope": "bead"
+ },
+ "text": "progress",
+ "tokens": null,
+ "transcript": null,
+ "transcript_info": null,
+ "transcript_status": "ref_unresolvable",
+ "usage": {
+  "accounting": "unknown",
+  "answer_bytes": 8,
+  "context_k": null,
+  "cost": 0,
+  "cost_source": "unknown",
+  "cost_usd": null,
+  "last_activity_at": "2026-10-27T23:43:52Z",
+  "ref": "thread-123",
+  "secs": 4.1,
+  "tokens": null,
+  "ttl_s": null,
+  "ttl_source": "unknown",
+  "turns": null,
+  "warm_until": null
+ },
+ "worker": {
+  "end": "timeout",
+  "kill_sent": false,
+  "stopped": true,
+  "survivors": [],
+  "term_sent": true,
+  "waited_s": 0.1
+ }
+}

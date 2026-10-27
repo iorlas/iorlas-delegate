@@ -211,6 +211,7 @@
  },
  "answer_schema": {
   "type": "object",
+  "additionalProperties": false,
   "required": [
    "contract",
    "data",
@@ -218,39 +219,114 @@
    "ref",
    "lane",
    "model",
-   "tokens",
+   "effort",
+   "family",
+   "flag",
    "cost",
+   "tokens",
+   "denied",
    "secs",
    "run_id",
-   "call_id",
    "transcript",
-   "transcript_info",
-   "denied",
    "say",
    "git_violation",
-   "usage",
-   "stop"
+   "call_id",
+   "transcript_info",
+   "transcript_status",
+   "stop",
+   "usage"
   ],
   "properties": {
    "contract": {
-    "type": "integer",
     "enum": [
      3
     ]
    },
+   "data": {},
    "text": {
     "type": "string"
    },
-   "say": {
-    "type": "string"
+   "ref": {
+    "type": [
+     "string",
+     "null"
+    ]
+   },
+   "lane": {
+    "type": [
+     "string",
+     "null"
+    ]
+   },
+   "model": {
+    "type": [
+     "string",
+     "null"
+    ]
+   },
+   "effort": {
+    "type": [
+     "string",
+     "null"
+    ]
+   },
+   "family": {
+    "type": [
+     "string",
+     "null"
+    ]
+   },
+   "flag": {
+    "type": [
+     "string",
+     "null"
+    ]
+   },
+   "cost": {
+    "type": "number"
+   },
+   "tokens": {
+    "type": [
+     "object",
+     "null"
+    ],
+    "additionalProperties": false,
+    "required": [
+     "in",
+     "cached",
+     "out"
+    ],
+    "properties": {
+     "in": {
+      "type": [
+       "integer",
+       "null"
+      ]
+     },
+     "cached": {
+      "type": [
+       "integer",
+       "null"
+      ]
+     },
+     "out": {
+      "type": [
+       "integer",
+       "null"
+      ]
+     }
+    }
    },
    "denied": {
     "type": "array",
     "items": {
      "type": "object",
+     "additionalProperties": false,
      "required": [
       "kind",
-      "tool"
+      "tool",
+      "path",
+      "input"
      ],
      "properties": {
       "kind": {
@@ -274,19 +350,14 @@
        ]
       },
       "input": {
-       "type": "object"
+       "type": "object",
+       "additionalProperties": {}
       }
      }
     }
    },
-   "git_violation": {
-    "type": "array"
-   },
-   "call_id": {
-    "type": [
-     "string",
-     "null"
-    ]
+   "secs": {
+    "type": "number"
    },
    "run_id": {
     "type": [
@@ -300,10 +371,33 @@
      "null"
     ]
    },
+   "say": {
+    "type": "string"
+   },
+   "git_violation": {
+    "type": "array",
+    "items": {
+     "type": "string"
+    }
+   },
+   "call_id": {
+    "type": [
+     "string",
+     "null"
+    ]
+   },
    "transcript_info": {
     "type": [
      "object",
      "null"
+    ],
+    "additionalProperties": false,
+    "required": [
+     "path",
+     "kind",
+     "from",
+     "to",
+     "bytes"
     ],
     "properties": {
      "path": {
@@ -328,48 +422,206 @@
      }
     }
    },
+   "transcript_status": {
+    "type": [
+     "string",
+     "null"
+    ],
+    "enum": [
+     "ok",
+     "ref_unresolvable",
+     "died_before_session_id",
+     "not_launched",
+     "unsupported",
+     null
+    ]
+   },
+   "stop": {
+    "type": [
+     "object",
+     "null"
+    ],
+    "additionalProperties": false,
+    "required": [
+     "reason",
+     "scope",
+     "permanence",
+     "retry",
+     "ref"
+    ],
+    "properties": {
+     "reason": {
+      "type": "string"
+     },
+     "scope": {
+      "type": "string",
+      "enum": [
+       "bead",
+       "caller",
+       "machine",
+       "lane",
+       "model"
+      ]
+     },
+     "permanence": {
+      "type": "string",
+      "enum": [
+       "transient",
+       "needs_owner"
+      ]
+     },
+     "retry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+       "kind",
+       "at"
+      ],
+      "properties": {
+       "kind": {
+        "type": "string",
+        "enum": [
+         "none",
+         "predicted",
+         "poll"
+        ]
+       },
+       "at": {
+        "type": [
+         "number",
+         "null"
+        ]
+       }
+      }
+     },
+     "ref": {
+      "type": [
+       "string",
+       "null"
+      ]
+     },
+     "fix": {
+      "type": "string"
+     },
+     "resumable": {
+      "type": "boolean"
+     },
+     "partial": {
+      "type": "boolean"
+     }
+    }
+   },
    "usage": {
     "type": "object",
+    "additionalProperties": false,
     "required": [
      "tokens",
      "cost",
      "secs",
      "turns",
      "context_k",
-     "answer_bytes"
+     "answer_bytes",
+     "ref",
+     "last_activity_at",
+     "warm_until",
+     "ttl_s",
+     "ttl_source",
+     "cost_usd",
+     "cost_source",
+     "accounting"
     ],
     "properties": {
      "tokens": {
-      "type": [
-       "object",
-       "null"
-      ],
-      "properties": {
-       "in_fresh": {
-        "type": [
-         "integer",
-         "null"
-        ]
+      "anyOf": [
+       {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+         "in",
+         "cached",
+         "out",
+         "in_fresh",
+         "cache_read",
+         "cache_write"
+        ],
+        "properties": {
+         "in": {
+          "type": [
+           "integer",
+           "null"
+          ]
+         },
+         "cached": {
+          "type": [
+           "integer",
+           "null"
+          ]
+         },
+         "out": {
+          "type": [
+           "integer",
+           "null"
+          ]
+         },
+         "in_fresh": {
+          "type": [
+           "integer",
+           "null"
+          ]
+         },
+         "cache_read": {
+          "type": [
+           "integer",
+           "null"
+          ]
+         },
+         "cache_write": {
+          "type": [
+           "integer",
+           "null"
+          ]
+         },
+         "cache_write_by_ttl": {
+          "type": "object",
+          "additionalProperties": {
+           "type": "integer"
+          }
+         }
+        }
        },
-       "cache_read": {
-        "type": [
-         "integer",
-         "null"
-        ]
+       {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+         "in",
+         "cached",
+         "out"
+        ],
+        "properties": {
+         "in": {
+          "type": [
+           "integer",
+           "null"
+          ]
+         },
+         "cached": {
+          "type": [
+           "integer",
+           "null"
+          ]
+         },
+         "out": {
+          "type": [
+           "integer",
+           "null"
+          ]
+         }
+        }
        },
-       "cache_write": {
-        "type": [
-         "integer",
-         "null"
-        ]
-       },
-       "out": {
-        "type": [
-         "integer",
-         "null"
-        ]
+       {
+        "type": "null"
        }
-      }
+      ]
      },
      "cost": {
       "type": "number"
@@ -448,88 +700,182 @@
      }
     }
    },
-   "stop": {
+   "rung": {
     "type": [
-     "object",
+     "integer",
      "null"
-    ],
+    ]
+   },
+   "fallback": {
+    "type": [
+     "boolean",
+     "null"
+    ]
+   },
+   "fallback_reason": {
+    "type": [
+     "string",
+     "null"
+    ]
+   },
+   "first_lane": {
+    "type": [
+     "string",
+     "null"
+    ]
+   },
+   "warnings": {
+    "type": "array",
+    "items": {
+     "type": "string"
+    }
+   },
+   "notice": {
+    "type": "string"
+   },
+   "warning": {
+    "type": "string"
+   },
+   "needs_input": {
+    "type": "array",
+    "items": {
+     "type": "string"
+    }
+   },
+   "ask_user": {
+    "type": "object",
+    "additionalProperties": false,
     "required": [
-     "reason",
-     "scope",
-     "permanence",
-     "retry"
+     "question",
+     "options",
+     "then"
     ],
     "properties": {
-     "reason": {
+     "question": {
       "type": "string"
      },
-     "scope": {
-      "type": "string",
-      "enum": [
-       "bead",
-       "caller",
-       "machine",
-       "lane",
-       "model"
-      ]
-     },
-     "permanence": {
-      "type": "string",
-      "enum": [
-       "transient",
-       "needs_owner"
-      ]
-     },
-     "retry": {
-      "type": "object",
-      "required": [
-       "kind",
-       "at"
-      ],
-      "properties": {
-       "kind": {
-        "type": "string",
-        "enum": [
-         "none",
-         "predicted",
-         "poll"
-        ]
-       },
-       "at": {
-        "type": [
-         "number",
-         "null"
-        ]
-       }
+     "options": {
+      "type": "array",
+      "items": {
+       "type": "string"
       }
      },
-     "ref": {
-      "type": [
-       "string",
-       "null"
-      ]
-     },
-     "resumable": {
-      "type": "boolean"
-     },
-     "partial": {
-      "type": "boolean"
-     },
-     "fix": {
+     "then": {
       "type": "string"
      }
     }
    },
+   "ask_kind": {
+    "type": "string",
+    "enum": [
+     "decision"
+    ],
+    "description": "what the caller is asked, when ask_user is set"
+   },
    "agent_model": {
+    "type": "string",
+    "description": "set only on the agent-tool handoff (stop is null): the model the orchestrator's Agent tool should run"
+   },
+   "brief_prefix": {
+    "type": "string"
+   },
+   "cwd": {
+    "type": "string"
+   },
+   "context": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": [
+     "instructions",
+     "env_keys"
+    ],
+    "properties": {
+     "instructions": {
+      "type": "array",
+      "items": {
+       "type": "string"
+      }
+     },
+     "env_keys": {
+      "type": "array",
+      "items": {
+       "type": "string"
+      }
+     }
+    }
+   },
+   "exit_code": {
     "type": [
-     "string",
+     "integer",
      "null"
     ],
-    "description": "set only on the agent-tool handoff (stop is null): the model the orchestrator's Agent tool should run"
+    "description": "the worker's exit status (negative = killed by that signal)"
+   },
+   "first_error": {
+    "type": "string",
+    "description": "the first error the harness or the process reported, cut to 240 characters"
    },
    "worker": {
     "type": "object",
-    "about": "how the worker's life ended: end ok|error|timeout|worker_survived, stopped, term_sent, kill_sent, waited_s, survivors[{pid,start}]; absent when no worker was launched"
+    "additionalProperties": false,
+    "required": [],
+    "properties": {
+     "end": {
+      "type": "string",
+      "enum": [
+       "ok",
+       "error",
+       "timeout",
+       "worker_survived"
+      ]
+     },
+     "stopped": {
+      "type": "boolean"
+     },
+     "term_sent": {
+      "type": "boolean"
+     },
+     "kill_sent": {
+      "type": "boolean"
+     },
+     "waited_s": {
+      "type": "number"
+     },
+     "survivors": {
+      "type": "array",
+      "items": {
+       "type": "object",
+       "additionalProperties": false,
+       "required": [
+        "pid"
+       ],
+       "properties": {
+        "pid": {
+         "type": "integer"
+        },
+        "start": {
+         "type": [
+          "string",
+          "null"
+         ]
+        }
+       }
+      }
+     },
+     "pid": {
+      "type": "integer"
+     },
+     "pgid": {
+      "type": "integer"
+     },
+     "start": {
+      "type": [
+       "string",
+       "null"
+      ]
+     }
+    },
+    "description": "how the worker's life ended; absent when no worker was launched"
    }
   }
  }

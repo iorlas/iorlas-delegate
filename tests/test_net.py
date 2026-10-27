@@ -106,10 +106,6 @@ class Words(unittest.TestCase):
                      "model not supported", "the test suite failed: 3 errors", ""):
             self.assertFalse(netprobe.looks_dropped(text), text)
 
-    def test_waiting_for_network_is_progress(self):
-        self.assertTrue(netprobe.waiting("Reconnecting... waiting for network (Connection failed: error sending request)"))
-        self.assertFalse(netprobe.waiting("Reconnecting... 2/5 (request timed out)"))
-
 
 class RouteNet(unittest.TestCase):
     def setUp(self):

@@ -22,17 +22,11 @@ IP_LITERAL = "1.1.1.1:443"              # no DNS: separates "offline" from "DNS 
 DROP_RE = re.compile(r"ENOTFOUND|ECONNRESET|ECONNREFUSED|ECONNABORTED|ETIMEDOUT|EAI_AGAIN|EPIPE|getaddrinfo|could not resolve host|network is unreachable"
                      r"|cannot connect to api|unable to connect|error sending request|connection (reset|closed|refused|timed out|failed)|socket hang up"
                      r"|dns error|network error|waiting for network|(?:TLS|SSL) handshake|stream disconnected(?!.{0,200}max_output_tokens)", re.I | re.S)
-WAITING_RE = re.compile(r"^\s*Reconnecting\.\.\.\s*waiting for network", re.I)      # codex waits for the network by itself; the engine is the one waiter
 
 
 def looks_dropped(text):
     """-> True when `text` (a vendor error event or stderr, never the model's answer) says the connection broke."""
     return bool(DROP_RE.search(text or ""))
-
-
-def waiting(text):
-    """-> True for codex's own "Reconnecting... waiting for network" line (no n/of): progress, not a failure."""
-    return bool(WAITING_RE.match(text or ""))
 
 
 def split_host(h, default_port=443):

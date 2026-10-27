@@ -19,6 +19,7 @@ spec = importlib.util.spec_from_file_location("route", ROOT / "skills" / "delega
 route = importlib.util.module_from_spec(spec)
 sys.modules["route"] = route
 spec.loader.exec_module(route)
+from delegate.adapters.harness import reset_parse  # noqa: E402  (route put src/ on sys.path)
 
 route.REAL_NET_PROBE = route.net_probe
 route.net_probe = lambda hosts=None: {"up": True, "ip_up": True, "why": "ok", "ms": 1, "hosts": {}, "at": time.time()}     # tests open no socket; tests/test_net.py swaps it per case
@@ -1041,7 +1042,7 @@ echo '{"type":"step_finish","sessionID":"ses_1","part":{"type":"step-finish","co
         out = route.load_state()["out"]["GROK_SUBSCRIPTION"]
         self.assertIn("Free usage limit reached", out["why"])
         self.assertGreater(out["until"], time.time())
-        self.assertLessEqual(out["until"], route.next_utc_midnight(time.time()) + 1)
+        self.assertLessEqual(out["until"], (time.time() // 86400 + 1) * 86400 + 1)
         self.assert_child_gone(pid)
 
     @unittest.skipIf(sys.platform != "darwin", "the Grok lane runs commands under sandbox-exec: macOS only")
@@ -1764,11 +1765,11 @@ echo '{"type":"step_finish","sessionID":"ses_1","part":{"type":"step-finish","co
         route.READERS["codex_app_server"] = reading
         self.run_it(mode="limit")
         self.assertAlmostEqual(route.load_state()["out"]["OPENAI_SUBSCRIPTION"]["until"], soon, delta=1)
-        when, source, _ = route.limit_until("You've hit your usage limit. ... or try again at 5:50 AM.", route.now(), {})
+        when, source, _ = reset_parse.limit_until("You've hit your usage limit. ... or try again at 5:50 AM.", route.now(), {})
         self.assertEqual(time.strftime("%H:%M", time.localtime(when)), "05:50")
         self.assertTrue(route.now() < when <= route.now() + 86400)
         self.assertEqual(source, "vendor")
-        when, source, _ = route.limit_until("the batch run is queued behind a rate limit", route.now(), {})
+        when, source, _ = reset_parse.limit_until("the batch run is queued behind a rate limit", route.now(), {})
         self.assertEqual((source, round(when - route.now())), ("guess", 900))       # nobody said when: refusal time + 15 min
 
     def test_a_plan_with_only_a_weekly_window_reads_it_as_the_week(self):
@@ -2091,7 +2092,7 @@ class ResetTimes(unittest.TestCase):
 
     def at(self, text, t=None):
         t = t or dt.datetime(2026, 10, 25, 0, 0, tzinfo=dt.timezone.utc).timestamp()
-        return route.parse_reset(text, t), t
+        return reset_parse.parse_reset(text, t), t
 
     @unittest.skipUnless(hasattr(time, "tzset"), "needs time.tzset")
     def test_will_reset_at_is_read_in_the_local_zone(self):
@@ -2127,11 +2128,11 @@ class ResetTimes(unittest.TestCase):
 
     def test_unknown_text_is_refusal_time_plus_15_30_60(self):
         t = 1_800_000_000.0
-        got = [route.limit_until("rate limited", t, {}, None, n) for n in range(4)]
+        got = [reset_parse.limit_until("rate limited", t, {}, None, n) for n in range(4)]
         self.assertEqual([round((u - t) / 60) for u, _, _ in got], [15, 30, 60, 60])
         self.assertEqual({src for _, src, _ in got}, {"guess"})
-        self.assertEqual(route.limit_until("rate limited", t, {"limit_reset": t + 7200})[1:], ("guess", None))
-        self.assertEqual(route.limit_until("rate limited", t, {}, lambda: t + 999)[:2], (t + 999, "vendor"))
+        self.assertEqual(reset_parse.limit_until("rate limited", t, {"limit_reset": t + 7200})[1:], ("guess", None))
+        self.assertEqual(reset_parse.limit_until("rate limited", t, {}, lambda: t + 999)[:2], (t + 999, "vendor"))
 
     def test_out_rows_record_source_and_zone_and_report_is_manual(self):
         with tempfile.TemporaryDirectory() as d, mock.patch.object(route, "config_dir", return_value=Path(d)):

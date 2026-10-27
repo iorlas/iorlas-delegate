@@ -249,7 +249,7 @@ class Command(unittest.TestCase):
         row = next(r for r in ck["lanes"] if r["id"] == "DEEPSEEK_FREE")
         self.assertEqual((row["state"], row["unlock"]["in_s"]), ("resting", 3 * HOUR))
         self.assertIn("unlocks " + row["unlock"]["text"], text)
-        for k in ("lanes", "running", "routing", "needs_input"):
+        for k in ("lanes", "running", "needs_input"):
             self.assertIn(k, data)
         self.assertIn(ck["next_worker"]["action"], ("run", "stop"))
 

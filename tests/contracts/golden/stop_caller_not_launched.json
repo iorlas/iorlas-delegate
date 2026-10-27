@@ -1,0 +1,53 @@
+{
+ "call_id": null,
+ "contract": 3,
+ "cost": 0,
+ "data": null,
+ "denied": [],
+ "effort": "medium",
+ "fallback": false,
+ "fallback_reason": null,
+ "family": "openai",
+ "first_lane": null,
+ "flag": null,
+ "git_violation": [],
+ "lane": "OPENAI_SUBSCRIPTION",
+ "model": "gpt-6.1-sol",
+ "notice": "not set up: CLAUDE_CREDIT, GROK_SUBSCRIPTION (doctor --lane NAME to set up, doctor --decline NAME to hide)",
+ "ref": null,
+ "run_id": null,
+ "rung": 0,
+ "say": "empty brief: pass it on stdin or with --brief FILE",
+ "secs": 0,
+ "stop": {
+  "permanence": "needs_owner",
+  "reason": "caller",
+  "ref": null,
+  "retry": {
+   "at": null,
+   "kind": "none"
+  },
+  "scope": "caller"
+ },
+ "text": "",
+ "tokens": null,
+ "transcript": null,
+ "transcript_info": null,
+ "transcript_status": null,
+ "usage": {
+  "accounting": "unknown",
+  "answer_bytes": 0,
+  "context_k": null,
+  "cost": 0,
+  "cost_source": "unknown",
+  "cost_usd": null,
+  "last_activity_at": null,
+  "ref": null,
+  "secs": 0,
+  "tokens": null,
+  "ttl_s": null,
+  "ttl_source": "unknown",
+  "turns": null,
+  "warm_until": null
+ }
+}

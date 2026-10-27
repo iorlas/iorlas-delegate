@@ -7,7 +7,12 @@ route.stop_tree (the whole process tree).
 Silence limits per CLI (spikes P7, P7b): Claude's longest healthy gap was 225 s, so 600; `codex exec --json` is silent during pure reasoning
 (rollout gaps up to 2,298 s, longest live gap 225.8 s), so 3600; opencode 900. Every gap over LONG_GAP_S is kept (`Watchdog.flush`) to learn the real distribution. A first event must arrive within 120 s (longest seen 35 s).
 """
+import sys
 import time
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[3] / "src"))
+from delegate.contracts import events as ev  # noqa: E402
 
 LIMITS = {"claude": {"first_event_s": 120, "silence_s": 600},
           "codex": {"first_event_s": 120, "silence_s": 3600},
@@ -49,6 +54,19 @@ class Turn:
     def tool(self, ident, open_):
         if ident is not None:
             (self.open.add if open_ else self.open.discard)(ident)
+
+    def apply(self, events):
+        """One parsed stream line (its HarnessEvents): the answer or turn end finishes the turn, a tool in flight keeps the long silence limit,
+        anything else means the turn goes on."""
+        if any(isinstance(e, (ev.Msg, ev.TurnDone)) for e in events):
+            self.finished()
+        else:
+            self.more()
+        for e in events:
+            if isinstance(e, (ev.Cmd, ev.Tool)):
+                self.tool(e.id, True)
+            elif isinstance(e, (ev.CmdEnd, ev.ToolEnd)):
+                self.tool(e.id, False)
 
     def verdict(self, wd):
         if self.done_t is not None and self.clock() - self.done_t >= grace_s(self.cli):

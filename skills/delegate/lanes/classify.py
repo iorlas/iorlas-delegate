@@ -21,7 +21,6 @@ NETWORK_RE = re.compile(r"ENOTFOUND|ECONNRESET|ECONNREFUSED|ETIMEDOUT|EAI_AGAIN|
                         r"|cannot connect to api|unable to connect", re.I)
 CODEX_STATUS_RE = re.compile(r'"status":\s*4(?!29)\d\d')          # codex puts the HTTP status inside its error JSON; 429 is a limit, not a bad request
 BAD_REQUEST_RE = re.compile(CODEX_STATUS_RE.pattern + r"|invalid_request_error|invalid_json_schema|Invalid schema for response_format|unrecognized arguments:|error: unknown argument", re.I)      # the vendor refused the request itself: schema, or a flag its CLI no longer takes
-RECONNECT_RE = re.compile(r"^\s*Reconnecting\.\.\.\s*(\d+)/(\d+)")        # codex retrying its stream: progress until n == of
 CLAUDE_ERROR_RE = re.compile(r"^(API Error|Credit balance|Invalid API key|Not logged in|Please run /login|Claude (AI )?usage limit|OAuth|Failed to authenticate"
                              r"|Request timed out|Error:)", re.I)       # how `claude -p` words its own failures; anything else in a result is the model talking
 # Paths a worker must never touch: credentials outside the repo and .env files in it (.env.example and kin are fine). A tripwire for
@@ -29,7 +28,7 @@ CLAUDE_ERROR_RE = re.compile(r"^(API Error|Credit balance|Invalid API key|Not lo
 SECRET_RE = re.compile(r"\.ssh\b|\.gnupg\b|\.aws\b|\.azure\b|\.config/gh\b|\.docker/config\.json|\.netrc\b|\.git-credentials\b|"
                        r"\.codex/auth\.json|Library/Keychains|(?<![\w.-])\.env(?:\.(?!(?:example|sample|template|dist)\b)[\w-]+)?(?![\w.-])")
 PATTERNS = {"limit": LIMIT_RE, "credit": CREDIT_RE, "spend": SPEND_RE, "login": LOGIN_RE, "network": NETWORK_RE, "codex_status": CODEX_STATUS_RE,
-            "bad_request": BAD_REQUEST_RE, "reconnect": RECONNECT_RE, "claude_error": CLAUDE_ERROR_RE, "secret": SECRET_RE}
+            "bad_request": BAD_REQUEST_RE, "claude_error": CLAUDE_ERROR_RE, "secret": SECRET_RE}
 
 Outcome = namedtuple("Outcome", "reason detail source")        # source: ours | event | stderr | exit
 
@@ -40,12 +39,6 @@ def load_contract():
 
 
 CONTRACT = load_contract()
-
-
-def transient(text):
-    """-> True when a codex error event is a stream retry still in progress ("Reconnecting... 2/5"), not a failure."""
-    m = RECONNECT_RE.match(text or "")
-    return bool(m) and int(m.group(1)) < int(m.group(2))
 
 
 def claude_vendor_error(j):

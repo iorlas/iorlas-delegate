@@ -1,0 +1,49 @@
+{
+ "call_id": null,
+ "contract": 3,
+ "cost": 0,
+ "data": null,
+ "denied": [],
+ "effort": null,
+ "family": null,
+ "flag": null,
+ "git_violation": [],
+ "lane": "OPENAI_SUBSCRIPTION",
+ "model": null,
+ "notice": "not set up: CLAUDE_CREDIT, GROK_SUBSCRIPTION (doctor --lane NAME to set up, doctor --decline NAME to hide)",
+ "ref": null,
+ "run_id": null,
+ "say": "OPENAI_SUBSCRIPTION (the role's first choice) has no free slot: busy: 4 running, 4 allowed",
+ "secs": 0,
+ "stop": {
+  "permanence": "transient",
+  "reason": "busy",
+  "ref": null,
+  "retry": {
+   "at": 1793144721.9536362,
+   "kind": "poll"
+  },
+  "scope": "lane"
+ },
+ "text": "",
+ "tokens": null,
+ "transcript": null,
+ "transcript_info": null,
+ "transcript_status": "not_launched",
+ "usage": {
+  "accounting": "unknown",
+  "answer_bytes": 0,
+  "context_k": null,
+  "cost": 0,
+  "cost_source": "unknown",
+  "cost_usd": null,
+  "last_activity_at": null,
+  "ref": null,
+  "secs": 0,
+  "tokens": null,
+  "ttl_s": null,
+  "ttl_source": "unknown",
+  "turns": null,
+  "warm_until": null
+ }
+}

@@ -179,7 +179,7 @@ class Stop(unittest.TestCase):
     def test_an_unknown_reason_still_gets_a_row_of_closed_facts(self):
         s = classify.stop_facts("some_new_reason")
         self.assertEqual((s["scope"], s["permanence"], s["retry"]["kind"]), ("machine", "needs_owner", "none"))
-        self.assertIsNone(route.schema_problem(dict(route.result("no_lane"), stop=s), CONTRACT["answer_schema"]))
+        self.assertIsNone(route.schema_problem(dict(route.result("no_lane"), stop=dict(s, ref=None)), CONTRACT["answer_schema"]))
 
     def test_the_schema_refuses_an_answer_with_a_missing_or_wrong_field(self):
         good = route.result("no_lane")
@@ -306,11 +306,6 @@ class Ladder(unittest.TestCase):
         self.assertEqual(c(1, "x", "", False, False, {"http_status": 401}).reason, "logged_out")
         self.assertEqual(c(1, "x", "", False, False, {"http_status": 400}).reason, "bad_request")
 
-    def test_codex_stream_retries_are_progress_until_the_last(self):
-        self.assertTrue(classify.transient("Reconnecting... 2/5 (idle timeout waiting for websocket)"))
-        self.assertFalse(classify.transient("Reconnecting... 5/5 (websocket closed by server)"))
-        self.assertFalse(classify.transient("stream disconnected"))
-
     def test_claude_error_text_is_the_clis_not_the_models(self):
         self.assertEqual(classify.claude_vendor_error({"is_error": True, "result": "API Error: 429 rate limit"}), "API Error: 429 rate limit")
         self.assertEqual(classify.claude_vendor_error({"is_error": True, "result": "x", "api_error_status": 529}), "x")
@@ -322,7 +317,7 @@ class Ladder(unittest.TestCase):
         for name in ("LIMIT_RE", "LOGIN_RE", "NETWORK_RE", "SECRET_RE", "SPEND_RE"):
             self.assertNotIn(f"\n{name} = re.compile", src)
             self.assertIn(f"\n{name} = re.compile", (ROOT / "skills" / "delegate" / "lanes" / "classify.py").read_text(encoding="utf-8"))
-        self.assertEqual(set(classify.PATTERNS), {"limit", "credit", "spend", "login", "network", "codex_status", "bad_request", "reconnect", "claude_error", "secret"})
+        self.assertEqual(set(classify.PATTERNS), {"limit", "credit", "spend", "login", "network", "codex_status", "bad_request", "claude_error", "secret"})
 
 
 class Launchers(unittest.TestCase):

@@ -1,0 +1,71 @@
+{
+ "call_id": null,
+ "context": {
+  "env_keys": [
+   "DELEGATE_DEPTH",
+   "HOME",
+   "PATH"
+  ],
+  "instructions": []
+ },
+ "contract": 3,
+ "cost": 0,
+ "data": null,
+ "denied": [],
+ "effort": "medium",
+ "fallback": false,
+ "fallback_reason": null,
+ "family": "openai",
+ "first_lane": null,
+ "flag": null,
+ "git_violation": [],
+ "lane": "OPENAI_SUBSCRIPTION",
+ "model": "gpt-6.1-sol",
+ "notice": "not set up: CLAUDE_CREDIT, GROK_SUBSCRIPTION (doctor --lane NAME to set up, doctor --decline NAME to hide)",
+ "ref": null,
+ "run_id": "71eec5c9-26fd-4b7b-8af9-7233eeb18293",
+ "rung": 0,
+ "say": "route.py got signal 15; its worker was stopped first",
+ "secs": 0.2,
+ "stop": {
+  "partial": false,
+  "permanence": "transient",
+  "reason": "killed",
+  "ref": null,
+  "resumable": false,
+  "retry": {
+   "at": null,
+   "kind": "none"
+  },
+  "scope": "machine"
+ },
+ "text": "",
+ "tokens": null,
+ "transcript": null,
+ "transcript_info": null,
+ "transcript_status": "died_before_session_id",
+ "usage": {
+  "accounting": "unknown",
+  "answer_bytes": 0,
+  "context_k": null,
+  "cost": 0,
+  "cost_source": "unknown",
+  "cost_usd": null,
+  "last_activity_at": null,
+  "ref": null,
+  "secs": 0.2,
+  "tokens": null,
+  "ttl_s": null,
+  "ttl_source": "unknown",
+  "turns": null,
+  "warm_until": null
+ },
+ "worker": {
+  "end": "error",
+  "kill_sent": false,
+  "stopped": true,
+  "survivors": [],
+  "term_sent": true,
+  "waited_s": 0.1
+ }
+}

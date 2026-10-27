@@ -68,14 +68,6 @@ class ZaiTests(unittest.TestCase):
             self.assertEqual(route.launch_opencode(d,'OK',a,'test1234',1,{})['outcome'],'setup')
             run.assert_not_called()
 
-    def test_dashboard_inventory_exposes_subscription(self):
-        cfg=copy.deepcopy(CFG);cfg['settings']['zai_coding_enabled']=True
-        ls=lanes();ls['ZAI_CODING_SUBSCRIPTION']=route.Lane('ZAI_CODING_SUBSCRIPTION','zai','subscription')
-        shot=route.routing_snapshot(cfg,ls,{},T)
-        row=next(r for r in shot['lanes'] if r['id']=='ZAI_CODING_SUBSCRIPTION')
-        self.assertEqual(row['billing'],'subscription')
-        self.assertEqual(row['label'],'Z.ai GLM Coding Plan')
-
     def test_both_ported_lanes_run_under_the_opencode_watchdog(self):
         a=SimpleNamespace(resume=None,schema=None,timeout=10)
         for lane,model in (('ZAI_CODING_SUBSCRIPTION','zai-coding-plan/glm-5.3'),('DEEPSEEK_FREE','opencode/deepseek-v4.1-flash-free')):

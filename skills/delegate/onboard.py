@@ -199,6 +199,8 @@ def doctor(R, cfg, deep=False, lane=None):
     notes = []
     if (os.path.exists("/.dockerenv") or os.path.exists("/run/.containerenv")) and "volumes" not in ack:
         notes.append({"id": "volumes", "say": "Container: whether ~/.codex and ~/.claude survive a rebuild is not checked. If your home folder is already a volume, run `route.py config ack volumes` and this goes away."})
+    if not (Path(R.HERE).parents[1] / "src" / "delegate" / "contracts" / "wire.py").is_file():     # the typed records ship next to skills/
+        notes.append({"id": "src", "say": "This install has no src/delegate: route.py cannot import its records. Reinstall the plugin."})
     for c in checks:
         if c["id"] in ack and not c["ok"]:
             c["skip"] = True

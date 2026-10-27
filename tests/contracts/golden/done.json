@@ -1,0 +1,71 @@
+{
+ "call_id": null,
+ "context": {
+  "env_keys": [
+   "DELEGATE_DEPTH",
+   "HOME",
+   "PATH"
+  ],
+  "instructions": []
+ },
+ "contract": 3,
+ "cost": 0.5,
+ "data": null,
+ "denied": [],
+ "effort": "medium",
+ "fallback": true,
+ "fallback_reason": "ceiling",
+ "family": "claude",
+ "first_lane": "OPENAI_SUBSCRIPTION",
+ "flag": null,
+ "git_violation": [],
+ "lane": "CLAUDE_SUBSCRIPTION",
+ "model": "sonnet-5.5",
+ "notice": "not set up: CLAUDE_CREDIT, GROK_SUBSCRIPTION (doctor --lane NAME to set up, doctor --decline NAME to hide)",
+ "ref": "sess-1",
+ "run_id": "8bf176ad-5fe9-4cb6-b5f2-3df1e12dfb2c",
+ "rung": 2,
+ "say": "",
+ "secs": 0.0,
+ "stop": null,
+ "text": "claude says hi",
+ "tokens": {
+  "cached": 50,
+  "in": 73,
+  "out": 9
+ },
+ "transcript": null,
+ "transcript_info": null,
+ "transcript_status": "ref_unresolvable",
+ "usage": {
+  "accounting": "estimated",
+  "answer_bytes": 14,
+  "context_k": null,
+  "cost": 0.5,
+  "cost_source": "harness",
+  "cost_usd": 0.5,
+  "last_activity_at": "2026-10-27T23:43:47Z",
+  "ref": "sess-1",
+  "secs": 0.0,
+  "tokens": {
+   "cache_read": 50,
+   "cache_write": 20,
+   "cached": 50,
+   "in": 73,
+   "in_fresh": 3,
+   "out": 9
+  },
+  "ttl_s": 3600,
+  "ttl_source": "vendor_default",
+  "turns": null,
+  "warm_until": "2026-10-28T00:43:47Z"
+ },
+ "worker": {
+  "end": "ok",
+  "kill_sent": false,
+  "stopped": false,
+  "survivors": [],
+  "term_sent": false,
+  "waited_s": 0
+ }
+}

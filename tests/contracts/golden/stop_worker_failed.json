@@ -1,0 +1,80 @@
+{
+ "call_id": null,
+ "context": {
+  "env_keys": [
+   "DELEGATE_DEPTH",
+   "HOME",
+   "PATH"
+  ],
+  "instructions": []
+ },
+ "contract": 3,
+ "cost": 0,
+ "data": null,
+ "denied": [],
+ "effort": "medium",
+ "fallback": false,
+ "fallback_reason": null,
+ "family": "openai",
+ "first_lane": null,
+ "flag": null,
+ "git_violation": [],
+ "lane": "OPENAI_SUBSCRIPTION",
+ "model": "gpt-6.1-sol",
+ "notice": "not set up: CLAUDE_CREDIT, GROK_SUBSCRIPTION (doctor --lane NAME to set up, doctor --decline NAME to hide)",
+ "ref": "thread-123",
+ "run_id": "45d3ae80-3b7d-43aa-807b-542d705fb05c",
+ "rung": 0,
+ "say": "codex exited 1 without an error: The batch run is queued behind a rate limit on the Unity side.",
+ "secs": 0.0,
+ "stop": {
+  "permanence": "transient",
+  "reason": "worker_failed",
+  "ref": "thread-123",
+  "retry": {
+   "at": null,
+   "kind": "none"
+  },
+  "scope": "bead"
+ },
+ "text": "The batch run is queued behind a rate limit on the Unity side.",
+ "tokens": {
+  "cached": 40,
+  "in": 100,
+  "out": 7
+ },
+ "transcript": null,
+ "transcript_info": null,
+ "transcript_status": "ref_unresolvable",
+ "usage": {
+  "accounting": "exact",
+  "answer_bytes": 62,
+  "context_k": null,
+  "cost": 0,
+  "cost_source": "unknown",
+  "cost_usd": null,
+  "last_activity_at": "2026-10-27T23:43:48Z",
+  "ref": "thread-123",
+  "secs": 0.0,
+  "tokens": {
+   "cache_read": 40,
+   "cache_write": null,
+   "cached": 40,
+   "in": 100,
+   "in_fresh": 60,
+   "out": 7
+  },
+  "ttl_s": 3600,
+  "ttl_source": "observed",
+  "turns": 1,
+  "warm_until": "2026-10-28T00:43:48Z"
+ },
+ "worker": {
+  "end": "error",
+  "kill_sent": false,
+  "stopped": true,
+  "survivors": [],
+  "term_sent": true,
+  "waited_s": 0.0
+ }
+}

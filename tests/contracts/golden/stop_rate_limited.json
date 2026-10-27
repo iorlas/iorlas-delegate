@@ -1,0 +1,80 @@
+{
+ "call_id": null,
+ "context": {
+  "env_keys": [
+   "DELEGATE_DEPTH",
+   "HOME",
+   "PATH"
+  ],
+  "instructions": []
+ },
+ "contract": 3,
+ "cost": 0,
+ "data": null,
+ "denied": [],
+ "effort": "medium",
+ "fallback": false,
+ "fallback_reason": null,
+ "family": "openai",
+ "first_lane": null,
+ "flag": null,
+ "git_violation": [],
+ "lane": "OPENAI_SUBSCRIPTION",
+ "model": "gpt-6.1-sol",
+ "notice": "not set up: CLAUDE_CREDIT, GROK_SUBSCRIPTION (doctor --lane NAME to set up, doctor --decline NAME to hide)",
+ "ref": "thread-123",
+ "run_id": "bc2ea651-0685-4c03-ace4-5fa37d5e892c",
+ "rung": 0,
+ "say": "OPENAI_SUBSCRIPTION hit a limit; out until Tue 27 Oct 23:52",
+ "secs": 0.0,
+ "stop": {
+  "permanence": "transient",
+  "reason": "rate_limited",
+  "ref": "thread-123",
+  "retry": {
+   "at": 1793145128.0333776,
+   "kind": "predicted"
+  },
+  "scope": "lane"
+ },
+ "text": "",
+ "tokens": {
+  "cached": 40,
+  "in": 100,
+  "out": 7
+ },
+ "transcript": null,
+ "transcript_info": null,
+ "transcript_status": "ref_unresolvable",
+ "usage": {
+  "accounting": "exact",
+  "answer_bytes": 0,
+  "context_k": null,
+  "cost": 0,
+  "cost_source": "unknown",
+  "cost_usd": null,
+  "last_activity_at": "2026-10-27T23:43:48Z",
+  "ref": "thread-123",
+  "secs": 0.0,
+  "tokens": {
+   "cache_read": 40,
+   "cache_write": null,
+   "cached": 40,
+   "in": 100,
+   "in_fresh": 60,
+   "out": 7
+  },
+  "ttl_s": 3600,
+  "ttl_source": "observed",
+  "turns": 1,
+  "warm_until": "2026-10-28T00:43:48Z"
+ },
+ "worker": {
+  "end": "error",
+  "kill_sent": false,
+  "stopped": true,
+  "survivors": [],
+  "term_sent": true,
+  "waited_s": 0.0
+ }
+}
