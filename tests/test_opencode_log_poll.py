@@ -1,4 +1,5 @@
 """opencode_log_poll: a limit phrase in a log line that quotes the worker's own command must not mark the lane out; a real limit line must."""
+import hermetic  # noqa: F401  (a home of its own for every test)
 import sys
 import tempfile
 import unittest

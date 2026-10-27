@@ -1,3 +1,4 @@
+import hermetic  # noqa: F401  (a home of its own for every test)
 import copy
 import json
 import os

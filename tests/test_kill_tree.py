@@ -1,4 +1,5 @@
 """Tree kill: a worker stopped by timeout, reap or the app-server path leaves no descendant, whatever session it sits in."""
+import hermetic  # noqa: F401  (a home of its own for every test)
 import contextlib
 import json
 import os
@@ -125,7 +126,7 @@ class KillPaths(unittest.TestCase):
         p.kill.assert_not_called()
 
     def test_no_pattern_kills_and_no_bare_kill_in_router(self):
-        src = (ROOT / "skills" / "delegate" / "route.py").read_text(encoding="utf-8")
+        src = "".join((ROOT / "skills" / "delegate" / f).read_text(encoding="utf-8") for f in ("route.py", "lanes/reaper.py"))
         self.assertIsNone(re.search(r"pkill|killall|pgrep", src))
         # the only .kill() calls are the tree kill's own last-resort fallback
         self.assertEqual(len(re.findall(r"\bp\.kill\(\)", src)), 1)

@@ -1,5 +1,6 @@
 """delegate-np7: one supervisor for Codex, Claude Code and opencode. Fixture replays: a fake CLI prints a recorded stream and never exits (or stalls);
 no real model is called. Grace and stall are cut to ~1 s through the supervisor constants."""
+import hermetic  # noqa: F401  (a home of its own for every test)
 import argparse
 import json
 import os

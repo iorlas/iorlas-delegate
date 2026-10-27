@@ -1,4 +1,5 @@
 """status --cheap: zero process spawns, last snapshot plus cached logins with age_s; next reads the login cache instead of spawning."""
+import hermetic  # noqa: F401  (a home of its own for every test)
 import contextlib
 import io
 import json

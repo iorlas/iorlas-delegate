@@ -1,4 +1,5 @@
 """Codex quota read (delegate-av1) and Claude-last routing (delegate-m86), with responses recorded from `codex app-server` on 2026-10-26."""
+import hermetic  # noqa: F401  (a home of its own for every test)
 import copy
 import os
 import tempfile

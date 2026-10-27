@@ -1,4 +1,5 @@
 """The lane cockpit: one row per known lane, an emoji for each state, a plain reason, the unlock time, usage windows with their source."""
+import hermetic  # noqa: F401  (a home of its own for every test)
 import copy
 import io
 import json

@@ -1,5 +1,6 @@
 """Reviewer order (delegate-jx2, qjw, pnz): Codex first, then the other non-Claude families cheapest configured cost first (Grok never reviews), then the
 writer's own non-Claude family (same_family warning, never blocks), then Claude Sonnet last; Opus never runs in the loop. Claude-last holds for every other role too."""
+import hermetic  # noqa: F401  (a home of its own for every test)
 import contextlib
 import copy
 import importlib.util
