@@ -29,9 +29,9 @@ class OsProc(unittest.TestCase):
         self.d = tempfile.mkdtemp(dir=os.environ["TMPDIR"])
         fake_proc(self.d, {10: ("node", "S", 1, 10, 500), 11: ("codex (native) x", "S", 10, 11, 501), 12: ("sh", "S", 11, 11, 502),
                            13: ("zomb", "Z", 10, 10, 503), 20: ("other", "S", 1, 20, 600)})
-        for p in (mock.patch.object(osproc, "PROC", self.d), mock.patch.object(osproc, "POSIX", True)):
-            p.start()
-            self.addCleanup(p.stop)
+        p = mock.patch.object(osproc, "PROC", self.d)
+        p.start()
+        self.addCleanup(p.stop)
 
     def test_table_skips_zombies_and_reads_comm_with_spaces_and_parens(self):
         self.assertEqual(osproc.table(), {10: (1, 10), 11: (10, 11), 12: (11, 11), 20: (1, 20)})

@@ -1,4 +1,4 @@
-"""The one place that knows how this OS lists processes (delegate-own). POSIX: /proc on Linux, `ps` on macOS; Windows answers "nothing found".
+"""The one place that knows how this OS lists processes (delegate-own). /proc on Linux, `ps` on macOS. POSIX only.
 
 Everything else (reaper, route) asks four questions: who is below pid P (`descendants`), is pid P the same process I saw before (`proc_start`),
 is it alive and not a zombie (`alive`), which group is it in (`pgid`). No other module runs ps, lsof or tasklist.
@@ -7,7 +7,6 @@ import contextlib
 import os
 import subprocess
 
-POSIX = os.name != "nt"
 PROC = "/proc"
 
 
@@ -32,8 +31,6 @@ def _ps(*args):
 
 def table():
     """{pid: (ppid, pgid)} of every live process; {} where the OS cannot say."""
-    if not POSIX:
-        return {}
     out = {}
     if _linux():
         with contextlib.suppress(OSError):
@@ -64,7 +61,7 @@ def descendants(pid, tab=None):
 
 def proc_start(pid):
     """A token that, with the pid, names one process (not a reused pid): None when it is gone or a zombie, or the OS cannot say."""
-    if not POSIX or not pid:
+    if not pid:
         return None
     if _linux():
         s = _stat(pid)

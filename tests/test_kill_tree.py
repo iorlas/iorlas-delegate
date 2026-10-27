@@ -14,8 +14,6 @@ from unittest import mock
 
 from test_route import route, ROOT
 
-POSIX = os.name != "nt"
-
 # A fake of the Codex CLI: a node-shim analogue that starts a native child in a session of its own; the child ignores SIGTERM.
 CHILD = "import signal,time; signal.signal(signal.SIGTERM, signal.SIG_IGN); time.sleep(300)"
 SHIM = ("import subprocess,sys,time; "
@@ -41,7 +39,6 @@ def gone(pid, start, seconds=15):
     return False
 
 
-@unittest.skipUnless(POSIX, "real process trees are POSIX; the Windows branch is asserted with a mock below")
 class RealTrees(unittest.TestCase):
     def setUp(self):
         self.d = tempfile.TemporaryDirectory()
@@ -102,19 +99,6 @@ class RealTrees(unittest.TestCase):
 
 
 class KillPaths(unittest.TestCase):
-    def test_windows_branch_uses_taskkill_tree(self):
-        p = mock.Mock(pid=4242)
-        with mock.patch.object(route.os, "name", "nt"), mock.patch.object(route.subprocess, "run") as run:
-            route.kill_tree(p)
-        self.assertEqual(run.call_args.args[0], ["taskkill", "/T", "/F", "/PID", "4242"])
-        p.kill.assert_called()
-
-    def test_windows_reap_goes_through_taskkill(self):
-        with mock.patch.object(route.os, "name", "nt"), mock.patch.object(route.subprocess, "run") as run, \
-                mock.patch.object(route, "proc_start", return_value=None):
-            route.reap({"worker_pid": 77, "worker_start": "x"})
-        self.assertEqual(run.call_args.args[0], ["taskkill", "/T", "/F", "/PID", "77"])
-
     def test_app_server_kill_goes_through_the_tree_kill(self):
         p = mock.Mock()
         p.stdout.readline.return_value = ""          # the server never answers

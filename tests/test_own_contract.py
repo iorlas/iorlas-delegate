@@ -18,7 +18,6 @@ import contracts, osproc               # noqa: E402
 from lanes import reaper, supervisor   # noqa: E402
 
 FAKE = str(Path(__file__).resolve().parent / "fakes" / "fake_agent.py")
-POSIX = os.name != "nt"
 
 
 def wait_pid(path, secs=10):
@@ -40,7 +39,6 @@ def dead(pid, secs=10):
     return False
 
 
-@unittest.skipUnless(POSIX, "process groups and signals are POSIX")
 class RealProcesses(unittest.TestCase):
     def setUp(self):
         del reaper.REPORTS[:]

@@ -9,7 +9,6 @@ All process listing is osproc's; this file only signals.
 import contextlib
 import os
 import signal
-import subprocess
 import sys
 import time
 from pathlib import Path
@@ -34,11 +33,6 @@ def _signal_all(groups, pids, sig):
 def stop_tree(pid, grace=0, done=None):
     """-> WorkerEnd. With `grace`, SIGTERM first and wait up to `grace` s for `done()` (default: nothing known is alive); then SIGKILL."""
     rep = contracts.WorkerEnd(contracts.END_OK, stopped=True)
-    if os.name == "nt":
-        with contextlib.suppress(Exception):
-            subprocess.run(["taskkill", "/T", "/F", "/PID", str(pid)], capture_output=True)
-        rep.kill_sent = True
-        return rep
     me, mygroup, t0 = os.getpid(), os.getpgrp(), time.time()
     known, groups = {pid}, set()
 

@@ -2196,7 +2196,7 @@ def run_proc(cmd, text, cwd, env, timeout, on_line=None, poll=None):
     `on_line(line)` returning True stops the worker now; a number stops it that many seconds later unless it exits first.
     `poll()` runs about every half second; a truthy answer stops the worker (its own process tree only). `tick()` runs for every line the
     worker prints on stdout or stderr (any stream delta is activity): the callback in WORKER_TICK, which the launcher sets just before the call."""
-    kw = {"start_new_session": True} if os.name != "nt" else {"creationflags": 0x00000200}
+    kw = {"start_new_session": True}
     tick = WORKER_TICK[0] if WORKER_TICK else None
     p = subprocess.Popen(cmd, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=cwd, env=env, **kw)
     for cb in WORKER_STARTED:
@@ -2230,7 +2230,7 @@ def run_proc(cmd, text, cwd, env, timeout, on_line=None, poll=None):
 
     def bye(signum, frame):
         raise SystemExit(128 + signum)
-    old = {g: signal.signal(g, bye) for g in (getattr(signal, n, None) for n in ("SIGTERM", "SIGHUP")) if g is not None} if os.name != "nt" else {}
+    old = {g: signal.signal(g, bye) for g in (getattr(signal, n, None) for n in ("SIGTERM", "SIGHUP")) if g is not None}
     try:
         while True:
             try:
@@ -2248,7 +2248,7 @@ def run_proc(cmd, text, cwd, env, timeout, on_line=None, poll=None):
                     kill_tree(p)
                     p.wait()
                     break
-                if UNATTENDED and os.name != "nt" and os.getppid() != ppid:     # SIGKILL on the engine cannot be caught: the parent changing is the only sign
+                if UNATTENDED and os.getppid() != ppid:     # SIGKILL on the engine cannot be caught: the parent changing is the only sign
                     raise SystemExit(1)
     except BaseException:       # SIGTERM, SIGHUP, Ctrl-C, parent gone: the worker is in its own process group, so stop it here or it keeps burning the plan
         kill_tree(p)
@@ -2261,7 +2261,7 @@ def run_proc(cmd, text, cwd, env, timeout, on_line=None, poll=None):
         th.join(5)
     rc = p.returncode
     if killed and rc == 0:      # we stopped it, but a shell wrapper can exit 0 in the instant its child dies, before our SIGKILL lands: it was killed all the same
-        rc = -signal.SIGKILL if os.name != "nt" else 1
+        rc = -signal.SIGKILL
     return rc, "".join(out), "".join(err), timed_out
 
 
