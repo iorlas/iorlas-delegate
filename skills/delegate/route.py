@@ -2295,7 +2295,7 @@ def run_proc(cmd, text, cwd, env, timeout, on_line=None, poll=None):
     for cb in WORKER_STARTED:
         with contextlib.suppress(Exception):
             cb(p.pid)
-    out, err, stop_at = [], [], []
+    out, err, stop_at, killed = [], [], [], []
 
     def pump(stream, sink, cb):
         for raw in iter(stream.readline, b""):
@@ -2306,6 +2306,7 @@ def run_proc(cmd, text, cwd, env, timeout, on_line=None, poll=None):
                     tick()
             ask = cb(line) if cb else None
             if ask is True:        # the callback asks to stop the worker now
+                killed.append(1)
                 kill_tree(p)
             elif ask and not stop_at:
                 stop_at.append(time.time() + ask)
@@ -2331,10 +2332,12 @@ def run_proc(cmd, text, cwd, env, timeout, on_line=None, poll=None):
             except subprocess.TimeoutExpired:
                 if end is not None and time.time() >= end:
                     timed_out = True
+                    killed.append(1)
                     kill_tree(p)
                     p.wait()
                     break
                 if (stop_at and time.time() >= stop_at[0]) or (poll and poll()):
+                    killed.append(1)
                     kill_tree(p)
                     p.wait()
                     break
@@ -2349,7 +2352,10 @@ def run_proc(cmd, text, cwd, env, timeout, on_line=None, poll=None):
             signal.signal(g, h_)
     for th in threads:
         th.join(5)
-    return p.returncode, "".join(out), "".join(err), timed_out
+    rc = p.returncode
+    if killed and rc == 0:      # we stopped it, but a shell wrapper can exit 0 in the instant its child dies, before our SIGKILL lands: it was killed all the same
+        rc = -signal.SIGKILL if os.name != "nt" else 1
+    return rc, "".join(out), "".join(err), timed_out
 
 
 def find_transcript(ref, family):
@@ -3068,7 +3074,7 @@ def launch_opencode(d, brief, a, rid, t, meta):
     res = {"text": text, "ref": seen["ref"], "stderr": err, "tokens": seen["tokens"], "denied": seen["denied"], "turns": seen["turns"] or None, "context_k": seen["ctx"],
            "started": bool(seen["ref"]), "partial": seen["work"], "acct": accounting.opencode_close(seen["acct"], d["lane"])}       # no `answered`: opencode has no resume-tested finished-answer signal (62-spikes-resume.md)
     res["cost"] = (res["acct"] or {}).get("cost_usd") or 0         # opencode's per-step cost where it states one (Grok); zai and free steps carry none
-    why = seen["error"] or (err if rc != 0 else "")
+    why = seen["error"] or (err if rc != 0 and turn.stop != "answer" else "")       # stderr after we stopped it ourselves is the shell reporting our kill
     o = classify.classify(rc, why, "", timed_out, seen["work"], dict(watch_fields(res, dog), secret=seen.get("secret")))
     if turn.stop == "answer" and o and o.reason == "killed" and text and not seen["error"] and not timed_out:       # we stopped it after its last step: the answer stands
         o = None
