@@ -99,15 +99,30 @@ class RealTrees(unittest.TestCase):
 
 
 class KillPaths(unittest.TestCase):
-    def test_app_server_kill_goes_through_the_tree_kill(self):
-        p = mock.Mock()
-        p.stdout.readline.return_value = ""          # the server never answers
-        with mock.patch.object(route.shutil, "which", return_value="codex"), mock.patch.object(route.subprocess, "Popen", return_value=p), \
-                mock.patch.object(route, "kill_tree") as kt:
+    def fake_server(self, body):
+        """A `codex` whose app-server runs `body` (python); returns the which() patch."""
+        d = tempfile.TemporaryDirectory()
+        self.addCleanup(d.cleanup)
+        exe = Path(d.name) / "codex"
+        exe.write_text(f"#!{sys.executable}\nimport sys, time\n{body}\n")
+        exe.chmod(0o755)
+        return mock.patch.object(route.shutil, "which", return_value=str(exe))
+
+    def test_a_silent_app_server_is_cut_at_the_deadline_and_killed_through_the_tree_kill(self):
+        with self.fake_server("time.sleep(300)"), mock.patch.object(route, "APP_SERVER_S", 1), \
+                mock.patch.object(route, "kill_tree", wraps=route.kill_tree) as kt:
+            t0 = time.monotonic()
             res, err = route.fetch_codex_limits()
-        self.assertIsNone(res)
-        kt.assert_called_once_with(p)
-        p.kill.assert_not_called()
+        self.assertLess(time.monotonic() - t0, 5)
+        self.assertEqual((res, err), (None, "codex app-server did not answer"))
+        kt.assert_called_once()
+
+    def test_a_partial_line_does_not_hang_and_answers_are_read_across_chunks(self):
+        body = ("sys.stdin.readline(); print('{\"id\":1,\"result\":{}}', flush=True); sys.stdin.readline(); sys.stdin.readline()\n"
+                "sys.stdout.write('{\"id\":2,\"res'); sys.stdout.flush(); time.sleep(0.3); print('ult\":{\"ok\":1}}', flush=True); time.sleep(300)")
+        with self.fake_server(body):
+            res, err = route.fetch_codex_limits()
+        self.assertEqual((res, err), ({"ok": 1}, None))
 
     def test_no_pattern_kills_and_no_bare_kill_in_router(self):
         src = "".join((ROOT / "skills" / "delegate" / f).read_text(encoding="utf-8") for f in ("route.py", "lanes/reaper.py"))

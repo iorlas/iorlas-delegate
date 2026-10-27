@@ -37,11 +37,7 @@
     "usage_stale_minutes": 30,
     "claude_weekly_reset": "",
     "deepseek_free_enabled": false,
-    "zai_coding_enabled": false,
-    "codex_plan_review_only": false,
-    "codex_resume_after_stall": false,
-    "claude_resume_after_stall": false,
-    "opencode_resume_after_stall": false
+    "zai_coding_enabled": false
   },
   "models": {
     "opus-5.5": {

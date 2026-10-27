@@ -253,7 +253,7 @@ class Cli(unittest.TestCase):
             os.environ["APPDATA"] = d
             os.environ["DELEGATE_NOW"] = str(T)
             try:
-                route.main(["report", "--lane", "OPENAI_SUBSCRIPTION", "--event", "out", "--until", str(T + 3600), "--message", "test"])
+                route.main(["report", "--lane", "OPENAI_SUBSCRIPTION", "--event", "out", "--until", str(T + 3600)])
                 st = route.load_state()
                 self.assertIn("OPENAI_SUBSCRIPTION", st["out"])
                 cfg = route.load_routing()
@@ -308,6 +308,12 @@ class Onboarding(unittest.TestCase):
         self.assertFalse(want["ready"])
         step = self.onboard.next_step(want)
         self.assertEqual((step["step"], step["who"], step["do"]), ("codex_cli", "agent", "codex_cli"))
+
+    def test_deep_doctor_validates_the_key_with_one_live_request(self):
+        with mock.patch.object(route, "find_key", return_value="sk-x"), mock.patch.object(self.onboard, "validate_key", return_value=(False, "401")) as vk:
+            d = self.onboard.doctor(route, self.cfg, deep=True)
+        vk.assert_called_once_with("sk-x")
+        self.assertIn("401", next(c for c in d["checks"] if c["id"] == "credit_key_valid")["say"])
 
     def test_decline_both_lanes_makes_it_ready(self):
         self.onboard.act(route, self.cfg, decline="OPENAI_SUBSCRIPTION")
@@ -419,18 +425,16 @@ class Onboarding(unittest.TestCase):
         self.assertIn("MISSING   codex_cli", text)
         self.assertIn("-> Install the Codex CLI.", text)
         self.assertIn("doctor --decline LANE", text)
-        route.set_ack("codex_cli", True)
-        route.set_ack("codex_login", True)
+        route.set_ack("codex_cli")
+        route.set_ack("codex_login")
         d2 = self.onboard.doctor(route, self.cfg, lane="OPENAI_SUBSCRIPTION")
         self.assertTrue(next(c for c in d2["checks"] if c["id"] == "codex_cli")["acked"])
-        route.set_ack("codex_cli", False)
-        self.assertNotIn("codex_cli", route.acked())
 
     def test_volumes_note_is_ackable(self):
         import unittest.mock as m
         with m.patch.object(self.onboard.os.path, "exists", lambda p: p == "/.dockerenv"):
             self.assertEqual([n["id"] for n in self.onboard.doctor(route, self.cfg)["notes"]], ["volumes"])
-            route.set_ack("volumes", True)
+            route.set_ack("volumes")
             self.assertEqual(self.onboard.doctor(route, self.cfg)["notes"], [])
 
     def test_unset_lanes_are_offered_once_and_never_block(self):
@@ -636,8 +640,6 @@ case "$FAKE_MODE" in
                       echo '{"type":"item.started","item":{"id":"i10","type":"command_execution","command":"make","status":"in_progress"}}'; hang; exit 0;;
   stall) echo '{"type":"item.completed","item":{"id":"i1","type":"command_execution","command":"ls","exit_code":0,"status":"completed"}}'; hang; exit 0;;
   tool_open) echo '{"type":"item.started","item":{"id":"i1","type":"command_execution","command":"make","status":"in_progress"}}'; hang; exit 0;;
-  stall_resume) case "$args" in *resume*) printf 'resumed answer' > "$out"; exit 0;; esac
-                echo '{"type":"item.completed","item":{"id":"i1","type":"command_execution","command":"ls","exit_code":0,"status":"completed"}}'; hang; exit 0;;
 esac
 [ "$FAKE_MODE" = answer_alive ] && echo '{"type":"item.completed","item":{"id":"i9","type":"agent_message","text":"{\\"findings\\": []}"}}'
 echo '{"type":"turn.completed","usage":{"input_tokens":100,"cached_input_tokens":40,"output_tokens":7}}'
@@ -961,16 +963,6 @@ printf '{"type":"result","result":"claude says hi","session_id":"sess-1","total_
         self.fast_clock()
         _, r = self.run_it(mode="tool_open", timeout=4)
         self.assertEqual(why(r), "timeout")
-
-    def test_resume_after_a_stall_is_off_by_default_and_runs_once_when_on(self):
-        self.fast_clock()
-        _, r = self.run_it(mode="stall_resume", timeout=20)
-        self.assertEqual(why(r), "hung")
-        cfg = route.load_routing()
-        cfg["settings"]["codex_resume_after_stall"] = True
-        with mock.patch.object(route, "load_routing", return_value=cfg):
-            _, r = self.run_it(mode="stall_resume", timeout=20)
-        self.assertEqual((r["stop"], r["text"]), (None, "resumed answer"))
 
     def test_sigterm_on_route_py_stops_the_worker_too(self):
         import signal
@@ -1823,7 +1815,7 @@ echo '{"type":"step_finish","sessionID":"ses_1","part":{"type":"step-finish","co
 
 
 class Holds(unittest.TestCase):
-    """delegate-dns: an owner hold {lane, roles, set_by, set_at, until (mandatory), reason} replaces the codex_plan_review_only flag."""
+    """delegate-dns: an owner hold {lane, roles, set_by, set_at, until (mandatory), reason}."""
 
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
@@ -1899,25 +1891,6 @@ class Holds(unittest.TestCase):
         self.assertIn("owner", d["say"])
         res = route.launch_codex({"role": "worker", "lane": "OPENAI_SUBSCRIPTION", "how": {"sandbox": "workspace-write"}}, "b", argparse_ns("worker"), "rid", T, {})
         self.assertEqual((res["retry_after"], res["outcome"]), (h["until"], "held"))
-
-    def test_the_old_flag_refusal_has_no_time_and_is_for_the_owner(self):
-        cfg = copy.deepcopy(CFG)
-        cfg["settings"]["codex_plan_review_only"] = True
-        with mock.patch.object(route, "load_routing", return_value=cfg):
-            res = route.launch_codex({"role": "worker", "lane": "OPENAI_SUBSCRIPTION", "how": {"sandbox": "workspace-write"}}, "b", argparse_ns("worker"), "rid", T, {})
-        self.assertEqual((res["retry_after"], res["outcome"]), (None, "held"))
-        r = route.result(res.pop("outcome"), **res)
-        self.assertEqual((r["stop"]["permanence"], r["stop"]["reason"], r["stop"]["retry"]["kind"]), ("needs_owner", "held", "none"))
-
-    def test_a_flag_left_in_config_json_becomes_a_hold_with_an_end(self):
-        route.update_config(lambda c: c.update(codex_plan_review_only=True))
-        code, out = self.main("holds")
-        self.assertEqual(code, 0)
-        self.assertEqual(out["holds"][0]["lane"], "OPENAI_SUBSCRIPTION")
-        self.assertEqual(out["holds"][0]["set_by"], "config")
-        self.assertGreater(out["holds"][0]["until"], time.time() + 6 * 86400)
-        self.assertNotIn("codex_plan_review_only", route.read_config())
-        self.assertEqual(len(self.main("holds")[1]["holds"]), 1)      # once
 
     def test_release_and_status_show_the_holder_and_expiry(self):
         h = route.add_hold("OPENAI_SUBSCRIPTION", "+2d", "budget", ["worker"], "alice")
@@ -2176,7 +2149,7 @@ class ResetTimes(unittest.TestCase):
 
 
 class StaleHolds(unittest.TestCase):
-    """delegate-eau: a hold whose release condition is true raises ONE ask (a status field); auto_release_below ends it without one."""
+    """delegate-eau: a hold whose lane has gone quiet raises ONE ask (a status field)."""
 
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
@@ -2209,22 +2182,7 @@ class StaleHolds(unittest.TestCase):
         self.assertIn("route.py release " + h["id"], asks[0]["answer"])
         self.assertTrue(route.hold_rows({"settings": {}}, st2, route.now())[0]["stale"])
 
-    def test_auto_release_below_ends_the_hold_without_an_ask(self):
-        h = route.add_hold("OPENAI_SUBSCRIPTION", "+2d", "weekly spent", auto_release_below=5)
-        asks, st = route.settle_holds(self.lanes(40), route.load_state(), route.now())
-        self.assertIn(h["id"], st["holds"])
-        asks, st = route.settle_holds(self.lanes(0), route.load_state(), route.now())
-        self.assertEqual((asks, h["id"] in st.get("holds", {})), ([], False))
-
-    def test_the_hold_command_takes_the_thresholds_and_status_carries_asks(self):
-        import io
-        real, sys.stdout = sys.stdout, io.StringIO()
-        try:
-            route.main(["hold", "OPENAI_SUBSCRIPTION", "--until", "+1d", "--auto-release-below", "2", "--release-below", "9"])
-            rec = json.loads(sys.stdout.getvalue())["hold"]
-        finally:
-            sys.stdout = real
-        self.assertEqual((rec["auto_release_below"], rec["release_below"]), (2.0, 9.0))
+    def test_status_carries_asks(self):
         payload = route.status_payload(CFG, self.lanes(50), [], route.load_state(), route.now())
         self.assertEqual(payload["asks"], [])
         self.assertIn("health", payload)

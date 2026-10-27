@@ -10,7 +10,7 @@ route.py doctor --lane L --next          first step for lane L as JSON
                      waiting_for_user: show say (link and code); wait for "done"; run --next again
     who == "user":   show say verbatim; wait for "done"; run --next again
 route.py doctor --decline L              hide a lane for good      (--undecline L)
-route.py doctor --ack ID                 this finding needs nothing (--unack ID), e.g. volumes
+route.py doctor --ack ID                 this finding needs nothing, e.g. volumes
 ```
 
 New lanes show up once as `notice` in a `run` answer: tell the user; "no" = `doctor --decline NAME`.

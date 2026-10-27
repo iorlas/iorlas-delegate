@@ -206,8 +206,9 @@ def doctor(R, cfg, deep=False, lane=None):
     if deep:
         key = R.find_key(quiet=True)
         if key:
-            checks.append({"id": "credit_key_valid", "lane": "CLAUDE_CREDIT", "ok": validate_key(key)[0], "skip": "CLAUDE_CREDIT" in skip,
-                           "who": "user", "say": "The stored API key was rejected: " + validate_key(key)[1]})
+            ok, why = validate_key(key)
+            checks.append({"id": "credit_key_valid", "lane": "CLAUDE_CREDIT", "ok": ok, "skip": "CLAUDE_CREDIT" in skip,
+                           "who": "user", "say": "The stored API key was rejected: " + why})
     enabled = {n for n, v in R.profile_lanes().items() if v == "enabled"}
     shared = {n for n, c in cfg["lanes"].items() if c.get("shared_with_orchestrator")}
     if lane:
@@ -312,14 +313,13 @@ def do_codex_login(R, open_browser=False):
     st = R.load_state()
     pid = st.get("codex_login_pid")
     alive = False
-    if pid and os.name != "nt":
+    if pid:
         with contextlib.suppress(OSError):
             os.kill(pid, 0)
             alive = True
     if not alive:
         with open(log, "w", encoding="utf-8") as lf:
-            kw = {"start_new_session": True} if os.name != "nt" else {"creationflags": 0x00000008 | 0x00000200}
-            p = subprocess.Popen([codex, "login", "--device-auth"], stdout=lf, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL, **kw)
+            p = subprocess.Popen([codex, "login", "--device-auth"], stdout=lf, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL, start_new_session=True)
         R.update_state(lambda s: s.__setitem__("codex_login_pid", p.pid))
     url = code = None
     end = time.time() + 20
@@ -332,7 +332,7 @@ def do_codex_login(R, open_browser=False):
             url, code = (m.group(0) if m else None), (c.group(0) if c else None)
     if not url:
         return {"done": False, "say": "Codex did not print a login link. Run `codex login --device-auth` in your own terminal."}
-    if open_browser and (sys.platform in ("darwin", "win32") or os.environ.get("DISPLAY")):
+    if open_browser and (sys.platform == "darwin" or os.environ.get("DISPLAY")):
         with contextlib.suppress(Exception):
             import webbrowser
             webbrowser.open(url)

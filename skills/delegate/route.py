@@ -10,7 +10,7 @@ The model supplies only what the script cannot read itself; the script decides.
   route.py run ROLE [--cwd DIR] [--brief FILE] [--schema FILE] [--resume REF] [--cap USD] [--timeout SEC] [--unattended] [--authored-by W] [--failed I,J] [--premium] [--allow-degraded]
                     [--claude-usage JSON] [--parent SESSION] [--task ID] [--title T]    brief on stdin; one JSON object on stdout, exit 0 (see docs/dev/integrations.md)
   route.py net [--lane L] [--host H ...]    is the machine online? stdlib sockets, no quota, answers in under 3 s: {up, why, hosts}
-  route.py report --lane LANE --event out|ok [--until EPOCH|ISO] [--message TEXT]
+  route.py report --lane LANE --event out|ok [--until EPOCH|ISO]
   route.py capture-limits [--print]  (status line JSON on stdin)
   route.py doctor [--lane L] [--next] [--fix ID] [--decline L] [--undecline L] [--ack ID] [--deep] [--json] [--quiet]   the one setup command: what each lane needs, and how to act on it
   route.py set-key [--stdin] [--force] | --web [--host IP|tailscale] [--port N] [--timeout S]   the key is handed over by the USER (terminal prompt or one-shot page); the agent never handles it
@@ -30,6 +30,7 @@ import json
 import os
 import random
 import re
+import select
 import shutil
 import shlex
 import signal
@@ -85,16 +86,14 @@ def config_dir():
     if p is None:
         sys.exit("route.py: not running from an installed plugin; set DELEGATE_CONFIG_DIR to the folder for settings and state")
     p.mkdir(parents=True, exist_ok=True)
-    if os.name != "nt":
-        with contextlib.suppress(OSError):
-            os.chmod(p, 0o700)        # holds the API key file, state and ledger: private to the user
+    with contextlib.suppress(OSError):
+        os.chmod(p, 0o700)        # holds the API key file, state and ledger: private to the user
     return p
 
 
 def private(path):
-    if os.name != "nt":
-        with contextlib.suppress(OSError):
-            os.chmod(path, 0o600)
+    with contextlib.suppress(OSError):
+        os.chmod(path, 0o600)
 
 
 def deep_merge(a, b):
@@ -279,13 +278,11 @@ def acked():
     return set((read_config().get("profile") or {}).get("ack") or [])
 
 
-def set_ack(ident, on):
+def set_ack(ident):
     def put(c):
         lst = c.setdefault("profile", {}).setdefault("ack", [])
-        if on and ident not in lst:
+        if ident not in lst:
             lst.append(ident)
-        if not on and ident in lst:
-            lst.remove(ident)
     update_config(put)
 
 
@@ -448,42 +445,51 @@ def apply_burn(lane, S, week_mins):
 
 # ----------------------------------------------------------------------------- readers (the script gathers what it can)
 
+APP_SERVER_S = 8          # seconds each codex app-server reply may take
+
+
 def fetch_codex_limits():
     """-> (result_dict, error_text). Spawns `codex app-server` once; ~1-2 s."""
     exe = shutil.which("codex")
     if not exe:
         return None, "codex CLI not installed"
     try:
-        p = subprocess.Popen([exe, "app-server"], stdin=subprocess.PIPE, stdout=subprocess.PIPE,
-                             stderr=subprocess.DEVNULL, text=True)
+        p = subprocess.Popen([exe, "app-server"], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
     except OSError as e:
         return None, f"codex app-server failed to start: {e}"
+    pending = bytearray()
 
     def send(m):
-        p.stdin.write(json.dumps(m) + "\n")
+        p.stdin.write((json.dumps(m) + "\n").encode())
         p.stdin.flush()
 
     def read(i, seconds):
-        end = time.time() + seconds
-        while time.time() < end:
-            line = p.stdout.readline()
-            if not line:
+        """The reply with id `i`, else None at the deadline or EOF: the wait itself is bounded (select), not only the gaps between lines."""
+        end = time.monotonic() + seconds
+        fd = p.stdout.fileno()
+        while True:
+            while b"\n" in pending:
+                line, _, rest = bytes(pending).partition(b"\n")
+                pending[:] = rest
+                with contextlib.suppress(ValueError):
+                    m = json.loads(line)
+                    if isinstance(m, dict) and m.get("id") == i:
+                        return m
+            left = end - time.monotonic()
+            if left <= 0 or not select.select([fd], [], [], left)[0]:
                 return None
-            try:
-                m = json.loads(line)
-            except ValueError:
-                continue
-            if m.get("id") == i:
-                return m
-        return None
+            chunk = os.read(fd, 65536)
+            if not chunk:
+                return None
+            pending.extend(chunk)
 
     try:
         send({"id": 1, "method": "initialize", "params": {"clientInfo": {"name": "delegate-route", "title": "delegate route", "version": "1"}}})
-        if read(1, 8) is None:
+        if read(1, APP_SERVER_S) is None:
             return None, "codex app-server did not answer"
         send({"method": "initialized"})
         send({"id": 2, "method": "account/rateLimits/read"})
-        r = read(2, 8)
+        r = read(2, APP_SERVER_S)
     finally:
         kill_tree(p)
         p.wait()
@@ -812,26 +818,12 @@ LATE_FLAGS = ("degraded", "same_family")
 
 # ----------------------------------------------------------------------------- owner holds (delegate-dns)
 
-LEGACY_HOLD = "flag:codex_plan_review_only"      # the config flag read as a hold with no expiry: the only hold that may lack `until`; the config migration removes it
-
-
 def real_hold(lane, role, st, t):
     """-> the owner's hold record that stops `role` on `lane` at time t, else None. A record is {id, lane, roles, set_by, set_at, until, reason}."""
     for h in (st.get("holds") or {}).values():
         if h.get("lane") == lane and (not h.get("roles") or role in h["roles"]) and h.get("until", 0) > t:
             return h
     return None
-
-
-def held(lane, role, mode, cfg, st, t):
-    """-> the hold that stops `role` (step mode read_only|write) on `lane` now, else None: a hold record, else the legacy codex_plan_review_only flag."""
-    h = real_hold(lane, role, st, t)
-    if h or not cfg["settings"].get("codex_plan_review_only") or (cfg["lanes"].get(lane) or {}).get("family") != "openai":
-        return h
-    if role in ("planner", "reviewer") and mode == "read_only":
-        return None
-    return {"id": LEGACY_HOLD, "lane": lane, "roles": [], "set_by": "config", "set_at": None, "until": None,
-            "reason": "codex_plan_review_only is set in config.json: Codex plans and reviews read-only"}
 
 
 def hold_text(h):
@@ -846,10 +838,8 @@ def refusal_fields(h, say=None):
 HOLD_STALE_BELOW = 5.0      # a hold whose lane now shows less than this % used (the weekly window, else the 5 h) has outlived its reason: one ask
 
 
-def add_hold(lane, until, reason, roles=None, set_by="owner", t=None, auto_release_below=None, release_below=None):
-    """Record an owner hold. `until` is mandatory and must be in the future: a hold with no end is how codex_plan_review_only stayed on for 12 hours.
-    `auto_release_below` (percent used): the hold ends by itself, with no ask, once the lane shows less than that. `release_below` (default 5)
-    is the level at which a hold still in force raises its one owner ask."""
+def add_hold(lane, until, reason, roles=None, set_by="owner", t=None):
+    """Record an owner hold. `until` is mandatory and must be in the future: a hold with no end is refused."""
     t = now() if t is None else t
     end = parse_until(until, t)
     if end is None:
@@ -859,9 +849,6 @@ def add_hold(lane, until, reason, roles=None, set_by="owner", t=None, auto_relea
     if lane not in load_routing()["lanes"]:
         raise ValueError(f"unknown lane {lane}; lanes: {', '.join(load_routing()['lanes'])}")
     rec = {"id": uuid.uuid4().hex[:8], "lane": lane, "roles": sorted(roles or []), "set_by": set_by, "set_at": t, "until": end, "reason": reason or ""}
-    for k, v in (("auto_release_below", auto_release_below), ("release_below", release_below)):
-        if v is not None:
-            rec[k] = float(v)
     update_state(lambda s: s.setdefault("holds", {}).__setitem__(rec["id"], rec))
     return rec
 
@@ -881,31 +868,21 @@ def hold_usage(lane):
 
 
 def settle_holds(lanes, st, t):
-    """Holds meet the lane's reading. A hold with `auto_release_below` whose lane shows less than that is released, silently. A hold still in force
-    whose lane shows less than its `release_below` (default 5 %) is stale: it gets ONE ask, stamped on the record (`stale_at`) so no later call
-    raises it again; nothing is printed or pushed, the ask is a field of `status --json` (`asks`). -> (asks, state after)."""
-    drop, stamp = [], []
-    for k, h in (st.get("holds") or {}).items():
-        used = hold_usage(lanes.get(h.get("lane")))
-        if used is None or h.get("until", 0) <= t:
-            continue
-        if h.get("auto_release_below") is not None and used < float(h["auto_release_below"]):
-            drop.append(k)
-        elif used < float(h.get("release_below", HOLD_STALE_BELOW)) and not h.get("stale_at"):
-            stamp.append(k)
-    if drop or stamp:
+    """A hold still in force whose lane shows less than HOLD_STALE_BELOW % used is stale: it gets ONE ask, stamped on the record (`stale_at`) so no
+    later call raises it again; nothing is printed or pushed, the ask is a field of `status --json` (`asks`). -> (asks, state after)."""
+    stamp = [k for k, h in (st.get("holds") or {}).items() if h.get("until", 0) > t and not h.get("stale_at")
+             and (u := hold_usage(lanes.get(h.get("lane")))) is not None and u < HOLD_STALE_BELOW]
+    if stamp:
         def apply(s_):
-            for k in drop:
-                (s_.get("holds") or {}).pop(k, None)
             for k in stamp:
                 h_ = (s_.get("holds") or {}).get(k)
                 if h_ and not h_.get("stale_at"):
                     h_["stale_at"] = t
         st = update_state(apply)
     asks = []
-    for k, h in (st.get("holds") or {}).items():
+    for h in (st.get("holds") or {}).values():
         used = hold_usage(lanes.get(h.get("lane")))
-        if h.get("stale_at") and h.get("until", 0) > t and used is not None and used < float(h.get("release_below", HOLD_STALE_BELOW)):
+        if h.get("stale_at") and h.get("until", 0) > t and used is not None and used < HOLD_STALE_BELOW:
             asks.append({"kind": "hold_stale", "id": h["id"], "lane": h["lane"], "raised_at": h["stale_at"], "used_pct": used,
                          "say": f"hold {h['id']} on {h['lane']} (until {local(h['until'])}{', ' + h['reason'] if h.get('reason') else ''}) is still in force but the lane shows {used:.0f}% used",
                          "answer": f"route.py release {h['id']} to end it, or leave it until it expires"})
@@ -915,15 +892,12 @@ def settle_holds(lanes, st, t):
 def hold_rows(cfg, st, t):
     """Every hold now in force, with who set it and when it ends: for status --json and `holds`."""
     rows = [dict(h, ends_in_s=int(h["until"] - t), stale=bool(h.get("stale_at"))) for h in (st.get("holds") or {}).values() if h.get("until", 0) > t]
-    if cfg["settings"].get("codex_plan_review_only"):
-        rows.append(dict(held("OPENAI_SUBSCRIPTION", "worker", "write", cfg, {}, t) or {}, ends_in_s=None))
     return sorted(rows, key=lambda h: (h.get("until") or 1e18))
 
 
 def cmd_hold(a, cfg):
     try:
-        rec = add_hold(a.lane, a.until, a.reason, [x for x in (a.roles or "").split(",") if x], a.set_by,
-                       auto_release_below=a.auto_release_below, release_below=a.release_below)
+        rec = add_hold(a.lane, a.until, a.reason, [x for x in (a.roles or "").split(",") if x], a.set_by)
     except ValueError as e:
         print(json.dumps({"ok": False, "error": str(e)}))
         return 1
@@ -946,25 +920,6 @@ def cmd_release(a, cfg):
 def cmd_holds(a, cfg):
     print(json.dumps({"holds": hold_rows(cfg, load_state(), now())}))
     return 0
-
-
-def migrate_legacy_hold(t):
-    """codex_plan_review_only in config.json becomes a hold record that ends in 7 days, and the flag is removed from the file."""
-    if not read_config().get("codex_plan_review_only"):
-        if "codex_plan_review_only" in read_config():
-            update_config(lambda c: c.pop("codex_plan_review_only", None))
-        return None
-    rec = add_hold("OPENAI_SUBSCRIPTION", "+7d", "migrated from codex_plan_review_only", ["worker", "hard", "light"], "config", t)
-    update_config(lambda c: c.pop("codex_plan_review_only", None))
-    return rec
-
-
-def codex_step_allowed(role_name, step, cfg):
-    """A paused Codex writer may only plan/review, and always under read-only access."""
-    if not cfg["settings"].get("codex_plan_review_only"):
-        return True
-    family = (cfg["models"].get(step.get("model")) or {}).get("family") or step.get("on")
-    return family != "openai" or (role_name in ("planner", "reviewer") and step.get("mode", "read_only") == "read_only")
 
 
 def loop_barred(step, role, cfg):
@@ -998,7 +953,7 @@ def build_tiers(role, cfg, args, role_name=None):
         steps = [dict(step)] + steps
     if role_name is None:
         role_name = next((name for name, value in cfg["roles"].items() if value == role), None)
-    steps = [s for s in steps if codex_step_allowed(role_name, s, cfg) and not loop_barred(s, role, cfg)]
+    steps = [s for s in steps if not loop_barred(s, role, cfg)]
     if role.get("order") == "cost":         # cheapest configured model first inside a tier (stable: ties keep the listed order)
         steps.sort(key=lambda s: (cfg["models"].get(s.get("model")) or {}).get("cost", 1000))
     steps = [dict(s, idx=i) for i, s in enumerate(steps)]
@@ -1016,7 +971,7 @@ def build_tiers(role, cfg, args, role_name=None):
         tiers += [[s for s in part if s.get("flag") not in LATE_FLAGS], [s for s in part if s.get("flag") in LATE_FLAGS]]
     tiers = [x for x in tiers if x]
     if args.get("allow_degraded") and role.get("degraded_needs_consent"):
-        tiers.append([dict(s, flag="degraded_with_consent", idx=len(steps) + i) for i, s in enumerate(role["degraded_needs_consent"]) if codex_step_allowed(role_name, s, cfg) and not loop_barred(s, role, cfg)])
+        tiers.append([dict(s, flag="degraded_with_consent", idx=len(steps) + i) for i, s in enumerate(role["degraded_needs_consent"]) if not loop_barred(s, role, cfg)])
     return tiers
 
 
@@ -1217,8 +1172,6 @@ def routing_snapshot(cfg, lanes, st, t):
         lane = current.get(name)
         available, why = usable(lane, cfg["settings"], True) if lane else (False, "disabled or not configured")
         label = c.get("label") or LABELS.get(name, name)
-        if c["family"] == "openai" and cfg["settings"].get("codex_plan_review_only"):
-            label += " (planning/review only)"
         inventory.append({"id": name, "label": label, "family": c["family"],
                           "billing": "free" if name == "DEEPSEEK_FREE" else c["kind"],
                           "enabled": lane is not None, "available": available, "reason": why,
@@ -1388,7 +1341,7 @@ def lane_model(cfg, name):
     for role in [cfg["roles"].get("worker")] + list(cfg["roles"].values()):
         for step in (role or {}).get("steps", []):
             if step.get("on") == fam:
-                return f"{step['model']} {step['effort']}" + (" (planning/review only)" if fam == "openai" and cfg["settings"].get("codex_plan_review_only") else "")
+                return f"{step['model']} {step['effort']}"
     return next((m for m, v in cfg["models"].items() if v["family"] == fam), None)
 
 
@@ -1774,7 +1727,7 @@ def decision(a, cfg):
     lanes = gather(cfg, st, t, parse_json_arg(a.claude_usage))
     new_offers = list(OFFERS)
     warnings = drift_warnings(lanes, st, t)
-    _, st = settle_holds(lanes, st, t)         # a hold whose auto_release_below is met ends here
+    _, st = settle_holds(lanes, st, t)
     publish_lanes(lanes, st, t)
     S = cfg["settings"]
     mark_busy(lanes, st, S, t)
@@ -1786,10 +1739,10 @@ def decision(a, cfg):
         lane = lanes.get(rec["lane"]) if rec else None
         if not rec:
             return {"action": "error", "error": f"unknown --resume ref {ref}"}, lanes, warnings, t
-        hold = held(rec["lane"], a.role, rec["mode"], cfg, st, t)
+        hold = real_hold(rec["lane"], a.role, st, t)
         if hold:
             return {"action": "stop", "lane": rec["lane"], "retry_after": hold.get("until"), "outcome": "held",
-                    "say": ("Codex writing is paused by user policy." if hold["id"] == LEGACY_HOLD else f"{rec['lane']} is on hold, {hold_text(hold)}.")
+                    "say": f"{rec['lane']} is on hold, {hold_text(hold)}."
                     + " Continue with a fresh writer on another lane; existing file changes remain in the working directory."}, lanes, warnings, t
         if lane is None or not usable(lane, S, True, rec["model"])[0]:
             why = usable(lane, S, True, rec["model"])[1] if lane else "not usable by this caller"
@@ -1856,7 +1809,7 @@ def cmd_report(a, cfg):
         lanes = gather(cfg, st, t, check_config=False)     # a lane the profile leaves out can still be reported out
         lane = lanes[a.lane]
         until = lane.out_until or (lane.week_reset if lane.week_reset and lane.week_reset > t and lane.kind == "credit" else None) or t + 3600
-    mark_out(a.lane, until, a.message or "reported out", t, "limit", "manual" if a.until else "guess")
+    mark_out(a.lane, until, "reported out", t, "limit", "manual" if a.until else "guess")
     print(f"{a.lane}: out until {local(until)}")
     return 0
 
@@ -2101,7 +2054,7 @@ PREAMBLE = (SECRET_RULE + " You are a delegated worker. Do exactly the task in t
 def guard_settings(read_only):
     """--settings for claude -p: delegate's PreToolUse hook (route.py guard), read-only for steps that may not write."""
     argv = [sys.executable, str(Path(__file__).resolve()), "guard"] + (["--read-only"] if read_only else [])
-    cmd = subprocess.list2cmdline(argv) if os.name == "nt" else " ".join(shlex.quote(x) for x in argv)
+    cmd = " ".join(shlex.quote(x) for x in argv)
     return {"hooks": {"PreToolUse": [{"matcher": "*", "hooks": [{"type": "command", "command": cmd}]}]}}
 
 
@@ -2113,7 +2066,7 @@ def find_key(quiet=False):
     with contextlib.suppress(OSError):
         k = p.read_text(encoding="utf-8").strip()
         if k:
-            if not quiet and os.name != "nt" and (p.stat().st_mode & 0o077):
+            if not quiet and (p.stat().st_mode & 0o077):
                 print(f"route.py: warning: {p} is readable by others; run: chmod 600 {p}", file=sys.stderr)
             return k
     if sys.platform == "darwin" and shutil.which("security"):
@@ -2141,7 +2094,7 @@ def publish_lanes(lanes, st, t):
 
 def run_tree(cmd, timeout, **kw):
     """subprocess.run with captured text output whose timeout stops the whole tree, not just the direct child. -> CompletedProcess; TimeoutExpired on timeout."""
-    sess = {"start_new_session": True} if os.name != "nt" else {"creationflags": 0x00000200}
+    sess = {"start_new_session": True}
     p = subprocess.Popen(cmd, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, **sess, **kw)
     try:
         out, err = p.communicate(timeout=timeout)
@@ -2543,9 +2496,9 @@ def codex_context_k(thread):
 def launch_codex(d, brief, a, rid, t, meta):
     """-> dict of result fields."""
     h = d["how"]
-    hold = held(d.get("lane") or "OPENAI_SUBSCRIPTION", d.get("role", getattr(a, "role", None)), "read_only" if h.get("sandbox") == "read-only" else "write", load_routing(), load_state(), t)
+    hold = real_hold(d.get("lane") or "OPENAI_SUBSCRIPTION", d.get("role", getattr(a, "role", None)), load_state(), t)
     if hold:
-        return refusal_fields(hold, "Codex is restricted to read-only planning and review; no worker was launched." if hold["id"] == LEGACY_HOLD else "no worker was launched")
+        return refusal_fields(hold, "no worker was launched")
     exe = shutil.which("codex")
     if not exe:
         return {"outcome": "setup", "say": "codex CLI not found on PATH (route.py doctor --lane OPENAI_SUBSCRIPTION)"}
@@ -2632,8 +2585,6 @@ def launch_codex(d, brief, a, rid, t, meta):
     with contextlib.suppress(OSError):
         text = out_file.read_text(encoding="utf-8", errors="replace").strip()
         out_file.unlink()
-    if seen["ref"] and stalled_once_more("codex", turn, dog, a):
-        return launch_codex(d, RESUME_NOTE, argparse.Namespace(**dict(vars(a), resume=seen["ref"], stalled_once=True)), rid, t, meta)       # once; off by default
     final = bool(text) or bool(seen["last"] and (seen["turns"] or turn.stop == "answer"))        # the turn finished: codex writes -o only at its end
     text = text or seen["last"]
     seen["tokens"] = accounting.per_call(seen["tokens"], before)      # a running total: keep this run's part
@@ -2769,16 +2720,6 @@ def stream_poll(poll0, turn, dog, live=None):
             dog.update(why="hung", kind="stall", words=turn.stall_words())
         return bool(v)
     return poll
-
-
-def stalled_once_more(cli, turn, dog, a):
-    """True when this run died on a stalled model stream (stall or silence deadline) and the one resume is allowed: setting `<cli>_resume_after_stall`, off by default
-    (resuming a turn that never closed is untested for all three CLIs)."""
-    stalled = turn.stop == "stall" or (dog["why"] == "hung" and dog["kind"] == "silence")
-    return stalled and not getattr(a, "stalled_once", False) and bool(load_routing()["settings"].get(f"{cli}_resume_after_stall"))
-
-
-RESUME_NOTE = "Your previous request stalled and was stopped. Continue and give your final answer."
 
 
 def log_gaps(w, d):
@@ -2968,8 +2909,6 @@ def launch_opencode(d, brief, a, rid, t, meta):
     finally:
         with contextlib.suppress(OSError):
             shell.unlink()
-    if seen["ref"] and stalled_once_more("opencode", turn, dog, a):
-        return launch_opencode(d, RESUME_NOTE, argparse.Namespace(**dict(vars(a), resume=seen["ref"], stalled_once=True)), rid, t, meta)       # once; off by default
     if seen["ref"]:     # opencode keeps sessions in its database: export one to a file, so `transcript` is a path like the other lanes'
         with contextlib.suppress(OSError, subprocess.TimeoutExpired):
             x = run_tree([exe, "export", seen["ref"]], 60, env=env)
@@ -3087,8 +3026,6 @@ def launch_claude(d, brief, a, rid, t, cfg, meta):
     rc, out, err, timed_out = run_proc(cmd, brief, h["cwd"], child_env(extra), a.timeout, on_line, stream_poll(poll, turn, dog, live))
     live_end(live, turn, dog, timed_out, rc, float((final[0] if final else {}).get("total_cost_usd") or 0) or None)
     log_gaps(dog, d)
-    if stalled_once_more("claude", turn, dog, a) and begun:
-        return launch_claude(d, RESUME_NOTE, argparse.Namespace(**dict(vars(a), resume=ref, stalled_once=True)), rid, t, cfg, meta)       # once; off by default
     j = final[0] if final else {}
     by_message = not final and turn.stop == "answer" and bool(said[0])         # the final assistant message came, the result event never did
     if (final and not j.get("is_error")) or by_message:
@@ -3488,8 +3425,8 @@ def cmd_doctor(a, cfg):
             set_profile_lane(a.undecline, None)
         print(json.dumps({"done": True, "say": f"{a.undecline} back in the list."}))
         return 0
-    if a.ack or a.unack:
-        set_ack(a.ack or a.unack, bool(a.ack))
+    if a.ack:
+        set_ack(a.ack)
         print(json.dumps({"acknowledged": sorted(acked())}))
         return 0
     if a.decline or a.fix:
@@ -3558,11 +3495,11 @@ def main(argv=None):
     n.add_argument("--premium", nargs="?", const="claude", metavar="FAMILY"); n.add_argument("--allow-degraded", action="store_true")
     n.add_argument("--claude-usage"); n.add_argument("--cwd"); n.add_argument("--verbose", action="store_true")
     r = sub.add_parser("report"); r.add_argument("--lane", required=True); r.add_argument("--event", choices=["out", "ok"], required=True)
-    r.add_argument("--until"); r.add_argument("--message")
+    r.add_argument("--until")
     cl = sub.add_parser("capture-limits"); cl.add_argument("--print", action="store_true")
     dr = sub.add_parser("doctor"); dr.add_argument("--quiet", action="store_true"); dr.add_argument("--deep", action="store_true"); dr.add_argument("--json", action="store_true")
     dr.add_argument("--lane"); dr.add_argument("--next", action="store_true"); dr.add_argument("--fix"); dr.add_argument("--decline"); dr.add_argument("--undecline")
-    dr.add_argument("--ack"); dr.add_argument("--unack"); dr.add_argument("--open-browser", action="store_true")
+    dr.add_argument("--ack"); dr.add_argument("--open-browser", action="store_true")
     sk = sub.add_parser("set-key"); sk.add_argument("--stdin", action="store_true"); sk.add_argument("--force", action="store_true")
     sk.add_argument("--web", action="store_true"); sk.add_argument("--host", default="127.0.0.1"); sk.add_argument("--port", type=int, default=0); sk.add_argument("--timeout", type=int, default=300)
     sub.add_parser("guard").add_argument("--read-only", action="store_true")
@@ -3576,8 +3513,6 @@ def main(argv=None):
     ru.add_argument("--call-id", help="the caller's id for this call: echoed in the answer and written to history.jsonl, the key that joins the caller's record to ours")
     ho = sub.add_parser("hold", help="stop a lane for some roles until a time; --until is mandatory"); ho.add_argument("lane"); ho.add_argument("--until"); ho.add_argument("--roles")
     ho.add_argument("--reason", default=""); ho.add_argument("--set-by", default="owner")
-    ho.add_argument("--auto-release-below", type=float, metavar="PCT", help="end the hold by itself, without an ask, when the lane shows less than PCT used")
-    ho.add_argument("--release-below", type=float, metavar="PCT", help="raise the one 'hold is stale' ask when the lane shows less than PCT used (default 5)")
     sub.add_parser("release", help="end a hold early (by id or lane)").add_argument("target")
     sub.add_parser("holds", help="every hold in force, with holder and expiry")
     a = ap.parse_args(argv)
@@ -3588,8 +3523,6 @@ def main(argv=None):
         return cmd_guard(a)
     if a.cmd == "net":
         return cmd_net(a)
-    with contextlib.suppress(Exception):
-        migrate_legacy_hold(now())      # a codex_plan_review_only flag left in config.json becomes a hold with an end
     cfg = load_routing()
     return {"status": cmd_status, "next": cmd_next, "report": cmd_report, "capture-limits": cmd_capture,
             "run": cmd_run, "contract": cmd_contract, "doctor": cmd_doctor, "set-key": cmd_set_key, "config": cmd_config,

@@ -68,7 +68,7 @@ This protocol applies when ending a Beads implementation workflow. It is subordi
 python3 -m unittest discover -s tests
 ```
 
-CI: Ubuntu, macOS, Windows x Python 3.8 and 3.12.
+CI: Ubuntu, macOS x Python 3.12.
 
 ## Architecture Overview
 
@@ -81,5 +81,5 @@ Read `docs/dev/integrations.md`: other tools (the iorlas-task-loop dashboard) re
 
 ## Conventions & Patterns
 
-- Python 3.8+, standard library only; macOS, Linux (also in containers), Windows.
+- Python 3.12+, standard library only; macOS, Linux (also in containers), POSIX only.
 - Bump `.claude-plugin/plugin.json` and the iorlas-marketplace entry on every release.

@@ -61,13 +61,10 @@ class Replay(unittest.TestCase):
             self.addCleanup(p.stop)
         self.a = argparse.Namespace(resume=None, schema=None, timeout=0, role="worker")
 
-    def fake(self, name, lines, hang=True, resume_lines=None):
-        """A script that prints `lines` and then never exits (its sleep child's pid goes to self.pidfile). With resume_lines, a launch whose args hold
-        resume/--session/--resume prints those and exits."""
+    def fake(self, name, lines, hang=True):
+        """A script that prints `lines` and then never exits (its sleep child's pid goes to self.pidfile)."""
         body = "#!/bin/sh\n[ \"$1\" = export ] && exit 1\ncat > /dev/null\n"
         emit = "".join(f"echo '{x}'\n" for x in lines)
-        if resume_lines is not None:
-            body += 'case "$*" in *--resume*|*" resume "*|*"--session "*) ' + "".join(f"echo '{x}'; " for x in resume_lines) + 'exit 0;; esac\n'
         body += emit + (f"sleep 300 & echo $! > {self.pidfile}; wait\n" if hang else "")
         f = self.base / name
         f.write_text(body)
@@ -96,11 +93,6 @@ class Replay(unittest.TestCase):
             if kind == "claude":
                 return route.launch_claude(d, "brief", a, "rid12345", T, route.load_routing(), {})
             return route.launch_opencode(d, "brief", a, "rid12345", T, {})
-
-    def flag_on(self, name):
-        cfg = route.load_routing()
-        cfg["settings"][name] = True
-        return mock.patch.object(route, "load_routing", return_value=cfg)
 
     CASES = {"codex": ([CODEX_STARTED, CODEX_CMD, CODEX_MSG, CODEX_DONE], "codex answer"),
              "claude": ([CLAUDE_TOOL, CLAUDE_TOOL_DONE, CLAUDE_FINAL, CLAUDE_RESULT], "claude answer"),
@@ -156,22 +148,6 @@ class Replay(unittest.TestCase):
                 self.assertEqual(r["outcome"], "timeout")
                 self.assertTrue(r["stream_tail"])
                 self.assertFalse(self.alive())
-
-    def test_one_resume_after_a_stall_only_when_the_flag_is_on(self):
-        cases = {"codex": ([CODEX_STARTED, CODEX_CMD], [CODEX_STARTED, CODEX_MSG, CODEX_DONE], "codex answer"),
-                 "claude": ([CLAUDE_TOOL, CLAUDE_TOOL_DONE], [CLAUDE_RESULT], "claude answer"),
-                 "opencode": ([OC_STEP_TOOLS], [OC_TEXT, OC_STEP_STOP], "opencode answer")}
-        for kind, (stall, resumed, text) in cases.items():
-            with self.subTest(kind):
-                exe = self.fake(kind, stall, resume_lines=resumed)
-                self.assertEqual(self.launch(kind, exe)["outcome"], "hung")                  # off by default
-                with self.flag_on(f"{kind}_resume_after_stall"):
-                    r = self.launch(kind, exe)
-                self.assertEqual((r.get("outcome"), r["text"]), (None, text), r)
-                exe = self.fake(kind, stall)                                                 # a second stall is not resumed again
-                with self.flag_on(f"{kind}_resume_after_stall"):
-                    r = self.launch(kind, exe, argparse.Namespace(**dict(vars(self.a), stalled_once=True)))
-                self.assertEqual(r["outcome"], "hung")
 
     def test_turn_rules_with_an_injected_clock(self):
         now = [0.0]
