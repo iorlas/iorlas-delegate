@@ -313,7 +313,7 @@ def do_codex_login(R, open_browser=False):
         return {"done": False, "say": "Install the Codex CLI first (`doctor --fix codex_cli` does it)."}
     log = R.config_dir() / "codex-login.log"
     st = R.load_state()
-    pid = st.get("codex_login_pid")
+    pid = st.codex_login_pid
     alive = False
     if pid:
         with contextlib.suppress(OSError):
@@ -322,7 +322,7 @@ def do_codex_login(R, open_browser=False):
     if not alive:
         with open(log, "w", encoding="utf-8") as lf:
             p = subprocess.Popen([codex, "login", "--device-auth"], stdout=lf, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL, start_new_session=True)
-        R.update_state(lambda s: s.__setitem__("codex_login_pid", p.pid))
+        R.update_state(lambda s: setattr(s, "codex_login_pid", p.pid))
     url = code = None
     end = time.time() + 20
     while time.time() < end and not (url and code):
