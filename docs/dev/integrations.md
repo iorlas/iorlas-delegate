@@ -15,7 +15,7 @@ Delegate writes them from one file, `skills/delegate/agent_runs.py`, the only co
 
 | call site | what it publishes | why the dashboard needs it |
 |---|---|---|
-| `launch_codex` / `launch_claude` (route.py), before the worker starts: `agent_runs.run(id, kind="codex"\|"claude-p", lane, model, cwd, parent_session, title[, task], started, status="running")`; codex adds `thread` as soon as `thread.started` arrives, claude passes `session=ref` | a run record | ties the unattended worker to the session (and so the task) that launched it; `session`/`thread` find its live log |
+| `launch_worker` (route.py, one for every harness), before the worker starts: `agent_runs.run(id, kind="codex"\|"claude-p", lane, model, cwd, parent_session, title[, task], started, status="running")`; codex adds `thread` as soon as `thread.started` arrives, claude passes `session=ref` | a run record | ties the unattended worker to the session (and so the task) that launched it; `session`/`thread` find its live log |
 | `cmd_run`, after it: `agent_runs.run(id, ended, status, transcript)` | the same record, finished | shows done or failed and how long it ran |
 | `publish_lanes(lanes, st, t)` after `gather()` in `cmd_status` and `cmd_next` | `lanes/delegate.json` | the limits chips (5h and weekly use, a lane that is out and why); a reader ignores it once it is 6 hours old |
 
@@ -163,11 +163,11 @@ line); unset, nothing is written. Records: `src/delegate/contracts/live.py`; wri
 `end` (status done|timeout|killed|error, secs, cost_usd), `raw` (type name of an unmapped event, never its payload). _start/_end pairs match by `id`. A value the
 harness did not give is left out, not null (`cmd_end.exit` null = unknown).
 - A write error warns once on stderr and stops the feed; the file stops growing at 20 MB (only `end` still goes out); the call is unaffected. Codex's events come from its
-harness class (`adapters/harness/codex.py`, parsed once); Claude's and OpenCode's from `skills/delegate/lanes/live.py` until their harness classes land.
+harness class (`adapters/harness/codex.py`, parsed once); Claude's and OpenCode's from their harness classes (`adapters/harness/{claude,opencode}.py`).
 
 ## 6. The worker's life belongs to delegate (OWN)
 
 - A run answer carries `worker` = `{end: ok|error|timeout|worker_survived, stopped, term_sent, kill_sent, waited_s, survivors[{pid,start}]}` (typed in `src/delegate/contracts/wire.py`; `RunRequest.to_argv()` is the flag list, `RunResult` the answer, `contract.json`'s `answer_schema` is generated from it by `dev/gen_contract.py`). It also names the process: `pid`, `pgid`, `start`. The answer carries `exit_code`, `first_error` and `ask_kind` when there is one.
-- Before delegate exits it stops the worker's whole tree (`lanes/reaper.py`): SIGTERM, `DELEGATE_STOP_GRACE` s (5), SIGKILL, re-look. A pid still alive after that is a survivor; a done answer with a survivor becomes stop reason `worker_survived`.
-- SIGTERM/SIGHUP to `route.py run` stops the tree first, then answers `killed` with exit 0. `run --idle N` sets the silence limit (default per CLI, `lanes/supervisor.py`); the live JSONL (`DELEGATE_LIVE_FILE`) is unchanged.
-- `osproc.py` is the only module that lists processes (/proc on Linux, `ps` on macOS; Windows answers "nothing found"). Tests: `python dev/suite.py` (sharded units, per-test home via `tests/hermetic.py`), `python dev/suite.py --contract` (real processes, fake agent `tests/fakes/fake_agent.py`).
+- Before delegate exits it stops the worker's whole tree (`adapters/procs.py`): SIGTERM, `DELEGATE_STOP_GRACE` s (5), SIGKILL, re-look. A pid still alive after that is a survivor; a done answer with a survivor becomes stop reason `worker_survived`.
+- SIGTERM/SIGHUP to `route.py run` stops the tree first, then answers `killed` with exit 0. `run --idle N` sets the silence limit (default per CLI, `app/watch.py`); the live JSONL (`DELEGATE_LIVE_FILE`) is unchanged.
+- `adapters/procs.py` reads process facts from delegate's own worker record (pid, pgid, start token from /proc where present), never from `ps`. Tests: `python dev/suite.py` (sharded units, per-test home via `tests/hermetic.py`), `python dev/suite.py --contract` (real processes, fake agent `tests/fakes/fake_agent.py`).

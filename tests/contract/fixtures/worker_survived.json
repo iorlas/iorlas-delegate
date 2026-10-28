@@ -6,7 +6,7 @@
   {
    "id": "worker_survived",
    "synthetic": true,
-   "source": "delegate-own: lanes/reaper.py survivor report",
+   "source": "delegate-own: adapters/procs.py survivor report",
    "expected_reason": "worker_survived",
    "expected_stop": {
     "reason": "worker_survived",
