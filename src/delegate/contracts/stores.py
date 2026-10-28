@@ -11,38 +11,28 @@ import time
 from collections.abc import Callable, Iterator
 from pathlib import Path
 
+from process_lock import LockHeldError, ProcessLock
+
 from delegate.contracts import codec
 from delegate.contracts.history import ROWS, HealthCheckpoint, HealthState, HistoryRow, LedgerRow, RunRow
 from delegate.contracts.routing import BreakerPolicy
 from delegate.contracts.state import Profile, StateDoc
 
-STALE_LOCK_S = 30
 HISTORY_MAX, HISTORY_DAYS = 1_000_000, 14
 
 
 @contextlib.contextmanager
 def locked(path: Path | str, timeout: float = 10.0) -> Iterator[None]:
-    """An exclusive lock on `path` (a sibling `.lock` file made with O_EXCL); a lock older than 30 s is a dead holder's and is broken."""
-    lock = str(path) + ".lock"
-    end = time.time() + timeout
-    fd = None
-    while fd is None:
-        try:
-            fd = os.open(lock, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
-        except FileExistsError:
-            with contextlib.suppress(OSError):
-                if time.time() - os.path.getmtime(lock) > STALE_LOCK_S:
-                    os.remove(lock)
-                    continue
-            if time.time() > end:
-                raise TimeoutError("%s is locked by another route.py for more than %.0fs" % (path, timeout)) from None
-            time.sleep(0.05)
+    """An exclusive lock on `path` (process_lock on a sibling `.lock` file; threads of this process exclude each other too, the kernel frees a dead
+    holder's). TimeoutError when it stays held for `timeout` s."""
+    try:
+        lock = ProcessLock.acquire(Path(str(path) + ".lock"), timeout=timeout, reentrant=False)
+    except LockHeldError as e:
+        raise TimeoutError("%s is locked by another route.py for more than %.0fs" % (path, timeout)) from e
     try:
         yield
     finally:
-        os.close(fd)
-        with contextlib.suppress(OSError):
-            os.remove(lock)
+        lock.release()
 
 
 def private(path: Path | str) -> None:
