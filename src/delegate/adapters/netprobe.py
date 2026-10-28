@@ -6,11 +6,13 @@ Pure but for sockets and the cache file it is given. stdlib only, no subprocess,
 neutral IP literal that answers while names do not is reported as `ip_up`, because that is a DNS outage and the vendor is still unreachable.
 """
 import json
-import os
 import re
 import socket
 import threading
 import time
+from pathlib import Path
+
+from atomic_io import atomic_write_text
 
 BUDGET_S = 2.5          # whole probe; route.py net answers in under 3 s
 CONNECT_S = 1.5         # one TCP connect
@@ -89,10 +91,7 @@ def record(path, res, clock=time.time):
     since = prev.get("since") if prev.get("up") == res["up"] and prev.get("since") else res["at"]
     row = {"v": 1, "up": res["up"], "ip_up": res["ip_up"], "why": res["why"], "hosts": res["hosts"], "at": res["at"], "since": since}
     try:
-        tmp = f"{path}.tmp{os.getpid()}"
-        with open(tmp, "w", encoding="utf-8") as f:
-            json.dump(row, f)
-        os.replace(tmp, path)
+        atomic_write_text(Path(path), json.dumps(row), fsync=False)
     except OSError:
         pass
     return row

@@ -10,6 +10,8 @@ import os
 import time
 from pathlib import Path
 
+from atomic_io import atomic_write_json
+
 RETAIN = 7 * 86400
 
 
@@ -19,10 +21,7 @@ def root():
 
 
 def _write(path, rec):
-    path.parent.mkdir(parents=True, exist_ok=True)
-    tmp = path.with_suffix(".tmp")
-    tmp.write_text(json.dumps(rec), encoding="utf-8")
-    os.replace(tmp, path)
+    atomic_write_json(path, rec, fsync=False, keep_mode=True)
 
 
 def run(run_id, **fields):

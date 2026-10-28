@@ -11,6 +11,7 @@ import time
 from collections.abc import Callable, Iterator
 from pathlib import Path
 
+from atomic_io import atomic_write_text
 from process_lock import LockHeldError, ProcessLock
 
 from delegate.contracts import codec
@@ -41,9 +42,7 @@ def private(path: Path | str) -> None:
 
 
 def write_atomic(path: Path, text: str) -> None:
-    tmp = path.with_suffix(".tmp%d" % os.getpid())
-    tmp.write_text(text, encoding="utf-8")
-    os.replace(tmp, path)
+    atomic_write_text(path, text, fsync=False)      # temp file + replace, private (0600); a state file is rewritten often, so no fsync
     private(path)
 
 

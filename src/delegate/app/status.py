@@ -2,13 +2,13 @@
 probe cache. `--cheap` spawns nothing: the last snapshot plus the cached logins, with the leases read fresh."""
 import contextlib
 import json
-import os
 from dataclasses import replace
+
+from atomic_io import atomic_write_text
 
 from delegate.adapters import netprobe
 from delegate.app import cockpit, decide, env, net, roles, usage
 from delegate.app.fleet import settle_holds
-from delegate.contracts.stores import private
 from delegate.domain.health import ledger as health_ledger
 from delegate.domain.holds.book import HoldBook
 from delegate.domain.lanes.leases import LeaseBook, suspect
@@ -62,10 +62,7 @@ def running_rows(st, t):
 def write_snapshot(payload):
     with contextlib.suppress(Exception):
         p = env.snapshot_path()
-        tmp = p.with_suffix(f".tmp{os.getpid()}")
-        tmp.write_text(json.dumps(payload), encoding="utf-8")
-        os.replace(tmp, p)
-        private(p)
+        atomic_write_text(p, json.dumps(payload), fsync=False)
 
 
 def cmd_status_cheap(a, cfg):

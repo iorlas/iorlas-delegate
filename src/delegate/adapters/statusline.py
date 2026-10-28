@@ -1,8 +1,9 @@
 """Claude Code's status line hands over the subscription's rate limits; `route.py capture-limits` stores them in ~/.claude/state/max-limits.json
 and this module is the one reader and writer of that file."""
 import json
-import os
 from pathlib import Path
+
+from atomic_io import atomic_write_text
 
 
 def path() -> Path:
@@ -26,8 +27,4 @@ def read(t: float, stale_s: float) -> tuple[dict, float] | None:
 
 
 def write(rate_limits: dict, t: float) -> None:
-    p = path()
-    p.parent.mkdir(parents=True, exist_ok=True)
-    tmp = p.with_name(f"{p.name}.{os.getpid()}")
-    tmp.write_text(json.dumps({"updated": t, "rate_limits": rate_limits}), encoding="utf-8")
-    os.replace(tmp, p)
+    atomic_write_text(path(), json.dumps({"updated": t, "rate_limits": rate_limits}), fsync=False, keep_mode=True)
