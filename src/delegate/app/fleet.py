@@ -132,7 +132,7 @@ def settle_holds(states: StateStore, lanes: dict[str, Lane], doc: StateDoc, t: f
 def drift_warnings(states: StateStore, lanes: dict[str, Lane], doc: StateDoc, t: float) -> list[str]:
     """A lane the profile enabled but the machine no longer supports: say so once a day."""
     bad = [n for n, lane in lanes.items() if lane.notes and lane.notes[0].startswith(DRIFT_NOTE)]
-    out = [f"{n} is enabled but not ready, so it is skipped (route.py doctor; or route.py doctor --decline {n})"
+    out = [f"{n} is enabled but not ready, so it is skipped (route.py doctor)"
            for n in bad if t - doc.warned_at.get(n, 0) > WARN_EVERY_S]
     if out:
         states.update(lambda s: s.warned_at.update({n: t for n in bad}))

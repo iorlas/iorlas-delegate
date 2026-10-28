@@ -33,7 +33,7 @@ Roles: `planner`, `worker`, `reviewer`, `light`. Chains, models and thresholds a
 ```
 skills/delegate/SKILL.md      dispatcher and the run loop (the only file read on a normal call)
 skills/delegate/modes/        init, codex, claude-credit, extend: read on demand
-skills/delegate/route.py      the launcher: puts src/ on the path and calls delegate.cli.main (verbs: run, next, status, report, capture-limits, doctor, set-key, config, hold)
+skills/delegate/route.py      the launcher: puts src/ on the path and calls delegate.cli.main (verbs: run, next, status, report, capture-limits, doctor|init, set-key, config, hold)
 src/delegate/                 contracts / domain / adapters / app / cli (layer rules in tests/test_layers.py)
 src/delegate/app/run.py       Run, the one entry of `run`; settle.py (Settler.apply), status.py, doctor.py, onboard.py
 src/delegate/adapters/agent_runs.py  publishes runs and lane limits as agent-runs v1 (a public contract)

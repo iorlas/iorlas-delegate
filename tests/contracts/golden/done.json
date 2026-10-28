@@ -21,7 +21,7 @@
  "git_violation": [],
  "lane": "CLAUDE_SUBSCRIPTION",
  "model": "sonnet-5.5",
- "notice": "not set up: CLAUDE_CREDIT, GROK_SUBSCRIPTION (doctor --lane NAME to set up, doctor --decline NAME to hide)",
+ "notice": "not set up: CLAUDE_CREDIT, GROK_SUBSCRIPTION (route.py doctor)",
  "ref": "sess-1",
  "run_id": "8bf176ad-5fe9-4cb6-b5f2-3df1e12dfb2c",
  "rung": 2,

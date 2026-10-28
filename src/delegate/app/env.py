@@ -10,7 +10,7 @@ import sys
 import time
 from pathlib import Path
 
-from child_env import APP_NAMES, APP_PREFIXES, scrub_current
+from child_env import scrub_current
 
 from delegate.contracts import codec
 from delegate.contracts.routing import Routing, split_retired
@@ -138,12 +138,6 @@ def set_profile_lane(name, value) -> None:
     config_store().set_lane(name, value)
 
 
-def acked() -> set:
-    return set(config_store().profile().ack)
-
-
-def set_ack(ident) -> None:
-    config_store().set_ack(ident)
 
 
 def history_add(row) -> None:
@@ -179,12 +173,8 @@ def session_host() -> str:
 
 
 # The child's environment is child_env.scrub (what a Claude session exports and credential-looking variables are removed); CLAUDE_CONFIG_DIR is kept
-# so a worker on a custom Claude login finds it. shelf lacks: an app-only scrub (keep credentials), so app_free_env uses the package's APP_* tuples.
+# so a worker on a custom Claude login finds it.
 KEEP = ("CLAUDE_CONFIG_DIR",)
-
-
-def app_free_env() -> dict:
-    return {k: v for k, v in os.environ.items() if k not in APP_NAMES and not k.startswith(APP_PREFIXES)} | {k: os.environ[k] for k in KEEP if k in os.environ}
 
 
 def child_env(extra: dict | None = None) -> dict:

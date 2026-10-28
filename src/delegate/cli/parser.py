@@ -17,7 +17,7 @@ The model supplies only what the script cannot read itself; the script decides.
   route.py net [--lane L] [--host H ...]    is the machine online? stdlib sockets, no quota, answers in under 3 s: {up, why, hosts}
   route.py report --lane LANE --event out|ok [--until EPOCH|ISO]
   route.py capture-limits [--print]  (status line JSON on stdin)
-  route.py doctor [--lane L] [--next] [--fix ID] [--decline L] [--undecline L] [--ack ID] [--deep] [--json] [--quiet]   the one setup command: what each lane needs, and how to act on it
+  route.py doctor [--json]   (also `init`) a table of every lane: enabled, ready, and what to run to fix it
   route.py set-key [--stdin] [--force] | --web [--host IP|tailscale] [--port N] [--timeout S]   the key is handed over by the USER (terminal prompt or one-shot page); the agent never handles it
   route.py config set KEY VALUE | show
   route.py hold LANE --until EPOCH|ISO|+2h|+3d [--roles worker,light] [--reason TEXT] | release ID|LANE | holds   an owner hold stops a lane for some roles; --until is mandatory
@@ -52,9 +52,7 @@ def build():
     r = sub.add_parser("report"); r.add_argument("--lane", required=True); r.add_argument("--event", choices=["out", "ok"], required=True)
     r.add_argument("--until")
     cl = sub.add_parser("capture-limits"); cl.add_argument("--print", action="store_true")
-    dr = sub.add_parser("doctor"); dr.add_argument("--quiet", action="store_true"); dr.add_argument("--deep", action="store_true"); dr.add_argument("--json", action="store_true")
-    dr.add_argument("--lane"); dr.add_argument("--next", action="store_true"); dr.add_argument("--fix"); dr.add_argument("--decline"); dr.add_argument("--undecline")
-    dr.add_argument("--ack"); dr.add_argument("--open-browser", action="store_true")
+    dr = sub.add_parser("doctor", aliases=["init"]); dr.add_argument("--json", action="store_true")
     sk = sub.add_parser("set-key"); sk.add_argument("--stdin", action="store_true"); sk.add_argument("--force", action="store_true")
     sk.add_argument("--web", action="store_true"); sk.add_argument("--host", default="127.0.0.1"); sk.add_argument("--port", type=int, default=0); sk.add_argument("--timeout", type=int, default=300)
     sub.add_parser("guard").add_argument("--read-only", action="store_true")

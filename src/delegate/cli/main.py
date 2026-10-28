@@ -6,7 +6,7 @@ from delegate.app import doctor, env, net, status
 from delegate.cli import parser, verbs
 
 TABLE = {"status": status.cmd_status, "next": verbs.cmd_next, "report": verbs.cmd_report, "capture-limits": verbs.cmd_capture,
-         "run": verbs.cmd_run, "contract": verbs.cmd_contract, "doctor": doctor.cmd_doctor, "set-key": doctor.cmd_set_key, "config": doctor.cmd_config,
+         "run": verbs.cmd_run, "contract": verbs.cmd_contract, "doctor": doctor.cmd_doctor, "init": doctor.cmd_doctor, "set-key": doctor.cmd_set_key, "config": doctor.cmd_config,
          "hold": verbs.cmd_hold, "release": verbs.cmd_release, "holds": verbs.cmd_holds}
 NO_CONFIG = {"guard": verbs.cmd_guard, "net": lambda a, cfg=None: net.cmd_net(a)}      # a hook (no config, no state) and the probe
 

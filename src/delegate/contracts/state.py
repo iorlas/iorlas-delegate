@@ -103,7 +103,6 @@ class StateDoc:
     warned_at: dict[str, float] = field(default_factory=dict)
     codex_limits: UsageCache | None = None
     claude_usage: UsageCache | None = None
-    codex_login_pid: int | None = None
 
 
 @mutable

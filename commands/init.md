@@ -1,4 +1,4 @@
 ---
-description: Set up the delegate plugin's lanes (Codex login, API key, limits) step by step.
+description: Show each delegate lane (enabled, ready, what to run to fix it).
 ---
 Follow the `delegate` skill's `modes/init.md`. Run its `route.py doctor` with this machine's Python 3 (`python3`).

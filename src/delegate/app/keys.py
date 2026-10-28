@@ -7,6 +7,7 @@ import os
 import secrets
 import shutil
 import socketserver
+import subprocess
 import sys
 import time
 import urllib.error
@@ -14,7 +15,7 @@ import urllib.request
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from urllib.parse import parse_qs
 
-from delegate.app import env, setup
+from delegate.app import env
 
 
 def validate_key(key):
@@ -74,8 +75,11 @@ def tailscale_ip():
     ts = shutil.which("tailscale")
     if not ts:
         return None
-    ok, out = setup.run_cmd([ts, "ip", "-4"], timeout=10)
-    return out.split()[0] if ok and out else None
+    try:
+        r = subprocess.run([ts, "ip", "-4"], capture_output=True, text=True, timeout=10)
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    return r.stdout.split()[0] if r.returncode == 0 and r.stdout.split() else None
 
 
 PAGE = """<!doctype html><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1"><title>delegate: API key</title>

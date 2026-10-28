@@ -128,7 +128,7 @@ class Emoji(unittest.TestCase):
             self.assertEqual((v["state"], v["emoji"], v["reason"]), ("off", "⛔", text))
             self.assertEqual(v["model"], "deepseek-v4.1-flash-free high")        # still shows what it would use
         with patch.object(env, "profile_lanes", return_value={}):
-            self.assertEqual(cockpit.off_reason("OPENAI_SUBSCRIPTION", cfg_all(), (None, "", None)), "not configured: `route.py doctor --lane OPENAI_SUBSCRIPTION` sets it up")
+            self.assertEqual(cockpit.off_reason("OPENAI_SUBSCRIPTION", cfg_all(), (None, "", None)), "not configured: `route.py doctor` says what it needs")
             self.assertEqual(cockpit.off_reason("OPENAI_SUBSCRIPTION", cfg_all(), (False, "", None)), "not configured: logged out, run `codex login`")
         with patch.object(env, "profile_lanes", return_value={"GROK_SUBSCRIPTION": "declined"}):
             self.assertIn("declined", cockpit.off_reason("GROK_SUBSCRIPTION", cfg_all(), (True, "", None)))

@@ -227,8 +227,5 @@ class ConfigStore:
             p.lanes.pop(name, None) if value is None else p.lanes.__setitem__(name, value)
         self._put_profile(put)
 
-    def set_ack(self, ident: str) -> None:
-        self._put_profile(lambda p: p.ack.append(ident) if ident not in p.ack else None)
-
     def mark_offered(self, names: list[str]) -> None:
         self._put_profile(lambda p: p.offered.extend(n for n in names if n not in p.offered))

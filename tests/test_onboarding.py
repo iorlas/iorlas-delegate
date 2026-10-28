@@ -3,7 +3,6 @@ import hermetic  # noqa: F401  (a home of its own for every test)
 import os
 import sys
 import tempfile
-from unittest import mock
 import unittest
 from pathlib import Path
 from test_route import route, T, argparse_ns
@@ -15,7 +14,7 @@ from delegate.app import harnesses
 from delegate.app import decide as dec
 from delegate.app import fleet
 import shutil
-from delegate.app import doctor, keys, setup
+from delegate.app import doctor, keys
 
 
 class Onboarding(unittest.TestCase):
@@ -43,28 +42,34 @@ class Onboarding(unittest.TestCase):
                 os.environ[k] = v
         self.tmp.cleanup()
 
-    def test_empty_machine_is_ready_with_lanes_on_offer_and_asking_for_one_gives_its_first_step(self):
-        d = doctor.doctor(self.cfg)
-        self.assertTrue(d["ready"])                                   # sub-agent-only is a complete setup
-        self.assertTrue(d["lanes"]["CLAUDE_SUBSCRIPTION"])
-        self.assertFalse(d["lanes"]["OPENAI_SUBSCRIPTION"])
-        self.assertTrue(all(c.get("available") for c in d["checks"] if not c["ok"] and not c.get("optional")))
-        want = doctor.doctor(self.cfg, lane="OPENAI_SUBSCRIPTION")
-        self.assertFalse(want["ready"])
-        step = doctor.next_step(want)
-        self.assertEqual((step["step"], step["who"], step["do"]), ("codex_cli", "agent", "codex_cli"))
 
-    def test_deep_doctor_validates_the_key_with_one_live_request(self):
-        with mock.patch.object(harnesses, "find_key", return_value="sk-x"), mock.patch.object(keys, "validate_key", return_value=(False, "401")) as vk:
-            d = doctor.doctor(self.cfg, deep=True)
-        vk.assert_called_once_with("sk-x")
-        self.assertIn("401", next(c for c in d["checks"] if c["id"] == "credit_key_valid")["say"])
 
-    def test_decline_both_lanes_makes_it_ready(self):
-        setup.act(self.cfg, decline="OPENAI_SUBSCRIPTION")
-        setup.act(self.cfg, decline="CLAUDE_CREDIT")
-        self.assertTrue(doctor.doctor(self.cfg)["ready"])
-        self.assertNotIn("step", doctor.next_step(doctor.doctor(self.cfg)))     # nothing required is left
+
+    def test_doctor_is_a_plain_lane_table_and_nothing_blocks(self):
+        rows = {r["lane"]: r for r in doctor.doctor(self.cfg)["lanes"]}
+        self.assertEqual(list(rows), list(self.cfg["lanes"]))
+        self.assertEqual((rows["CLAUDE_SUBSCRIPTION"]["enabled"], rows["CLAUDE_SUBSCRIPTION"]["ready"], rows["CLAUDE_SUBSCRIPTION"]["fix"]), (True, True, ""))
+        o = rows["OPENAI_SUBSCRIPTION"]
+        self.assertEqual((o["enabled"], o["ready"]), (True, False))
+        self.assertIn("npm install -g @openai/codex", o["fix"])
+        self.assertFalse(rows["DEEPSEEK_FREE"]["enabled"])                            # an opt-in lane is off until its setting is true
+        self.assertIn("deepseek_free_enabled", rows["DEEPSEEK_FREE"]["fix"])
+        self._make_codex_ready()
+        o = {r["lane"]: r for r in doctor.doctor(self.cfg)["lanes"]}["OPENAI_SUBSCRIPTION"]
+        self.assertEqual((o["ready"], o["fix"]), (True, ""))
+        env.set_profile_lane("OPENAI_SUBSCRIPTION", "declined")
+        self.assertFalse({r["lane"]: r for r in doctor.doctor(self.cfg)["lanes"]}["OPENAI_SUBSCRIPTION"]["enabled"])
+
+    def test_the_table_prints_one_line_per_lane(self):
+        import io
+        from contextlib import redirect_stdout
+        buf = io.StringIO()
+        with redirect_stdout(buf):
+            self.assertEqual(route.main(["doctor"]), 0)
+            self.assertEqual(route.main(["init"]), 0)
+        lines = buf.getvalue().splitlines()
+        self.assertEqual(len(lines), 2 * (len(self.cfg["lanes"]) + 1))
+        self.assertTrue(lines[0].startswith("lane") and "enabled" in lines[0] and "ready" in lines[0] and "fix" in lines[0])
 
     def _gather(self, st=None):
         real = dict(usage.READERS)
@@ -154,31 +159,7 @@ class Onboarding(unittest.TestCase):
         self.assertTrue(keys.allowed_host("192.168.1.5"))
 
 
-    def test_every_missing_item_says_what_to_do_and_ack_clears_it(self):
-        import io
-        d = doctor.doctor(self.cfg, lane="OPENAI_SUBSCRIPTION")
-        self.assertFalse(d["ready"])
-        buf, real = io.StringIO(), sys.stdout
-        sys.stdout = buf
-        try:
-            doctor.print_doctor(d, quiet=False)
-        finally:
-            sys.stdout = real
-        text = buf.getvalue()
-        self.assertIn("MISSING   codex_cli", text)
-        self.assertIn("-> Install the Codex CLI.", text)
-        self.assertIn("doctor --decline LANE", text)
-        env.set_ack("codex_cli")
-        env.set_ack("codex_login")
-        d2 = doctor.doctor(self.cfg, lane="OPENAI_SUBSCRIPTION")
-        self.assertTrue(next(c for c in d2["checks"] if c["id"] == "codex_cli")["acked"])
 
-    def test_volumes_note_is_ackable(self):
-        import unittest.mock as m
-        with m.patch.object(os.path, "exists", lambda p: p == "/.dockerenv"):
-            self.assertEqual([n["id"] for n in doctor.doctor(self.cfg)["notes"]], ["volumes"])
-            env.set_ack("volumes")
-            self.assertEqual(doctor.doctor(self.cfg)["notes"], [])
 
     def test_unset_lanes_are_offered_once_and_never_block(self):
         a = argparse_ns("worker")
@@ -229,18 +210,6 @@ class Onboarding(unittest.TestCase):
         finally:
             sys.stdin = real
         self.assertEqual(harnesses.find_key(quiet=True), "sk-ant-test-key")
-
-
-class OnboardChildEnv(unittest.TestCase):
-    def test_child_clis_run_without_the_claude_app_variables(self):
-        from unittest import mock
-        seen = {}
-        with mock.patch.dict(os.environ, {"ANTHROPIC_BASE_URL": "http://x", "CLAUDE_CODE_OAUTH_SCOPES": "s", "KEEP_ME": "1"}), \
-                mock.patch.object(setup.subprocess, "run", side_effect=lambda argv, **kw: seen.update(kw["env"]) or mock.Mock(returncode=0, stdout="", stderr="")):
-            setup.run_cmd(["claude", "auth", "status"])
-        self.assertNotIn("ANTHROPIC_BASE_URL", seen)
-        self.assertNotIn("CLAUDE_CODE_OAUTH_SCOPES", seen)
-        self.assertEqual(seen["KEEP_ME"], "1")
 
 
 if __name__ == "__main__":

@@ -10,7 +10,7 @@
  "git_violation": [],
  "lane": "OPENAI_SUBSCRIPTION",
  "model": null,
- "notice": "not set up: CLAUDE_CREDIT, GROK_SUBSCRIPTION (doctor --lane NAME to set up, doctor --decline NAME to hide)",
+ "notice": "not set up: CLAUDE_CREDIT, GROK_SUBSCRIPTION (route.py doctor)",
  "ref": null,
  "run_id": null,
  "say": "OPENAI_SUBSCRIPTION (the role's first choice) has no free slot: busy: 4 running, 4 allowed",

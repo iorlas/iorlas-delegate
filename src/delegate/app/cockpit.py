@@ -62,10 +62,10 @@ def off_reason(name, cfg, login):
     if flag and cfg["settings"].get(flag) is not True:
         return f"disabled: `route.py config set {flag} true` turns it on"
     if env.profile_lanes().get(name) == "declined":
-        return f"declined: `route.py doctor --undecline {name}` brings it back"
+        return "declined: remove it from the profile in config.json to bring it back"
     if login[0] is False:
         return f"not configured: logged out, run `{LOGIN_CMD[name]}`"
-    return f"not configured: `route.py doctor --lane {name}` sets it up" + (f" ({login[1]})" if login[0] is None and login[1] else "")
+    return f"not configured: `route.py doctor` says what it needs" + (f" ({login[1]})" if login[0] is None and login[1] else "")
 
 
 def classify_out(lane, rec):

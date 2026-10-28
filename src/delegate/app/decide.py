@@ -136,7 +136,7 @@ def decision(a, cfg, unattended=False):
                 env.update_state(mark)
     if fleet.offers:
         env.config_store().mark_offered(fleet.offers)
-        d["notice"] = "not set up: " + ", ".join(fleet.offers) + " (doctor --lane NAME to set up, doctor --decline NAME to hide)"
+        d["notice"] = "not set up: " + ", ".join(fleet.offers) + " (route.py doctor)"
     return d, lanes, warnings, t
 
 
