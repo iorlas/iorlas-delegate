@@ -14,6 +14,8 @@ Read this before changing anything in this repo. Rules are Denis's; the lessons 
 8. **No secret enters chat.** A login is the user's, in their own terminal.
 9. **Claim only what was checked.** Say "built" vs "bead"; report test and CI status of the exact commit.
 10. **Read `docs/dev/integrations.md`** before changing how workers launch or how limits are computed (agent-runs v1 is a public format).
+11. **Claude lanes are the last resort for every role** (workers and reviewers): the router picks one only when no other lane is usable. The owner's Claude subscription carries his interactive work; the other licences are there to be used up.
+12. **A network drop is its own outcome, never a lane failure.** It does not count toward a cap or mark a lane out; the step resumes the same vendor session with backoff, finished output is never thrown away, and checks and land are idempotent. Drops are common where the owner lives; treating them as failures burns retries and good lanes.
 
 ## Lessons
 
@@ -27,6 +29,7 @@ Read this before changing anything in this repo. Rules are Denis's; the lessons 
 - Nothing on the owner's own user hides ~/.ssh from an approved command: Codex keeps escalations sandboxed whenever a read is denied (by design, `core/src/tools/sandboxing.rs`), so a read block and Unity exclude each other; Claude's own sandbox breaks `dotnet build`; an outer `sandbox-exec` wrapper stops Codex from applying its own sandbox. Delegate's secrets guard is a regex tripwire; a separate user or VM is the real fix.
 - Another harness on the same subscription adds no capacity. OpenCode on the ChatGPT login matched Codex on tokens and quality but changed out-of-scope code to pass a test, and has no reviewer of its own: dropped 2026-10-21, findings and a tested Haiku judge design in bead delegate-p8g.
 - A harness on another subscription does add capacity. Grok came back 2026-10-23 as OpenCode on the SuperGrok login (bead delegate-7dm): grok-4.7 matched Codex on the bench with fewer tokens. The Grok CLI and grok-build-0.1 lost: 2-10 times the tokens, and both rewrote code the sandbox blocked. Grok's own sandbox profiles that block network refuse to start when /var/run/docker.sock is a symlink (OrbStack), so delegate sandboxes OpenCode's shell itself. A worker whose command the sandbox blocks must report it, not work around it: the rule says so.
+- Give Codex one moderate atomic chunk per job (not a micro edit, not a whole feature) and keep it sandboxed. Each ticket names acceptance commands Codex can run in its sandbox (build, formatter, its own probes) and says "do not run Unity" when Unity is involved: the coordinator runs Unity and the full gate afterwards and sends the findings back on the same thread (`--resume-last`). Full access would bypass the worktree and no-commit hooks. The sandbox blocks Unity, and Codex once missed dozens of analyzer errors it never ran. A background job can stall in "queued"; running the companion in the foreground inside a backgrounded Bash call worked.
 - Parallel slots of one repo change refs and worktrees while a worker runs; compare only the cwd's HEAD and branch.
 - macOS has no `timeout`; use `subprocess` timeouts.
 - `HTTPServer.server_bind` does a reverse-DNS lookup that stalls for seconds on macOS runners; skip it.
