@@ -10,7 +10,7 @@ import sys
 import threading
 import time
 from collections.abc import Callable
-from typing import Any
+from typing import Any, Literal
 
 from jsonl_log import append_line, open_append
 
@@ -19,6 +19,7 @@ from delegate.contracts import live
 from delegate.contracts.codec import ABSENT, to_json
 from delegate.contracts.live import LIVE_FILE_MAX
 
+EndStatus = Literal["done", "timeout", "killed", "error"]      # the contract's live end statuses
 ENV = "DELEGATE_LIVE_FILE"
 CMD_MAX, OUT_MAX, MSG_MAX, THINK_MAX = 2000, 1500, 2000, 500
 STALL_FIRST_S = 60       # no event this long: one "stall", then one more every STALL_EVERY_S while it lasts
@@ -100,7 +101,7 @@ class LiveSink:
             while self.stall_at <= idle_s:
                 self.stall_at += STALL_EVERY_S
 
-    def end(self, status: str, cost_usd: float | None = None) -> None:
+    def end(self, status: EndStatus, cost_usd: float | None = None) -> None:
         if not self.on:
             return
         self.write(live.LiveEnd(t=self.wall(), status=status, secs=round(self.wall() - self.t0, 1), cost_usd=_opt(cost_usd)), final=True)
@@ -177,7 +178,7 @@ class LiveSink:
                 pass            # a turn end with no usage to report (claude's result carries its own totals in `end`)
 
 
-def end_status(timed_out: bool, hung: str | None, stop: str | None, rc: int | None) -> str:
+def end_status(timed_out: bool, hung: str | None, stop: str | None, rc: int | None) -> EndStatus:
     """run_proc's outcome as the contract's end status."""
     if timed_out:
         return "timeout"

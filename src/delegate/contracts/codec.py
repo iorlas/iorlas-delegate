@@ -38,11 +38,13 @@ class StaleRecord(CodecError):
         self.want = want
 
 
+@typing.dataclass_transform(frozen_default=True, kw_only_default=True)
 def record[T](cls: type[T]) -> type[T]:
     """The decorator of every record: a frozen, keyword-only, slotted dataclass."""
     return dataclasses.dataclass(frozen=True, kw_only=True, slots=True)(cls)
 
 
+@typing.dataclass_transform(kw_only_default=True)
 def mutable[T](cls: type[T]) -> type[T]:
     """A record a process fills in as it goes (the reaper's report): a keyword-only, slotted dataclass."""
     return dataclasses.dataclass(kw_only=True, slots=True)(cls)

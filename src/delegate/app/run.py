@@ -7,7 +7,9 @@ import json
 import sys
 import time
 import uuid
+from collections.abc import Callable
 from pathlib import Path
+from typing import Any
 
 from delegate.adapters import agent_runs, git, procs
 from delegate.app import answer, cockpit, decide, env, harnesses, launch, net, usage, watch
@@ -15,11 +17,12 @@ from delegate.app.lease import RunLease
 from delegate.app.supervisor import RunHooks
 from delegate.contracts import codec
 from delegate.contracts import history as hist
-from delegate.contracts.state import RefRecord
+from delegate.contracts.state import RefRecord, StateDoc
 from delegate.domain.cost import accounting
 from delegate.domain.health import ledger as health_ledger
 from delegate.domain.holds.book import HoldBook
 from delegate.domain.lanes import profiles
+from delegate.domain.lanes.lane import Lane
 from delegate.domain.policy.worker import GIT_RULES, SECRET_RULE
 
 CANARY_BRIEF = "Reply with exactly: OK"
@@ -28,16 +31,16 @@ IDENTITY = ("lane", "model", "effort", "family", "flag", "rung", "fallback", "fa
 
 
 class Run:
-    def __init__(self, a, cfg, unattended=False, idle_s=None):
+    def __init__(self, a: env.Args, cfg: dict, unattended: bool = False, idle_s: float | None = None):
         self.a, self.cfg, self.unattended, self.idle_s = a, cfg, unattended, idle_s
-        self.extra = {}         # fields every answer of this call carries: warnings, notice, needs_input
+        self.extra: dict = {}         # fields every answer of this call carries: warnings, notice, needs_input
         self.settler = launch.settler()
 
     # -- the answer ----------------------------------------------------------------------------------------------------------------------
-    def emit(self, outcome, **kw):
+    def emit(self, outcome: str | None, **kw: Any):
         return answer.emit(answer.result(outcome, **kw), not self.unattended)
 
-    def refuse(self, outcome, say, retry_after, **who):
+    def refuse(self, outcome: str, say: str, retry_after: float | None, **who: Any):
         """An answer given without launching a worker; history keeps it too, so refusals are countable."""
         a, call_id = self.a, getattr(self.a, "call_id", None)
         env.history_add(hist.RefusalRow(ts=env.now(), call_id=call_id, **health_ledger.failure_fields(outcome, "", say, retry_after), role=a.role, task=getattr(a, "task", None) or "",
@@ -79,7 +82,7 @@ class Run:
             return self.emit("caller", **who, call_id=call_id, say="empty brief: pass it on stdin or with --brief FILE", **self.extra)
         return self._run(d, lanes, t, who, brief)
 
-    def _stopped(self, d, lanes, t):
+    def _stopped(self, d: dict, lanes: dict, t: float):
         a = self.a
         if d["action"] == "error":
             return self.refuse("caller", d["error"], None)
@@ -93,7 +96,7 @@ class Run:
             return self.refuse("busy", d["say"], d["retry_after"], lane=d.get("lane"))
         return self.refuse("no_lane", d["say"], retry)
 
-    def _run(self, d, lanes, t, who, brief):
+    def _run(self, d: dict, lanes: dict, t: float, who: dict, brief: str):
         a, h = self.a, d["how"]
         rid = str(uuid.uuid4())
         lane = lanes[d["lane"]]
@@ -127,29 +130,29 @@ class Run:
             lease.release()
         return self._finish(res, d, lane, who, rid, lease, hooks, launched, cap, (t0, t_from, git_before))
 
-    def _hooks(self, rid, lease, d):
-        launched = {}
+    def _hooks(self, rid: str, lease: RunLease, d: dict):
+        launched: dict = {}
         hooks = RunHooks(idle_s=self.idle_s, unattended=self.unattended)
         ref_rec = RefRecord(lane=d["lane"], model=d["model"], effort=d["effort"], mode=d["mode"], cap=d.get("cap"),
                             rung=d.get("rung"), fallback=d.get("fallback"), fallback_reason=d.get("fallback_reason"), first_lane=d.get("first_lane"))
 
-        def worker_started(w):
+        def worker_started(w: procs.Worker):
             """The worker runs in its own process group (pgid = pid), so a SIGKILL on route.py leaves it running: say where it is, before any
             work, on stderr and in the lease (status --json `running`), so the caller can kill the group itself."""
             print(f"delegate: worker pid={w.pid} pgid={w.pgid} run_id={rid}", file=sys.stderr, flush=True)
             launched.update(pid=w.pid, pgid=w.pgid, start=w.start)
             lease.worker_started(w.pid, w.start)
 
-        def keep_ref(ref):
+        def keep_ref(ref: str):
             """Remember the ref for `--resume` whatever the outcome."""
-            def keep(s):
+            def keep(s: StateDoc):
                 s.refs[ref] = ref_rec
                 for k in list(s.refs)[:-200]:
                     s.refs.pop(k)
             env.update_state(keep)
         self.keep_ref = keep_ref
 
-        def ref_seen(ref):
+        def ref_seen(ref: str):
             """The vendor revealed its session id: store it, stamp the lease, and print it on stderr (the engine reads `delegate: ref=`) before any work is lost."""
             keep_ref(ref)
             print(f"delegate: ref={ref} run_id={rid}", file=sys.stderr, flush=True)
@@ -158,9 +161,11 @@ class Run:
         return hooks, launched
 
     # -- the launch ladder: canary, network retry, schema re-ask ------------------------------------------------------------------------------
-    def _launch(self, d, brief, rid, t, meta, hooks, canary_due):
+    def _launch(self, d: dict, brief: str, rid: str, t: float, meta: dict, hooks: RunHooks, canary_due: bool):
         a = self.a
-        launch_one = lambda b, a_: launch.launch_worker(d, b, a_, rid, t, self.cfg, meta, hooks)
+
+        def launch_one(b: str, a_: env.Args):
+            return launch.launch_worker(d, b, a_, rid, t, self.cfg, meta, hooks)
         res = self._canary(launch_one, d, a) if canary_due else None      # the one probe before full traffic; None = it passed
         res = res or launch_one(brief, a)
         if res.get("outcome") == "network" and not res.pop("started", False) and net.net_up(d["lane"]):
@@ -171,7 +176,7 @@ class Run:
         res.pop("answered", None)
         return res
 
-    def _canary(self, launch_one, d, a):
+    def _canary(self, launch_one: Callable[[str, env.Args], dict], d: dict, a: env.Args):
         """The pair's bench ended (or its lane's limit did): one 30 s probe before full traffic. -> None when it answered (a `done` row in history ends
         the ladder), else the failed result, which is the answer to the caller: the run's own history row then starts the next rung."""
         res = launch_one(CANARY_BRIEF, argparse.Namespace(**dict(vars(a), resume=None, schema=None, timeout=CANARY_TIMEOUT_S)))
@@ -184,7 +189,7 @@ class Run:
             res["say"] = "canary failed: " + (res.get("say") or "")
         return res
 
-    def _schema(self, res, launch_one):
+    def _schema(self, res: dict, launch_one: Callable[[str, env.Args], dict]):
         """delegate enforces the schema: one re-ask in the same thread, then schema_invalid."""
         a = self.a
         schema = json.loads(Path(a.schema).read_text(encoding="utf-8"))
@@ -205,7 +210,8 @@ class Run:
         return res
 
     # -- the end: history, usage, the answer ----------------------------------------------------------------------------------------------------
-    def _finish(self, res, d, lane, who, rid, lease, hooks, launched, cap, started):
+    def _finish(self, res: dict, d: dict, lane: Lane, who: dict, rid: str, lease: RunLease, hooks: RunHooks, launched: dict, cap: int | None,
+                started: tuple):
         a, cfg, extra = self.a, self.cfg, self.extra
         t0, t_from, git_before = started
         fam, cwd = who["family"], d["how"]["cwd"]
@@ -250,7 +256,7 @@ class Run:
         return self.emit(res.pop("outcome", None), worker=codec.to_json(wk), **res)
 
 
-def transcript_info(path, family, start=0):
+def transcript_info(path: str | None, family: str, start: int = 0):
     """-> {path, kind, from, to, bytes}: the transcript file and the byte window this call wrote (a resumed thread appends to one file), or None."""
     if not path:
         return None
@@ -263,7 +269,7 @@ def transcript_info(path, family, start=0):
     return {"path": path, "kind": kind, "from": frm, "to": size, "bytes": size - frm}
 
 
-def file_size(path):
+def file_size(path: str | None):
     try:
         return Path(path).stat().st_size if path else 0
     except OSError:

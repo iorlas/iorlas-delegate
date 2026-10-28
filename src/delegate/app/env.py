@@ -2,12 +2,14 @@
 
 The functions are the seam tests patch; `load_routing` is the one place routing.json and the owner's config.json meet.
 """
+import argparse
 import contextlib
 import copy
 import json
 import os
 import sys
 import time
+import types
 from pathlib import Path
 
 from child_env import scrub_current
@@ -16,6 +18,7 @@ from delegate.contracts import codec
 from delegate.contracts.routing import Routing, split_retired
 from delegate.contracts.stores import ConfigStore, HistoryStore, StateStore
 
+Args = argparse.Namespace | types.SimpleNamespace      # the parsed command line (a stand-in namespace in tests)
 SKILL_DIR = Path(__file__).resolve().parents[3] / "skills" / "delegate"        # routing.json, contract.json, SKILL.md: next to src/ in the plugin tree
 
 

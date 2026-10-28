@@ -102,9 +102,17 @@ class Quiet:
 
 class Harness(Protocol):
     kind: str
-    secret_event: type | None       # the event delegate polices for secret paths (no PreToolUse hook under this CLI); None = the CLI blocks it itself
+
+    @property
+    def secret_event(self) -> type | None:
+        """The event delegate polices for secret paths (no PreToolUse hook under this CLI); None = the CLI blocks it itself"""
+        ...
+
     evidence: Evidence
-    log_dir: Path | None            # a log of the CLI's own the supervisor watches for a limit it retries forever
+    @property
+    def log_dir(self) -> Path | None:
+        """A log of the CLI's own the supervisor watches for a limit it retries forever."""
+        ...
 
     def launch_spec(self, i: LaunchInputs) -> LaunchSpec: ...
 

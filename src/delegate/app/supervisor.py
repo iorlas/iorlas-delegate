@@ -85,7 +85,7 @@ class LogWatcher:
     """Stops a worker whose harness log gained a limit line since launch (OpenCode retries a limit forever without exiting). A line that only
     echoes the worker's own tool input is never one."""
 
-    def __init__(self, log_dir: Path, is_limit: Callable[[str], bool], echoes: Callable[[str], bool]) -> None:
+    def __init__(self, log_dir: Path, is_limit: Callable[[str], object], echoes: Callable[[str], bool]) -> None:
         self.dir, self.is_limit, self.echoes, self.offs = log_dir, is_limit, echoes, {}
         with contextlib.suppress(OSError):
             self.offs = {f: f.stat().st_size for f in log_dir.glob("*.log")}

@@ -7,18 +7,20 @@ import shlex
 import shutil
 import sys
 import time
-from collections import namedtuple
+from collections.abc import Callable
 from pathlib import Path
+from typing import Any, NamedTuple
 
 from delegate.adapters import agent_runs, codex_account
 from delegate.adapters.harness import classify, opencode_sandbox
-from delegate.adapters.harness.base import LaunchInputs
+from delegate.adapters.harness.base import Harness, LaunchInputs, LaunchSpec
 from delegate.adapters.harness.claude import ClaudeHarness
 from delegate.adapters.harness.codex import CodexHarness
 from delegate.adapters.harness.opencode import OpenCodeHarness, Profile
 from delegate.app import answer, decide, env, harnesses, net, settle, watch
 from delegate.app.publish import LiveSink
-from delegate.app.supervisor import LogWatcher, Supervisor
+from delegate.app.supervisor import LogWatcher, RunHooks, Supervisor
+from delegate.contracts.state import StateDoc
 from delegate.domain.cost import accounting
 from delegate.domain.holds.book import HoldBook
 from delegate.domain.policy import worker as policy
@@ -37,22 +39,22 @@ def settler():
     return settle.Settler(env.states(), net.net_up, env.now, decide.busy_jitter)
 
 
-def guard_settings(read_only):
+def guard_settings(read_only: bool | None):
     """--settings for claude -p: delegate's PreToolUse hook (route.py guard), read-only for steps that may not write."""
     argv = [sys.executable, str(env.SKILL_DIR / "route.py"), "guard"] + (["--read-only"] if read_only else [])
     cmd = shlex.join(argv)
     return {"hooks": {"PreToolUse": [{"matcher": "*", "hooks": [{"type": "command", "command": cmd}]}]}}
 
 
-def codex_reset_now(t):
+def codex_reset_now(t: float):
     """The reset of the Codex window a fresh reading shows full (>= 95%), else None."""
     res, _ = codex_account.rate_limits()
     rl = (res or {}).get("rateLimits") or {}
-    full = [w.get("resetsAt") for w in (rl.get("primary") or {}, rl.get("secondary") or {}) if (w.get("usedPercent") or 0) >= 95 and (w.get("resetsAt") or 0) > t]
+    full = [r for w in (rl.get("primary") or {}, rl.get("secondary") or {}) if (w.get("usedPercent") or 0) >= 95 and (r := w.get("resetsAt") or 0) > t]
     return min(full) if full else None
 
 
-def repo_instruction_text(cwd, cap=32768):
+def repo_instruction_text(cwd: str, cap: int = 32768):
     """--restricted keeps Claude from loading the repo's CLAUDE.md; Codex reads AGENTS.md. Both lanes get the same files (repo_instructions),
     capped like Codex's project_doc_max_bytes."""
     out, left = "", cap
@@ -66,10 +68,15 @@ def repo_instruction_text(cwd, cap=32768):
     return out
 
 
-Prep = namedtuple("Prep", "hx spec extra")       # the harness, its launch, and what the ladder needs from before the launch
+class Prep(NamedTuple):
+    """The harness, its launch, and what the ladder needs from before the launch."""
+
+    hx: Harness
+    spec: LaunchSpec
+    extra: dict
 
 
-def lane_gone_check(lane, since):
+def lane_gone_check(lane: str, since: float):
     """-> a function: the words of a limit, credit or login mark another process set on `lane` after `since` (wall clock), else None. The worker
     still running there is burning an exhausted lane."""
     def gone():
@@ -80,25 +87,25 @@ def lane_gone_check(lane, since):
     return gone
 
 
-def secret_in(e):
+def secret_in(e: Any):
     """The command a Cmd or CmdEnd event names a secret path in, else None (delegate polices the stream of the CLIs that have no hook)."""
     return e.text if secret_hit(e.text) else None
 
 
-def denied_items(hx, read_only):
+def denied_items(hx: Harness, read_only: bool | None):
     """The `denied` items of a run, from the denials its harness reported. A git write the coordinator forbids, or a write on a read-only step, is
     delegate's policy, not the owner's call, and Claude's own record of it is dropped."""
     out = []
     for x in hx.evidence.denials:
         cmd = (x.input or {}).get("command")
-        if hx.kind == "claude" and policy.is_policy_denial(x.tool, x.input, read_only):
+        if hx.kind == "claude" and policy.is_policy_denial(x.tool, x.input, bool(read_only)):
             continue
         kind = x.kind if x.kind != "policy" else "secret" if hx.kind == "opencode" and x.tool == "Bash" and secret_hit(cmd) else "policy"
         out.append(policy.denial_item(policy.denial(kind, x.tool, x.input)))
     return out
 
 
-def prepare_codex(d, brief, a, rid, t, cfg):
+def prepare_codex(d: dict, brief: str, a: env.Args, rid: str, t: float, cfg: dict):
     h = d["how"]
     hold = HoldBook(env.load_state().holds).covering(d.get("lane") or "OPENAI_SUBSCRIPTION", d.get("role", getattr(a, "role", None)), t)
     if hold:
@@ -115,7 +122,7 @@ def prepare_codex(d, brief, a, rid, t, cfg):
     return Prep(hx, spec, {"before": before, "started": time.time()})       # wall clock, not env.now(): it is compared with file times
 
 
-def prepare_claude(d, brief, a, rid, t, cfg):
+def prepare_claude(d: dict, brief: str, a: env.Args, rid: str, t: float, cfg: dict):
     """claude -p on the logged-in subscription (CLAUDE_SUBSCRIPTION, unattended)."""
     h = d["how"]
     exe = shutil.which("claude")
@@ -128,7 +135,7 @@ def prepare_claude(d, brief, a, rid, t, cfg):
     return Prep(hx, spec, {})
 
 
-def prepare_opencode(d, brief, a, rid, t, cfg):
+def prepare_opencode(d: dict, brief: str, a: env.Args, rid: str, t: float, cfg: dict):
     """OpenCode headless runner for subscription and isolated free-only lanes."""
     h, lane = d["how"], d["lane"]
     exe = OpenCodeHarness.find_exe()
@@ -158,7 +165,7 @@ REF_FIELD = {"codex": "thread", "claude_p": "session", "opencode": "session"}   
 AGENT_KIND = {"codex": "codex", "claude_p": "claude-p", "opencode": "opencode"}
 
 
-def login_text(kind, lane):
+def login_text(kind: str, lane: str):
     """(the hint stored with a lane that is logged out, the text of the answer with {why})."""
     if kind == "codex":
         return "logged out: run `codex login`", "codex is not logged in: {why} (route.py doctor)"
@@ -169,7 +176,7 @@ def login_text(kind, lane):
     return hint, f"{lane}: {hint}: {{why}}"
 
 
-def codex_usage(res, x):
+def codex_usage(res: dict, x: dict):
     """Codex's usage is a thread's running total: keep this run's part, add the reviewer's tokens (its own child thread), and read the context size."""
     tokens = accounting.per_call(res["tokens"], x["before"])
     if res["ref"]:
@@ -180,7 +187,14 @@ def codex_usage(res, x):
     res.update(tokens=tokens, context_k=codex_account.context_k(res["ref"]), acct=accounting.codex(tokens))
 
 
-def launch_worker(d, brief, a, rid, t, cfg, meta, hooks):
+def lane_cleared(lane: str) -> Callable[[StateDoc], Any]:
+    """The state change that drops the out-mark of `lane`."""
+    def clear(s: StateDoc) -> Any:
+        return s.out.pop(lane, None)
+    return clear
+
+
+def launch_worker(d: dict, brief: str, a: env.Args, rid: str, t: float, cfg: dict, meta: dict, hooks: RunHooks):
     """One worker, end to end: its harness builds the launch, the supervisor runs it, the one ladder settles it. -> dict of result fields."""
     h = d["how"]
     prep = PREPARE[h["kind"]](d, brief, a, rid, t, cfg)
@@ -189,7 +203,7 @@ def launch_worker(d, brief, a, rid, t, cfg, meta, hooks):
     hx, spec, x = prep
     field = REF_FIELD[h["kind"]]
 
-    def on_ref(ref):
+    def on_ref(ref: str):
         if hooks.ref:
             hooks.ref(ref)
         agent_runs.run(rid, **{field: ref})
@@ -210,7 +224,7 @@ def launch_worker(d, brief, a, rid, t, cfg, meta, hooks):
     with contextlib.suppress(Exception):        # one history row per inter-event gap over watch.LONG_GAP_S (role "gap"): the health fold ignores it
         sup.dog.flush(env.history_add, d["lane"], d["model"], out.watch.why is None)
     sm, w = out.summary, out.watch
-    res = dict(sm.res, stderr=out.err, denied=denied_items(hx, h.get("read_only")))
+    res: dict[str, Any] = dict(sm.res, stderr=out.err, denied=denied_items(hx, h.get("read_only")))
     if h["kind"] == "codex":
         codex_usage(res, x)
     if out.stream_tail:
@@ -228,7 +242,7 @@ def launch_worker(d, brief, a, rid, t, cfg, meta, hooks):
         settler().apply(res, o, d, t, hx.kind, a, sm.rc, sm.tail, reset=(lambda: codex_reset_now(t)) if hx.kind == "codex" else None,
                login=login_text(h["kind"], d["lane"]))
     else:
-        env.update_state(lambda s: s.out.pop(d["lane"], None))
+        env.update_state(lane_cleared(d["lane"]))
         res.update(data=sm.data if sm.data is not None else answer.parse_data(sm.text, a.schema))
         if sm.warnings:
             res["warnings"] = sm.warnings
