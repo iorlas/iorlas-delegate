@@ -13,7 +13,8 @@ from unittest import mock
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "skills" / "delegate"))
 import route                                  # noqa: E402
-from lanes import supervisor, usage          # noqa: E402
+from delegate.adapters.harness import claude   # noqa: E402
+from lanes import supervisor                # noqa: E402
 
 T = 1_000_000.0
 
@@ -164,9 +165,9 @@ class Replay(unittest.TestCase):
         self.assertEqual(turn.verdict(wd), "answer")
 
     def test_claude_stream_usage_sums_requests(self):
-        self.assertEqual(usage.claude_stream([{"input_tokens": 1, "output_tokens": 2}, {"input_tokens": 3, "cache_read_input_tokens": 9}]),
+        self.assertEqual(claude.stream_usage([{"input_tokens": 1, "output_tokens": 2}, {"input_tokens": 3, "cache_read_input_tokens": 9}]),
                          {"input_tokens": 4, "cache_read_input_tokens": 9, "cache_creation_input_tokens": 0, "output_tokens": 2})
-        self.assertEqual(usage.claude_stream([]), {})
+        self.assertEqual(claude.stream_usage([]), {})
 
 
 if __name__ == "__main__":

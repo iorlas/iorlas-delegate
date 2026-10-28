@@ -52,12 +52,14 @@ if str(HERE) not in sys.path:
     sys.path.insert(0, str(HERE))
 sys.path.insert(0, str(HERE.parents[1] / "src"))     # delegate.*: the typed records and the harness classes ship in the plugin dir, next to skills/
 from lanes import classify, health, live as livemod, supervisor      # the one outcome ladder (delegate-e05); the health fold and breaker (rdt, a9x); the idle watchdog (go0)
-from lanes import netprobe, profiles, usage as accounting                # network facts (4n7); the lane adapter registry (dlz)
+from delegate.adapters import netprobe
+from lanes import profiles, usage as accounting                # network facts (4n7); the lane adapter registry (dlz)
 from lanes import cockpit as role_view              # roles{} for status (0sf)
 from lanes import reaper                            # a worker dies with its call: process-tree stop with a survivor report (own)
 import osproc                                       # the one module that lists processes
 from delegate.adapters.harness import reset_parse
 from delegate.adapters.harness.base import LaunchInputs
+from delegate.adapters.harness.claude import ClaudeHarness
 from delegate.adapters.harness.codex import CodexHarness
 from delegate.app.publish import LiveSink, end_status
 from delegate.contracts import codec, wire
@@ -497,6 +499,8 @@ def fetch_codex_limits():
         send({"method": "initialized"})
         send({"id": 2, "method": "account/rateLimits/read"})
         r = read(2, APP_SERVER_S)
+    except BrokenPipeError:         # the server exited under us
+        return None, "codex app-server closed its input"
     finally:
         kill_tree(p)
         p.wait()
@@ -1237,26 +1241,6 @@ def when(epoch, t):
     return f"{local(epoch)} (in {fmt_in(epoch - t)})"
 
 
-def cli_login(exe_name, args, ok_if):
-    """-> (True | False | None, why). Runs a vendor's own status command (no model call, no quota); None = could not tell."""
-    exe = shutil.which(exe_name)
-    if not exe:
-        return None, f"{exe_name} CLI not installed"
-    try:
-        r = run_tree([exe] + args, AUTH_TIMEOUT)
-    except (OSError, subprocess.TimeoutExpired) as e:
-        return None, f"{exe_name} login check failed: {type(e).__name__}"
-    return ok_if(r), (r.stdout + r.stderr).strip()[:120]
-
-
-def claude_login_ok(r):
-    try:
-        v = json.loads(r.stdout).get("loggedIn")
-    except (ValueError, AttributeError):
-        return None
-    return v if isinstance(v, bool) else None
-
-
 def opencode_auth_has(key, need_key=False):
     f = Path(os.environ.get("XDG_DATA_HOME") or Path.home() / ".local" / "share") / "opencode" / "auth.json"
     try:
@@ -1271,7 +1255,7 @@ def probe_login(name):
     if name == "OPENAI_SUBSCRIPTION":
         return CodexHarness().login_probe(AUTH_TIMEOUT)
     if name == "CLAUDE_SUBSCRIPTION":
-        return cli_login("claude", ["auth", "status"], claude_login_ok)
+        return ClaudeHarness().login_probe(AUTH_TIMEOUT)
     if name == "CLAUDE_CREDIT":
         return (True, "API key stored") if find_key(quiet=True) else (False, "no API key stored")
     if name in ("GROK_SUBSCRIPTION", "ZAI_CODING_SUBSCRIPTION", "DEEPSEEK_FREE"):
@@ -2094,7 +2078,7 @@ def note_ref(ref):
 def live_for(cli, d, a, rid):
     """The live event file writer for this launch (a no-op unless DELEGATE_LIVE_FILE is set); its WorkerStarted and start event go out once the
     process has a pid. Codex's events come from its harness class; Claude's and OpenCode's from lanes/live.py until they have one."""
-    lv = LiveSink(cli, run_id=rid) if cli == "codex" else livemod.Live(cli, run_id=rid)
+    lv = LiveSink(cli, run_id=rid) if cli != "opencode" else livemod.Live(cli, run_id=rid)
     lv.start(lane=d.get("lane"), model=d.get("model"), effort=d.get("effort"), role=d.get("role") or getattr(a, "role", None))
     WORKER_STARTED.append(lv.started)
     return lv
@@ -2811,6 +2795,12 @@ def repo_instruction_text(cwd, cap=32768):
     return out
 
 
+def claude_denials(events, read_only):
+    """The denied items of a claude run: what its own classifier or our guard refused, minus git writes and read-only breaches (delegate's policy, not the owner's call)."""
+    return [denial("secret" if x.tool == "Bash" and secret_hit((x.input or {}).get("command")) else "policy", x.tool, x.input)
+            for x in events if not policy_denial({"tool_name": x.tool, "tool_input": x.input}, read_only)]
+
+
 def launch_claude(d, brief, a, rid, t, cfg, meta):
     """claude -p on the credit key (CLAUDE_CREDIT) or the logged-in subscription (CLAUDE_SUBSCRIPTION, unattended). -> dict of result fields."""
     h = d["how"]
@@ -2828,91 +2818,44 @@ def launch_claude(d, brief, a, rid, t, cfg, meta):
         if ledger_spend(start) + cap > float(c["monthly_cap"]):
             return {"outcome": "rate_limited", "retry_after": nxt, "say": f"cycle cap: ${ledger_spend(start):.2f} spent + ${cap:.2f} > ${c['monthly_cap']}"}
         extra["ANTHROPIC_API_KEY"] = key
-    write = bool(h["write"])
-    tools = ["Read", "Glob", "Grep"] + (["Edit", "Write"] if write else []) + ["Bash"]       # read-only steps: Bash limited by the guard
-    cmd = [exe, "-p", "--output-format", "stream-json", "--verbose", "--model", h["model"], "--effort", d["effort"]]
-    cmd += ["--max-budget-usd", str(cap)] if credit else []
-    cmd += ["--resume", a.resume] if a.resume else ["--session-id", rid]
-    cmd += ["--append-system-prompt", PREAMBLE + repo_instruction_text(h["cwd"]), "--restricted", "--tools", ",".join(tools), "--strict-mcp-config",
-            "--permission-mode", "auto", "--permission-prompts", "none", "--settings", json.dumps(guard_settings(h.get("read_only")))]
-    if a.schema:
-        cmd += ["--json-schema", Path(a.schema).read_text(encoding="utf-8")]
-    ref = a.resume or rid
+    hx = ClaudeHarness(credit)
+    spec = hx.launch_spec(LaunchInputs(
+        exe=exe, cwd=h["cwd"], model=h["model"], effort=d["effort"], prompt=brief, env=child_env(extra), schema=a.schema, resume=a.resume, session=rid,
+        system=PREAMBLE + repo_instruction_text(h["cwd"]), settings=json.dumps(guard_settings(h.get("read_only"))), write=bool(h["write"]),
+        budget=cap if credit else None))
+    ref = hx.evidence.ref
     note_ref(ref)               # claude takes the session id from us (--session-id): known before the first event
     if agent_runs:
         agent_runs.run(rid, kind="claude-p", session=ref, lane=d["lane"], model=d["model"], cwd=h["cwd"], started=t, status="running", **meta)
-    final, ctx, begun, said, streamed = [], [], [], [""], {}
     turn = supervisor.Turn("claude")
     live = live_for("claude", d, a, rid)
 
-    def on_line(line):      # the first result is the answer: claude -p then waits for background tasks and takes another turn on their exit
-        with contextlib.suppress(ValueError):
-            e = json.loads(line)
-            if not isinstance(e, dict):
-                return None
+    def on_line(line):
+        events = hx.parse_line(line)
+        turn.apply(events)
+        for e in events:
             live.feed(e)
-            kind, msg = e.get("type"), e.get("message") if isinstance(e.get("message"), dict) else {}
-            blocks = [b for b in msg.get("content") or [] if isinstance(b, dict)] if isinstance(msg.get("content"), list) else []
-            if kind in ("assistant", "user", "result"):
-                begun[:] = [True]           # the session exists on disk from its first message
-            if kind == "result":
-                if not final:
-                    final.append(e)
-                turn.finished()
-            elif kind == "assistant":
-                for b in blocks:
-                    if b.get("type") == "tool_use":
-                        turn.tool(b.get("id"), True)        # a running tool keeps the long silence limit
-                    elif b.get("type") == "text" and b.get("text"):
-                        said[0] = b["text"]
-                if msg.get("stop_reason") == "end_turn" and not any(b.get("type") == "tool_use" for b in blocks):
-                    turn.finished()         # the final assistant message; a later event resets the grace
-                else:
-                    turn.more()
-                if isinstance(msg.get("usage"), dict):
-                    u_ = msg["usage"]       # one model request: its whole input is the context size
-                    streamed[msg.get("id") or len(streamed)] = u_
-                    ctx[:] = [round(((u_.get("input_tokens") or 0) + (u_.get("cache_read_input_tokens") or 0) + (u_.get("cache_creation_input_tokens") or 0)) / 1000, 1)]
-            else:
-                for b in blocks:
-                    if b.get("type") == "tool_result":
-                        turn.tool(b.get("tool_use_id"), False)
-                turn.more()
-        return None
     poll, tick, dog = worker_watch("claude", d["lane"])
     WORKER_TICK[:] = [tick]
-    rc, out, err, timed_out = run_proc(cmd, brief, h["cwd"], child_env(extra), a.timeout, on_line, stream_poll(poll, turn, dog, live))
-    live_end(live, turn, dog, timed_out, rc, float((final[0] if final else {}).get("total_cost_usd") or 0) or None)
+    rc, out, err, timed_out = run_proc(spec.argv, spec.stdin, spec.cwd, spec.env, a.timeout, on_line, stream_poll(poll, turn, dog, live))
+    sm = hx.summary(rc, out, err, turn.stop, timed_out)
+    live_end(live, turn, dog, timed_out, rc, sm.cost or None)
     log_gaps(dog, d)
-    j = final[0] if final else {}
-    by_message = not final and turn.stop == "answer" and bool(said[0])         # the final assistant message came, the result event never did
-    if (final and not j.get("is_error")) or by_message:
-        rc = 0          # stopped by us after answering
-    text = j.get("result") if isinstance(j.get("result"), str) else said[0] if by_message else out.strip()[-2000:]
-    cost = float(j.get("total_cost_usd") or 0)          # the harness's own figure on every lane, subscription included (study 85)
-    if credit and cost > 0:
-        ledger_add(cost, d["model"], t)
-    u = j.get("usage") if isinstance(j.get("usage"), dict) else accounting.claude_stream(streamed.values())      # no result event: what the stream's requests reported
-    res = {"text": text, "ref": j.get("session_id") or ref, "cost": cost, "stderr": err, "tokens": claude_tokens(u),
-           "acct": accounting.claude(u, j.get("total_cost_usd"), credit),
-           "denied": [denial("secret" if x.get("tool_name") == "Bash" and secret_hit((x.get("tool_input") or {}).get("command")) else "policy", x.get("tool_name"), x.get("tool_input"))
-                      for x in j.get("permission_denials") or [] if isinstance(x, dict) and not policy_denial(x, h.get("read_only"))]}
-    res.update(turns=j.get("num_turns"), context_k=ctx[0] if ctx else None, started=bool(begun), partial=bool(begun))
+    res = dict(sm.res, stderr=err, denied=claude_denials(hx.evidence.denials, h.get("read_only")))
+    if credit and sm.cost > 0:
+        ledger_add(sm.cost, d["model"], t)
     if dog["why"] or turn.stop or timed_out:        # the raw tail of the stream, so the call record shows what the CLI last said before it was stopped
         res["stream_tail"] = supervisor.tail(out)
-    failed = rc != 0 or bool(j.get("is_error"))
-    o = classify.classify(rc or (1 if failed else 0), classify.claude_vendor_error(j), err, timed_out, (j.get("num_turns") or 0) > 1,
-                          dict(watch_fields(res, dog), http_status=j.get("api_error_status"))) if failed or timed_out else None
+    j = hx.evidence.final or {}
+    o = classify.classify(sm.rc, sm.vendor, sm.stderr, timed_out, sm.work, dict(watch_fields(res, dog), http_status=j.get("api_error_status"))) if sm.check else None
     if o:       # the CLI's own error and stderr, never the model's answer (a worker may write "rate limit")
-        settle(res, o, d, t, "claude", a, rc, text, credit_until=nxt, login=("logged out: run `claude auth login`", "claude is not logged in: {why} (claude auth login)"))
+        settle(res, o, d, t, "claude", a, sm.rc, sm.text, credit_until=nxt, login=("logged out: run `claude auth login`", "claude is not logged in: {why} (claude auth login)"))
     else:
         update_state(lambda s: s.setdefault("out", {}).pop(d["lane"], None))
-        data = j.get("structured_output") if isinstance(j.get("structured_output"), (dict, list)) else parse_data(text, a.schema)
+        data = j.get("structured_output") if isinstance(j.get("structured_output"), (dict, list)) else parse_data(sm.text, a.schema)
         res.update(data=data)
-        if by_message:
-            res["warnings"] = ["answer_done_process_alive"]
-        if final and netprobe.looks_dropped(err):       # the answer was in before the connection broke (ae6v): done, with a note
-            res["warnings"] = ["net_after_answer"]
+        if sm.warnings:
+            res["warnings"] = sm.warnings
     return res
 
 
@@ -2920,15 +2863,6 @@ def policy_denial(x, read_only=False):
     """A git write the coordinator forbids, or a write on a read-only step, is delegate's policy, not a decision for the owner (a secret path stays one)."""
     cmd = ((x.get("tool_input") or {}).get("command") or "").strip()
     return x.get("tool_name") == "Bash" and not secret_hit(cmd) and bool(git_write(cmd) or read_only and read_only_problem(cmd))
-
-
-def claude_tokens(u):
-    """Claude's input_tokens leaves out cache reads and cache writes; `in` counts all input, as codex's does."""
-    if not u:
-        return None
-    cached = u.get("cache_read_input_tokens") or 0
-    return {"in": (u.get("input_tokens") or 0) + cached + (u.get("cache_creation_input_tokens") or 0),
-            "cached": cached, "out": u.get("output_tokens")}
 
 
 profiles.register("codex", "codex", "codex", lambda d, b, a, rid, t, cfg, meta: launch_codex(d, b, a, rid, t, meta))

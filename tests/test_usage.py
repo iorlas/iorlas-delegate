@@ -7,6 +7,7 @@ import unittest
 from pathlib import Path
 from test_route import route
 from lanes import usage
+from delegate.adapters.harness import claude
 
 # Two consecutive real Codex rollout token_count totals of one thread (2026-10-20, a resumed thread): the second is cumulative, not the second call's own.
 CALL1 = {"input_tokens": 14742, "cached_input_tokens": 12288, "cache_write_input_tokens": 0, "output_tokens": 63, "reasoning_output_tokens": 0, "total_tokens": 14805}
@@ -57,13 +58,13 @@ class Claude(unittest.TestCase):
     def test_subscription_cost_is_the_harness_figure(self):
         u = {"input_tokens": 3, "cache_read_input_tokens": 50, "cache_creation_input_tokens": 20, "output_tokens": 9,
              "cache_creation": {"ephemeral_5m_input_tokens": 0, "ephemeral_1h_input_tokens": 20}}
-        a = usage.claude(u, 0.0123, credit=False)
+        a = claude.acct_of(u, 0.0123, credit=False)
         self.assertEqual((a["in_fresh"], a["cache_read"], a["cache_write"], a["out"], a["cost_usd"], a["cost_source"]), (3, 50, 20, 9, 0.0123, "harness"))
         self.assertEqual((a["ttl_s"], a["ttl_source"], a["cache_write_by_ttl"]), (3600, "vendor_default", {"5m": 0, "1h": 20}))
-        self.assertEqual(usage.claude(u, 0.01, credit=True)["ttl_s"], 300)
+        self.assertEqual(claude.acct_of(u, 0.01, credit=True)["ttl_s"], 300)
 
     def test_no_cost_reported_is_unknown_not_zero(self):
-        a = usage.claude({"input_tokens": 1}, None, credit=False)
+        a = claude.acct_of({"input_tokens": 1}, None, credit=False)
         self.assertEqual((a["cost_usd"], a["cost_source"], a["accounting"]), (None, "unknown", "unknown"))
 
 

@@ -17,8 +17,9 @@ from unittest import mock
 
 from test_route import route, CFG, T, lanes
 
-LANES = Path(__file__).resolve().parent.parent / "skills" / "delegate" / "lanes"
-from lanes import classify, cockpit, health, netprobe, profiles          # noqa: E402  (test_route put skills/delegate on sys.path)
+LANES = Path(__file__).resolve().parent.parent / "src" / "delegate" / "adapters"
+from delegate.adapters import netprobe
+from lanes import classify, cockpit, health, profiles          # noqa: E402  (test_route put skills/delegate on sys.path)
 
 
 @contextlib.contextmanager

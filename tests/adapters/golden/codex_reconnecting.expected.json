@@ -43,6 +43,9 @@
   "error": "",
   "transient": "Reconnecting... 2/5 (stream disconnected before completion: idle timeout waiting for websocket)",
   "net_at": null,
-  "declined": []
+  "denials": [],
+  "final": null,
+  "context_k": null,
+  "steps": []
  }
 }

@@ -3,7 +3,8 @@
 Pure: the caller passes `decide` (route.decide), the lanes, and the cached network probe. No process, no socket. A full `status` computes the
 rows; `status --cheap` replays them from the snapshot and refreshes the parts that move without a spawn: `net` (the probe cache), live holds.
 """
-from . import netprobe, profiles
+from delegate.adapters import netprobe
+from . import profiles
 
 
 def families(node):

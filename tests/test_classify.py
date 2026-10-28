@@ -306,18 +306,12 @@ class Ladder(unittest.TestCase):
         self.assertEqual(c(1, "x", "", False, False, {"http_status": 401}).reason, "logged_out")
         self.assertEqual(c(1, "x", "", False, False, {"http_status": 400}).reason, "bad_request")
 
-    def test_claude_error_text_is_the_clis_not_the_models(self):
-        self.assertEqual(classify.claude_vendor_error({"is_error": True, "result": "API Error: 429 rate limit"}), "API Error: 429 rate limit")
-        self.assertEqual(classify.claude_vendor_error({"is_error": True, "result": "x", "api_error_status": 529}), "x")
-        self.assertEqual(classify.claude_vendor_error({"is_error": True, "result": "I added rate limit handling; quota tests fail with 429"}), "")
-        self.assertEqual(classify.claude_vendor_error({"is_error": False, "result": "API Error: shown by the task itself"}), "")
-
     def test_one_patterns_block_one_copy_of_each_regex(self):
         src = (ROOT / "skills" / "delegate" / "route.py").read_text(encoding="utf-8")
         for name in ("LIMIT_RE", "LOGIN_RE", "NETWORK_RE", "SECRET_RE", "SPEND_RE"):
             self.assertNotIn(f"\n{name} = re.compile", src)
             self.assertIn(f"\n{name} = re.compile", (ROOT / "skills" / "delegate" / "lanes" / "classify.py").read_text(encoding="utf-8"))
-        self.assertEqual(set(classify.PATTERNS), {"limit", "credit", "spend", "login", "network", "codex_status", "bad_request", "claude_error", "secret"})
+        self.assertEqual(set(classify.PATTERNS), {"limit", "credit", "spend", "login", "network", "codex_status", "bad_request", "secret"})
 
 
 class Launchers(unittest.TestCase):

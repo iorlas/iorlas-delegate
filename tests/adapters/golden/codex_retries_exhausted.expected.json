@@ -41,6 +41,9 @@
   "error": "stream disconnected before completion: websocket closed by server",
   "transient": "Reconnecting... 4/5 (websocket closed by server)",
   "net_at": null,
-  "declined": []
+  "denials": [],
+  "final": null,
+  "context_k": null,
+  "steps": []
  }
 }

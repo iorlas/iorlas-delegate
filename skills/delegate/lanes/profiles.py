@@ -5,7 +5,7 @@ lanes/supervisor.LIMITS), the executable to look for, and `launch`, the function
 registers its three launchers at import; `launchers()` is the dict `route.LAUNCHERS` is built from, so adding a runner is one `register` call. The
 build / events / render_policy / ready split of the bead is NOT done here: the launchers still own their command lines and event parsing.
 
-Lane facts that are data, not code, live here too (`LANE_HOSTS`: the API hosts a lane needs, for lanes/netprobe).
+Lane facts that are data, not code, live here too (`LANE_HOSTS`: the API hosts a lane needs, for adapters/netprobe).
 """
 from collections import namedtuple
 

@@ -174,7 +174,7 @@ class LiveSink:
             case ev.Unknown():
                 self.raw(e.type)
             case ev.TurnDone():
-                self.raw("turn.completed")
+                pass            # a turn end with no usage to report (claude's result carries its own totals in `end`)
 
 
 def end_status(timed_out: bool, hung: str | None, stop: str | None, rc: int | None) -> str:

@@ -47,6 +47,7 @@ class ToolEnd:
 @record
 class Msg:
     text: str
+    final: bool = True              # this message ends the turn (false: the worker goes on, e.g. text before a tool call)
 
 
 @record

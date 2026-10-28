@@ -84,7 +84,8 @@
   [
    {
     "event": "Msg",
-    "text": "done"
+    "text": "done",
+    "final": true
    }
   ],
   [
@@ -130,6 +131,9 @@
   "error": "",
   "transient": "",
   "net_at": null,
-  "declined": []
+  "denials": [],
+  "final": null,
+  "context_k": null,
+  "steps": []
  }
 }

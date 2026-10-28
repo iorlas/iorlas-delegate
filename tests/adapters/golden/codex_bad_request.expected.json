@@ -19,6 +19,9 @@
   "error": "{\"type\": \"error\", \"status\": 400, \"error\": {\"message\": \"model not supported\"}}",
   "transient": "",
   "net_at": null,
-  "declined": []
+  "denials": [],
+  "final": null,
+  "context_k": null,
+  "steps": []
  }
 }

@@ -19,6 +19,9 @@
   "error": "exceeded retry limit, last status: 429 Too Many Requests",
   "transient": "",
   "net_at": null,
-  "declined": []
+  "denials": [],
+  "final": null,
+  "context_k": null,
+  "steps": []
  }
 }

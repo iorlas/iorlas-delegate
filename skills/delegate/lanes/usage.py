@@ -5,8 +5,6 @@ Counts are per call, never cumulative. cache_write and cost_usd are None where t
 cost is what the harness returned, or unknown. warm_until is telemetry (when the vendor's prompt cache probably expires); nothing routes on it."""
 import datetime as dt
 
-CLAUDE_SUBSCRIPTION_TTL_S = 3600      # a -p main conversation on a subscription gets the 1 h cache
-CLAUDE_CREDIT_TTL_S = 300             # API / credit billing: the 5 min default
 CODEX_TTL_S = 3600                    # measured 65 min (study 85); the vendor states 5-10 min to 24 h
 
 
@@ -32,29 +30,6 @@ def codex(tokens):
     cached = t.get("cached") or 0
     return {"in_fresh": max(0, (t.get("in") or 0) - cached), "cache_read": cached, "cache_write": None, "out": t.get("out") or 0,
             "cost_usd": None, "cost_source": "unknown", "accounting": "exact", "ttl_s": CODEX_TTL_S, "ttl_source": "observed"} if tokens else None
-
-
-def claude(u, cost, credit):
-    """`claude -p` result usage + total_cost_usd -> acct. The cost is the harness's own figure on every lane; None when absent."""
-    if not u and cost is None:
-        return None
-    u = u or {}
-    by_ttl = u.get("cache_creation") if isinstance(u.get("cache_creation"), dict) else None
-    a = {"in_fresh": u.get("input_tokens") or 0, "cache_read": u.get("cache_read_input_tokens") or 0, "cache_write": u.get("cache_creation_input_tokens") or 0,
-         "out": u.get("output_tokens") or 0, "cost_usd": None if cost is None else float(cost), "cost_source": "unknown" if cost is None else "harness",
-         "accounting": "estimated" if cost is not None else "unknown",
-         "ttl_s": CLAUDE_CREDIT_TTL_S if credit else CLAUDE_SUBSCRIPTION_TTL_S, "ttl_source": "vendor_default"}
-    if by_ttl:      # an unexpected downgrade to 5 m shows here
-        a["cache_write_by_ttl"] = {"5m": by_ttl.get("ephemeral_5m_input_tokens") or 0, "1h": by_ttl.get("ephemeral_1h_input_tokens") or 0}
-    return a
-
-
-def claude_stream(requests):
-    """The assistant events of a `claude -p` stream (one usage dict per model request, newest wins per message id) -> one usage dict in the result event's shape.
-    Used where the stream ended without its `result` event (we stopped the worker): the requests already made were still paid for."""
-    keys = ("input_tokens", "cache_read_input_tokens", "cache_creation_input_tokens", "output_tokens")
-    rs = [r for r in requests if isinstance(r, dict)]
-    return {k: sum(r.get(k) or 0 for r in rs) for k in keys} if rs else {}
 
 
 def opencode_step(acct, tokens, cost):

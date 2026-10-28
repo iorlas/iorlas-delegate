@@ -1,6 +1,6 @@
 """Network facts (delegate-4n7, A2.5): is the machine online, and does this text say a connection dropped.
 
-Pure but for sockets and the cache file it is given. stdlib only (Windows too), no subprocess, no vendor call, so a probe costs no quota.
+Pure but for sockets and the cache file it is given. stdlib only, no subprocess, no vendor call, so a probe costs no quota.
 `probe()` resolves each host and opens a TCP connection to it, all hosts at once, and gives up on the whole thing after `budget_s`
 (socket.getaddrinfo ignores socket timeouts, so the join deadline is what bounds the call). `up` means a vendor name resolved AND connected: a
 neutral IP literal that answers while names do not is reported as `ip_up`, because that is a DNS outage and the vendor is still unreachable.

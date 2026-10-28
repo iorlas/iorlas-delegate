@@ -23,6 +23,9 @@
   "error": "",
   "transient": "Reconnecting... waiting for network (Connection failed: error sending request)",
   "net_at": 5.0,
-  "declined": []
+  "denials": [],
+  "final": null,
+  "context_k": null,
+  "steps": []
  }
 }

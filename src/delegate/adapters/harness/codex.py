@@ -146,13 +146,16 @@ class CodexHarness:
             elif isinstance(x, ev.Msg):
                 e.last = x.text
             elif isinstance(x, ev.Denied):
-                e.declined.append(_s(x.input.get("command")))
+                e.denials.append(x)
             elif isinstance(x, ev.HarnessError):
                 e.error = x.text
             elif isinstance(x, (ev.Reconnecting, ev.WaitingForNetwork)):
                 e.transient = x.text
                 if isinstance(x, ev.WaitingForNetwork):
                     e.net_at = self.clock()
+
+    def parse_log_line(self, line: str) -> list[ev.HarnessEvent]:
+        return []
 
     def vendor_error(self, rc: int | None) -> str:
         """The failure text the classifier reads: codex's error event, else a retry that never recovered (only when the exit was a failure)."""

@@ -50,35 +50,6 @@ class Live(LiveSink):
     def _raw(self, ev):
         self.raw(_s(ev.get("type")))
 
-    def _claude(self, ev):
-        kind = ev.get("type")
-        msg = ev.get("message") if isinstance(ev.get("message"), dict) else {}
-        blocks = [b for b in msg.get("content") or [] if isinstance(b, dict)] if isinstance(msg.get("content"), list) else []
-        if kind == "assistant":
-            for b in blocks:
-                bt = b.get("type")
-                if bt == "text" and b.get("text"):
-                    self.message(_s(b["text"]))
-                elif bt == "thinking" and b.get("thinking"):
-                    self.think(_s(b["thinking"]))
-                elif bt == "tool_use":
-                    inp = b.get("input") if isinstance(b.get("input"), dict) else {}
-                    if b.get("name") == "Bash":
-                        self.begin(b.get("id"), True, inp.get("command"), ev.get("cwd"))
-                    else:
-                        self.begin(b.get("id"), False, tool_text(b.get("name"), inp))
-            u, mid = msg.get("usage"), msg.get("id")
-            if isinstance(u, dict) and mid not in self.seen_usage:
-                self.seen_usage.add(mid)
-                cached = u.get("cache_read_input_tokens") or 0
-                self.tokens((u.get("input_tokens") or 0) + cached + (u.get("cache_creation_input_tokens") or 0), cached, u.get("output_tokens"))
-        elif kind == "user":
-            for b in blocks:
-                if b.get("type") == "tool_result" and b.get("tool_use_id") in self.open:
-                    self.finish(b["tool_use_id"], False, out=_text_of(b.get("content")), exit_=1 if b.get("is_error") else None)
-        elif kind not in ("system", "result", "stream_event", "rate_limit_event"):
-            self._raw(ev)
-
     def _opencode(self, ev):
         kind, p = ev.get("type"), ev.get("part") if isinstance(ev.get("part"), dict) else {}
         if kind == "tool_use":
