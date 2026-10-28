@@ -9,6 +9,7 @@ Silence limits per CLI (spikes P7, P7b): Claude's longest healthy gap was 225 s,
 import time
 
 from delegate.contracts import events as ev
+from delegate.contracts.history import GapRow
 
 LIMITS = {"claude": {"first_event_s": 120, "silence_s": 600},
           "codex": {"first_event_s": 120, "silence_s": 3600},
@@ -130,6 +131,6 @@ class Watchdog:
         try:
             tail = self.clock() - self.last
             for g in self.gaps + ([round(tail, 1)] if self.events and tail > LONG_GAP_S else []):
-                add({"ts": now(), "run_id": None, "role": "gap", "lane": lane, "model": model, "gap_s": g, "finished": bool(finished)})
+                add(GapRow(ts=now(), lane=lane, model=model, gap_s=g, finished=bool(finished)))
         except Exception:
             pass

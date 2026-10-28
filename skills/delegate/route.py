@@ -1393,9 +1393,9 @@ def lane_gone_check(lane, since):
     """-> a function: the words of a limit, credit or login mark another process set on `lane` after `since` (wall clock), else None. The worker
     still running there is burning an exhausted lane."""
     def gone():
-        o = (load_state().get("out") or {}).get(lane) or {}
-        if o.get("set", 0) >= since and o.get("until", 0) > now() and o.get("reason", "limit") in ("limit", "credit", "logged_out"):
-            return o.get("why") or "lane marked out"
+        o = load_state().out.get(lane)
+        if o and o.set >= since and o.until > now() and o.reason in ("limit", "credit", "logged_out"):
+            return o.why or "lane marked out"
         return None
     return gone
 

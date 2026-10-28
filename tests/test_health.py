@@ -5,6 +5,7 @@ import unittest
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(ROOT / "src"))
 sys.path.insert(0, str(ROOT / "skills" / "delegate"))
 from delegate.app import watch      # noqa: E402
 
@@ -66,9 +67,9 @@ class Watchdog(unittest.TestCase):
             self.assertIsNone(at)
             rows = []
             wd.flush(rows.append, "OPENAI_SUBSCRIPTION", "gpt", True)
-            self.assertEqual([r["gap_s"] for r in rows], logged)
+            self.assertEqual([r.gap_s for r in rows], logged)
             for r in rows:
-                self.assertEqual((r["lane"], r["model"], r["finished"], r["run_id"]), ("OPENAI_SUBSCRIPTION", "gpt", True, None))
+                self.assertEqual((r.lane, r.model, r.finished), ("OPENAI_SUBSCRIPTION", "gpt", True))
 
     def test_codex_3700s_dead_stream_is_killed_and_logged(self):
         at, wd = run_watch("codex", [5], 6000)       # run_proc turns this verdict into route.stop_tree (covered in test_route)
@@ -76,7 +77,7 @@ class Watchdog(unittest.TestCase):
         self.assertLess(at, 3700)
         rows = []
         wd.flush(rows.append, "L", "m", False)
-        self.assertEqual([(r["finished"], r["gap_s"] > 1800) for r in rows], [(False, True)])
+        self.assertEqual([(r.finished, r.gap_s > 1800) for r in rows], [(False, True)])
         wd.flush(lambda r: 1 / 0, "L", "m", False)      # a failing writer never fails the call
 
     def test_claude_silence_600_and_opencode_900(self):

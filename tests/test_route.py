@@ -19,7 +19,6 @@ spec = importlib.util.spec_from_file_location("route", ROOT / "skills" / "delega
 route = importlib.util.module_from_spec(spec)
 sys.modules["route"] = route
 spec.loader.exec_module(route)
-<<<<<<< HEAD
 from delegate.adapters import procs  # noqa: E402  (route put src/ on sys.path)
 from delegate.adapters.harness import opencode_sandbox as box, reset_parse  # noqa: E402
 from delegate.adapters.harness.base import LaunchSpec  # noqa: E402
@@ -29,12 +28,9 @@ from delegate.domain.policy.matchers import heredoc_only_hit, secret_hit  # noqa
 from delegate.domain.policy.shell import git_write, read_only_problem  # noqa: E402
 from delegate.domain.policy.worker import is_policy_denial  # noqa: E402
 from delegate.app.supervisor import RunHooks, Supervisor  # noqa: E402
-=======
-from delegate.adapters.harness import reset_parse  # noqa: E402  (route put src/ on sys.path)
 import routing_support as support  # noqa: E402
 from delegate.app.fleet import apply_health  # noqa: E402
 from delegate.contracts import codec, stores  # noqa: E402
->>>>>>> 454cb35 (D2: route.py on the typed Router/Fleet/HoldBook; lanes/health.py removed; tests ported to the typed API)
 
 route.REAL_NET_PROBE = route.net_probe
 route.net_probe = lambda hosts=None: {"up": True, "ip_up": True, "why": "ok", "ms": 1, "hosts": {}, "at": time.time()}     # tests open no socket; tests/test_net.py swaps it per case
@@ -1602,37 +1598,20 @@ echo '{"type":"step_finish","sessionID":"ses_1","part":{"type":"step-finish","co
         last = json.loads(route.history_path().read_text().splitlines()[-1])
         self.assertEqual((last["outcome"], last["v"], last["model"], len(last["fingerprint"])), ("hung", 1, "gpt-6.1-sol", 12))
 
-<<<<<<< HEAD
     def test_a_gap_over_1800s_is_written_to_history_through_the_watchdog_and_the_fold_ignores_it(self):
         from delegate.app import watch
-        from lanes import health
-=======
-    def test_a_gap_over_1800s_is_written_to_history_through_worker_watch_and_the_fold_ignores_it(self):
-        import functools
->>>>>>> 454cb35 (D2: route.py on the typed Router/Fleet/HoldBook; lanes/health.py removed; tests ported to the typed API)
         t = [0.0]
         d = {"lane": "OPENAI_SUBSCRIPTION", "model": "gpt-6.1-sol"}
         dog = watch.Watchdog(120, 3600, clock=lambda: t[0])
         for at in (5, 1805, 4005):       # gaps of 1800 s (not logged) and 2200 s (logged)
             t[0] = at
-<<<<<<< HEAD
             dog.touch()
         self.assertFalse(dog.poll())
         dog.flush(route.history_add, d["lane"], d["model"], True)
-        rows = [json.loads(x) for x in route.history_path().read_text().splitlines()]
-        self.assertEqual([(r["role"], r["lane"], r["model"], r["gap_s"], r["finished"], r["run_id"]) for r in rows],
-                         [("gap", "OPENAI_SUBSCRIPTION", "gpt-6.1-sol", 2200.0, True, None)])
-        self.assertEqual(health.fold(rows)["pairs"], {})
-        dog.flush(None, d["lane"], d["model"], True)       # never raises
-=======
-            tick()
-        self.assertFalse(poll())
-        route.log_gaps(w, d)
         rows = route.history_store().rows()
         self.assertEqual([(type(r).__name__, r.lane, r.model, r.gap_s, r.finished) for r in rows], [("GapRow", "OPENAI_SUBSCRIPTION", "gpt-6.1-sol", 2200.0, True)])
         self.assertEqual(route.health_ledger.HealthLedger(route.typed_routing(CFG).settings.breaker).fold(rows).pairs, {})
-        route.log_gaps({"wd": None}, d)       # never raises
->>>>>>> 454cb35 (D2: route.py on the typed Router/Fleet/HoldBook; lanes/health.py removed; tests ported to the typed API)
+        dog.flush(None, d["lane"], d["model"], True)       # never raises
 
     def test_any_stream_line_counts_as_activity_even_on_stderr(self):
         with mock.patch.dict(route.watch.LIMITS["codex"], silence_s=1):      # the fake prints to stderr every 0.4 s for 3 s
@@ -1736,15 +1715,9 @@ echo '{"type":"step_finish","sessionID":"ses_1","part":{"type":"step-finish","co
         dead = sp.Popen(["true"]); dead.wait()
         orphan = sp.Popen(["sleep", "300"], start_new_session=True)
         try:
-<<<<<<< HEAD
             start = procs.start_token(orphan.pid)
-            route.update_state(lambda st: st.setdefault("leases", {}).__setitem__("old-run", {
-                "lane": "OPENAI_SUBSCRIPTION", "role": "worker", "pid": dead.pid, "pid_start": "Mon Jan  1 00:00:00 2001", "start": route.now() - 300,
-                "expires": route.now() + 60, "task": "T-7", "worker_pid": orphan.pid, "worker_start": start}))
-=======
-            start = route.proc_start(orphan.pid)
-            support.put_lease("old-run", lane="OPENAI_SUBSCRIPTION", role="worker", pid=dead.pid, pid_start="Mon Jan  1 00:00:00 2001", start=route.now() - 300,                 expires=route.now() + 60, task="T-7", worker_pid=orphan.pid, worker_start=start)
->>>>>>> 454cb35 (D2: route.py on the typed Router/Fleet/HoldBook; lanes/health.py removed; tests ported to the typed API)
+            support.put_lease("old-run", lane="OPENAI_SUBSCRIPTION", role="worker", pid=dead.pid, pid_start="Mon Jan  1 00:00:00 2001", start=route.now() - 300,
+                              expires=route.now() + 60, task="T-7", worker_pid=orphan.pid, worker_start=start)
             _, r = self.run_it("--task", "T-7")
             self.assertEqual(r["stop"], None)                      # ran after the orphan was stopped
             self.assertIsNotNone(orphan.poll())
@@ -1757,13 +1730,8 @@ echo '{"type":"step_finish","sessionID":"ses_1","part":{"type":"step-finish","co
         import subprocess as sp
         worker = sp.Popen(["sleep", "300"], start_new_session=True)
         try:
-<<<<<<< HEAD
-            route.update_state(lambda st: st.setdefault("leases", {}).__setitem__("old-run", {
-                "lane": "OPENAI_SUBSCRIPTION", "role": "worker", "pid": os.getpid(), "pid_start": procs.start_token(os.getpid()), "start": route.now() - 300,
-                "expires": route.now() - 1, "task": "T-9", "worker_pid": worker.pid, "worker_start": procs.start_token(worker.pid)}))
-=======
-            support.put_lease("old-run", lane="OPENAI_SUBSCRIPTION", role="worker", pid=os.getpid(), pid_start=route.proc_start(os.getpid()), start=route.now() - 300,                 expires=route.now() - 1, task="T-9", worker_pid=worker.pid, worker_start=route.proc_start(worker.pid))
->>>>>>> 454cb35 (D2: route.py on the typed Router/Fleet/HoldBook; lanes/health.py removed; tests ported to the typed API)
+            support.put_lease("old-run", lane="OPENAI_SUBSCRIPTION", role="worker", pid=os.getpid(), pid_start=procs.start_token(os.getpid()), start=route.now() - 300,
+                              expires=route.now() - 1, task="T-9", worker_pid=worker.pid, worker_start=procs.start_token(worker.pid))
             _, r = self.run_it("--task", "T-9")
             self.assertEqual(why(r), "duplicate_task")
             self.assertIsNone(worker.poll())
@@ -1925,13 +1893,8 @@ class Holds(unittest.TestCase):
             d, _, _, _ = route.decision(a, copy.deepcopy(CFG))
         self.assertEqual((d["action"], d["retry_after"], d["outcome"]), ("stop", h.until, "held"))
         self.assertIn("owner", d["say"])
-<<<<<<< HEAD
         res = route.launch_worker({"role": "worker", "lane": "OPENAI_SUBSCRIPTION", "how": {"kind": "codex", "sandbox": "workspace-write"}}, "b", argparse_ns("worker"), "rid", T, CFG, {}, RunHooks())
-        self.assertEqual((res["retry_after"], res["outcome"]), (h["until"], "held"))
-=======
-        res = route.launch_codex({"role": "worker", "lane": "OPENAI_SUBSCRIPTION", "how": {"sandbox": "workspace-write"}}, "b", argparse_ns("worker"), "rid", T, {})
         self.assertEqual((res["retry_after"], res["outcome"]), (h.until, "held"))
->>>>>>> 454cb35 (D2: route.py on the typed Router/Fleet/HoldBook; lanes/health.py removed; tests ported to the typed API)
 
     def test_release_and_status_show_the_holder_and_expiry(self):
         h = support.add_hold("OPENAI_SUBSCRIPTION", "+2d", "budget", ["worker"], "alice")
