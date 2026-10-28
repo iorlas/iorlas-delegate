@@ -13,6 +13,9 @@ from delegate.adapters.harness.base import Evidence, LaunchInputs, LaunchSpec, Q
 from delegate.contracts import events as ev
 
 RECONNECT_RE = re.compile(r"^\s*Reconnecting\.\.\.\s*(\d+)/(\d+)")        # codex retrying its stream: progress until n == of
+ANSI_RE = re.compile(r"\x1b\[[0-9;?]*[A-Za-z]")
+LOGIN_URL_RE = re.compile(r"https://\S+")
+LOGIN_CODE_RE = re.compile(r"\b[A-Z0-9]{4,}-[A-Z0-9]{4,}\b")
 WAITING_RE = re.compile(r"^\s*Reconnecting\.\.\.\s*waiting for network", re.I)     # codex waits for the network by itself
 STATUS_RE = re.compile(r"(?:last status|status|HTTP)\W{0,3}(\d{3})\b")
 SHELL_ITEM = "command_execution"
@@ -197,3 +200,10 @@ class CodexHarness(Quiet):
             return None, f"{self.EXE} login check failed: {type(e).__name__}"
         text = r.stdout + r.stderr
         return r.returncode == 0 and "not logged" not in text.lower(), text.strip()[:120]
+
+    @staticmethod
+    def device_login_prompt(text: str) -> tuple[str | None, str | None]:
+        """(link, code) printed by `codex login --device-auth`, either None while it has not printed it yet."""
+        text = ANSI_RE.sub("", text)
+        m, c = LOGIN_URL_RE.search(text), LOGIN_CODE_RE.search(text)
+        return (m.group(0) if m else None), (c.group(0) if c else None)

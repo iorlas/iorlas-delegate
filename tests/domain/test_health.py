@@ -16,6 +16,7 @@ from delegate.contracts.routing import BreakerPolicy                            
 from delegate.contracts.stores import CheckpointStore, HistoryStore                         # noqa: E402
 from delegate.domain.health.ledger import STATES, HealthLedger, combine, failure_fields, stale_usage   # noqa: E402
 from delegate.domain.health.matchers import fingerprint                                     # noqa: E402
+from delegate.cli import verbs
 
 POL = BreakerPolicy()
 LEDGER = HealthLedger(POL)
@@ -23,7 +24,7 @@ GOLDEN = json.loads((Path(__file__).resolve().parent / "golden" / "health_replay
 
 
 def row(ts, lane="L", model="m", outcome=None, task=None, say="", until=None, **kw):
-    """A history row as route.run_once writes it."""
+    """A history row as verbs.cmd_run writes it."""
     return RunRow(ts=ts, run_id=kw.pop("run_id", f"r{ts}"), role="worker", lane=lane, model=model, effort="high", done=outcome is None,
                   task=task or f"t{ts}", **failure_fields(outcome, "event", say, until), **kw)
 

@@ -14,6 +14,8 @@ ROOT = Path(__file__).resolve().parent.parent.parent
 sys.path.insert(0, str(ROOT / "tests"))
 from test_route import route                       # noqa: E402  (loads route.py and puts src/ on sys.path)
 from delegate.contracts import codec, live, schema, wire   # noqa: E402
+from delegate.app import answer
+from delegate.domain.time import spec
 
 GOLDEN = sorted((Path(__file__).resolve().parent / "golden").glob("*.json"))
 spec = importlib.util.spec_from_file_location("gen_contract", ROOT / "dev" / "gen_contract.py")
@@ -43,7 +45,7 @@ class Goldens(unittest.TestCase):
         sch = schema.of(wire.RunResult)
         for p in GOLDEN:
             with self.subTest(p.stem):
-                self.assertIsNone(route.schema_problem(json.loads(p.read_text()), sch))
+                self.assertIsNone(answer.schema_problem(json.loads(p.read_text()), sch))
 
     def test_route_builds_and_prints_the_golden(self):
         """result() + emit() rebuild each launched-and-stopped golden from its own facts and print it identically."""
@@ -55,8 +57,8 @@ class Goldens(unittest.TestCase):
             kw = {k: v for k, v in gold.items() if k not in ("stop", "contract")}
             if stop:
                 kw.update(retry_after=stop["retry"]["at"], fix=stop.get("fix"), resumable=stop.get("resumable"), partial=stop.get("partial"))
-            with self.subTest(p.stem), mock.patch.object(route, "interactive", return_value=False), redirect_stdout(io.StringIO()) as out:
-                route.emit(route.result(stop["reason"] if stop else None, **kw))
+            with self.subTest(p.stem), redirect_stdout(io.StringIO()) as out:
+                answer.emit(answer.result(stop["reason"] if stop else None, **kw), False)
             self.assertEqual(canon(json.loads(out.getvalue())), canon(gold))
 
     def test_new_fields_are_absent_until_set_and_a_null_is_not_absent(self):

@@ -19,9 +19,17 @@ route = importlib.util.module_from_spec(spec)
 sys.modules["route"] = route
 spec.loader.exec_module(route)
 import routing_support as support  # noqa: E402
+from delegate.app import env
+from delegate.app import usage
+from delegate.app import decide as dec
+from delegate.app import net
+from delegate.domain.time import spec
+from delegate.domain.lanes.lane import Lane
+from delegate.contracts.stores import locked
+from delegate.domain.health import ledger as health_ledger
 
-route.REAL_NET_PROBE = route.net_probe
-route.net_probe = lambda hosts=None: {"up": True, "ip_up": True, "why": "ok", "ms": 1, "hosts": {}, "at": time.time()}     # tests open no socket; tests/test_net.py swaps it per case
+net.REAL_NET_PROBE = net.net_probe
+net.net_probe = lambda hosts=None: {"up": True, "ip_up": True, "why": "ok", "ms": 1, "hosts": {}, "at": time.time()}     # tests open no socket; tests/test_net.py swaps it per case
 os.environ["DELEGATE_CONFIG_DIR"] = tempfile.mkdtemp()      # tests never touch a real config; classes that need their own set one
 T = 1_000_000_000.0   # a fixed "now"
 CFG = json.loads((ROOT / "skills" / "delegate" / "routing.json").read_text(encoding="utf-8"))
@@ -39,7 +47,7 @@ def at(r):
 
 def lanes(openai=None, sub=None, credit=None):
     """Build lane states. Each arg is a dict of Lane attributes; None = healthy default."""
-    mk = lambda name, fam, kind, shared=False: route.Lane(name, fam, kind, shared)
+    mk = lambda name, fam, kind, shared=False: Lane(name, fam, kind, shared)
     o, s, c = mk("OPENAI_SUBSCRIPTION", "openai", "subscription"), mk("CLAUDE_SUBSCRIPTION", "claude", "subscription", True), mk("CLAUDE_CREDIT", "claude", "credit")
     o.five, o.week, o.pace = 10, 5, 0
     s.five, s.week, s.pace = 30, 40, 0
@@ -57,7 +65,7 @@ def decide(role, ls, st=None, **args):
 
 
 def health_mod():
-    return route.health
+    return health_ledger
 
 
 def argparse_ns(role, **kw):
@@ -188,14 +196,14 @@ class Roles(unittest.TestCase):
 
     def test_only_one_family_up_never_stops_and_warns(self):
         out = {"out": True, "out_until": T + 3600}
-        grok = route.Lane("GROK_SUBSCRIPTION", "xai", "subscription")
+        grok = Lane("GROK_SUBSCRIPTION", "xai", "subscription")
         cases = {"openai": lambda: lanes(sub=out, credit=out), "claude": lambda: lanes(openai=out),
                  }
         for who, mk in cases.items():
             ls = mk()
             if who != "xai":
                 grok.out, grok.out_until, grok.out_reason = True, T + 7200, "limit"
-            ls["GROK_SUBSCRIPTION"] = grok if who != "xai" else route.Lane("GROK_SUBSCRIPTION", "xai", "subscription")
+            ls["GROK_SUBSCRIPTION"] = grok if who != "xai" else Lane("GROK_SUBSCRIPTION", "xai", "subscription")
             if who != "xai":
                 ls["GROK_SUBSCRIPTION"] = grok
             d = decide("reviewer", ls, authored_by=who)
@@ -208,7 +216,7 @@ class Roles(unittest.TestCase):
     def test_warning_names_why_other_families_are_down(self):
         out = {"out": True, "out_until": T + 3600, "out_reason": "logged_out"}
         ls = lanes(sub=out, credit=out)
-        g = route.Lane("GROK_SUBSCRIPTION", "xai", "subscription")
+        g = Lane("GROK_SUBSCRIPTION", "xai", "subscription")
         g.out, g.out_until = True, T + 7200
         ls["GROK_SUBSCRIPTION"] = g
         w = decide("reviewer", ls, authored_by="openai")["warning"]
@@ -230,8 +238,8 @@ class Roles(unittest.TestCase):
 
 class Helpers(unittest.TestCase):
     def test_unknown_usage_shapes_are_rejected(self):
-        self.assertIsNone(route.normalize_usage({"x": 1}))
-        self.assertIsNone(route.normalize_usage({"five_hour": {"used": 37}}))      # only get_usage's real shape is understood
+        self.assertIsNone(usage.normalize_usage({"x": 1}))
+        self.assertIsNone(usage.normalize_usage({"five_hour": {"used": 37}}))      # only get_usage's real shape is understood
 
     def test_real_get_usage_result_is_understood(self):
         real = {"plan": {"status": "ok", "plan": "Max", "windows": [
@@ -239,14 +247,14 @@ class Helpers(unittest.TestCase):
             {"label": "Weekly \u00b7 all models", "percentUsed": 3, "resetsAt": "2026-10-25T13:59:59.908Z", "resetsIn": "6d 21h"},
             {"label": "Weekly \u00b7 Fable", "percentUsed": 1, "resetsAt": "2026-10-25T13:59:59.908Z"}],
             "extraUsage": {"enabled": True}}, "context": {"percentUsed": 25}}
-        u = route.normalize_usage(real)
+        u = usage.normalize_usage(real)
         self.assertEqual((u["five_hour"]["used"], u["weekly"]["used"], u["fable"]["used"]), (1.0, 3.0, 1.0))
         self.assertAlmostEqual(u["weekly"]["resets_at"], dt.datetime(2026, 10, 25, 13, 59, 59, 908000, tzinfo=dt.timezone.utc).timestamp(), places=2)
-        self.assertEqual(route.normalize_usage(real["plan"]), u)
+        self.assertEqual(usage.normalize_usage(real["plan"]), u)
 
     def test_next_weekly(self):
         t = dt.datetime(2026, 10, 18, 17, 1).timestamp()          # Sunday just after 17:00
-        n = dt.datetime.fromtimestamp(route.next_weekly("Sun 17:00", t))
+        n = dt.datetime.fromtimestamp(spec.next_weekly("Sun 17:00", t))
         self.assertEqual((n.weekday(), n.hour, n.day), (6, 17, 25))
 
 
@@ -258,18 +266,18 @@ class Cli(unittest.TestCase):
             os.environ["DELEGATE_NOW"] = str(T)
             try:
                 route.main(["report", "--lane", "OPENAI_SUBSCRIPTION", "--event", "out", "--until", str(T + 3600)])
-                st = route.load_state()
+                st = env.load_state()
                 self.assertIn("OPENAI_SUBSCRIPTION", st.out)
-                cfg = route.load_routing()
-                real = dict(route.READERS)
-                route.READERS.update({k: (lambda lane, S, st_, t, *a: None) for k in real})
+                cfg = env.load_routing()
+                real = dict(usage.READERS)
+                usage.READERS.update({k: (lambda lane, S, st_, t, *a: None) for k in real})
                 try:
-                    ls = route.fleet_builder(cfg).build(st, T, check_config=False).lanes
+                    ls = dec.fleet_builder(cfg).build(st, T, check_config=False).lanes
                 finally:
-                    route.READERS.update(real)
+                    usage.READERS.update(real)
                 self.assertTrue(ls["OPENAI_SUBSCRIPTION"].out)
                 route.main(["report", "--lane", "OPENAI_SUBSCRIPTION", "--event", "ok"])
-                self.assertNotIn("OPENAI_SUBSCRIPTION", route.load_state().out)
+                self.assertNotIn("OPENAI_SUBSCRIPTION", env.load_state().out)
             finally:
                 for k in ("XDG_CONFIG_HOME", "APPDATA", "DELEGATE_NOW", "DELEGATE_CONFIG_DIR"):
                     os.environ.pop(k, None)
@@ -287,7 +295,7 @@ class BaseTable(unittest.TestCase):
             cells = [c.strip() for c in line.strip().strip("|").split("|")]
             if len(cells) == 2 and cells[0] not in ("role", "---", ""):
                 table[cells[0]] = cells[1]
-        cfg = route.load_routing()
+        cfg = env.load_routing()
         want = {}
         for name, role in cfg["roles"].items():
             steps = role["by_author"]["openai"] if "by_author" in role else role["steps"]
@@ -299,14 +307,14 @@ class BaseTable(unittest.TestCase):
 class StateLock(unittest.TestCase):
     def test_a_lock_that_stays_held_raises_instead_of_running_unlocked(self):
         with tempfile.TemporaryDirectory() as d:
-            with route.locked(Path(d) / "x", timeout=5):
+            with locked(Path(d) / "x", timeout=5):
                 with self.assertRaises(TimeoutError):
-                    with route.locked(Path(d) / "x", timeout=0.2):
+                    with locked(Path(d) / "x", timeout=0.2):
                         pass
 
     def test_parallel_processes_lose_no_update(self):
-        code = ("import sys; sys.path.insert(0, %r); import route\n"
-                "for _ in range(25): route.update_state(lambda s: s.warned_at.__setitem__('n', s.warned_at.get('n', 0) + 1))" % str(Path(route.__file__).parent))
+        code = ("import sys; sys.path.insert(0, %r); from delegate.app import env\n"
+                "for _ in range(25): env.update_state(lambda s: s.warned_at.__setitem__('n', s.warned_at.get('n', 0) + 1))" % str(ROOT / "src"))
         with tempfile.TemporaryDirectory() as d:
             env = dict(os.environ, DELEGATE_CONFIG_DIR=d)
             ps = [subprocess.Popen([sys.executable, "-c", code], env=env, stderr=subprocess.PIPE) for _ in range(8)]

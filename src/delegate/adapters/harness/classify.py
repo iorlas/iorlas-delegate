@@ -1,16 +1,12 @@
-"""The one outcome ladder (delegate-e05): what a vendor CLI said -> one reason from contract.json.
+"""The one outcome ladder : what a vendor CLI said -> one reason from contract.json.
 
 Pure: no state, no I/O except reading contract.json once. The three launchers (codex, opencode, claude) collect evidence, call
-`classify`, then apply the effects of the reason in one place (route.settle). Vendor text enters through `vendor_err` (the vendor's own
+`classify`, then apply the effects of the reason in one place (Settler.apply). Vendor text enters through `vendor_err` (the vendor's own
 error event, or the CLI's own error result) and `stderr`; the model's answer text is never an argument, so a worker that says
 "rate limit" cannot take its lane out.
 """
-import json
 import re
 from collections import namedtuple
-from pathlib import Path
-
-CONTRACT_FILE = Path(__file__).resolve().parent.parent / "contract.json"
 
 # ---- PATTERNS: every regex that turns vendor text into a reason lives here --------------------------------------------------------
 LIMIT_RE = re.compile(r"usage limit|rate.?limit|quota|too many requests|\b429\b|try again (later|in)|credit balance", re.I)
@@ -25,14 +21,6 @@ PATTERNS = {"limit": LIMIT_RE, "credit": CREDIT_RE, "spend": SPEND_RE, "login": 
             "bad_request": BAD_REQUEST_RE}
 
 Outcome = namedtuple("Outcome", "reason detail source")        # source: ours | event | stderr | exit
-
-
-def load_contract():
-    with open(CONTRACT_FILE, encoding="utf-8") as f:
-        return json.load(f)
-
-
-CONTRACT = load_contract()
 
 
 def classify(rc, vendor_err="", stderr="", timed_out=False, work_seen=False, structured=None):
@@ -82,27 +70,19 @@ def classify(rc, vendor_err="", stderr="", timed_out=False, work_seen=False, str
     return None
 
 
-def facts(reason):
-    """-> the contract row of a reason (scope, permanence, retry kind, health effect), or None for a name contract.json does not list."""
-    return CONTRACT["reasons"].get(reason)
+def says_login(text):
+    return bool(LOGIN_RE.search(text))
 
 
-def benches_pair(reason):
-    """True when the reason may count against a (lane, model) pair's health. bad_request is a caller fault: never (61 5.1)."""
-    row = facts(reason)
-    return bool(row) and row["health"] in ("breaker", "exhausted")
+def says_spend(text):
+    return bool(SPEND_RE.search(text))
 
 
-def stop_facts(reason, retry_after=None, fix=None):
-    """-> the `stop` object an answer carries: {reason, scope, permanence, retry: {kind, at}}. An unknown reason still gets a row
-    (open reasons, closed facts): machine / needs_owner / none."""
-    row = facts(reason) or {"scope": "machine", "permanence": "needs_owner", "retry": "none"}
-    perm, kind = row["permanence"], row["retry"]
-    if retry_after and kind in ("none", "predicted"):       # a time the lane ends by itself: transient, whatever the table says for the general case
-        perm, kind = "transient", "predicted"
-    elif kind == "predicted":       # nothing to wait for: a person must act
-        kind, perm = "none", "needs_owner"
-    stop = {"reason": reason, "scope": row["scope"], "permanence": perm, "retry": {"kind": kind, "at": retry_after if kind in ("predicted", "poll") else None}}
-    if fix:
-        stop["fix"] = fix
-    return stop
+def limit_words(text, top):
+    """The window a limit message names ("weekly limit hit"), else `top` (the fullest window's name) or the plain words."""
+    if re.search(r"free usage", text, re.I):
+        return "free usage limit reached"
+    for pat, word in ((r"week|7.?day", "weekly"), (r"5.?hour|five.?hour", "5-hour"), (r"daily|per day|\bday\b", "daily")):
+        if re.search(pat, text, re.I):
+            return f"{word} limit hit"
+    return f"{top} limit hit" if top else "usage limit hit"

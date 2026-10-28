@@ -11,7 +11,7 @@ Two kinds of fact, both read from the run's outcome:
                the next rung starts at once.
 Never counted: bad_request (the caller's fault), network, killed, timeout, secrets, schema_invalid, refusals.
 """
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 from delegate.contracts.history import (CanaryRow, Failure, HealthState, HistoryRow, LaneFact, PairFact, ReleaseRow,
                                         RunRow, Streak)

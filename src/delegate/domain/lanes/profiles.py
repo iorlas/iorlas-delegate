@@ -25,3 +25,8 @@ def hosts_for_family(family):
 
 def all_hosts():
     return tuple(dict.fromkeys(h for hs in LANE_HOSTS.values() for h in hs))
+
+
+LOGIN_CMD = {"OPENAI_SUBSCRIPTION": "codex login", "CLAUDE_SUBSCRIPTION": "claude auth login", "CLAUDE_CREDIT": "route.py set-key",
+             "GROK_SUBSCRIPTION": "opencode auth login", "ZAI_CODING_SUBSCRIPTION": "opencode auth login, choose Z.AI Coding Plan",
+             "DEEPSEEK_FREE": "route.py doctor --lane DEEPSEEK_FREE"}

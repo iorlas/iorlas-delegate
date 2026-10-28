@@ -1,4 +1,4 @@
-"""The outcome ladder (skills/delegate/lanes/classify.py) and contract.json, replayed on fixtures taken from real runs (tests/contract/fixtures)."""
+"""The outcome ladder (adapters/harness/classify.py) and contract.json, replayed on fixtures taken from real runs (tests/contract/fixtures)."""
 import hermetic  # noqa: F401  (a home of its own for every test)
 import argparse
 import json
@@ -12,8 +12,20 @@ from delegate.domain.policy.worker import denial, denial_item
 from delegate.adapters.harness.opencode import OpenCodeHarness
 from delegate.app.supervisor import RunHooks
 from fakes.fake_run import replay as replay_run
+from delegate.app import env
+from delegate.app import answer
+from delegate.app import launch
+from delegate.adapters.harness import classify
+from delegate.contracts import stops
+import sys
+from delegate.domain.lanes import profiles
+from delegate.cli import verbs
+from delegate.app import decide as dec
+import shutil
+from delegate.adapters import agent_runs
+from delegate.adapters import codex_account
 
-classify = route.classify
+
 FIXTURES = sorted((ROOT / "tests" / "contract" / "fixtures").glob("*.json"))
 CONTRACT = json.loads((ROOT / "skills" / "delegate" / "contract.json").read_text(encoding="utf-8"))
 LAUNCH_ONLY = {"duplicate_task", "busy", "no_lane", "caller", "crash", "schema_invalid", "lock", "setup", "held"}      # answered outside the ladder
@@ -66,14 +78,14 @@ class Fixtures(unittest.TestCase):
                 self.assertTrue(row.get("source"), name)
 
     def test_bad_request_never_benches_a_pair(self):
-        self.assertFalse(classify.benches_pair("bad_request"))
+        self.assertFalse(stops.benches_pair("bad_request"))
         self.assertEqual(CONTRACT["reasons"]["bad_request"]["health"], "none")
         for name, f, row, want in all_rows():
             if want == "bad_request":
-                self.assertFalse(classify.benches_pair(replay(row, f).reason), row["id"])
+                self.assertFalse(stops.benches_pair(replay(row, f).reason), row["id"])
         for reason in ("network", "killed", "timeout", "secrets", "schema_invalid", "held", "busy", "caller"):
-            self.assertFalse(classify.benches_pair(reason), reason)
-        self.assertTrue(classify.benches_pair("rate_limited") and classify.benches_pair("credit_exhausted"))
+            self.assertFalse(stops.benches_pair(reason), reason)
+        self.assertTrue(stops.benches_pair("rate_limited") and stops.benches_pair("credit_exhausted"))
 
 
 def stop_tuple(r):
@@ -97,14 +109,14 @@ class Stop(unittest.TestCase):
 
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
-        self.patch = patch.object(route, "config_dir", return_value=Path(self.tmp.name))
+        self.patch = patch.object(env, "config_dir", return_value=Path(self.tmp.name))
         self.patch.start()
         self.addCleanup(self.patch.stop)
         self.addCleanup(self.tmp.cleanup)
 
     def answer(self, o, lane, credit_until=None):
-        res = route.settle({}, o, {"lane": lane}, T, "cli", SimpleNamespace(timeout=30), 1, "tail", reset=lambda: T + 3600, credit_until=credit_until)
-        return route.result(res.pop("outcome"), **res)
+        res = launch.settler().apply({}, o, {"lane": lane}, T, "cli", SimpleNamespace(timeout=30), 1, "tail", reset=lambda: T + 3600, credit_until=credit_until)
+        return answer.result(res.pop("outcome"), **res)
 
     def test_every_fixture_row_answers_with_its_expected_stop_tuple_and_fits_the_schema(self):
         n = 0
@@ -114,18 +126,18 @@ class Stop(unittest.TestCase):
                 want_reason = row.get("expected_reason", f.get("expected_reason"))
                 if "evidence" not in row or not want_reason:
                     continue
-                before = (route.load_state().out or None)
+                before = (env.load_state().out or None)
                 lane = f.get("lane", "OPENAI_SUBSCRIPTION")
                 o = replay(row, f)
                 r = self.answer(o, lane)
-                if route.net_pass(o, {"lane": lane}).reason == "network" and o.reason != "network":      # a failure that words a dropped connection is the network's (R17)
+                if launch.settler().net_pass(o, {"lane": lane}).reason == "network" and o.reason != "network":      # a failure that words a dropped connection is the network's (R17)
                     self.assertEqual(r["stop"]["reason"], "network", f"{path.name} {row['id']}")
                     continue
                 self.assertEqual(stop_tuple(r), expected_tuple(f, row, want_reason), f"{path.name} {row['id']}")
-                self.assertIsNone(route.schema_problem(r, CONTRACT["answer_schema"]), f"{path.name} {row['id']}")
+                self.assertIsNone(answer.schema_problem(r, CONTRACT["answer_schema"]), f"{path.name} {row['id']}")
                 if r["stop"]["scope"] in ("bead", "caller", "machine"):
-                    self.assertEqual((route.load_state().out or None), before, f"{path.name} {row['id']}: a {r['stop']['scope']}-scoped fault touched the lane's state")
-                route.update_state(lambda s: s.out.clear())
+                    self.assertEqual((env.load_state().out or None), before, f"{path.name} {row['id']}: a {r['stop']['scope']}-scoped fault touched the lane's state")
+                env.update_state(lambda s: s.out.clear())
                 n += 1
         self.assertGreater(n, 250)
 
@@ -134,7 +146,7 @@ class Stop(unittest.TestCase):
         self.assertEqual(len(f["rows"]), 53)
         for row in f["rows"]:
             self.assertEqual(stop_tuple(self.answer(replay(row, f), "OPENAI_SUBSCRIPTION")), ("bad_request", "caller", "needs_owner", "none"), row["id"])
-        self.assertIsNone((route.load_state().out or None))            # not one of them marks the lane
+        self.assertIsNone((env.load_state().out or None))            # not one of them marks the lane
 
     def test_golden_the_grok_batch_is_a_lane_out_with_no_time_and_marks_the_lane_once_for_all(self):
         f = load(ROOT / "tests" / "contract" / "fixtures" / "grok_spending_limit_24oct.json")
@@ -143,7 +155,7 @@ class Stop(unittest.TestCase):
             r = self.answer(replay(row, f), "GROK_SUBSCRIPTION")
             self.assertEqual(stop_tuple(r), ("credit_exhausted", "lane", "needs_owner", "none"), row["id"])
             self.assertIsNone(r["stop"]["retry"]["at"])
-        self.assertIn("GROK_SUBSCRIPTION", route.load_state().out)
+        self.assertIn("GROK_SUBSCRIPTION", env.load_state().out)
 
     def test_golden_the_22_oct_night_has_53_bad_requests_and_every_other_row_is_done(self):
         f = load(ROOT / "tests" / "contract" / "fixtures" / "night_22oct.json")
@@ -151,13 +163,13 @@ class Stop(unittest.TestCase):
         tuples = [stop_tuple(self.answer(o, "OPENAI_SUBSCRIPTION")) if (o := replay(row, f)) else None for row in f["rows"]]
         self.assertEqual(tuples.count(("bad_request", "caller", "needs_owner", "none")), 53)
         self.assertEqual(tuples.count(None), 268 - 53)
-        self.assertIsNone((route.load_state().out or None))
+        self.assertIsNone((env.load_state().out or None))
 
     def test_credit_exhausted_marks_the_lane_with_no_retry_time(self):
         row = load(ROOT / "tests" / "contract" / "fixtures" / "grok_spending_limit_24oct.json")["rows"][0]
         o = replay(row, None)
         r = self.answer(o, "GROK_SUBSCRIPTION")
-        out = route.load_state().out["GROK_SUBSCRIPTION"]
+        out = env.load_state().out["GROK_SUBSCRIPTION"]
         self.assertGreater(out.until, T)                  # hidden from the picker (gather needs a time) and probed again later
         self.assertEqual((out.reason, r["stop"]["scope"], r["stop"]["retry"]), ("credit", "lane", {"kind": "none", "at": None}))
 
@@ -175,37 +187,37 @@ class Stop(unittest.TestCase):
     def test_killed_and_network_carry_resumable_and_partial_and_never_a_lane_mark(self):
         for reason in ("killed", "network"):
             res = {"ref": "thread-1", "started": True, "partial": True}
-            route.settle(res, classify.Outcome(reason, "signal 15" if reason == "killed" else "ENOTFOUND", "exit"), {"lane": "OPENAI_SUBSCRIPTION"}, T, "cli", SimpleNamespace(timeout=30), 1, "")
-            r = route.result(res.pop("outcome"), **res)
+            launch.settler().apply(res, classify.Outcome(reason, "signal 15" if reason == "killed" else "ENOTFOUND", "exit"), {"lane": "OPENAI_SUBSCRIPTION"}, T, "cli", SimpleNamespace(timeout=30), 1, "")
+            r = answer.result(res.pop("outcome"), **res)
             self.assertEqual((r["stop"]["reason"], r["stop"]["resumable"], r["stop"]["partial"], r["stop"]["ref"]), (reason, True, True, "thread-1"))
-        self.assertIsNone((route.load_state().out or None))
+        self.assertIsNone((env.load_state().out or None))
 
     def test_an_unknown_reason_still_gets_a_row_of_closed_facts(self):
-        s = classify.stop_facts("some_new_reason")
+        s = stops.stop_facts("some_new_reason")
         self.assertEqual((s["scope"], s["permanence"], s["retry"]["kind"]), ("machine", "needs_owner", "none"))
-        self.assertIsNone(route.schema_problem(dict(route.result("no_lane"), stop=dict(s, ref=None)), CONTRACT["answer_schema"]))
+        self.assertIsNone(answer.schema_problem(dict(answer.result("no_lane"), stop=dict(s, ref=None)), CONTRACT["answer_schema"]))
 
     def test_the_schema_refuses_an_answer_with_a_missing_or_wrong_field(self):
-        good = route.result("no_lane")
-        self.assertIsNone(route.schema_problem(good, CONTRACT["answer_schema"]))
-        done = route.result()
-        self.assertIsNone(route.schema_problem(done, CONTRACT["answer_schema"]))
+        good = answer.result("no_lane")
+        self.assertIsNone(answer.schema_problem(good, CONTRACT["answer_schema"]))
+        done = answer.result()
+        self.assertIsNone(answer.schema_problem(done, CONTRACT["answer_schema"]))
         self.assertIsNone(done["stop"])
         for bad in (dict(good, stop=dict(good["stop"], scope="planet")), {k: v for k, v in good.items() if k != "usage"}, {k: v for k, v in good.items() if k != "stop"},
                     dict(good, contract=2), dict(good, denied=[{"kind": "whim", "tool": "Bash"}])):
-            self.assertIsNotNone(route.schema_problem(bad, CONTRACT["answer_schema"]))
+            self.assertIsNotNone(answer.schema_problem(bad, CONTRACT["answer_schema"]))
 
     def test_a_bad_flag_or_argument_of_run_is_a_bad_request_answer_and_other_commands_keep_exit_2(self):
         import io
-        cases = [["run", "worker", "--nope"], ["run"], ["run", "worker", "--timeout", "soon"]]
+        cases = [["run", "worker", "--nope", "--unattended"], ["run", "--unattended"], ["run", "worker", "--timeout", "soon", "--unattended"]]
         for argv in cases:
-            with patch("sys.stdout", io.StringIO()) as out, patch.object(route, "interactive", lambda: False), self.assertRaises(SystemExit) as ex:
+            with patch("sys.stdout", io.StringIO()) as out, self.assertRaises(SystemExit) as ex:
                 route.main(argv)
             self.assertEqual(ex.exception.code, 0, argv)
             r = json.loads(out.getvalue())
             self.assertEqual(stop_tuple(r), ("bad_request", "caller", "needs_owner", "none"), argv)
             self.assertTrue(r["stop"]["fix"].startswith("update task-loop or delegate: "), argv)
-            self.assertIsNone(route.schema_problem(r, CONTRACT["answer_schema"]), argv)
+            self.assertIsNone(answer.schema_problem(r, CONTRACT["answer_schema"]), argv)
         with patch("sys.stderr", io.StringIO()), self.assertRaises(SystemExit) as ex:
             route.main(["status", "--nope"])
         self.assertEqual(ex.exception.code, 2)
@@ -219,7 +231,7 @@ class Stop(unittest.TestCase):
 
     def test_contract_3_has_no_wire_left(self):
         gone = ("v", "status", "reason", "next", "retry_after")
-        for r in (route.result(), route.result("no_lane"), route.result("rate_limited", retry_after=T)):
+        for r in (answer.result(), answer.result("no_lane"), answer.result("rate_limited", retry_after=T)):
             self.assertEqual(r["contract"], 3)
             for k in gone:
                 self.assertNotIn(k, r)
@@ -231,7 +243,7 @@ class Stop(unittest.TestCase):
         self.assertEqual(CONTRACT["denied_kinds"], ["policy", "sandbox_limit", "secret"])
 
     def test_the_old_wire_is_gone_from_the_source(self):
-        for path in [*(ROOT / "skills" / "delegate").rglob("*.py"), ROOT / "skills" / "delegate" / "contract.json"]:
+        for path in [*(ROOT / "skills" / "delegate").rglob("*.py"), *(ROOT / "src").rglob("*.py"), ROOT / "skills" / "delegate" / "contract.json"]:
             text = path.read_text(encoding="utf-8")
             for word in ("to_wire_v2", "vendor_prework", "lane_out", "wire_reasons", "wire_default"):
                 self.assertNotIn(word, text, f"{path.name}: {word}")
@@ -247,7 +259,7 @@ class Stop(unittest.TestCase):
 
 class Docs(unittest.TestCase):
     """The words the orchestrator reads match the code (delegate-fvk): flags, reasons, no dead compat."""
-    SRC = (ROOT / "skills" / "delegate" / "route.py").read_text(encoding="utf-8")
+    SRC = (ROOT / "src" / "delegate" / "cli" / "parser.py").read_text(encoding="utf-8")
     FOREIGN = {"codex.md": {"--write", "--background", "--skip-git-repo-check"}}      # flags of other tools, named in prose
 
     def test_run_args_are_the_flags_of_run(self):
@@ -311,10 +323,12 @@ class Ladder(unittest.TestCase):
         self.assertEqual(c(1, "x", "", False, False, {"http_status": 400}).reason, "bad_request")
 
     def test_one_patterns_block_one_copy_of_each_regex(self):
-        src = (ROOT / "skills" / "delegate" / "route.py").read_text(encoding="utf-8")
+        here = ROOT / "src" / "delegate" / "adapters" / "harness" / "classify.py"
+        others = [p for p in (ROOT / "src").rglob("*.py") if p != here]
         for name in ("LIMIT_RE", "LOGIN_RE", "NETWORK_RE", "SPEND_RE"):
-            self.assertNotIn(f"\n{name} = re.compile", src)
-            self.assertIn(f"\n{name} = re.compile", (ROOT / "skills" / "delegate" / "lanes" / "classify.py").read_text(encoding="utf-8"))
+            self.assertIn(f"\n{name} = re.compile", here.read_text(encoding="utf-8"))
+            for p in others:
+                self.assertNotIn(f"\n{name} = re.compile", p.read_text(encoding="utf-8"), p.name)
         self.assertEqual(set(classify.PATTERNS), {"limit", "credit", "spend", "login", "network", "codex_status", "bad_request"})
 
 
@@ -323,10 +337,10 @@ class Launchers(unittest.TestCase):
 
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
-        for p in (patch.object(route, "config_dir", return_value=Path(self.tmp.name)), patch.object(route, "agent_runs", None),
-                  patch.object(route.shutil, "which", return_value="cli"), patch.object(route, "opencode_exe", return_value="opencode"),
-                  patch.object(route.sys, "platform", "darwin"), patch.object(OpenCodeHarness, "write_shell"), patch.object(route, "child_env", return_value={}),
-                  patch.object(route, "codex_thread_total", return_value=None), patch.object(route, "codex_child_tokens", return_value=({"in": 0, "cached": 0, "out": 0}, 0))):
+        for p in (patch.object(env, "config_dir", return_value=Path(self.tmp.name)), patch.object(agent_runs, 'run'), patch.object(agent_runs, 'lanes'),
+                  patch.object(shutil, "which", return_value="cli"), patch.object(OpenCodeHarness, "find_exe", return_value="opencode"),
+                  patch.object(sys, "platform", "darwin"), patch.object(OpenCodeHarness, "write_shell"), patch.object(env, "child_env", return_value={}),
+                  patch.object(codex_account, "thread_total", return_value=None), patch.object(codex_account, "child_tokens", return_value=({"in": 0, "cached": 0, "out": 0}, 0))):
             p.start()
             self.addCleanup(p.stop)
         self.addCleanup(self.tmp.cleanup)
@@ -335,7 +349,7 @@ class Launchers(unittest.TestCase):
     def run_cli(self, kind, lines, rc, err="", lane="OPENAI_SUBSCRIPTION", **how):
         d = dict(lane=lane, model="m", effort="high", role="worker", how=dict(kind=kind, model="m", cwd=self.tmp.name, write=False, sandbox="read-only", cli=["codex", "exec"], isolation=[], **how))
         with replay_run(lines, rc, err):
-            res = route.launch_worker(d, "brief", self.a, "rid12345", T, route.load_routing(), {}, RunHooks())
+            res = launch.launch_worker(d, "brief", self.a, "rid12345", T, env.load_routing(), {}, RunHooks())
         res.pop("stderr", None)
         return res
 
@@ -346,19 +360,19 @@ class Launchers(unittest.TestCase):
         row = load(ROOT / "tests" / "contract" / "fixtures" / "grok_spending_limit_24oct.json")["rows"][0]
         res = self.opencode([{"type": "error", "error": {"name": "APIError", "data": {"message": row["evidence"]["vendor_err"]}}}])
         self.assertEqual((res["outcome"], res.get("retry_after")), ("credit_exhausted", None))
-        self.assertIn("GROK_SUBSCRIPTION", route.load_state().out)
+        self.assertIn("GROK_SUBSCRIPTION", env.load_state().out)
 
     def test_a_bad_request_row_through_the_codex_launcher_leaves_the_lane_alone(self):
         for row in load(ROOT / "tests" / "contract" / "fixtures" / "bad_request_22oct.json")["rows"][:3]:
             res = self.run_cli("codex", [{"type": "turn.failed", "error": {"message": row["evidence"]["vendor_err"]}}], 1)
             self.assertEqual(res["outcome"], "bad_request")
-        self.assertEqual((route.load_state().out or None), None)
+        self.assertEqual((env.load_state().out or None), None)
 
     def test_a_sigterm_with_no_error_is_killed_and_retried_not_failed(self):
         res = self.opencode([{"type": "step_finish", "part": {"tokens": {"input": 5}}}], rc=-15)
         self.assertEqual(res["outcome"], "killed")
         self.assertNotIn("retry_after", res)
-        self.assertEqual((route.load_state().out or None), None)
+        self.assertEqual((env.load_state().out or None), None)
 
     def test_codex_stream_retries_do_not_fail_a_run_that_finished(self):
         res = self.run_cli("codex", [{"type": "error", "message": "Reconnecting... 2/5 (idle timeout waiting for websocket)"},
@@ -379,13 +393,13 @@ class Launchers(unittest.TestCase):
         self.assertEqual(res["outcome"], "worker_failed")
         res = self.opencode([{"type": "text", "part": {"text": words}}], rc=1)
         self.assertEqual(res["outcome"], "worker_failed")
-        self.assertEqual((route.load_state().out or None), None)
+        self.assertEqual((env.load_state().out or None), None)
 
     def test_the_clis_own_error_still_does(self):
         res = self.run_cli("claude_p", [{"type": "result", "is_error": True, "result": "API Error: 429 rate limit exceeded", "num_turns": 1}], 1,
                            lane="CLAUDE_SUBSCRIPTION", cap=1, read_only=False)
         self.assertEqual(res["outcome"], "rate_limited")
-        self.assertIn("CLAUDE_SUBSCRIPTION", route.load_state().out)
+        self.assertIn("CLAUDE_SUBSCRIPTION", env.load_state().out)
 
     def test_additive_usage_facts_come_from_the_events(self):
         res = self.opencode([{"type": "step_finish", "part": {"tokens": {"input": 1000, "output": 5, "cache": {"read": 3000, "write": 0}}}},
@@ -394,15 +408,15 @@ class Launchers(unittest.TestCase):
         self.assertEqual((res.get("outcome"), res["turns"], res["context_k"]), (None, 2, 6.0))
 
     def test_a_runner_kind_that_is_not_a_launcher_is_a_setup_error(self):
-        kinds = {c["runner"] for c in route.load_routing()["lanes"].values()}
-        self.assertEqual(set(route.profiles.REGISTRY), {"codex", "opencode", "claude_p"})
+        kinds = {c["runner"] for c in env.load_routing()["lanes"].values()}
+        self.assertEqual(set(profiles.REGISTRY), {"codex", "opencode", "claude_p"})
         self.assertLessEqual(kinds, {"codex", "opencode", "claude_p", "agent_tool"})
         d = {"action": "run", "role": "worker", "lane": "OPENAI_SUBSCRIPTION", "model": "m", "effort": "high", "mode": "write", "how": {"kind": "codexx", "cwd": self.tmp.name}}
         a = argparse.Namespace(role="worker", authored_by=None, failed="", premium=None, allow_degraded=False, claude_usage=None, cwd=None, resume=None, cap=None,
                                brief=None, timeout=5, unattended=True, schema=None, parent=None, task=None, title=None, call_id="c#1")
         import io
-        with patch.object(route, "decision", return_value=(d, {}, [], T)), patch.object(route, "interactive", return_value=False), patch("sys.stdout", io.StringIO()) as out:
-            route.run_once(a, route.load_routing())
+        with patch.object(dec, "decision", return_value=(d, {}, [], T)), patch("sys.stdout", io.StringIO()) as out:
+            verbs.cmd_run(a, env.load_routing())
         r = json.loads(out.getvalue())
         self.assertEqual((r["stop"]["reason"], r["call_id"]), ("setup", "c#1"))
         self.assertIn("codexx", r["say"])

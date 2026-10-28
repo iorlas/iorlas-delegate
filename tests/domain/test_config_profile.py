@@ -13,6 +13,7 @@ sys.path.insert(0, str(ROOT / "src"))
 sys.path.insert(0, str(ROOT / "skills" / "delegate"))
 import route  # noqa: E402
 from delegate.contracts.stores import ConfigStore  # noqa: E402
+from delegate.app import env
 
 
 class ProfileStaysOut(unittest.TestCase):
@@ -25,9 +26,9 @@ class ProfileStaysOut(unittest.TestCase):
             store = ConfigStore(Path(d) / "config.json")
             self.assertNotIn("profile", store.overrides())
             self.assertEqual(store.overrides().get("max_parallel"), 3)
-            cfg = route.load_routing()
+            cfg = env.load_routing()
             self.assertNotIn("profile", cfg["settings"])
-            self.assertFalse(hasattr(route.typed_routing(cfg).settings, "profile"))
+            self.assertFalse(hasattr(env.typed_routing(cfg).settings, "profile"))
             self.assertEqual(store.profile().lanes, {"X": "enabled"})
 
     def test_choosing_a_lane_keeps_the_settings_overrides_and_writes_only_the_profile(self):

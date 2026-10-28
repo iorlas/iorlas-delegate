@@ -11,6 +11,9 @@ from test_route import route, ROOT, _call
 from delegate.domain.policy.matchers import heredoc_only_hit, secret_hit
 from delegate.domain.policy.shell import git_write, read_only_problem
 from delegate.domain.policy.worker import is_policy_denial
+from delegate.app import launch
+from delegate.domain.policy import worker
+from delegate.adapters import git
 
 
 class SecretGuard(unittest.TestCase):
@@ -78,8 +81,8 @@ class SecretGuard(unittest.TestCase):
         self.assertNotIn("apply_patch", r.stderr)
 
     def test_writer_briefs_say_to_edit_with_apply_patch(self):
-        self.assertIn("apply_patch", route.EDIT_RULE)
-        self.assertIn(route.EDIT_RULE, route.PREAMBLE)
+        self.assertIn("apply_patch", worker.EDIT_RULE)
+        self.assertIn(worker.EDIT_RULE, launch.PREAMBLE)
 
     def test_lets_through_lookalikes_and_written_content(self):
         for ti in ({"command": "cat .env.example"}, {"command": "node -e 'process.env.HOME'"}, {"command": "dotnet test"},
@@ -111,27 +114,27 @@ class GitOwnership(unittest.TestCase):
         self.tmp.cleanup()
 
     def test_editing_files_is_clean(self):
-        before = route.git_state(self.dir)
+        before = git.state(self.dir)
         Path(self.dir, "f.txt").write_text("2")
         Path(self.dir, "new.txt").write_text("x")
-        self.assertEqual(route.git_changes(before, route.git_state(self.dir)), [])
+        self.assertEqual(git.changes(before, git.state(self.dir)), [])
 
     def test_branch_and_head_changes_are_reported_other_refs_and_worktrees_are_not(self):
-        before = route.git_state(self.dir)
+        before = git.state(self.dir)
         wt = tempfile.mkdtemp()
         self.git("worktree", "add", "-q", os.path.join(wt, "w"), "-b", "other")         # parallel slots do this all the time
-        self.assertEqual(route.git_changes(before, route.git_state(self.dir)), [])
+        self.assertEqual(git.changes(before, git.state(self.dir)), [])
         self.git("checkout", "-qb", "feature")
         Path(self.dir, "f.txt").write_text("3")
         self.git("commit", "-qam", "x")
-        text = " ".join(route.git_changes(before, route.git_state(self.dir)))
+        text = " ".join(git.changes(before, git.state(self.dir)))
         self.assertIn("branch", text)
         self.assertIn("HEAD", text)
 
     def test_not_a_repo_is_a_no_op(self):
         with tempfile.TemporaryDirectory() as d:
-            self.assertIsNone(route.git_state(d))
-            self.assertEqual(route.git_changes(None, None), [])
+            self.assertIsNone(git.state(d))
+            self.assertEqual(git.changes(None, None), [])
 
     def test_the_guard_blocks_every_git_write(self):
         for c in ("git commit -m x", "git push", "git checkout x", "git switch x", "git branch x", "git worktree add y", "git merge x",

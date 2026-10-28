@@ -6,8 +6,9 @@ import tempfile
 import unittest
 from pathlib import Path
 from test_route import route
-from lanes import usage
+from delegate.domain.cost import accounting as usage
 from delegate.adapters.harness import claude
+from delegate.adapters import codex_account
 
 # Two consecutive real Codex rollout token_count totals of one thread (2026-10-20, a resumed thread): the second is cumulative, not the second call's own.
 CALL1 = {"input_tokens": 14742, "cached_input_tokens": 12288, "cache_write_input_tokens": 0, "output_tokens": 63, "reasoning_output_tokens": 0, "total_tokens": 14805}
@@ -42,7 +43,7 @@ class CodexResume(unittest.TestCase):
             old = os.environ.get("CODEX_HOME")
             os.environ["CODEX_HOME"] = d
             try:
-                before = route.codex_thread_total("thr-1")
+                before = codex_account.thread_total("thr-1")
             finally:
                 os.environ.pop("CODEX_HOME") if old is None else os.environ.__setitem__("CODEX_HOME", old)
         self.assertEqual(before, short(CALL1))

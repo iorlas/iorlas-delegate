@@ -7,6 +7,7 @@ from pathlib import Path
 from test_route import route
 from delegate.adapters.harness.opencode import OpenCodeHarness
 from delegate.app.supervisor import LogWatcher
+from delegate.adapters.harness import classify
 
 ECHO = ['INFO  2026-10-26T21:32:01 +3ms service=permission evaluated permission=bash pattern="cat <<EOF\\ntry again later\\nEOF" action=allow',
         'INFO  2026-10-26T21:32:02 +1ms service=permission evaluated permission=bash pattern="echo rate limit hit" action=allow']
@@ -17,7 +18,7 @@ class LogWatch(unittest.TestCase):
     def run_poll(self, lines):
         with tempfile.TemporaryDirectory() as d:
             (Path(d) / "a.log").write_text("old\n")
-            w = LogWatcher(Path(d), route.classify.LIMIT_RE.search, OpenCodeHarness().echoes_input)
+            w = LogWatcher(Path(d), classify.LIMIT_RE.search, OpenCodeHarness().echoes_input)
             with open(Path(d) / "a.log", "a") as f:
                 f.write("\n".join(lines) + "\n")
             return w.poll()
@@ -33,7 +34,7 @@ class LogWatch(unittest.TestCase):
     def test_lines_from_before_the_launch_are_not_seen(self):
         with tempfile.TemporaryDirectory() as d:
             (Path(d) / "a.log").write_text(REAL + "\n")
-            self.assertIsNone(LogWatcher(Path(d), route.classify.LIMIT_RE.search, OpenCodeHarness().echoes_input).poll())
+            self.assertIsNone(LogWatcher(Path(d), classify.LIMIT_RE.search, OpenCodeHarness().echoes_input).poll())
 
 
 if __name__ == "__main__":

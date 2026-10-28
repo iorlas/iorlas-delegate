@@ -10,6 +10,7 @@ from unittest import mock
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
+from delegate.app import cockpit, decide, env
 from delegate.app.fleet import Fleet
 from delegate.domain.holds.book import new_hold
 
@@ -19,10 +20,7 @@ from delegate.contracts.state import Hold, Lease, OutState, StateDoc
 from delegate.domain.holds.book import HoldBook
 from delegate.domain.routing.router import Router
 from delegate.domain.routing.tiers import TierPlan
-
-
-def route_module():
-    return sys.modules["route"]
+from delegate.app import decide as dec
 
 
 def doc_of(st):
@@ -31,8 +29,7 @@ def doc_of(st):
 
 
 def decide(role, cfg, ls, st, t, args):
-    r = route_module()
-    routing = r.typed_routing(cfg)
+    routing = env.typed_routing(cfg)
     doc = doc_of(st)
     ca = CallArgs(authored_by=args.get("authored_by"), failed=tuple(args.get("failed") or ()), premium=args.get("premium"),
                   allow_degraded=bool(args.get("allow_degraded")), unattended=bool(args.get("unattended")))
@@ -42,30 +39,30 @@ def decide(role, cfg, ls, st, t, args):
         step = {"model": d.model, "effort": d.effort, "mode": d.mode}
         if d.cap is not None:
             step["cap"] = d.cap
-        out["how"] = r.how(ls[d.lane], step, cfg, args.get("cwd"), args.get("unattended", False))
+        out["how"] = dec.how(ls[d.lane], step, cfg, args.get("cwd"), args.get("unattended", False))
     return out
 
 
 def router(cfg, t, st=None):
     doc = doc_of(st or {})
-    return Router(route_module().typed_routing(cfg), HoldBook(doc.holds), doc.prev, t)
+    return Router(env.typed_routing(cfg), HoldBook(doc.holds), doc.prev, t)
 
 
 def build_tiers(role_name, cfg, args):
     """The role's tiers for `args` (a dict as `next` takes), as dicts: what the old route.build_tiers gave."""
-    routing = route_module().typed_routing(cfg)
+    routing = env.typed_routing(cfg)
     ca = CallArgs(authored_by=args.get("authored_by"), failed=tuple(args.get("failed") or ()))
     tiers = TierPlan(routing).tiers(routing.roles[role_name], ca)
     return [[codec.to_json(s) for s in t] for t in tiers or []]
 
 
 def put_out(lane, until, why="t", **kw):
-    route_module().update_state(lambda s: s.out.__setitem__(lane, OutState(until=until, why=why, **kw)))
+    env.update_state(lambda s: s.out.__setitem__(lane, OutState(until=until, why=why, **kw)))
 
 
 def put_lease(rid, **kw):
     kw.setdefault("pid", 1)
-    route_module().update_state(lambda s: s.leases.__setitem__(rid, Lease(**kw)))
+    env.update_state(lambda s: s.leases.__setitem__(rid, Lease(**kw)))
 
 
 def lease(**kw):
@@ -74,7 +71,7 @@ def lease(**kw):
 
 
 def put_hold(h):
-    route_module().update_state(lambda s: s.holds.__setitem__(h.id, h))
+    env.update_state(lambda s: s.holds.__setitem__(h.id, h))
 
 
 def holds_of(*hs):
@@ -82,11 +79,11 @@ def holds_of(*hs):
 
 
 def clear_out():
-    route_module().update_state(lambda s: s.out.clear())
+    env.update_state(lambda s: s.out.clear())
 
 
 def state_json():
-    return codec.to_json(route_module().load_state())
+    return codec.to_json(env.load_state())
 
 
 __all__ = ["add_hold", "fleet_patches", "decide", "put_out", "put_lease", "lease", "put_hold", "holds_of", "clear_out", "state_json", "Hold", "copy"]
@@ -94,19 +91,18 @@ __all__ = ["add_hold", "fleet_patches", "decide", "put_out", "put_lease", "lease
 
 def add_hold(lane, until, reason, roles=None, set_by="owner", t=None):
     """Record an owner hold the way `route.py hold` does; ValueError for an end that is missing or past."""
-    r = route_module()
-    h = new_hold(uuid.uuid4().hex[:8], lane, until, reason, list(roles or []), set_by, r.now() if t is None else t)
-    r.update_state(lambda s: s.holds.__setitem__(h.id, h))
+    h = new_hold(uuid.uuid4().hex[:8], lane, until, reason, list(roles or []), set_by, env.now() if t is None else t)
+    env.update_state(lambda s: s.holds.__setitem__(h.id, h))
     return h
 
 
 @contextlib.contextmanager
 def fleet_patches(ls):
     """The fleet is `ls`: no reader, no profile, no health fold, busy marking and lane publishing off."""
-    r = route_module()
     builder = types.SimpleNamespace(build=lambda *a, **k: Fleet(ls))
     with contextlib.ExitStack() as stack:
-        stack.enter_context(mock.patch.object(r, "fleet_builder", return_value=builder))
-        stack.enter_context(mock.patch.object(r, "publish_lanes"))
-        stack.enter_context(mock.patch.object(r, "mark_busy", side_effect=lambda lanes, *a, **k: lanes))
+        stack.enter_context(mock.patch.object(dec, "fleet_builder", return_value=builder))
+        stack.enter_context(mock.patch.object(dec, "publish_lanes"))
+        for m in (dec, cockpit):
+            stack.enter_context(mock.patch.object(m, "mark_busy", side_effect=lambda lanes, *a, **k: lanes))
         yield

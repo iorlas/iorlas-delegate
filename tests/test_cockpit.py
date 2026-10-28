@@ -13,7 +13,17 @@ from types import SimpleNamespace
 from unittest.mock import patch
 import routing_support as support
 from test_route import route, CFG, lanes, T
-import onboard
+from delegate.app import onboard
+from delegate.app import env
+from delegate.app import usage
+from delegate.app import cockpit
+from delegate.app import harnesses
+from delegate.domain.time import spec
+from delegate.contracts import history as hist
+from delegate.domain.lanes.lane import Lane
+from delegate.contracts.stores import locked
+from delegate.app import status
+from delegate.adapters.harness.opencode import OpenCodeHarness
 
 HOUR = 3600
 
@@ -26,20 +36,20 @@ def cfg_all():
 
 def lane(name, **over):
     c = CFG["lanes"][name]
-    l = route.Lane(name, c["family"], c["kind"], c.get("shared_with_orchestrator", False))
+    l = Lane(name, c["family"], c["kind"], c.get("shared_with_orchestrator", False))
     for k, v in over.items():
         setattr(l, k, v)
     return l
 
 
 def view(name, l, st=None, history=(), login=(True, "ok", T), cfg=None, off=None):
-    return route.lane_view(name, cfg or cfg_all(), l, support.doc_of(st or {}), T, history, 0, login, off)
+    return cockpit.lane_view(name, cfg or cfg_all(), l, support.doc_of(st or {}), T, history, 0, login, off)
 
 
 class Emoji(unittest.TestCase):
     def test_ready_with_a_live_window(self):
         l = lane("OPENAI_SUBSCRIPTION", week=3.0, week_reset=T + 6 * 86400)
-        route.add_window(l, 3.0, T + 6 * 86400, 10080, "live read (codex app-server)", T - 120)
+        usage.add_window(l, 3.0, T + 6 * 86400, 10080, "live read (codex app-server)", T - 120)
         v = view("OPENAI_SUBSCRIPTION", l)
         self.assertEqual((v["state"], v["emoji"], v["reason"]), ("ready", "✅", "ready"))
         w = v["windows"][0]
@@ -52,7 +62,7 @@ class Emoji(unittest.TestCase):
         self.assertEqual((v["state"], v["emoji"], v["reason"]), ("resting", "⏳", "weekly limit hit"))
         self.assertTrue(v["unlock"]["known"])
         self.assertEqual(v["unlock"]["in_s"], 2 * HOUR + 600)
-        self.assertEqual(v["unlock"]["text"], f"{route.local(l.out_until)} (in 2h 10m)")
+        self.assertEqual(v["unlock"]["text"], f"{spec.local(l.out_until)} (in 2h 10m)")
 
     def test_an_old_state_entry_without_a_typed_reason_is_still_resting_until_its_time(self):
         rec = {"until": T + 5 * HOUR, "why": "free usage limit still reached at 18:45; opencode hangs 47 min instead of exiting", "at": T - HOUR}
@@ -114,14 +124,14 @@ class Emoji(unittest.TestCase):
     def test_disabled_and_not_configured(self):
         cfg = copy.deepcopy(CFG)
         for name, text in (("DEEPSEEK_FREE", "disabled: `route.py config set deepseek_free_enabled true` turns it on"),):
-            v = view(name, None, cfg=cfg, off=route.off_reason(name, cfg, (True, "", T)))
+            v = view(name, None, cfg=cfg, off=cockpit.off_reason(name, cfg, (True, "", T)))
             self.assertEqual((v["state"], v["emoji"], v["reason"]), ("off", "⛔", text))
             self.assertEqual(v["model"], "deepseek-v4.1-flash-free high")        # still shows what it would use
-        with patch.object(route, "profile_lanes", return_value={}):
-            self.assertEqual(route.off_reason("OPENAI_SUBSCRIPTION", cfg_all(), (None, "", None)), "not configured: `route.py doctor --lane OPENAI_SUBSCRIPTION` sets it up")
-            self.assertEqual(route.off_reason("OPENAI_SUBSCRIPTION", cfg_all(), (False, "", None)), "not configured: logged out, run `codex login`")
-        with patch.object(route, "profile_lanes", return_value={"GROK_SUBSCRIPTION": "declined"}):
-            self.assertIn("declined", route.off_reason("GROK_SUBSCRIPTION", cfg_all(), (True, "", None)))
+        with patch.object(env, "profile_lanes", return_value={}):
+            self.assertEqual(cockpit.off_reason("OPENAI_SUBSCRIPTION", cfg_all(), (None, "", None)), "not configured: `route.py doctor --lane OPENAI_SUBSCRIPTION` sets it up")
+            self.assertEqual(cockpit.off_reason("OPENAI_SUBSCRIPTION", cfg_all(), (False, "", None)), "not configured: logged out, run `codex login`")
+        with patch.object(env, "profile_lanes", return_value={"GROK_SUBSCRIPTION": "declined"}):
+            self.assertIn("declined", cockpit.off_reason("GROK_SUBSCRIPTION", cfg_all(), (True, "", None)))
 
     def test_unknown_when_a_metered_lane_has_no_reading(self):
         v = view("CLAUDE_SUBSCRIPTION", lane("CLAUDE_SUBSCRIPTION", shared=True))
@@ -135,7 +145,7 @@ class Emoji(unittest.TestCase):
 
     def test_low_tokens_over_the_gate_but_under_the_ceiling_stays_ready_with_a_warning(self):
         l = lane("OPENAI_SUBSCRIPTION", week=96.0)
-        route.add_window(l, 96.0, T + 86400, 10080, "live read", T)
+        usage.add_window(l, 96.0, T + 86400, 10080, "live read", T)
         v = view("OPENAI_SUBSCRIPTION", l)
         self.assertEqual(v["state"], "ready")
         self.assertEqual(v["low_tokens"][0]["over"], "gate")
@@ -143,34 +153,34 @@ class Emoji(unittest.TestCase):
 
     def test_over_the_hard_ceiling_rests_until_that_window_resets(self):
         l = lane("OPENAI_SUBSCRIPTION", week=99.0, week_reset=T + 3 * HOUR)
-        route.add_window(l, 99.0, T + 3 * HOUR, 10080, "live read", T)
+        usage.add_window(l, 99.0, T + 3 * HOUR, 10080, "live read", T)
         v = view("OPENAI_SUBSCRIPTION", l)
         self.assertEqual((v["state"], v["low_tokens"][0]["over"]), ("resting", "ceiling"))
         self.assertEqual(v["unlock"]["in_s"], 3 * HOUR)
 
     def test_every_state_has_its_own_emoji(self):
-        self.assertEqual(len(set(route.EMOJI.values())), 7)
-        self.assertEqual(set(route.EMOJI), {"ready", "resting", "logged_out", "spend", "slow", "off", "unknown"})
+        self.assertEqual(len(set(cockpit.EMOJI.values())), 7)
+        self.assertEqual(set(cockpit.EMOJI), {"ready", "resting", "logged_out", "spend", "slow", "off", "unknown"})
 
 
 class Fmt(unittest.TestCase):
     def test_fmt_in(self):
-        self.assertEqual([route.fmt_in(s) for s in (20, 45 * 60, 2 * HOUR + 600, 6 * 86400 + 21 * HOUR)], ["<1m", "45m", "2h 10m", "6d 21h"])
+        self.assertEqual([spec.fmt_in(s) for s in (20, 45 * 60, 2 * HOUR + 600, 6 * 86400 + 21 * HOUR)], ["<1m", "45m", "2h 10m", "6d 21h"])
 
 
 class Readers(unittest.TestCase):
     def test_the_credit_reader_estimates_from_the_ledger_and_the_claude_reader_marks_its_source(self):
         S = CFG["settings"]
         with tempfile.TemporaryDirectory() as d, patch.dict(os.environ, {"DELEGATE_CONFIG_DIR": d}):
-            route.ledger_add(30.0, "m", T - 3600)
+            env.ledger_add(30.0, "m", T - 3600)
             l = lane("CLAUDE_CREDIT")
-            with patch.object(route, "now", return_value=T):
-                route.read_claude_credit(l, route.settings_of(CFG), support.doc_of({}), T)
+            with patch.object(env, "now", return_value=T):
+                usage.read_claude_credit(l, env.settings_of(CFG), support.doc_of({}), T)
             w = l.windows[0]
             self.assertEqual((w["name"], round(w["used"]), w["source"], w["at"]), ("monthly", 20, "estimated from history (this tool's ledger)", T - 3600))
             c = lane("CLAUDE_SUBSCRIPTION", shared=True)
-            with patch.object(route, "claude_logged_out", return_value=False), patch.object(route, "update_state"):
-                route.read_claude_subscription(c, route.settings_of(CFG), support.doc_of({}), T, {"plan": {"windows": [{"label": "5 hour", "percentUsed": 12, "resetsAt": T + HOUR}, {"label": "All weekly", "percentUsed": 40, "resetsAt": T + 86400}]}})
+            with patch.object(usage, "claude_logged_out", return_value=False), patch.object(env, "update_state"):
+                usage.read_claude_subscription(c, env.settings_of(CFG), support.doc_of({}), T, {"plan": {"windows": [{"label": "5 hour", "percentUsed": 12, "resetsAt": T + HOUR}, {"label": "All weekly", "percentUsed": 40, "resetsAt": T + 86400}]}})
             self.assertEqual([(w["name"], w["used"], w["source"]) for w in c.windows], [("5-hour", 12.0, "manual mark (get_usage passed in)"), ("weekly", 40.0, "manual mark (get_usage passed in)")])
 
 
@@ -187,25 +197,25 @@ class LoginCheck(unittest.TestCase):
             count = Path(d) / "count"
             self.fake(d, "codex", 'echo x >> "%s"; [ "$1 $2" = "login status" ] && { echo "Not logged in"; exit 1; }; exit 2' % count)
             st = {}
-            with patch.object(route, "update_state", side_effect=lambda fn: fn(st)):
-                a = route.login_state("OPENAI_SUBSCRIPTION", st, T)
-                b = route.login_state("OPENAI_SUBSCRIPTION", st, T + 200)
-                c = route.login_state("OPENAI_SUBSCRIPTION", st, T + 400)
+            with patch.object(env, "update_state", side_effect=lambda fn: fn(st)):
+                a = cockpit.login_state("OPENAI_SUBSCRIPTION", st, T)
+                b = cockpit.login_state("OPENAI_SUBSCRIPTION", st, T + 200)
+                c = cockpit.login_state("OPENAI_SUBSCRIPTION", st, T + 400)
             self.assertEqual((a[0], b[0], c[0]), (False, False, False))
             self.assertEqual(len(count.read_text().split()), 2)          # once, then again after the 5-minute cache ran out
             self.fake(d, "codex", 'echo "Logged in using ChatGPT"')
-            self.assertTrue(route.probe_login("OPENAI_SUBSCRIPTION")[0])
+            self.assertTrue(harnesses.probe_login("OPENAI_SUBSCRIPTION")[0])
 
     def test_opencode_logins_are_read_from_its_auth_file(self):
-        with tempfile.TemporaryDirectory() as d, patch.dict(os.environ, {"XDG_DATA_HOME": d}), patch.object(route, "opencode_exe", return_value="opencode"):
+        with tempfile.TemporaryDirectory() as d, patch.dict(os.environ, {"XDG_DATA_HOME": d}), patch.object(OpenCodeHarness, "find_exe", return_value="opencode"):
             (Path(d) / "opencode").mkdir()
             auth = Path(d) / "opencode" / "auth.json"
             auth.write_text(json.dumps({"xai": {"type": "oauth"}}))
-            self.assertTrue(route.probe_login("GROK_SUBSCRIPTION")[0])
-            self.assertFalse(route.probe_login("ZAI_CODING_SUBSCRIPTION")[0])
+            self.assertTrue(harnesses.probe_login("GROK_SUBSCRIPTION")[0])
+            self.assertFalse(harnesses.probe_login("ZAI_CODING_SUBSCRIPTION")[0])
             auth.write_text(json.dumps({"zai-coding-plan": {"type": "api", "key": "k"}}))
-            self.assertTrue(route.probe_login("ZAI_CODING_SUBSCRIPTION")[0])
-            self.assertFalse(route.probe_login("GROK_SUBSCRIPTION")[0])
+            self.assertTrue(harnesses.probe_login("ZAI_CODING_SUBSCRIPTION")[0])
+            self.assertFalse(harnesses.probe_login("GROK_SUBSCRIPTION")[0])
 
 
 class Command(unittest.TestCase):
@@ -214,13 +224,13 @@ class Command(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d, patch.dict(os.environ, {"DELEGATE_CONFIG_DIR": d, "CLAUDE_CODE_ENTRYPOINT": "cli"}):
             (Path(d) / "state.json").write_text(json.dumps({"v": 1, **(state or {})}))
             ready = ready or {n: True for n in cfg["lanes"]}
-            noread = {k: (lambda lane_, S, st_, t, *a: None) for k in route.READERS}
+            noread = {k: (lambda lane_, S, st_, t, *a: None) for k in usage.READERS}
             logins = {"OPENAI_SUBSCRIPTION": (False, "Not logged in"), "GROK_SUBSCRIPTION": (True, "ok")}
             out, sys.stdout = sys.stdout, io.StringIO()
             try:
-                with patch.object(route, "load_routing", return_value=cfg), patch.dict(route.READERS, noread), \
-                        patch.object(onboard, "configured_lanes", return_value=ready), patch.object(route, "probe_login", side_effect=lambda n: logins.get(n, (True, "ok"))), \
-                        patch.object(route, "now", return_value=T):
+                with patch.object(env, "load_routing", return_value=cfg), patch.dict(usage.READERS, noread), \
+                        patch.object(onboard, "configured_lanes", return_value=ready), patch.object(harnesses, "probe_login", side_effect=lambda n: logins.get(n, (True, "ok"))), \
+                        patch.object(env, "now", return_value=T):
                     route.main(["status", *argv])
                 return sys.stdout.getvalue()
             finally:
@@ -262,7 +272,7 @@ class Command(unittest.TestCase):
             def reconfigure(self, **kw):
                 self.reconfigured = kw
         s = Narrow()
-        with patch.object(sys, "stdout", s), patch.object(route, "cmd_status", return_value=0):
+        with patch.object(sys, "stdout", s), patch.object(status, "cmd_status", return_value=0):
             route.main(["status"])
         self.assertEqual(s.reconfigured, {"encoding": "utf-8", "errors": "replace"})
 

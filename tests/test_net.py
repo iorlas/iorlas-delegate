@@ -23,7 +23,18 @@ from test_route import route, CFG, T, lanes
 
 LANES = Path(__file__).resolve().parent.parent / "src" / "delegate" / "adapters"
 from delegate.adapters import netprobe, procs
-from lanes import classify, cockpit, profiles          # noqa: E402  (test_route put skills/delegate on sys.path)
+from delegate.app import roles as role_view
+from delegate.adapters.harness import classify
+from delegate.contracts import stops
+from delegate.app import env
+from delegate.app import cockpit
+from delegate.app import launch
+from delegate.app import net
+from delegate.adapters.harness import classify
+from delegate.contracts import stops
+from delegate.domain.lanes import profiles
+from delegate.app import harnesses
+from delegate.app.settle import Settler
 
 
 @contextlib.contextmanager
@@ -127,7 +138,7 @@ class RouteNet(unittest.TestCase):
             if patch_spawns:
                 ex.enter_context(mock.patch.object(subprocess, "run", boom))
                 ex.enter_context(mock.patch.object(subprocess, "Popen", boom))
-            ex.enter_context(mock.patch.object(route, "net_probe", route.REAL_NET_PROBE))
+            ex.enter_context(mock.patch.object(net, "net_probe", net.REAL_NET_PROBE))
             ex.enter_context(contextlib.redirect_stdout(out))
             rc = route.main(argv)
         return rc, json.loads(out.getvalue())
@@ -146,13 +157,13 @@ class RouteNet(unittest.TestCase):
     def test_the_probe_is_cached_for_status_cheap(self):
         with listener() as host:
             self.run_main(["net", "--host", host])
-        c = netprobe.load(str(route.net_cache_path()))
+        c = netprobe.load(str(env.net_cache_path()))
         self.assertTrue(c["up"])
 
 
 class NotTheLanesFault(unittest.TestCase):
     def test_network_never_counts_against_a_pair(self):
-        self.assertFalse(classify.benches_pair("network"))
+        self.assertFalse(stops.benches_pair("network"))
         led = HealthLedger(BreakerPolicy())
         rows = [RunRow(ts=1000.0 + i, run_id=f"r{i}", task=f"t{i}", role="worker", lane="OPENAI_SUBSCRIPTION", model="m", effort="high", done=False,
                        **failure_fields("network", "", "error sending request", None)) for i in range(12)]
@@ -165,18 +176,18 @@ class NotTheLanesFault(unittest.TestCase):
         down = {"up": False, "ip_up": False, "why": "offline", "ms": 1, "hosts": {}, "at": 1.0}
         for reason in ("hung", "worker_failed", "vendor_blip"):
             o = classify.Outcome(reason, "", "ours")
-            with mock.patch.object(route, "net_probe", lambda hosts=None: down):
-                self.assertEqual(route.net_pass(o, d).reason, "network", reason)
-            self.assertEqual(route.net_pass(o, d).reason, reason)          # test_route's probe says up
+            with mock.patch.object(net, "net_probe", lambda hosts=None: down):
+                self.assertEqual(launch.settler().net_pass(o, d).reason, "network", reason)
+            self.assertEqual(launch.settler().net_pass(o, d).reason, reason)          # test_route's probe says up
         for reason in ("rate_limited", "bad_request", "logged_out", "secrets", "timeout", "credit_exhausted"):
             o = classify.Outcome(reason, "", "ours")
-            with mock.patch.object(route, "net_probe", lambda hosts=None: down):
-                self.assertEqual(route.net_pass(o, d).reason, reason, reason)        # never second-guessed, never probed
+            with mock.patch.object(net, "net_probe", lambda hosts=None: down):
+                self.assertEqual(launch.settler().net_pass(o, d).reason, reason, reason)        # never second-guessed, never probed
 
     def test_dropped_words_win_without_a_probe(self):
         probe = mock.Mock(side_effect=AssertionError("probed"))
-        with mock.patch.object(route, "net_probe", probe):
-            o = route.net_pass(classify.Outcome("worker_failed", "stream disconnected before completion: websocket closed", "event"), {"lane": "X"})
+        with mock.patch.object(net, "net_probe", probe):
+            o = launch.settler().net_pass(classify.Outcome("worker_failed", "stream disconnected before completion: websocket closed", "event"), {"lane": "X"})
         self.assertEqual(o.reason, "network")
 
     def test_a_hung_worker_on_a_dead_net_marks_no_lane_out(self):
@@ -184,8 +195,8 @@ class NotTheLanesFault(unittest.TestCase):
         a = mock.Mock(schema=None, timeout=60)
         down = {"up": False, "ip_up": False, "why": "offline", "ms": 1, "hosts": {}, "at": 1.0}
         res = {"hung_words": "printed nothing within 120s", "hung_kind": "first_event", "ref": None}
-        with mock.patch.object(route, "net_probe", lambda hosts=None: down), mock.patch.object(route, "mark_out") as mark:
-            route.settle(res, classify.Outcome("hung", "", "ours"), d, T, "codex", a)
+        with mock.patch.object(net, "net_probe", lambda hosts=None: down), mock.patch.object(Settler, "mark_out") as mark:
+            launch.settler().apply(res, classify.Outcome("hung", "", "ours"), d, T, "codex", a)
         mark.assert_not_called()
         self.assertEqual((res["outcome"], res["resumable"]), ("network", False))
         self.assertNotIn("hung_words", res)
@@ -195,7 +206,7 @@ class Roles(unittest.TestCase):
     def test_roles_say_usable_and_net(self):
         ls = lanes()
         cached = {"up": True, "since": T - 50, "at": T - 5, "hosts": {"chatgpt.com": "ok", "api.anthropic.com": "tcp"}}
-        roles = cockpit.roles_view(CFG, ls, support.router(CFG, T), support.doc_of({}), T, cached)
+        roles = role_view.roles_view(CFG, ls, support.router(CFG, T), support.doc_of({}), T, cached)
         self.assertEqual(set(roles), set(CFG["roles"]))
         self.assertTrue(roles["planner"]["usable"])
         self.assertEqual(roles["planner"]["lane"], "OPENAI_SUBSCRIPTION")
@@ -205,20 +216,20 @@ class Roles(unittest.TestCase):
 
     def test_an_unusable_role_says_why_and_when(self):
         ls = lanes(openai={"out": True, "out_until": T + 600, "out_reason": "limit"}, sub={"out": True, "out_until": T + 900, "out_reason": "limit"})
-        roles = cockpit.roles_view(CFG, ls, support.router(CFG, T), support.doc_of({}), T, None)
+        roles = role_view.roles_view(CFG, ls, support.router(CFG, T), support.doc_of({}), T, None)
         self.assertIs(roles["planner"]["usable"], False)
         self.assertEqual(roles["planner"]["until"], T + 600)
         self.assertIsNone(roles["planner"]["net"]["up"])
 
     def test_deciding_roles_leaves_the_lanes_as_it_found_them(self):
         ls = lanes()
-        cockpit.roles_view(CFG, ls, support.router(CFG, T), support.doc_of({}), T, None)
+        role_view.roles_view(CFG, ls, support.router(CFG, T), support.doc_of({}), T, None)
         self.assertTrue(all(not l.busy and not l.out for l in ls.values()))
 
     def test_refresh_brings_net_and_holds_up_to_date_without_a_spawn(self):
         roles = {"worker": {"usable": True, "lane": "OPENAI_SUBSCRIPTION", "model": "m", "why": None, "until": None, "hosts": ["chatgpt.com"], "net": {"up": None}}}
         cached = {"up": False, "since": T, "at": T, "hosts": {"chatgpt.com": "tcp"}}
-        r = cockpit.refresh(roles, [{"lane": "OPENAI_SUBSCRIPTION", "roles": ["worker"], "until": T + 100, "reason": "pace"}], cached, T + 1)
+        r = role_view.refresh(roles, [{"lane": "OPENAI_SUBSCRIPTION", "roles": ["worker"], "until": T + 100, "reason": "pace"}], cached, T + 1)
         self.assertEqual((r["worker"]["usable"], r["worker"]["net"]["up"]), (False, False))
         self.assertEqual(r["worker"]["until"], T + 100)
 
@@ -241,14 +252,14 @@ class Cheap(unittest.TestCase):
 
     def test_a_full_status_writes_roles_and_cheap_replays_them_with_a_fresh_net(self):
         out = io.StringIO()
-        with mock.patch.object(route, "probe_login", return_value=(True, "ok")), contextlib.redirect_stdout(out):
+        with mock.patch.object(harnesses, "probe_login", return_value=(True, "ok")), contextlib.redirect_stdout(out):
             route.main(["status", "--json"])
         full = json.loads(out.getvalue())
         self.assertEqual(set(full["roles"]), set(CFG["roles"]))
         for r in full["roles"].values():
             self.assertIn("usable", r)
             self.assertIn("net", r)
-        netprobe.record(str(route.net_cache_path()), {"up": False, "ip_up": False, "why": "offline", "hosts": {"chatgpt.com": "tcp"}, "at": time.time()})
+        netprobe.record(str(env.net_cache_path()), {"up": False, "ip_up": False, "why": "offline", "hosts": {"chatgpt.com": "tcp"}, "at": time.time()})
         rc, cheap = self.cheap()
         self.assertEqual(rc, 0)
         self.assertEqual(set(cheap["roles"]), set(CFG["roles"]))
@@ -269,7 +280,7 @@ class Adapters(unittest.TestCase):
         for a in profiles.REGISTRY.values():
             self.assertIn(a.cli, watch.LIMITS)
         self.assertEqual(profiles.REGISTRY["opencode"].resume, "untested")
-        self.assertEqual(set(route.PREPARE), set(profiles.REGISTRY))          # each runner has one harness preparation, and launch_worker is the only launcher
+        self.assertEqual(set(launch.PREPARE), set(profiles.REGISTRY))          # each runner has one harness preparation, and launch_worker is the only launcher
 
     def test_every_lane_in_routing_json_has_hosts_to_probe(self):
         for lane in CFG["lanes"]:

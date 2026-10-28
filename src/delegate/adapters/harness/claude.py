@@ -7,7 +7,7 @@ import subprocess
 from pathlib import Path
 from typing import Any
 
-from delegate.adapters import netprobe
+from delegate.adapters import netprobe, procs
 from delegate.adapters.harness.base import Evidence, LaunchInputs, LaunchSpec, Quiet, Summary
 from delegate.contracts import events as ev
 
@@ -218,7 +218,7 @@ class ClaudeHarness(Quiet):
         if not exe:
             return None, f"{self.EXE} CLI not installed"
         try:
-            r = subprocess.run([exe, "auth", "status"], capture_output=True, text=True, timeout=timeout, stdin=subprocess.DEVNULL)
+            r = procs.run_capture([exe, "auth", "status"], timeout)
         except (OSError, subprocess.TimeoutExpired) as x:
             return None, f"{self.EXE} login check failed: {type(x).__name__}"
         try:

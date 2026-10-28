@@ -9,6 +9,8 @@ import tempfile
 import unittest
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))      # delegate.*: next to skills/ in the plugin tree
+
 REAL_HOME = os.path.realpath(os.path.expanduser("~"))
 FORBIDDEN = tuple(os.path.join(REAL_HOME, d) + os.sep for d in (".config", ".codex", ".claude", ".opencode", os.path.join(".local", "share")))
 FORBIDDEN_EXACT = tuple(os.path.join(REAL_HOME, d) for d in (".config", ".codex", ".claude", ".opencode"))

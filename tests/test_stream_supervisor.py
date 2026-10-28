@@ -17,6 +17,11 @@ from delegate.adapters.harness import claude   # noqa: E402
 from delegate.adapters.harness.opencode import OpenCodeHarness   # noqa: E402
 from delegate.app.supervisor import RunHooks   # noqa: E402
 from delegate.app import watch                # noqa: E402
+from delegate.app import env
+from delegate.app import launch
+import shutil
+from delegate.adapters import agent_runs
+from delegate.adapters import codex_account
 
 T = 1_000_000.0
 
@@ -55,11 +60,11 @@ class Replay(unittest.TestCase):
             setattr(watch, k, v)
         self.addCleanup(setattr, watch, "GRACE_OF", watch.GRACE_OF)
         watch.GRACE_OF = {}
-        env = dict(os.environ, DELEGATE_CONFIG_DIR=str(self.cfg), HOME=str(self.base), CODEX_HOME=str(self.base))
-        for p in (mock.patch.dict(os.environ, env), mock.patch.object(route, "agent_runs", None), mock.patch.object(route.sys, "platform", "darwin"),
-                  mock.patch.object(OpenCodeHarness, "write_shell"), mock.patch.object(route, "child_env", side_effect=lambda extra=None: dict(os.environ, **(extra or {}))),
-                  mock.patch.object(route, "codex_thread_total", return_value=None), mock.patch.object(route, "codex_child_tokens", return_value=({"in": 0, "cached": 0, "out": 0}, 0)),
-                  mock.patch.object(route, "codex_context_k", return_value=None)):
+        penv = dict(os.environ, DELEGATE_CONFIG_DIR=str(self.cfg), HOME=str(self.base), CODEX_HOME=str(self.base))
+        for p in (mock.patch.dict(os.environ, penv), mock.patch.object(agent_runs, 'run'), mock.patch.object(agent_runs, 'lanes'), mock.patch.object(sys, "platform", "darwin"),
+                  mock.patch.object(OpenCodeHarness, "write_shell"), mock.patch.object(env, "child_env", side_effect=lambda extra=None: dict(os.environ, **(extra or {}))),
+                  mock.patch.object(codex_account, "thread_total", return_value=None), mock.patch.object(codex_account, "child_tokens", return_value=({"in": 0, "cached": 0, "out": 0}, 0)),
+                  mock.patch.object(codex_account, "context_k", return_value=None)):
             p.start()
             self.addCleanup(p.stop)
         self.a = argparse.Namespace(resume=None, schema=None, timeout=0, role="worker")
@@ -90,8 +95,8 @@ class Replay(unittest.TestCase):
     def launch(self, kind, exe, a=None):
         a = a or self.a
         d = self.d(kind)
-        with mock.patch.object(route.shutil, "which", return_value=exe), mock.patch.object(route, "opencode_exe", return_value=exe):
-            return route.launch_worker(d, "brief", a, "rid12345", T, route.load_routing(), {}, RunHooks())
+        with mock.patch.object(shutil, "which", return_value=exe), mock.patch.object(OpenCodeHarness, "find_exe", return_value=exe):
+            return launch.launch_worker(d, "brief", a, "rid12345", T, env.load_routing(), {}, RunHooks())
 
     CASES = {"codex": ([CODEX_STARTED, CODEX_CMD, CODEX_MSG, CODEX_DONE], "codex answer"),
              "claude": ([CLAUDE_TOOL, CLAUDE_TOOL_DONE, CLAUDE_FINAL, CLAUDE_RESULT], "claude answer"),

@@ -19,6 +19,10 @@ from delegate.adapters.harness.codex import CodexHarness
 from delegate.app.publish import LiveSink
 from delegate.app.supervisor import RunHooks, Supervisor
 from delegate.contracts.state import Lease
+from delegate.app import usage
+from delegate.app import lease
+import shutil
+from delegate.adapters import codex_account
 
 # A fake of the Codex CLI: a node-shim analogue that starts a native child in a session of its own; the child ignores SIGTERM.
 CHILD = "import signal,time; signal.signal(signal.SIGTERM, signal.SIG_IGN); time.sleep(300)"
@@ -78,7 +82,7 @@ class RealTrees(unittest.TestCase):
         cstart = procs.start_token(child)
         self.assertTrue(v.worker_start and cstart)
         t0 = time.time()
-        self.assertTrue(route.reap(v))
+        self.assertTrue(lease.reap(v))
         self.assertTrue(gone(child, cstart), "the shim's native child survived reap")
         self.assertLess(time.time() - t0, 15)
 
@@ -111,13 +115,13 @@ class KillPaths(unittest.TestCase):
         exe = Path(d.name) / "codex"
         exe.write_text(f"#!{sys.executable}\nimport sys, time\n{body}\n")
         exe.chmod(0o755)
-        return mock.patch.object(route.shutil, "which", return_value=str(exe))
+        return mock.patch.object(shutil, "which", return_value=str(exe))
 
     def test_a_silent_app_server_is_cut_at_the_deadline_and_killed_through_the_tree_kill(self):
-        with self.fake_server("time.sleep(300)"), mock.patch.object(route, "APP_SERVER_S", 1), \
+        with self.fake_server("time.sleep(300)"), mock.patch.object(codex_account, "APP_SERVER_S", 1), \
                 mock.patch.object(procs, "kill_tree", wraps=procs.kill_tree) as kt:
             t0 = time.monotonic()
-            res, err = route.fetch_codex_limits()
+            res, err = usage.fetch_codex_limits()
         self.assertLess(time.monotonic() - t0, 5)
         self.assertEqual((res, err), (None, "codex app-server did not answer"))
         kt.assert_called_once()
@@ -126,7 +130,7 @@ class KillPaths(unittest.TestCase):
         body = ("sys.stdin.readline(); print('{\"id\":1,\"result\":{}}', flush=True); sys.stdin.readline(); sys.stdin.readline()\n"
                 "sys.stdout.write('{\"id\":2,\"res'); sys.stdout.flush(); time.sleep(0.3); print('ult\":{\"ok\":1}}', flush=True); time.sleep(300)")
         with self.fake_server(body):
-            res, err = route.fetch_codex_limits()
+            res, err = usage.fetch_codex_limits()
         self.assertEqual((res, err), ({"ok": 1}, None))
 
     def test_no_pattern_kills_and_no_bare_kill_in_router(self):

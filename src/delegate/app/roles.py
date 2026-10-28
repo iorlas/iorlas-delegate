@@ -5,7 +5,7 @@ rows; `status --cheap` replays them from the snapshot and refreshes the parts th
 """
 from delegate.adapters import netprobe
 from delegate.contracts.routing import CallArgs, Run
-from . import profiles
+from delegate.domain.lanes import profiles
 
 
 def families(node):

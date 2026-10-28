@@ -7,7 +7,11 @@ import unittest
 import routing_support as support
 from delegate.contracts.state import UsageCache
 from test_route import route, CFG, lanes, decide, T
-import onboard
+from delegate.app import onboard
+from delegate.app import env
+from delegate.app import usage
+from delegate.app import cockpit
+from delegate.domain.lanes.lane import Lane
 
 # `account/rateLimits/read` as recorded: Pro Lite, one weekly window sent as `primary`, no `secondary`, no other bucket, no credits.
 RECORDED = {"ordinaryUsageAllowed": True, "rateLimits": {
@@ -27,10 +31,10 @@ NOW = 1793000000          # 2026-10-26, before both resets
 
 
 def with_res(res, S=None, st=None, t=NOW):
-    lane = route.Lane("OPENAI_SUBSCRIPTION", "openai", "subscription")
-    route.update_state(lambda s_: setattr(s_, "codex_limits", UsageCache(at=t, data=res)))
-    S = route.settings_of(CFG) if S is None else route.settings_of({**CFG, "settings": S})
-    route.read_codex(lane, S, st if st is not None else route.load_state(), t)
+    lane = Lane("OPENAI_SUBSCRIPTION", "openai", "subscription")
+    env.update_state(lambda s_: setattr(s_, "codex_limits", UsageCache(at=t, data=res)))
+    S = env.settings_of(CFG) if S is None else env.settings_of({**CFG, "settings": S})
+    usage.read_codex(lane, S, st if st is not None else env.load_state(), t)
     return lane
 
 
@@ -67,16 +71,16 @@ class CodexRead(Fresh):
                                                      "primary": {"usedPercent": 10, "windowDurationMins": 10080, "resetsAt": NOW + 86400}, "secondary": None}
         lane = with_res(res)
         cfg = copy.deepcopy(CFG)
-        v = route.lane_view("OPENAI_SUBSCRIPTION", cfg, lane, support.doc_of({}), NOW, (), 0, (True, "ok", NOW), None)
+        v = cockpit.lane_view("OPENAI_SUBSCRIPTION", cfg, lane, support.doc_of({}), NOW, (), 0, (True, "ok", NOW), None)
         ck = {"at": NOW, "next_worker": {"action": "stop", "say": "x"}, "legend": {}, "lanes": [v]}
-        text = "\n".join(route.cockpit_text(ck))
+        text = "\n".join(cockpit.cockpit_text(ck))
         self.assertIn("spark weekly", text)
         self.assertIn("6% used, resets Sun 01 Nov", text)
 
 
 class ClaudeLast(Fresh):
     def grok(self, **over):
-        g = route.Lane("GROK_SUBSCRIPTION", "xai", "subscription")
+        g = Lane("GROK_SUBSCRIPTION", "xai", "subscription")
         for k, v in over.items():
             setattr(g, k, v)
         return g
@@ -85,7 +89,7 @@ class ClaudeLast(Fresh):
         ls = lanes()
         ls["GROK_SUBSCRIPTION"] = self.grok()
         for fam, name in (("deepseek", "DEEPSEEK_FREE"), ("zai", "ZAI_CODING_SUBSCRIPTION")):
-            ls[name] = route.Lane(name, fam, "subscription")
+            ls[name] = Lane(name, fam, "subscription")
         return ls
 
     def cfg(self):
@@ -147,16 +151,16 @@ class ClaudeLast(Fresh):
         for n in ("OPENAI_SUBSCRIPTION", "GROK_SUBSCRIPTION", "DEEPSEEK_FREE"):
             ls[n].out, ls[n].out_until = True, T + 3600
         del ls["ZAI_CODING_SUBSCRIPTION"]
-        nw = route.next_worker(cfg, ls, support.doc_of({}), T)
+        nw = cockpit.next_worker(cfg, ls, support.doc_of({}), T)
         self.assertTrue(nw["lane"].startswith("CLAUDE"))
         for part in ("OPENAI_SUBSCRIPTION out until", "GROK_SUBSCRIPTION out until", "DEEPSEEK_FREE out until", "ZAI_CODING_SUBSCRIPTION not set up"):
             self.assertIn(part, nw["why"])
-        v = route.lane_view("OPENAI_SUBSCRIPTION", cfg, None, support.doc_of({}), T)
-        text = route.cockpit_text({"at": T, "next_worker": nw, "legend": {}, "lanes": [v]})[0]
+        v = cockpit.lane_view("OPENAI_SUBSCRIPTION", cfg, None, support.doc_of({}), T)
+        text = cockpit.cockpit_text({"at": T, "next_worker": nw, "legend": {}, "lanes": [v]})[0]
         self.assertIn("(Claude because OPENAI_SUBSCRIPTION out until", text)
 
     def test_cockpit_next_line_has_no_reason_when_a_non_claude_lane_is_picked(self):
-        nw = route.next_worker(self.cfg(), self.everything(), support.doc_of({}), T)
+        nw = cockpit.next_worker(self.cfg(), self.everything(), support.doc_of({}), T)
         self.assertEqual((nw["lane"], nw["why"]), ("DEEPSEEK_FREE", None))
 
 

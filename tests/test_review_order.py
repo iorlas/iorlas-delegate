@@ -12,6 +12,10 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from delegate.app import decide as dec
+from delegate.domain.time import spec
+from delegate.domain.lanes.lane import Lane
+from delegate.cli import verbs
 
 ROOT = Path(__file__).resolve().parent.parent
 spec = importlib.util.spec_from_file_location("route", ROOT / "skills" / "delegate" / "route.py")
@@ -33,7 +37,7 @@ def lanes(*up):
     """Only the families in `up` are healthy; every other family is out."""
     out = {}
     for fam, (name, kind) in NAMES.items():
-        l = route.Lane(name, fam, CFG["lanes"][name]["kind"], fam == "claude")
+        l = Lane(name, fam, CFG["lanes"][name]["kind"], fam == "claude")
         l.five, l.week, l.pace = 10, 5, 0
         if fam not in up:
             l.out, l.out_until, l.out_reason = True, T + 3600, "limit"
@@ -201,15 +205,15 @@ class ReviewOrder(unittest.TestCase):
 
     def test_next_prints_the_warning_on_stderr_and_in_the_result(self):
         d = review("openai", "openai", "claude")
-        route_decision = route.decision
-        route.decision = lambda a, cfg: (copy.deepcopy(d), lanes("openai", "claude"), [], T)
+        route_decision = dec.decision
+        dec.decision = lambda a, cfg: (copy.deepcopy(d), lanes("openai", "claude"), [], T)
         err, out = io.StringIO(), io.StringIO()
         try:
             ns = type("A", (), {"verbose": False})()
             with contextlib.redirect_stderr(err), contextlib.redirect_stdout(out):
-                self.assertEqual(route.cmd_next(ns, CFG), 0)
+                self.assertEqual(verbs.cmd_next(ns, CFG), 0)
         finally:
-            route.decision = route_decision
+            dec.decision = route_decision
         self.assertIn("warning: reviewing openai's work with openai", err.getvalue())
         self.assertEqual(json.loads(out.getvalue())["warning"], d["warning"])
 

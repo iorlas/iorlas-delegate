@@ -8,6 +8,7 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "src"))
 sys.path.insert(0, str(ROOT / "skills" / "delegate"))
 from delegate.app import watch      # noqa: E402
+from delegate.adapters import procs
 
 
 class Clock:
@@ -72,7 +73,7 @@ class Watchdog(unittest.TestCase):
                 self.assertEqual((r.lane, r.model, r.finished), ("OPENAI_SUBSCRIPTION", "gpt", True))
 
     def test_codex_3700s_dead_stream_is_killed_and_logged(self):
-        at, wd = run_watch("codex", [5], 6000)       # run_proc turns this verdict into route.stop_tree (covered in test_route)
+        at, wd = run_watch("codex", [5], 6000)       # run_proc turns this verdict into procs.stop_tree (covered in test_route)
         self.assertEqual(wd.why, "silence")
         self.assertLess(at, 3700)
         rows = []
