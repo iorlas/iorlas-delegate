@@ -412,7 +412,7 @@ class Launchers(unittest.TestCase):
         self.assertEqual(set(profiles.REGISTRY), {"codex", "opencode", "claude_p"})
         self.assertLessEqual(kinds, {"codex", "opencode", "claude_p", "agent_tool"})
         d = {"action": "run", "role": "worker", "lane": "OPENAI_SUBSCRIPTION", "model": "m", "effort": "high", "mode": "write", "how": {"kind": "codexx", "cwd": self.tmp.name}}
-        a = argparse.Namespace(role="worker", authored_by=None, failed="", premium=None, allow_degraded=False, claude_usage=None, cwd=None, resume=None, cap=None,
+        a = argparse.Namespace(role="worker", authored_by=None, premium=None, allow_degraded=False, claude_usage=None, cwd=None, resume=None, cap=None,
                                brief=None, timeout=5, unattended=True, schema=None, parent=None, task=None, title=None, call_id="c#1")
         import io
         with patch.object(dec, "decision", return_value=(d, {}, [], T)), patch("sys.stdout", io.StringIO()) as out:

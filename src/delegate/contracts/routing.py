@@ -142,7 +142,6 @@ class CallArgs:
     """What the caller asked for, as the router sees it (no argv, no paths)."""
 
     authored_by: str | None = None
-    failed: tuple[int, ...] = ()
     premium: str | None = None
     allow_degraded: bool = False
     unattended: bool = False

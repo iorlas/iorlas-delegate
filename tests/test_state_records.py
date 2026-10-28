@@ -53,7 +53,7 @@ class Breaker(unittest.TestCase):
     def test_a_benched_pair_falls_through_to_the_next_step_and_only_that_pair(self):
         ls = self.lanes_with(self.rows("OPENAI_SUBSCRIPTION", "gpt-6.1-sol"))
         self.assertIn("gpt-6.1-sol", ls["OPENAI_SUBSCRIPTION"].benched)
-        d = support.decide("worker", CFG, ls, {}, T + 1, {"authored_by": None, "failed": [], "premium": None, "allow_degraded": False})
+        d = support.decide("worker", CFG, ls, {}, T + 1, {"authored_by": None, "premium": None, "allow_degraded": False})
         self.assertNotEqual(d["model"], "gpt-6.1-sol")
         S = env.settings_of(CFG)
         ok, why = ls["OPENAI_SUBSCRIPTION"].usable(S, True, "gpt-6.1-sol")
@@ -65,7 +65,7 @@ class Breaker(unittest.TestCase):
     def test_all_pairs_benched_stops_with_the_bench_ends_listed(self):
         ls = self.lanes_with(self.rows("OPENAI_SUBSCRIPTION", "gpt-6.1-sol") + self.rows("CLAUDE_SUBSCRIPTION", "sonnet-5.5") + self.rows("CLAUDE_SUBSCRIPTION", "opus-5.5")
                              + self.rows("CLAUDE_CREDIT", "sonnet-5.5") + self.rows("GROK_SUBSCRIPTION", "grok-4.7"))
-        d = support.decide("worker", CFG, ls, {}, T + 1, {"authored_by": None, "failed": [], "premium": None, "allow_degraded": False})
+        d = support.decide("worker", CFG, ls, {}, T + 1, {"authored_by": None, "premium": None, "allow_degraded": False})
         self.assertEqual(d["action"], "stop")
         self.assertIn("OPENAI_SUBSCRIPTION/gpt-6.1-sol", d["resets"])
 

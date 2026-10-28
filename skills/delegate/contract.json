@@ -178,7 +178,6 @@
  },
  "run_args": [
   "--authored-by",
-  "--failed",
   "--premium",
   "--allow-degraded",
   "--claude-usage",

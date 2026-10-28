@@ -57,8 +57,6 @@ class TierPlan:
         if role.order == "cost":         # cheapest configured model first inside a tier (stable: ties keep the listed order)
             steps.sort(key=lambda x: self.r.models[x.model].cost if x.model in self.r.models else 1000)
         steps = [replace(x, idx=i) for i, x in enumerate(steps)]
-        if role.advance == "on_failure":
-            steps = steps[(max(args.failed) + 1) if args.failed else 0:]
         first = [x for x in steps if x.flag == PREMIUM_FLAG]
         rest = [x for x in steps if x not in first]
         tiers = [first]

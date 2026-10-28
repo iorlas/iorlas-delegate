@@ -31,7 +31,7 @@ def doc_of(st):
 def decide(role, cfg, ls, st, t, args):
     routing = env.typed_routing(cfg)
     doc = doc_of(st)
-    ca = CallArgs(authored_by=args.get("authored_by"), failed=tuple(args.get("failed") or ()), premium=args.get("premium"),
+    ca = CallArgs(authored_by=args.get("authored_by"), premium=args.get("premium"),
                   allow_degraded=bool(args.get("allow_degraded")), unattended=bool(args.get("unattended")))
     d = Router(routing, HoldBook(doc.holds), doc.prev, t).decide(role, ca, ls, wait_busy=bool(args.get("wait_busy")))
     out = d.as_dict()
@@ -51,7 +51,7 @@ def router(cfg, t, st=None):
 def build_tiers(role_name, cfg, args):
     """The role's tiers for `args` (a dict as `next` takes), as dicts: what the old route.build_tiers gave."""
     routing = env.typed_routing(cfg)
-    ca = CallArgs(authored_by=args.get("authored_by"), failed=tuple(args.get("failed") or ()))
+    ca = CallArgs(authored_by=args.get("authored_by"))
     tiers = TierPlan(routing).tiers(routing.roles[role_name], ca)
     return [[codec.to_json(s) for s in t] for t in tiers or []]
 

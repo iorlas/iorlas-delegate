@@ -100,7 +100,7 @@ def fleet_builder(cfg):
 
 
 def call_args(a, unattended):
-    return CallArgs(authored_by=a.authored_by, failed=tuple(int(x) for x in a.failed.split(",") if x != "") if a.failed else (), premium=a.premium,
+    return CallArgs(authored_by=a.authored_by, premium=a.premium,
                     allow_degraded=a.allow_degraded, unattended=unattended, resume=getattr(a, "resume", None), cap=getattr(a, "cap", None))
 
 

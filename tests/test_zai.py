@@ -25,7 +25,7 @@ class ZaiTests(unittest.TestCase):
     def choose(self, role, ls, **kwargs):
         cfg=copy.deepcopy(CFG)
         cfg['settings'].update(deepseek_free_enabled=True, zai_coding_enabled=True)
-        return support.decide(role,cfg,ls,{},T,dict(authored_by=None, failed=[], premium=None, allow_degraded=False, **kwargs))
+        return support.decide(role,cfg,ls,{},T,dict(authored_by=None, premium=None, allow_degraded=False, **kwargs))
 
     def test_worker_priority_and_backoff(self):
         ls=lanes()
@@ -42,7 +42,7 @@ class ZaiTests(unittest.TestCase):
 
     def test_zai_author_gets_other_family(self):
         cfg=copy.deepcopy(CFG);cfg['settings'].update(deepseek_free_enabled=True,zai_coding_enabled=True)
-        args=dict(authored_by='zai',failed=[],premium=None,allow_degraded=False)
+        args=dict(authored_by='zai',premium=None,allow_degraded=False)
         d=support.decide('reviewer',cfg,lanes(),{},T,args)
         self.assertEqual(d['lane'],'OPENAI_SUBSCRIPTION')
         ls={'ZAI_CODING_SUBSCRIPTION':Lane('ZAI_CODING_SUBSCRIPTION','zai','subscription')}

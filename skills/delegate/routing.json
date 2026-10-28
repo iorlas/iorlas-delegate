@@ -434,26 +434,6 @@
         "xai"
       ]
     },
-    "hard": {
-      "about": "two workers failed it, or it needs real design reasoning inside the code. Split into short subtasks; only the failed subtask climbs. Pass the indexes of steps that ran and failed with --failed.",
-      "advance": "on_failure",
-      "steps": [
-        {
-          "model": "gpt-6.1-sol",
-          "effort": "high",
-          "on": "openai",
-          "mode": "write"
-        },
-        {
-          "model": "sonnet-5.5",
-          "effort": "high",
-          "on": "claude",
-          "mode": "write",
-          "cap": 3
-        }
-      ],
-      "stop": "Every rung was tried or is unavailable. Report what was tried; if a rung needed more than a couple of tries the plan or the split is wrong. Fable only if the user says so."
-    },
     "light": {
       "about": "simple, low-risk, low-reasoning work: read many files, summarise logs, classify, mechanical small edits. Not about parallelism.",
       "advance": "on_unavailable",

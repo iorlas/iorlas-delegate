@@ -5,8 +5,8 @@ description: Delegate a sub-task to another model or subscription, only when the
 
 `DELEGATE_DEPTH` set = you are a worker: do not delegate.
 Use Bash `run_in_background`.
-`python3 ${CLAUDE_SKILL_DIR}/route.py run ROLE [--cwd D] [--authored-by openai|claude|xai|deepseek] [--failed I,J] [--premium] [--allow-degraded] [--claude-usage JSON] < brief`
-Roles: planner (plan) · worker (implement) · reviewer (`--authored-by`: family that wrote it) · hard (after 2 failures) · light (read).
+`python3 ${CLAUDE_SKILL_DIR}/route.py run ROLE [--cwd D] [--authored-by openai|claude|xai|deepseek] [--premium] [--allow-degraded] [--claude-usage JSON] < brief`
+Roles: planner (plan) · worker (implement) · reviewer (`--authored-by`: family that wrote it) · light (read).
 
 | answer | do |
 |---|---|
@@ -27,7 +27,6 @@ No Python 3.8+: Agent tool only, no worktree, effort in the brief.
 | planner | sonnet high |
 | worker | sonnet medium |
 | reviewer | sonnet medium |
-| hard | sonnet high |
 | light | haiku low > sonnet low |
 <!-- /base-table -->
 

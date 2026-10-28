@@ -24,9 +24,9 @@ Requirements: Claude Code. Base mode (Claude sub-agents only) needs nothing else
 
 | `DEEPSEEK_FREE` | temporary OpenCode free tier (macOS; explicit opt-in) | none; isolated from saved provider logins |
 
-Enable with `route.py config set deepseek_free_enabled true` (disable with `false`). Light work and implementation try DeepSeek first, then fall back to the existing lanes. Reviews preserve family independence; planning and hard tasks keep their original chains. Before every launch the exact `opencode/deepseek-v4.1-flash-free` model must have zero input, output and cache prices in the CLI catalog. No paid DeepSeek replacement is selected. Free access can be withdrawn or rate-limited.
+Enable with `route.py config set deepseek_free_enabled true` (disable with `false`). Light work and implementation try DeepSeek first, then fall back to the existing lanes. Reviews preserve family independence; planning keeps their original chains. Before every launch the exact `opencode/deepseek-v4.1-flash-free` model must have zero input, output and cache prices in the CLI catalog. No paid DeepSeek replacement is selected. Free access can be withdrawn or rate-limited.
 
-Roles: `planner`, `worker`, `reviewer`, `hard`, `light`. Chains, models and thresholds are data in `skills/delegate/routing.json`. The premium tier (Fable for claude) runs only when the user asks for it by name (`--premium`).
+Roles: `planner`, `worker`, `reviewer`, `light`. Chains, models and thresholds are data in `skills/delegate/routing.json`. The premium tier (Fable for claude) runs only when the user asks for it by name (`--premium`).
 
 ## Layout
 
@@ -48,7 +48,7 @@ Dashboards: each Codex and `claude -p` run and the lanes' limits are published a
 
 State, ledger, settings, profile and the key file live in Claude Code's data folder for the plugin (`~/.claude/plugins/data/iorlas-delegate-<marketplace>`), owner-only. A checkout has no default and refuses to run until `DELEGATE_CONFIG_DIR` names a folder, so state is never split between two places. Uninstalling the plugin deletes the folder, key included. Nothing secret is in this repository. Work is tracked with beads (`bd list`).
 
-Pause a lane with `route.py hold LANE --until +2h [--roles worker,hard]` (`--until` is mandatory); `route.py holds` lists them, `route.py release ID` ends one early.
+Pause a lane with `route.py hold LANE --until +2h [--roles worker,light]` (`--until` is mandatory); `route.py holds` lists them, `route.py release ID` ends one early.
 
 
 Claude lanes come last for every role: routing tries each usable Codex, Z.ai, DeepSeek and Grok lane first, and the cockpit's `next worker` line says why when it picks Claude.

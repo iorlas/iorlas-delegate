@@ -71,8 +71,8 @@ class Holds(unittest.TestCase):
         self.assertIsNone(answer.schema_problem(r, stops.CONTRACT["answer_schema"]))
 
     def test_a_hold_stops_its_roles_until_it_ends_and_the_trace_says_who(self):
-        h = support.add_hold("OPENAI_SUBSCRIPTION", "+2h", "weekly budget", ["worker", "hard"], t=T)
-        self.assertEqual((h.set_by, h.until, h.roles), ("owner", T + 7200, ["hard", "worker"]))
+        h = support.add_hold("OPENAI_SUBSCRIPTION", "+2h", "weekly budget", ["worker", "light"], t=T)
+        self.assertEqual((h.set_by, h.until, h.roles), ("owner", T + 7200, ["light", "worker"]))
         st = env.load_state()
         d = support.decide("worker", copy.deepcopy(CFG), lanes(), st, T, {"authored_by": None, "failed": [], "premium": None, "allow_degraded": False})
         self.assertNotEqual(d["lane"], "OPENAI_SUBSCRIPTION")

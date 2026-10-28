@@ -70,7 +70,7 @@ def health_mod():
 
 def argparse_ns(role, **kw):
     import argparse
-    base = dict(role=role, authored_by=None, failed="", premium=None, allow_degraded=False, claude_usage=None, cwd=None, resume=None, cap=None)
+    base = dict(role=role, authored_by=None, premium=None, allow_degraded=False, claude_usage=None, cwd=None, resume=None, cap=None)
     base.update(kw)
     return argparse.Namespace(**base)
 
@@ -160,13 +160,6 @@ class Roles(unittest.TestCase):
         ls2 = lanes(openai={"out": True, "out_until": T + 5000}, credit={"out": True, "out_until": T + 9000}, sub={"week": 96, "five": 10})
         self.assertEqual(decide("planner", ls2, allow_degraded=True)["action"], "stop")   # ceiling still binds
 
-    def test_hard_escalates_on_failure_only(self):
-        ls = lanes()
-        self.assertEqual(decide("hard", ls)["model"], "gpt-6.1-sol")
-        d = decide("hard", ls, failed=[0])                          # Claude Sonnet is the last rung; Opus is never routed in the loop (delegate-pnz)
-        self.assertEqual((d["model"], d["effort"]), ("sonnet-5.5", "high"))
-        self.assertEqual(decide("hard", ls, failed=[0, 1])["action"], "stop")
-
     def test_reviewer_prefers_the_other_family_and_authored_by_is_optional(self):
         self.assertEqual(decide("reviewer", lanes())["model"], "gpt-6.1-sol")                 # no author given: Codex first (the most room), no claim of independence
         d = decide("reviewer", lanes(), authored_by="openai")                                  # Claude is the last lane tried (delegate-m86): Codex reviews Codex, flagged
@@ -225,7 +218,7 @@ class Roles(unittest.TestCase):
         self.assertNotIn("warning", decide("reviewer", lanes(), authored_by="claude"))
 
     def test_premium_only_when_requested(self):
-        self.assertNotEqual(decide("hard", lanes())["model"], "fable-5.1")
+        self.assertNotEqual(decide("planner", lanes())["model"], "fable-5.1")
         d = decide("worker", lanes(), premium="claude")
         self.assertEqual((d["model"], d["flag"]), ("fable-5.1", "user_requested_premium"))
         d = decide("worker", lanes(), premium="openai")

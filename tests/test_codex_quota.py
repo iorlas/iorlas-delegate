@@ -121,7 +121,7 @@ class ClaudeLast(Fresh):
         ls = self.everything()
         for n in ("OPENAI_SUBSCRIPTION", "GROK_SUBSCRIPTION", "DEEPSEEK_FREE", "ZAI_CODING_SUBSCRIPTION"):
             ls[n].out, ls[n].out_until, ls[n].out_reason = True, T + 3600, "limit"
-        for role in ("worker", "light", "planner", "hard"):
+        for role in ("worker", "light", "planner"):
             d = self.pick(role, copy.deepcopy(ls))
             self.assertEqual((d["action"], d["lane"].startswith("CLAUDE")), ("run", True), role)
         ls["ZAI_CODING_SUBSCRIPTION"].out = False                                # one non-Claude lane back: it wins again

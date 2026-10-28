@@ -40,7 +40,7 @@ def routing(overrides):
 
 
 def call_args(a, unattended):
-    return CallArgs(authored_by=a["authored_by"], failed=tuple(int(x) for x in a["failed"].split(",") if x), premium=a["premium"],
+    return CallArgs(authored_by=a["authored_by"], premium=a["premium"],
                     allow_degraded=a["allow_degraded"], unattended=unattended, resume=a["resume"], cap=a["cap"])
 
 

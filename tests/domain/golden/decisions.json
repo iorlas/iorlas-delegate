@@ -6,7 +6,6 @@
    "cap": null,
    "claude_usage": null,
    "cwd": null,
-   "failed": "",
    "premium": null,
    "resume": null,
    "role": "planner"
@@ -70,7 +69,6 @@
    "cap": null,
    "claude_usage": null,
    "cwd": null,
-   "failed": "",
    "premium": null,
    "resume": null,
    "role": "planner"
@@ -134,7 +132,6 @@
    "cap": null,
    "claude_usage": null,
    "cwd": null,
-   "failed": "",
    "premium": null,
    "resume": null,
    "role": "worker"
@@ -198,7 +195,6 @@
    "cap": null,
    "claude_usage": null,
    "cwd": null,
-   "failed": "",
    "premium": null,
    "resume": null,
    "role": "worker"
@@ -262,7 +258,6 @@
    "cap": null,
    "claude_usage": null,
    "cwd": null,
-   "failed": "",
    "premium": null,
    "resume": null,
    "role": "reviewer"
@@ -326,7 +321,6 @@
    "cap": null,
    "claude_usage": null,
    "cwd": null,
-   "failed": "",
    "premium": null,
    "resume": null,
    "role": "reviewer"
@@ -390,135 +384,6 @@
    "cap": null,
    "claude_usage": null,
    "cwd": null,
-   "failed": "",
-   "premium": null,
-   "resume": null,
-   "role": "hard"
-  },
-  "expect": {
-   "action": "run",
-   "cap": null,
-   "effort": "high",
-   "fallback": false,
-   "fallback_reason": null,
-   "first_lane": null,
-   "flag": null,
-   "lane": "OPENAI_SUBSCRIPTION",
-   "mode": "write",
-   "model": "gpt-6.1-sol",
-   "pass": "strict",
-   "role": "hard",
-   "rung": 0,
-   "trace": [
-    "OPENAI_SUBSCRIPTION: usable"
-   ]
-  },
-  "lanes": [
-   {
-    "family": "openai",
-    "five": 10,
-    "kind": "subscription",
-    "name": "OPENAI_SUBSCRIPTION",
-    "pace": 0,
-    "shared": false,
-    "week": 5
-   },
-   {
-    "family": "claude",
-    "five": 30,
-    "kind": "subscription",
-    "name": "CLAUDE_SUBSCRIPTION",
-    "pace": 0,
-    "shared": true,
-    "week": 40
-   },
-   {
-    "cap": 150.0,
-    "family": "claude",
-    "kind": "credit",
-    "name": "CLAUDE_CREDIT",
-    "reset_in_days": 20.0,
-    "shared": false,
-    "spend": 0.0
-   }
-  ],
-  "name": "hard_healthy",
-  "settings": {},
-  "state": {},
-  "unattended": false
- },
- {
-  "args": {
-   "allow_degraded": false,
-   "authored_by": null,
-   "cap": null,
-   "claude_usage": null,
-   "cwd": null,
-   "failed": "",
-   "premium": null,
-   "resume": null,
-   "role": "hard"
-  },
-  "expect": {
-   "action": "run",
-   "cap": null,
-   "effort": "high",
-   "fallback": false,
-   "fallback_reason": null,
-   "first_lane": null,
-   "flag": null,
-   "lane": "OPENAI_SUBSCRIPTION",
-   "mode": "write",
-   "model": "gpt-6.1-sol",
-   "pass": "strict",
-   "role": "hard",
-   "rung": 0,
-   "trace": [
-    "OPENAI_SUBSCRIPTION: usable"
-   ]
-  },
-  "lanes": [
-   {
-    "family": "openai",
-    "five": 10,
-    "kind": "subscription",
-    "name": "OPENAI_SUBSCRIPTION",
-    "pace": 0,
-    "shared": false,
-    "week": 5
-   },
-   {
-    "family": "claude",
-    "five": 30,
-    "kind": "subscription",
-    "name": "CLAUDE_SUBSCRIPTION",
-    "pace": 0,
-    "shared": true,
-    "week": 40
-   },
-   {
-    "cap": 150.0,
-    "family": "claude",
-    "kind": "credit",
-    "name": "CLAUDE_CREDIT",
-    "reset_in_days": 20.0,
-    "shared": false,
-    "spend": 0.0
-   }
-  ],
-  "name": "hard_unattended",
-  "settings": {},
-  "state": {},
-  "unattended": true
- },
- {
-  "args": {
-   "allow_degraded": false,
-   "authored_by": null,
-   "cap": null,
-   "claude_usage": null,
-   "cwd": null,
-   "failed": "",
    "premium": null,
    "resume": null,
    "role": "light"
@@ -582,7 +447,6 @@
    "cap": null,
    "claude_usage": null,
    "cwd": null,
-   "failed": "",
    "premium": null,
    "resume": null,
    "role": "light"
@@ -646,7 +510,6 @@
    "cap": null,
    "claude_usage": null,
    "cwd": null,
-   "failed": "",
    "premium": null,
    "resume": null,
    "role": "worker"
@@ -711,7 +574,6 @@
    "cap": null,
    "claude_usage": null,
    "cwd": null,
-   "failed": "",
    "premium": null,
    "resume": null,
    "role": "worker"
@@ -778,7 +640,6 @@
    "cap": null,
    "claude_usage": null,
    "cwd": null,
-   "failed": "",
    "premium": null,
    "resume": null,
    "role": "worker"
@@ -848,7 +709,6 @@
    "cap": null,
    "claude_usage": null,
    "cwd": null,
-   "failed": "",
    "premium": null,
    "resume": null,
    "role": "worker"
@@ -917,7 +777,6 @@
    "cap": null,
    "claude_usage": null,
    "cwd": null,
-   "failed": "",
    "premium": null,
    "resume": null,
    "role": "worker"
@@ -990,7 +849,6 @@
    "cap": null,
    "claude_usage": null,
    "cwd": null,
-   "failed": "",
    "premium": null,
    "resume": null,
    "role": "worker"
@@ -1060,7 +918,6 @@
    "cap": null,
    "claude_usage": null,
    "cwd": null,
-   "failed": "",
    "premium": null,
    "resume": null,
    "role": "worker"
@@ -1132,7 +989,6 @@
    "cap": null,
    "claude_usage": null,
    "cwd": null,
-   "failed": "",
    "premium": null,
    "resume": null,
    "role": "worker"
@@ -1203,7 +1059,6 @@
    "cap": null,
    "claude_usage": null,
    "cwd": null,
-   "failed": "",
    "premium": null,
    "resume": null,
    "role": "worker"
@@ -1274,7 +1129,6 @@
    "cap": null,
    "claude_usage": null,
    "cwd": null,
-   "failed": "",
    "premium": null,
    "resume": null,
    "role": "worker"
@@ -1352,7 +1206,6 @@
    "cap": null,
    "claude_usage": null,
    "cwd": null,
-   "failed": "",
    "premium": null,
    "resume": null,
    "role": "worker"
@@ -1429,7 +1282,6 @@
    "cap": null,
    "claude_usage": null,
    "cwd": null,
-   "failed": "",
    "premium": null,
    "resume": null,
    "role": "worker"
@@ -1508,7 +1360,6 @@
    "cap": null,
    "claude_usage": null,
    "cwd": null,
-   "failed": "",
    "premium": null,
    "resume": null,
    "role": "worker"
@@ -1586,7 +1437,6 @@
    "cap": null,
    "claude_usage": null,
    "cwd": null,
-   "failed": "",
    "premium": null,
    "resume": null,
    "role": "worker"
@@ -1662,7 +1512,6 @@
    "cap": null,
    "claude_usage": null,
    "cwd": null,
-   "failed": "",
    "premium": null,
    "resume": null,
    "role": "worker"
@@ -1736,7 +1585,6 @@
    "cap": null,
    "claude_usage": null,
    "cwd": null,
-   "failed": "",
    "premium": null,
    "resume": null,
    "role": "worker"
@@ -1803,7 +1651,6 @@
    "cap": null,
    "claude_usage": null,
    "cwd": null,
-   "failed": "",
    "premium": null,
    "resume": null,
    "role": "worker"
@@ -1864,7 +1711,6 @@
    "cap": null,
    "claude_usage": null,
    "cwd": null,
-   "failed": "",
    "premium": null,
    "resume": null,
    "role": "worker"
@@ -1938,7 +1784,6 @@
    "cap": null,
    "claude_usage": null,
    "cwd": null,
-   "failed": "",
    "premium": null,
    "resume": null,
    "role": "worker"
@@ -2032,7 +1877,6 @@
    "cap": null,
    "claude_usage": null,
    "cwd": null,
-   "failed": "0",
    "premium": null,
    "resume": null,
    "role": "worker"
@@ -2096,7 +1940,6 @@
    "cap": null,
    "claude_usage": null,
    "cwd": null,
-   "failed": "0,1",
    "premium": null,
    "resume": null,
    "role": "worker"
@@ -2160,7 +2003,6 @@
    "cap": null,
    "claude_usage": null,
    "cwd": null,
-   "failed": "",
    "premium": "claude",
    "resume": null,
    "role": "worker"
@@ -2225,7 +2067,6 @@
    "cap": null,
    "claude_usage": null,
    "cwd": null,
-   "failed": "",
    "premium": "openai",
    "resume": null,
    "role": "worker"
@@ -2275,7 +2116,6 @@
    "cap": null,
    "claude_usage": null,
    "cwd": null,
-   "failed": "",
    "premium": "nope",
    "resume": null,
    "role": "worker"
@@ -2325,14 +2165,13 @@
    "cap": null,
    "claude_usage": null,
    "cwd": null,
-   "failed": "",
    "premium": null,
    "resume": null,
    "role": "nosuch"
   },
   "expect": {
    "action": "error",
-   "error": "unknown role nosuch; roles: planner, worker, reviewer, hard, light"
+   "error": "unknown role nosuch; roles: planner, worker, reviewer, light"
   },
   "lanes": [
    {
@@ -2375,7 +2214,6 @@
    "cap": null,
    "claude_usage": null,
    "cwd": null,
-   "failed": "",
    "premium": null,
    "resume": null,
    "role": "reviewer"
@@ -2440,7 +2278,6 @@
    "cap": null,
    "claude_usage": null,
    "cwd": null,
-   "failed": "",
    "premium": null,
    "resume": null,
    "role": "reviewer"
@@ -2504,7 +2341,6 @@
    "cap": null,
    "claude_usage": null,
    "cwd": null,
-   "failed": "",
    "premium": null,
    "resume": null,
    "role": "reviewer"
@@ -2576,7 +2412,6 @@
    "cap": null,
    "claude_usage": null,
    "cwd": null,
-   "failed": "",
    "premium": null,
    "resume": null,
    "role": "reviewer"
@@ -2626,7 +2461,6 @@
    "cap": null,
    "claude_usage": null,
    "cwd": null,
-   "failed": "",
    "premium": null,
    "resume": null,
    "role": "reviewer"
@@ -2696,7 +2530,6 @@
    "cap": null,
    "claude_usage": null,
    "cwd": null,
-   "failed": "",
    "premium": null,
    "resume": null,
    "role": "reviewer"
@@ -2766,7 +2599,6 @@
    "cap": null,
    "claude_usage": null,
    "cwd": null,
-   "failed": "",
    "premium": null,
    "resume": null,
    "role": "planner"
@@ -2846,7 +2678,6 @@
    "cap": null,
    "claude_usage": null,
    "cwd": null,
-   "failed": "",
    "premium": null,
    "resume": null,
    "role": "planner"
@@ -2919,82 +2750,10 @@
  {
   "args": {
    "allow_degraded": false,
-   "authored_by": null,
-   "cap": null,
-   "claude_usage": null,
-   "cwd": null,
-   "failed": "",
-   "premium": null,
-   "resume": null,
-   "role": "hard"
-  },
-  "expect": {
-   "action": "stop",
-   "resets": {
-    "CLAUDE_CREDIT": "Sun 09 Sep 02:53",
-    "OPENAI_SUBSCRIPTION": "Sun 09 Sep 03:46"
-   },
-   "role": "hard",
-   "say": "Every rung was tried or is unavailable. Report what was tried; if a rung needed more than a couple of tries the plan or the split is wrong. Fable only if the user says so.",
-   "trace": [
-    "OPENAI_SUBSCRIPTION: rejected, out until Sun 09 Sep 03:46",
-    "OPENAI_SUBSCRIPTION: rejected, out until Sun 09 Sep 03:46",
-    "CLAUDE_SUBSCRIPTION: rejected, out",
-    "CLAUDE_CREDIT: rejected, out until Sun 09 Sep 02:53",
-    "CLAUDE_SUBSCRIPTION: rejected, out",
-    "CLAUDE_CREDIT: rejected, out until Sun 09 Sep 02:53"
-   ]
-  },
-  "lanes": [
-   {
-    "family": "openai",
-    "five": 10,
-    "kind": "subscription",
-    "name": "OPENAI_SUBSCRIPTION",
-    "out": true,
-    "out_reason": "limit",
-    "out_until": 1000007200.0,
-    "pace": 0,
-    "shared": false,
-    "week": 5
-   },
-   {
-    "family": "claude",
-    "five": 30,
-    "kind": "subscription",
-    "name": "CLAUDE_SUBSCRIPTION",
-    "out": true,
-    "out_reason": "logged_out",
-    "pace": 0,
-    "shared": true,
-    "week": 40
-   },
-   {
-    "cap": 150.0,
-    "family": "claude",
-    "kind": "credit",
-    "name": "CLAUDE_CREDIT",
-    "out": true,
-    "out_reason": "limit",
-    "out_until": 1000004000.0,
-    "reset_in_days": 20.0,
-    "shared": false,
-    "spend": 0.0
-   }
-  ],
-  "name": "hard_all_claude_logged_out",
-  "settings": {},
-  "state": {},
-  "unattended": false
- },
- {
-  "args": {
-   "allow_degraded": false,
    "authored_by": "openai",
    "cap": null,
    "claude_usage": null,
    "cwd": null,
-   "failed": "",
    "premium": null,
    "resume": null,
    "role": "reviewer"
@@ -3076,7 +2835,6 @@
    "cap": null,
    "claude_usage": null,
    "cwd": null,
-   "failed": "",
    "premium": null,
    "resume": null,
    "role": "worker"
@@ -3145,7 +2903,6 @@
    "cap": null,
    "claude_usage": null,
    "cwd": null,
-   "failed": "",
    "premium": null,
    "resume": "nope",
    "role": "worker"
@@ -3195,7 +2952,6 @@
    "cap": null,
    "claude_usage": null,
    "cwd": null,
-   "failed": "",
    "premium": null,
    "resume": "ref1",
    "role": "worker"
@@ -3269,7 +3025,6 @@
    "cap": 5,
    "claude_usage": null,
    "cwd": null,
-   "failed": "",
    "premium": null,
    "resume": "ref1",
    "role": "worker"
@@ -3343,7 +3098,6 @@
    "cap": null,
    "claude_usage": null,
    "cwd": null,
-   "failed": "",
    "premium": null,
    "resume": "ref1",
    "role": "worker"
@@ -3421,7 +3175,6 @@
    "cap": null,
    "claude_usage": null,
    "cwd": null,
-   "failed": "",
    "premium": null,
    "resume": "ref1",
    "role": "worker"
@@ -3491,7 +3244,6 @@
    "cap": null,
    "claude_usage": null,
    "cwd": null,
-   "failed": "",
    "premium": null,
    "resume": "ref1",
    "role": "worker"
@@ -3560,7 +3312,6 @@
    "cap": null,
    "claude_usage": null,
    "cwd": null,
-   "failed": "",
    "premium": null,
    "resume": "ref1",
    "role": "worker"
@@ -3634,7 +3385,6 @@
    "cap": null,
    "claude_usage": null,
    "cwd": null,
-   "failed": "",
    "premium": null,
    "resume": "ref1",
    "role": "worker"
@@ -3708,7 +3458,6 @@
    "cap": null,
    "claude_usage": null,
    "cwd": null,
-   "failed": "",
    "premium": null,
    "resume": "ref1",
    "role": "worker"
