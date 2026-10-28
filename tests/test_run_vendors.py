@@ -9,6 +9,8 @@ from pathlib import Path
 from test_route import route, _call, at, why
 from delegate.domain.policy.worker import is_policy_denial
 import routing_support as support
+import stream_proc
+from stream_proc import alive, proc_start
 from delegate.adapters import procs
 from delegate.app import env
 from delegate.app import answer
@@ -248,7 +250,7 @@ class RunVendors(RunBase):
         self.assertLess(time.time() - t0, 25)
         self.assertEqual((why(r), r["ref"]), ("network", "thread-123"))
         self.assertTrue(r["stop"]["resumable"])
-        self.assertIsNone(procs.start_token(int(Path(os.environ["FAKE_PIDFILE"]).read_text())))
+        self.assertIsNone(proc_start(int(Path(os.environ["FAKE_PIDFILE"]).read_text())))
 
     def test_a_claude_worker_waiting_on_a_background_task_is_stopped_after_its_answer(self):
         self.codex_out()
@@ -257,7 +259,7 @@ class RunVendors(RunBase):
         self.assertEqual((r["stop"], r["text"]), (None, "answered"))
         self.assertLess(time.time() - t0, 20)
         bg = int(Path(os.environ["FAKE_PIDFILE"]).read_text())
-        self.assertIsNone(procs.start_token(bg))          # its own process group, stopped too
+        self.assertIsNone(proc_start(bg))          # its own process group, stopped too
 
     def test_a_logged_out_claude_sends_the_planner_to_codex(self):
         _, r = self.run_it(mode="authout", role="planner")
@@ -304,7 +306,7 @@ class RunVendors(RunBase):
         support.clear_out()
 
     def test_codex_that_goes_quiet_is_stopped_through_the_tree_kill_and_the_lane_is_not_marked_out(self):
-        with mock.patch.dict(watch.LIMITS["codex"], silence_s=1), mock.patch.object(procs, "stop_tree", wraps=procs.stop_tree) as st:
+        with mock.patch.dict(watch.LIMITS["codex"], silence_s=1), mock.patch.object(stream_proc, "stop_tree", wraps=stream_proc.stop_tree) as st:
             t0 = time.time()
             _, r = self.run_it(mode="hang", timeout=0)
         self.assertLess(time.time() - t0, 15)

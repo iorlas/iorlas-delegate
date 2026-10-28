@@ -13,6 +13,7 @@ from pathlib import Path
 from unittest import mock
 
 from test_route import route, ROOT
+from stream_proc import alive, proc_start
 from delegate.adapters import procs
 from delegate.adapters.harness.base import LaunchSpec
 from delegate.adapters.harness.codex import CodexHarness
@@ -43,7 +44,7 @@ def wait_for(path, seconds=10):
 def gone(pid, start, seconds=15):
     end = time.time() + seconds
     while time.time() < end:
-        if procs.start_token(pid) != start:
+        if proc_start(pid) != start:
             return True
         time.sleep(0.2)
     return False
@@ -61,7 +62,7 @@ class RealTrees(unittest.TestCase):
 
         def watch():          # capture start times while both are alive
             child = wait_for(self.pidfile)
-            seen.update(child=child, child_start=procs.start_token(child), shim_start=procs.start_token(seen["shim"]))
+            seen.update(child=child, child_start=proc_start(child), shim_start=proc_start(seen["shim"]))
         import threading
         th = threading.Thread(target=watch)
         th.start()
@@ -78,8 +79,8 @@ class RealTrees(unittest.TestCase):
         p = subprocess.Popen([sys.executable, "-c", SHIM, self.pidfile], start_new_session=True)
         self.addCleanup(lambda: (p.kill(), p.wait()))
         child = wait_for(self.pidfile)
-        v = Lease(lane="L", pid=1, start=0.0, expires=0.0, worker_pid=p.pid, worker_start=procs.start_token(p.pid))
-        cstart = procs.start_token(child)
+        v = Lease(lane="L", pid=1, start=0.0, expires=0.0, worker_pid=p.pid, worker_start=proc_start(p.pid))
+        cstart = proc_start(child)
         self.assertTrue(v.worker_start and cstart)
         t0 = time.time()
         self.assertTrue(lease.reap(v))
@@ -91,9 +92,9 @@ class RealTrees(unittest.TestCase):
             procs.run_capture([sys.executable, "-c", SHIM, self.pidfile], 3)
         child = wait_for(self.pidfile)
         end = time.time() + 15
-        while procs.alive(child) and time.time() < end:
+        while alive(child) and time.time() < end:
             time.sleep(0.2)
-        self.assertFalse(procs.alive(child), "the shim's native child survived the run_tree timeout")
+        self.assertFalse(alive(child), "the shim's native child survived the run_tree timeout")
 
     def test_stop_tree_grace_sends_term_first(self):
         code = "import signal,sys,time; signal.signal(signal.SIGTERM, lambda *a: (open(sys.argv[1],'w').write('term'), sys.exit(0))); open(sys.argv[1]+'.up','w'); time.sleep(300)"
@@ -102,7 +103,7 @@ class RealTrees(unittest.TestCase):
         wait_for_file = time.time() + 10
         while not os.path.exists(flag + ".up") and time.time() < wait_for_file:
             time.sleep(0.05)
-        procs.stop_tree(p.pid, grace=3, done=lambda: p.poll() is not None)
+        procs.stop(p, 3)
         p.wait(5)
         self.assertEqual(Path(flag).read_text(), "term")
 
@@ -136,8 +137,7 @@ class KillPaths(unittest.TestCase):
     def test_no_pattern_kills_and_no_bare_kill_in_router(self):
         src = "".join((ROOT / "skills" / "delegate" / f).read_text(encoding="utf-8") for f in ("route.py", "../../src/delegate/adapters/procs.py", "../../src/delegate/app/supervisor.py"))
         self.assertIsNone(re.search(r"pkill|killall|pgrep", src))
-        # the only .kill() calls are the tree kill's own last-resort fallback
-        self.assertEqual(len(re.findall(r"\bp\.kill\(\)", src)), 1)
+        self.assertIsNone(re.search(r"\.kill\(\)|os\.kill", src))      # every stop goes through stream_proc
         self.assertEqual(len(re.findall(r"\.terminate\(\)", src)), 0)
 
 

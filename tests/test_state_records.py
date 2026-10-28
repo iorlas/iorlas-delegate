@@ -16,6 +16,7 @@ from delegate.app.supervisor import RunHooks, Supervisor
 import routing_support as support
 from delegate.app.fleet import apply_health
 from delegate.contracts import codec, stores
+import stream_proc
 from delegate.adapters import procs
 from delegate.adapters.harness import reset_parse
 from delegate.adapters.harness.base import LaunchSpec
@@ -290,7 +291,7 @@ class WatchdogProc(unittest.TestCase):
     def run_child(self, code, **limits):
         with mock.patch.dict(watch.LIMITS["codex"], **limits):
             sup = Supervisor(CodexHarness(), "codex", RunHooks(), LiveSink("codex", ""))
-        with mock.patch.object(procs, "stop_tree", wraps=procs.stop_tree) as st:
+        with mock.patch.object(stream_proc, "stop_tree", wraps=stream_proc.stop_tree) as st:
             t0 = time.time()
             out = sup.run(LaunchSpec(argv=[sys.executable, "-c", code], env=dict(os.environ), cwd=self.tmp.name, stdin=""), 0)
         return out.rc, {"why": out.watch.why, "kind": out.watch.kind}, st, time.time() - t0

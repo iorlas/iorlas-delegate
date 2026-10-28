@@ -9,6 +9,8 @@ import unittest
 from pathlib import Path
 from test_route import route, at, why
 import routing_support as support
+import stream_proc
+from stream_proc import alive, proc_start
 from delegate.adapters import procs
 from delegate.adapters.harness import opencode_sandbox as box
 from delegate.app import env
@@ -216,7 +218,7 @@ class RunCommand(RunBase):
         dead = sp.Popen(["true"]); dead.wait()
         orphan = sp.Popen(["sleep", "300"], start_new_session=True)
         try:
-            start = procs.start_token(orphan.pid)
+            start = proc_start(orphan.pid)
             support.put_lease("old-run", lane="OPENAI_SUBSCRIPTION", role="worker", pid=dead.pid, pid_start="Mon Jan  1 00:00:00 2001", start=env.now() - 300,
                               expires=env.now() + 60, task="T-7", worker_pid=orphan.pid, worker_start=start)
             _, r = self.run_it("--task", "T-7")
@@ -231,8 +233,8 @@ class RunCommand(RunBase):
         import subprocess as sp
         worker = sp.Popen(["sleep", "300"], start_new_session=True)
         try:
-            support.put_lease("old-run", lane="OPENAI_SUBSCRIPTION", role="worker", pid=os.getpid(), pid_start=procs.start_token(os.getpid()), start=env.now() - 300,
-                              expires=env.now() - 1, task="T-9", worker_pid=worker.pid, worker_start=procs.start_token(worker.pid))
+            support.put_lease("old-run", lane="OPENAI_SUBSCRIPTION", role="worker", pid=os.getpid(), pid_start=proc_start(os.getpid()), start=env.now() - 300,
+                              expires=env.now() - 1, task="T-9", worker_pid=worker.pid, worker_start=proc_start(worker.pid))
             _, r = self.run_it("--task", "T-9")
             self.assertEqual(why(r), "duplicate_task")
             self.assertIsNone(worker.poll())

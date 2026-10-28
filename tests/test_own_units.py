@@ -1,11 +1,8 @@
-"""delegate-own, unit side: the OS module on a fake /proc, the typed contract, the answer's `worker` field. No process is started."""
+"""delegate-own, unit side: the process-lister guard, the typed contract, the answer's `worker` field. No process is started."""
 import hermetic          # noqa: F401
 import json
-import os
-import tempfile
 import unittest
 from pathlib import Path
-from unittest import mock
 
 from test_route import route, ROOT, CFG
 
@@ -13,37 +10,7 @@ from delegate.adapters import procs    # noqa: E402  (route put skills/delegate 
 from delegate.contracts import wire    # noqa: E402
 
 
-def fake_proc(root, rows):
-    """rows: {pid: (comm, state, ppid, pgid, start)} written as /proc/<pid>/stat does (comm may hold spaces and parens)."""
-    (Path(root) / "self").mkdir(parents=True, exist_ok=True)
-    (Path(root) / "self" / "stat").write_text("1 (x) S 0 1 1\n")
-    for pid, (comm, st, ppid, pgid, start) in rows.items():
-        d = Path(root) / str(pid)
-        d.mkdir()
-        tail = [st, ppid, pgid, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, start, 0]
-        (d / "stat").write_text("%d (%s) %s\n" % (pid, comm, " ".join(map(str, tail))))
-
-
 class OsProc(unittest.TestCase):
-    def setUp(self):
-        self.d = tempfile.mkdtemp(dir=os.environ["TMPDIR"])
-        fake_proc(self.d, {10: ("node", "S", 1, 10, 500), 11: ("codex (native) x", "S", 10, 11, 501), 12: ("sh", "S", 11, 11, 502),
-                           13: ("zomb", "Z", 10, 10, 503), 20: ("other", "S", 1, 20, 600)})
-        p = mock.patch.object(procs, "PROC", self.d)
-        p.start()
-        self.addCleanup(p.stop)
-
-    def test_table_skips_zombies_and_reads_comm_with_spaces_and_parens(self):
-        self.assertEqual(procs.table(), {10: (1, 10), 11: (10, 11), 12: (11, 11), 20: (1, 20)})
-
-    def test_descendants_follow_parent_links_across_groups(self):
-        self.assertEqual(sorted(procs.descendants(10)), [11, 12])
-        self.assertEqual(procs.descendants(20), [])
-
-    def test_start_token_names_one_process_and_a_zombie_is_gone(self):
-        self.assertEqual((procs.start_token(11), procs.start_token(13), procs.start_token(99)), ("501", None, None))
-        self.assertTrue(procs.alive(12) and not procs.alive(13))
-
     def test_no_module_runs_a_process_lister(self):
         for f in list((ROOT / "skills" / "delegate").rglob("*.py")) + list((ROOT / "src").rglob("*.py")):
             src = f.read_text(encoding="utf-8")

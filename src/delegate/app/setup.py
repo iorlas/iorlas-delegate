@@ -9,6 +9,8 @@ import sys
 import time
 import webbrowser
 
+import stream_proc
+
 from delegate.adapters.harness.codex import CodexHarness
 from delegate.app import env, onboard
 
@@ -45,12 +47,7 @@ def do_codex_login(open_browser=False):
     log = env.config_dir() / "codex-login.log"
     st = env.load_state()
     pid = st.codex_login_pid
-    alive = False
-    if pid:
-        with contextlib.suppress(OSError):
-            os.kill(pid, 0)
-            alive = True
-    if not alive:
+    if not stream_proc.alive(pid):
         with open(log, "w", encoding="utf-8") as lf:
             p = subprocess.Popen([codex, "login", "--device-auth"], stdout=lf, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL, start_new_session=True)
         env.update_state(lambda s: setattr(s, "codex_login_pid", p.pid))

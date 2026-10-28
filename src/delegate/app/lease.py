@@ -5,6 +5,8 @@ import os
 import threading
 from dataclasses import replace
 
+from stream_proc import alive, proc_start
+
 from delegate.adapters import procs
 from delegate.app import env
 from delegate.contracts import history as hist
@@ -15,15 +17,15 @@ from delegate.domain.lanes.leases import LEASE_RENEW, LEASE_TTL, LeaseBook, susp
 def orphan(v):
     """True when the lease's route.py process is gone (pid plus start time: an expired lease alone may be a laptop waking up) but its worker
     is still running: a SIGKILL on route.py leaves the worker, which is its own process group, editing the tree."""
-    gone = procs.start_token(v.pid) != v.pid_start
-    return gone and bool(v.worker_start) and procs.start_token(v.worker_pid) == v.worker_start
+    gone = proc_start(v.pid) != v.pid_start
+    return gone and bool(v.worker_start) and proc_start(v.worker_pid) == v.worker_start
 
 
 def reap(v):
-    """Stop an orphaned worker's whole tree: SIGTERM, a short grace, SIGKILL (stop_tree). -> True when the worker is gone."""
+    """Stop an orphaned worker's whole tree: SIGTERM, a short grace, SIGKILL (stream_proc.stop_tree). -> True when the worker is gone."""
     pg = int(v.worker_pid)
-    procs.stop_tree(pg, grace=3, done=lambda: procs.start_token(pg) != v.worker_start)
-    return procs.start_token(pg) != v.worker_start
+    procs.stop(procs.Orphan(procs.Worker(pid=pg, pgid=pg, start=v.worker_start)), 3)
+    return not alive(pg, v.worker_start)
 
 
 class RunLease:
@@ -36,7 +38,7 @@ class RunLease:
     def claim(self):
         """-> None when the lease is held, else (reason, say): duplicate_task | busy."""
         taken = {}
-        me_start = procs.start_token(os.getpid())
+        me_start = proc_start(os.getpid())
 
         def claim(st):
             live = self._live_after_reaping(st)
@@ -65,7 +67,7 @@ class RunLease:
                     live.pop(k, None)
                 else:           # still running: its lease stays, so the same task or a full lane waits
                     live[k] = replace(v, expires=env.now() + LEASE_TTL)
-            elif k not in live and v.pid_start and procs.start_token(v.pid) == v.pid_start:
+            elif k not in live and v.pid_start and proc_start(v.pid) == v.pid_start:
                 live[k] = v     # expired only because route.py could not renew it (the laptop slept): it is still running
         return live
 

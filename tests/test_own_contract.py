@@ -15,6 +15,8 @@ from test_route import route, ROOT
 
 sys.path.insert(0, str(ROOT / "skills" / "delegate"))
 from delegate.adapters import procs    # noqa: E402
+import stream_proc    # noqa: E402
+from stream_proc import alive, proc_start, procfs    # noqa: E402
 from delegate.adapters.harness.base import LaunchSpec    # noqa: E402
 from delegate.adapters.harness.codex import CodexHarness    # noqa: E402
 from delegate.app import watch    # noqa: E402
@@ -38,7 +40,7 @@ def wait_pid(path, secs=10):
 def dead(pid, secs=10):
     end = time.time() + secs
     while time.time() < end:
-        if not procs.alive(pid):
+        if not alive(pid):
             return True
         time.sleep(0.1)
     return False
@@ -93,8 +95,8 @@ class RealProcesses(unittest.TestCase):
     def test_worker_survived_names_the_pids_and_ends_the_run_so(self):
         p = self.start("stall")
         pid = p.pid
-        with mock.patch.object(procs, "alive", side_effect=lambda x: x == pid):      # a pid the kernel will not let go
-            rep = procs.stop_tree(pid, grace=0)
+        with mock.patch.object(stream_proc, "stop_tree", return_value=(pid,)):      # a pid the kernel will not let go
+            rep = procs.stop(p, 0)
         self.assertEqual(rep.end, wire.END_SURVIVED)
         self.assertEqual([s.pid for s in rep.survivors], [pid])
         end = procs.worker_end([rep], None)
@@ -115,7 +117,7 @@ class RealProcesses(unittest.TestCase):
         self.assertEqual(json.loads(out.out.splitlines()[-1])["result"], "fake answer")
         end = procs.worker_end(hooks.stops, None)
         self.assertEqual((end.end, end.stopped), (wire.END_OK, False))
-        self.assertEqual((out.worker.pgid, bool(out.worker.start)), (out.worker.pid, procs.has_proc()))
+        self.assertEqual((out.worker.pgid, bool(out.worker.start)), (out.worker.pid, procfs.has_proc()))
 
     def test_call_timeout_stops_a_worker_that_ignores_sigterm(self):
         t0 = time.time()

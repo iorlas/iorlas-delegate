@@ -2,6 +2,7 @@
 today and may only shrink: a file or function that is not in the table and is over fails, and an entry that is no longer over fails too."""
 import hermetic  # noqa: F401  (a home of its own for every test)
 import ast
+import re
 import subprocess
 import sys
 import unittest
@@ -49,6 +50,33 @@ class Caps(unittest.TestCase):
         found = oversize()
         for key in KNOWN_OVERSIZE:
             self.assertIn(key, found, f"{key} is under its cap now: delete its line")
+
+
+# Nothing sends a signal except the vendored stream_proc (stop_tree / run); a pid-liveness read is stream_proc.alive. Installing a handler (signal.signal) is not a send.
+SENDS = (r"\bos\.kill(pg)?\(", r"\bsignal\.(raise_signal|pthread_kill|alarm|setitimer)\(", r"\.send_signal\(", r"\.terminate\(\)", r"\.kill\(\)", r"\bkillpg\(")
+SIGNAL_EXCEPTIONS: dict[str, str] = {}      # "path" -> why it still sends a signal itself (shelf lacks: ...); may only shrink
+
+
+def signal_sends():
+    found = {}
+    for base in ("src", "skills", "dev"):
+        for p in sorted((ROOT / base).rglob("*.py")):
+            rel = str(p.relative_to(ROOT))
+            if rel.startswith(EXEMPT_DIRS):
+                continue
+            if any(re.search(pat, line) for line in p.read_text(encoding="utf-8").splitlines() if not line.lstrip().startswith("#") for pat in SENDS):
+                found[rel] = True
+    return found
+
+
+class Signals(unittest.TestCase):
+    def test_no_signal_is_sent_outside_stream_proc(self):
+        for rel in signal_sends():
+            self.assertIn(rel, SIGNAL_EXCEPTIONS, f"{rel} sends a signal: go through stream_proc (stop_tree / run / alive)")
+
+    def test_the_exception_table_only_shrinks(self):
+        for rel in SIGNAL_EXCEPTIONS:
+            self.assertIn(rel, signal_sends(), f"{rel} no longer sends a signal: delete its line")
 
 
 class VendorGuard(unittest.TestCase):
