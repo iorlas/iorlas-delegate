@@ -6,18 +6,17 @@ Call sites, and what a rewrite must keep: docs/dev/integrations.md.
 """
 
 import json
-import os
 import time
 from pathlib import Path
 
+from app_dirs import config_dir
 from atomic_io import atomic_write_json
 
 RETAIN = 7 * 86400
 
 
 def root():
-    base = os.environ.get("XDG_CONFIG_HOME") or str(Path.home() / ".config")
-    return Path(base) / "agent-runs"
+    return config_dir("agent-runs")
 
 
 def _write(path, rec):

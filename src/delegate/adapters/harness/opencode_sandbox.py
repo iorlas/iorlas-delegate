@@ -6,6 +6,8 @@ import os
 import shlex
 from pathlib import Path
 
+from app_dirs import config_dir
+
 SECRETS = (".ssh", ".aws", ".gnupg", ".azure", ".config/gh", ".docker", ".netrc", ".git-credentials", ".codex", ".grok", ".claude", ".claude.json",
            ".local/share/opencode", "Library/Keychains")
 RULE = ("You run unattended. Every command runs in a sandbox: no network, no credential files, no writes outside this directory. If a command "
@@ -15,9 +17,7 @@ NETWORK_REFUSALS = ("tcp connect error", "Network is unreachable", "Failed to co
 
 def readable_outside() -> list[str]:
     """Folders outside the work folder a read-only worker may read: the caller's runs folder (the engine points reviewers at its files) and temp dirs."""
-    xdg = os.environ.get("XDG_CONFIG_HOME")
-    runs = (Path(xdg) if xdg else Path.home() / ".config") / "task-loop" / "runs"
-    return [str(runs), "/private/tmp", "/private/var/folders", "/tmp", "/var/folders"]
+    return [str(config_dir("task-loop") / "runs"), "/private/tmp", "/private/var/folders", "/tmp", "/var/folders"]
 
 
 def permissions(write: bool) -> dict:

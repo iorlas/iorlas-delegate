@@ -8,6 +8,8 @@ Read `docs/dev/constitution.md` before changing anything: Denis's standing rules
 
 All code lives in `src/delegate/` (contracts / domain / adapters / app / cli; `route.py` is a launcher that puts it on `sys.path`; caps in `tests/test_rules.py`); the answer is `contracts/wire.py` `RunResult`, and `contract.json`'s `answer_schema` is generated from it: `python3 dev/gen_contract.py` (a test fails on drift).
 
+Shelf packages (process-lock, stream-proc, child-env, atomic-io, jsonl-log, timefmt, app-dirs) are vendored byte-identical in `skills/delegate/_vendor/` (`python3 dev/vendor.py sync|check`; never edit them; `src/delegate/__init__.py` is the one bootstrap). Signals are sent only by stream_proc (tests/test_rules.py).
+
 <!-- BEGIN BEADS INTEGRATION v:1 profile:minimal hash:1105d646 -->
 ## Beads Issue Tracker
 
