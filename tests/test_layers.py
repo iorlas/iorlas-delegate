@@ -37,6 +37,11 @@ class Layers(unittest.TestCase):
             if layer in NO_RE:
                 self.assertNotIn("re", set(imported(tree)), p.name)
 
+    def test_re_in_the_domain_only_in_matchers(self):
+        for p, layer, tree in modules():
+            if layer == "domain" and p.name != "matchers.py":
+                self.assertNotIn("re", set(imported(tree)), p.name)
+
     def test_no_import_inside_a_function(self):
         for p, _, tree in modules():
             for fn in (n for n in ast.walk(tree) if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef))):

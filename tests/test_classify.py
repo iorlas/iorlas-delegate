@@ -8,6 +8,7 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
 from test_route import route, ROOT, T
+from delegate.domain.policy.worker import denial, denial_item
 from delegate.adapters.harness.opencode import OpenCodeHarness
 from delegate.app.supervisor import RunHooks
 from fakes.fake_run import replay as replay_run
@@ -210,11 +211,11 @@ class Stop(unittest.TestCase):
         self.assertEqual(ex.exception.code, 2)
 
     def test_sandbox_limit_is_listed_and_never_counted(self):
-        d = route.denial("sandbox_limit", "bash", {"command": "ps aux"})
+        d = denial_item(denial("sandbox_limit", "bash", {"command": "ps aux"}))
         self.assertEqual((d["kind"], d["path"]), ("sandbox_limit", None))
-        self.assertEqual(route.denial("secret", "bash", {"command": "cat ~/.ssh/id_rsa"})["path"], ".ssh")
-        self.assertEqual(route.denial("policy", "edit", {"filePath": "x.py"})["path"], "x.py")
-        self.assertEqual(sum(1 for x in [d, route.denial("policy", "bash", {})] if x.get("kind") != "sandbox_limit"), 1)
+        self.assertEqual(denial_item(denial("secret", "bash", {"command": "cat ~/.ssh/id_rsa"}))["path"], ".ssh")
+        self.assertEqual(denial_item(denial("policy", "edit", {"filePath": "x.py"}))["path"], "x.py")
+        self.assertEqual(sum(1 for x in [d, denial_item(denial("policy", "bash", {}))] if x.get("kind") != "sandbox_limit"), 1)
 
     def test_contract_3_has_no_wire_left(self):
         gone = ("v", "status", "reason", "next", "retry_after")
@@ -311,10 +312,10 @@ class Ladder(unittest.TestCase):
 
     def test_one_patterns_block_one_copy_of_each_regex(self):
         src = (ROOT / "skills" / "delegate" / "route.py").read_text(encoding="utf-8")
-        for name in ("LIMIT_RE", "LOGIN_RE", "NETWORK_RE", "SECRET_RE", "SPEND_RE"):
+        for name in ("LIMIT_RE", "LOGIN_RE", "NETWORK_RE", "SPEND_RE"):
             self.assertNotIn(f"\n{name} = re.compile", src)
             self.assertIn(f"\n{name} = re.compile", (ROOT / "skills" / "delegate" / "lanes" / "classify.py").read_text(encoding="utf-8"))
-        self.assertEqual(set(classify.PATTERNS), {"limit", "credit", "spend", "login", "network", "codex_status", "bad_request", "secret"})
+        self.assertEqual(set(classify.PATTERNS), {"limit", "credit", "spend", "login", "network", "codex_status", "bad_request"})
 
 
 class Launchers(unittest.TestCase):

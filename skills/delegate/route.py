@@ -68,6 +68,9 @@ from delegate.app.publish import LiveSink
 from delegate.app.supervisor import LogWatcher, RunHooks, Supervisor
 from delegate.contracts import codec, wire
 from delegate.contracts import events as harness_events
+from delegate.domain.policy import worker as policy
+from delegate.domain.policy.matchers import heredoc_only_hit, secret_hit
+from delegate.domain.policy.worker import APPLY_PATCH_HINT, EDIT_RULE, GIT_RULES, SECRET_RULE
 WEEK_MIN = 7 * 24 * 60
 
 
@@ -1768,187 +1771,16 @@ def cmd_capture(a, cfg):
 
 # ----------------------------------------------------------------------------- git ownership: the coordinator owns git, workers do not
 
-# Arguments that keep a path OUT of a search or listing (rg --glob '!**/.env*', grep --exclude, find -not -path, git ':!x'): a worker
-# avoiding a secret must not trip the guard.
-EXCLUDED_RE = re.compile(r"""(?:--i?glob|-g)[=\s]+(?:(['"])!.*?\1|!\S+)|--exclude(?:-dir)?[=\s]+(?:(['"]).*?\2|\S+)"""
-                         r"""|(?:-not|!)\s+-i?(?:path|name|wholename|regex)\s+(?:(['"]).*?\3|\S+)|(['"]):(?:!|\(exclude\))[^'"]*\4|(?<!\S):(?:!|\(exclude\))\S+""")
-
-
-SHELLS = {"sh", "bash", "zsh", "dash"}
-EXCL_OPTS = {"-g", "--glob", "--iglob", "--exclude", "--exclude-dir", "--exclude-from"}
-EXCL_PATH_OPTS = {"-path", "-ipath", "-name", "-iname", "-wholename", "-iwholename", "-regex", "-iregex"}
-
-
-def unwrap(cmd, depth=3):
-    """The script inside `sh|bash|zsh -c/-lc "<script>"` (nested up to `depth` times), else `cmd` unchanged."""
-    for _ in range(depth):
-        try:
-            t = shlex.split(cmd)
-        except ValueError:
-            return cmd
-        i = next((k for k, x in enumerate(t[1:], 1) if re.fullmatch(r"-[a-z]*c[a-z]*", x)), 0)
-        if not (t and os.path.basename(t[0]) in SHELLS and i and all(x.startswith("-") for x in t[1:i]) and i + 1 < len(t)):
-            return cmd
-        cmd = t[i + 1]
-    return cmd
-
-
-def without_excluded(text):
-    """`text` as shell words with the arguments that keep a path OUT of a search removed (quote splicing collapsed); None if unparsable."""
-    try:
-        t = shlex.split(unwrap(text))
-    except ValueError:
-        return None
-    out, prev, prev2 = [], "", ""
-    for x in t:
-        glob_excl = prev in EXCL_OPTS and (x.startswith("!") or prev.startswith("--exclude"))
-        path_excl = prev in EXCL_PATH_OPTS and prev2 in ("-not", "!")
-        inline = re.match(r"--exclude(?:-dir|-from)?=|(?:--i?glob=|-g)!", x)
-        if not (glob_excl or path_excl or inline or x in EXCL_OPTS or re.match(r":(?:!|\(exclude\))", x) or x in ("-not", "!") or x in EXCL_PATH_OPTS and prev in ("-not", "!")):
-            out.append(x)
-        prev2, prev = prev, x
-    return " ".join(out)
-
-
-def secret_hit(text):
-    """The secret path `text` names, ignoring paths it only excludes; None when there is none."""
-    text = text or ""
-    stripped = without_excluded(text)
-    m = classify.SECRET_RE.search(stripped if stripped is not None else EXCLUDED_RE.sub(" ", text))
-    return m.group() if m else None
-
-
-def denial(kind, tool, inp):
-    """One `denied` item. kind: `policy` (a reviewer or classifier refused the call: the owner decides), `secret` (the call named a secret path),
-    `sandbox_limit` (the sandbox blocked a call that needs a system resource, like ps: noise, never a failure). path: the secret matched, else
-    the call's own path argument."""
-    inp = inp if isinstance(inp, dict) else {}
-    path = secret_hit(inp.get("command")) if kind == "secret" else inp.get("file_path") or inp.get("filePath") or inp.get("path")
-    return {"kind": kind, "tool": tool, "path": path, "input": inp}
-
-
-HEREDOC_RE = re.compile(r"<<-?[ \t]*(['\"]?)(\w+)\1[^\n]*\n.*?(?:\n[ \t]*\2\b|\Z)", re.S)
-EDIT_RULE = "Edit files with the patch/edit tool (apply_patch), never with shell heredocs or `python -c` file rewrites."
-APPLY_PATCH_HINT = "rewrite this edit with apply_patch (the secret name is only inside a heredoc body; heredoc and `python -c` rewrites are blocked)"
-
-
-def heredoc_only_hit(cmd):
-    """True when `cmd` names a secret path only inside a heredoc body (code being written), not in the command itself."""
-    cmd = unwrap(cmd or "")
-    return bool(secret_hit(cmd) and not secret_hit(HEREDOC_RE.sub(lambda m: m.group().split("\n", 1)[0] + "\n", cmd)))
-
-
-SECRET_RULE = "Never touch credential files (~/.ssh, .env, ~/.aws, tokens, keychains): it is blocked. If the task needs one, stop and say so."
-
-
-# A read-only Claude step (reviewer, planner, light) gets Bash for reading only: every piece of the command line must start with one of
-# these, with no output redirection or command substitution. Codex read steps get the same from their read-only sandbox, enforced by the OS;
-# this is a filter on the command text, not a boundary.
-READ_CMDS = {"cat", "head", "tail", "wc", "ls", "rg", "grep", "egrep", "fgrep", "find", "sed", "sort", "uniq", "cut", "tr", "diff", "nl",
-             "file", "stat", "pwd", "echo", "jq", "tree", "du", "basename", "dirname", "realpath", "which", "true", "test", "cd", "git"}
-READ_GIT = {"diff", "log", "show", "status", "blame", "ls-files", "ls-tree", "rev-parse", "grep", "merge-base", "cat-file", "describe",
-            "shortlog", "rev-list", "branch"}
-READ_ONLY_HELP = ("this step is read-only: Bash allows only reading commands (git diff/log/show/status/blame/grep/ls-files, rg, grep, cat, "
-                  "head, tail, ls, find without -exec/-delete, sed without -i, wc, sort, diff, jq), no '>' and no $(...).")
-
-
-def pieces(cmd):
-    """The command lines in `cmd` (split on | || && ; and newlines), each as words; None when one cannot be parsed."""
-    out = []
-    for seg in re.split(r"\|\||&&|;|\||\n", re.sub(r"\d?>&\d|&?\d?>\s*/dev/null", " ", unwrap(cmd))):
-        try:
-            t = shlex.split(seg)
-        except ValueError:
-            return None
-        if t:
-            out.append(t)
-    return out
-
-
-def git_args(t):
-    """Words after `git` and its -C/--no-pager/--git-dir options; the first is the subcommand."""
-    args = t[1:]
-    while args and args[0] in ("-C", "--no-pager") or args and args[0].startswith("--git-dir"):
-        args = args[2:] if args[0] == "-C" else args[1:]
-    return args
-
-
-GIT_LISTING = ("--list", "-l", "-a", "-r", "--show-current", "-v", "-vv", "--contains", "--merged", "--no-merged", "--points-at", "--format", "--sort")
-
-
-def git_write(cmd):
-    """The first git command in `cmd` that changes refs, the index's commits, worktrees or remotes (git is the coordinator's), else None.
-    Listing forms pass: stash list/show, branch and tag listings, worktree list."""
-    for t in pieces(cmd) or []:
-        if os.path.basename(t[0]) != "git":
-            continue
-        args = git_args(t)
-        sub, rest = (args[0] if args else ""), args[1:]
-        if sub in ("commit", "push", "checkout", "switch", "merge", "rebase", "reset", "cherry-pick", "revert", "am", "pull") \
-                or sub == "stash" and not (rest and rest[0] in ("list", "show")) \
-                or sub == "worktree" and not (rest and rest[0] == "list") \
-                or sub in ("branch", "tag") and (rest and not rest[0].startswith("-") or any(x.startswith("-") and not x.startswith(GIT_LISTING) for x in rest)):
-            return " ".join(t[:3])
-    return None
-
-
-def read_only_problem(cmd):
-    """None when every piece of `cmd` only reads, else what is not allowed."""
-    cmd = unwrap(cmd)
-    if re.search(r"`|\$\(|[<>]\(|>", re.sub(r"\d?>&\d|&?\d?>\s*/dev/null", " ", cmd)):
-        return "output redirection or command substitution"
-    ps = pieces(cmd)
-    if ps is None:
-        return "unparsable command"
-    for t in ps:
-        name = os.path.basename(t[0])
-        if name not in READ_CMDS:
-            return f"`{name}` is not a reading command"
-        if name == "find" and set(t) & {"-exec", "-execdir", "-ok", "-okdir", "-delete", "-fprint", "-fprintf", "-fls"}:
-            return "find may not run or delete"
-        if name == "sed" and any(x.startswith(("-i", "--in-place")) for x in t):
-            return "sed -i writes"
-        if name == "rg" and any(x.startswith("--pre") for x in t):
-            return "rg --pre runs a program"
-        if name == "git":
-            args = git_args(t)
-            sub = args[0] if args else ""
-            if sub not in READ_GIT | {"stash", "tag", "worktree"}:         # also catches `git -c key=value ...`, which can run a program
-                return f"git {sub} is not a reading command"
-            if git_write(" ".join(shlex.quote(x) for x in t)):
-                return f"git {sub} may only list"
-            if any(x.startswith("--output") for x in args):
-                return "--output writes a file"
-    return None
-
-
 def cmd_guard(a, cfg=None):
-    """Claude PreToolUse hook: exit 2 (block, reason on stderr) when a tool call names a secret path, or, with --read-only, when a Bash
-    command does more than read. Only the fields that name what is run or opened are checked, not file contents being written (a .gitignore
-    listing .env is fine)."""
+    """Claude PreToolUse hook: exit 2 (block, reason on stderr) when a tool call names a secret path, changes git, or, with --read-only, does
+    more than read. The verdict is domain/policy's; this is the hook's stdin and exit code."""
     with contextlib.suppress(ValueError, AttributeError):
         j = json.load(sys.stdin)
-        ti = j.get("tool_input") or {}
-        hit = secret_hit(" ".join(str(ti.get(k) or "") for k in ("command", "file_path", "path", "pattern", "glob")))
-        if hit:
-            hint = f" {APPLY_PATCH_HINT}." if heredoc_only_hit(str(ti.get("command") or "")) else ""
-            print(f"blocked by delegate: {hit} is a secret path.{hint} {SECRET_RULE}", file=sys.stderr)
-            return 2
-        cmd = str(ti.get("command") or "") if j.get("tool_name") == "Bash" else ""
-        gw = git_write(cmd)
-        if gw:
-            print(f"blocked by delegate: `{gw}` changes git, which is the coordinator's. {GIT_RULES}", file=sys.stderr)
-            return 2
-        why = getattr(a, "read_only", False) and cmd and read_only_problem(cmd)
-        if why:
-            print(f"blocked by delegate: {why}; {READ_ONLY_HELP}", file=sys.stderr)
+        v = policy.judge(j.get("tool_name"), j.get("tool_input") or {}, bool(getattr(a, "read_only", False)))
+        if v.blocked:
+            print(v.reason, file=sys.stderr)
             return 2
     return 0
-
-
-GIT_RULES = ("Git is the coordinator's. Stay in the current directory. Do not create or switch branches or worktrees; "
-             "do not commit, amend, merge, rebase, reset, stash, tag or push. Read-only git is fine. Leave changes uncommitted.")
-
 
 
 def git_state(cwd):
@@ -2278,10 +2110,10 @@ def denied_items(hx, read_only):
     out = []
     for x in hx.evidence.denials:
         cmd = (x.input or {}).get("command")
-        if hx.kind == "claude" and policy_denial({"tool_name": x.tool, "tool_input": x.input}, read_only):
+        if hx.kind == "claude" and policy.is_policy_denial(x.tool, x.input, read_only):
             continue
         kind = x.kind if x.kind != "policy" else "secret" if hx.kind == "opencode" and x.tool == "Bash" and secret_hit(cmd) else "policy"
-        out.append(denial(kind, x.tool, x.input))
+        out.append(policy.denial_item(policy.denial(kind, x.tool, x.input)))
     return out
 
 
@@ -2436,12 +2268,6 @@ def launch_worker(d, brief, a, rid, t, cfg, meta, hooks):
         if sm.warnings:
             res["warnings"] = sm.warnings
     return res
-
-
-def policy_denial(x, read_only=False):
-    """A git write the coordinator forbids, or a write on a read-only step, is delegate's policy, not a decision for the owner (a secret path stays one)."""
-    cmd = ((x.get("tool_input") or {}).get("command") or "").strip()
-    return x.get("tool_name") == "Bash" and not secret_hit(cmd) and bool(git_write(cmd) or read_only and read_only_problem(cmd))
 
 
 def transcript_info(path, family, start=0):

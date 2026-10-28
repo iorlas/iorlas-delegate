@@ -24,6 +24,9 @@ from delegate.adapters.harness import opencode_sandbox as box, reset_parse  # no
 from delegate.adapters.harness.base import LaunchSpec  # noqa: E402
 from delegate.adapters.harness.codex import CodexHarness  # noqa: E402
 from delegate.app.publish import LiveSink  # noqa: E402
+from delegate.domain.policy.matchers import heredoc_only_hit, secret_hit  # noqa: E402
+from delegate.domain.policy.shell import git_write, read_only_problem  # noqa: E402
+from delegate.domain.policy.worker import is_policy_denial  # noqa: E402
 from delegate.app.supervisor import RunHooks, Supervisor  # noqa: E402
 
 route.REAL_NET_PROBE = route.net_probe
@@ -71,6 +74,10 @@ def argparse_ns(role, **kw):
     base = dict(role=role, authored_by=None, failed="", premium=None, allow_degraded=False, claude_usage=None, cwd=None, resume=None, cap=None)
     base.update(kw)
     return argparse.Namespace(**base)
+
+
+def _call(x):
+    return x["tool_name"], x["tool_input"]
 
 
 class Pick(unittest.TestCase):
@@ -580,7 +587,7 @@ class SecretGuard(unittest.TestCase):
             self.assertEqual(self.guard({"command": c}, "--read-only", tool="Bash"), 0, c)
         for c in ("git stash", "git branch new", "git tag v1", "git checkout -b x", "cd a && git commit -m x", "ls; git push", "git -C /x reset --hard"):
             self.assertEqual(self.guard({"command": c}, tool="Bash"), 2, c)
-            self.assertTrue(route.policy_denial({"tool_name": "Bash", "tool_input": {"command": c}}), c)
+            self.assertTrue(is_policy_denial(*_call({"tool_name": "Bash", "tool_input": {"command": c}})), c)
 
     def test_excluding_secret_paths_in_quoted_and_wrapped_searches_is_not_touching_them(self):
         real = ("/bin/zsh -lc \"rg --files --hidden -g '*SKILL.md' -g '\"'!'\"\\\\.git' -g '\"'!'\"\\\\.beads/**' -g '\"'!'\"\\\\.task/**' "
@@ -588,21 +595,21 @@ class SecretGuard(unittest.TestCase):
         for c in (real, "rg -n --hidden -g '!config' -g '!.git/**' -g '!.beads/**' -g '!.env*' foo",
                   "rg --files --hidden -g AGENTS.md -g '!.git' -g '!.beads' -g '!.env*'", "bash -c \"zsh -c 'rg x --glob=!.env'\"",
                   "find . -not -path './.env*'", "find . ! -path '*/.ssh/*'"):
-            self.assertIsNone(route.secret_hit(c), c)
-            self.assertIsNone(route.read_only_problem(c), c)
+            self.assertIsNone(secret_hit(c), c)
+            self.assertIsNone(read_only_problem(c), c)
             self.assertEqual(self.guard({"command": c}, "--read-only", tool="Bash"), 0, c)
         for c in ("cat .env", "rg foo .env", "rg -g '.env*' foo", "cat ~/.ssh/id_rsa", "bash -lc \"cat .env\"", "rg -g '!x' foo .env"):
-            self.assertTrue(route.secret_hit(c), c)
+            self.assertTrue(secret_hit(c), c)
             self.assertEqual(self.guard({"command": c}, tool="Bash"), 2, c)
-        self.assertEqual(route.read_only_problem("bash -lc 'rm x'"), "`rm` is not a reading command")
+        self.assertEqual(read_only_problem("bash -lc 'rm x'"), "`rm` is not a reading command")
 
     def test_heredoc_body_secret_name_gets_an_apply_patch_hint_and_real_reads_do_not(self):
         hd = "zsh -lc \"python - <<'EOF'\nif path.name == '.env':\n    pass\nEOF\""
-        self.assertTrue(route.heredoc_only_hit(hd))
-        self.assertTrue(route.secret_hit(hd))                       # still blocked
+        self.assertTrue(heredoc_only_hit(hd))
+        self.assertTrue(secret_hit(hd))                       # still blocked
         for c in ("python -c \"open('.env')\"", "cat .env", "cat .env <<'EOF'\nx\nEOF"):
-            self.assertFalse(route.heredoc_only_hit(c), c)
-            self.assertTrue(route.secret_hit(c), c)
+            self.assertFalse(heredoc_only_hit(c), c)
+            self.assertTrue(secret_hit(c), c)
         r = subprocess.run([sys.executable, str(ROOT / "skills" / "delegate" / "route.py"), "guard"], capture_output=True, text=True,
                            input=json.dumps({"tool_name": "Bash", "tool_input": {"command": hd}}))
         self.assertEqual(r.returncode, 2)
@@ -1285,9 +1292,9 @@ echo '{"type":"step_finish","sessionID":"ses_1","part":{"type":"step-finish","co
         line = self.args_seen().splitlines()[-1]
         self.assertIn("--tools Read,Glob,Grep,Bash", line)
         self.assertIn("guard --read-only", line)
-        self.assertTrue(route.policy_denial({"tool_name": "Bash", "tool_input": {"command": "touch x"}}, read_only=True))
-        self.assertFalse(route.policy_denial({"tool_name": "Bash", "tool_input": {"command": "cat .env > x"}}, read_only=True))
-        self.assertFalse(route.policy_denial({"tool_name": "Bash", "tool_input": {"command": "touch x"}}))
+        self.assertTrue(is_policy_denial(*_call({"tool_name": "Bash", "tool_input": {"command": "touch x"}}), True))
+        self.assertFalse(is_policy_denial(*_call({"tool_name": "Bash", "tool_input": {"command": "cat .env > x"}}), True))
+        self.assertFalse(is_policy_denial(*_call({"tool_name": "Bash", "tool_input": {"command": "touch x"}})))
 
     def test_claude_steps_get_the_secret_guard_hook_and_the_rule_first(self):
         self.codex_out()
@@ -2043,7 +2050,7 @@ class GitOwnership(unittest.TestCase):
     def test_the_guard_blocks_every_git_write(self):
         for c in ("git commit -m x", "git push", "git checkout x", "git switch x", "git branch x", "git worktree add y", "git merge x",
                   "git rebase x", "git reset --hard", "git stash", "git cherry-pick a", "git tag v", "git revert a", "git am p", "git pull"):
-            self.assertTrue(route.git_write(c), c)
+            self.assertTrue(git_write(c), c)
 
 
 class AgentRuns(unittest.TestCase):
