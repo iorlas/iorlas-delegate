@@ -26,6 +26,20 @@ CODEX_ACCESS = ["--ignore-user-config", "--ignore-rules", "-c", "sandbox_workspa
                 "-c", "sandbox_workspace_write.writable_roots=[]", "-c", "approval_policy=on-request", "-c", "approvals_reviewer=auto_review"]
 
 
+def codex_env(base: dict[str, str], cwd: str, sandbox: str, access: list[str] = CODEX_ACCESS) -> dict[str, str]:
+    """The environment of a codex worker: uv must not reach for ~/.cache/uv (outside the sandbox: 'Operation not permitted', then a refused
+    second escalation). A writing step caches in the git-ignored .task/ of its working folder, a reading one in no cache; with the network off
+    uv stays offline."""
+    out = dict(base)
+    if sandbox == "workspace-write":
+        out["UV_CACHE_DIR"] = str(Path(cwd) / ".task" / "uv-cache")
+    else:
+        out["UV_NO_CACHE"] = "1"
+    if "sandbox_workspace_write.network_access=false" in access:
+        out["UV_OFFLINE"] = "1"
+    return out
+
+
 def repo_dirs(cwd: str):
     """The folders from the repo root (or cwd outside a repo) down to cwd."""
     wd = Path(cwd).resolve()

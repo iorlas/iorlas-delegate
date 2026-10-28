@@ -122,7 +122,7 @@ def prepare_codex(d: dict, brief: str, a: env.Args, rid: str, t: float, cfg: dic
         return {"outcome": "setup", "say": "codex CLI not found on PATH"}
     hx = CodexHarness(a.resume)
     spec = hx.launch_spec(LaunchInputs(
-        exe=exe, cwd=h["cwd"], model=h["model"], effort=d["effort"], sandbox=h["sandbox"], out_file=str(env.config_dir() / f"codex-last-{rid[:8]}.txt"), env=env.child_env(),
+        exe=exe, cwd=h["cwd"], model=h["model"], effort=d["effort"], sandbox=h["sandbox"], out_file=str(env.config_dir() / f"codex-last-{rid[:8]}.txt"), env=decide.codex_env(env.child_env(), h["cwd"], h["sandbox"]),
         cli=h["cli"], access=decide.CODEX_ACCESS, isolation=h["isolation"], schema=a.schema, resume=a.resume,
         prompt=" ".join((SECRET_RULE, GIT_RULES, EDIT_RULE, NO_SUBAGENTS_RULE, ESCALATE_RULE, DENIED_RULE)) + "\n\n" + brief))
     before = (codex_account.thread_total(a.resume) or env.history_store().last_cumulative(a.resume)) if a.resume else None
