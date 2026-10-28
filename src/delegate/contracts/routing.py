@@ -165,7 +165,7 @@ class Run:
     trace: tuple[str, ...] | None = None       # None: a resume plan reasoned about nothing
 
     def as_dict(self) -> dict[str, Any]:
-        d = {"action": "run", "role": self.role, "pass": self.pass_, "rung": self.rung, "fallback": self.fallback,
+        d: dict[str, Any] = {"action": "run", "role": self.role, "pass": self.pass_, "rung": self.rung, "fallback": self.fallback,
              "fallback_reason": self.fallback_reason, "first_lane": self.first_lane, "lane": self.lane, "model": self.model,
              "effort": self.effort, "mode": self.mode, "cap": self.cap}
         if self.pass_ != "resume":
@@ -194,7 +194,8 @@ class Stop:
         d: dict[str, Any] = {"action": "stop"}
         if self.reason == "busy":
             d |= {"reason": "busy", "lane": self.lane, "retry_after": self.retry_after, "say": self.say}
-            return d | ({} if self.trace is None else {"trace": list(self.trace)})
+            extra: dict[str, Any] = {} if self.trace is None else {"trace": list(self.trace)}
+            return d | extra
         d |= {"role": self.role, "say": self.say, "resets": dict(self.resets), "trace": list(self.trace or ())}
         if self.reason:
             d["reason"] = self.reason

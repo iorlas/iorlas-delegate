@@ -3,44 +3,56 @@ worker's pid and the vendor ref as they appear, released when the run ends. Orph
 import contextlib
 import os
 import threading
+from collections.abc import Callable
 from dataclasses import replace
+from typing import Any
 
 from stream_proc import alive, proc_start
 
 from delegate.adapters import procs
 from delegate.app import env
 from delegate.contracts import history as hist
-from delegate.contracts.state import Lease
+from delegate.contracts.state import Lease, StateDoc
 from delegate.domain.lanes.leases import LEASE_RENEW, LEASE_TTL, LeaseBook, suspect
 
 
-def orphan(v):
+def orphan(v: Lease):
     """True when the lease's route.py process is gone (pid plus start time: an expired lease alone may be a laptop waking up) but its worker
     is still running: a SIGKILL on route.py leaves the worker, which is its own process group, editing the tree."""
     gone = proc_start(v.pid) != v.pid_start
     return gone and bool(v.worker_start) and proc_start(v.worker_pid) == v.worker_start
 
 
-def reap(v):
+def reap(v: Lease):
     """Stop an orphaned worker's whole tree: SIGTERM, a short grace, SIGKILL (stream_proc.stop_tree). -> True when the worker is gone."""
-    pg = int(v.worker_pid)
+    assert v.worker_pid is not None and v.worker_start is not None      # orphan() held: the worker was recorded
+    pg = v.worker_pid
     procs.stop(procs.Orphan(procs.Worker(pid=pg, pgid=pg, start=v.worker_start)), 3)
     return not alive(pg, v.worker_start)
 
 
+def _set(**fields: Any) -> Callable[[Lease], None]:
+    """The lease edit that sets these fields."""
+    def apply(v: Lease) -> None:
+        for k, x in fields.items():
+            setattr(v, k, x)
+    return apply
+
+
 class RunLease:
-    def __init__(self, rid, role, task, lane, model, slots, canary_due, silence_s):
+    def __init__(self, rid: str, role: str, task: str | None, lane: str, model: str, slots: int | None, canary_due: bool, silence_s: float):
         self.rid, self.role, self.task, self.lane, self.model = rid, role, task, lane, model
         self.slots, self.canary_due, self.silence_s = slots, canary_due, silence_s
-        self.peers, self.ended_peers = [], []
+        self.peers: list[str] = []
+        self.ended_peers: list[str] = []
         self.beat = threading.Event()
 
     def claim(self):
         """-> None when the lease is held, else (reason, say): duplicate_task | busy."""
-        taken = {}
+        taken: dict[str, tuple[str, str]] = {}
         me_start = proc_start(os.getpid())
 
-        def claim(st):
+        def claim(st: StateDoc):
             live = self._live_after_reaping(st)
             st.leases = live
             if self.task and any(v.task == self.task for v in live.values()):
@@ -57,7 +69,7 @@ class RunLease:
         return taken.get("no")
 
     @staticmethod
-    def _live_after_reaping(st):
+    def _live_after_reaping(st: StateDoc):
         live = LeaseBook(st.leases).live(env.now())
         for k, v in list(st.leases.items()):
             if orphan(v):
@@ -71,8 +83,8 @@ class RunLease:
                 live[k] = v     # expired only because route.py could not renew it (the laptop slept): it is still running
         return live
 
-    def _edit(self, fn):
-        def apply(st):
+    def _edit(self, fn: Callable[[Lease], None]):
+        def apply(st: StateDoc):
             if self.rid in st.leases:
                 fn(st.leases[self.rid])
         env.update_state(apply)
@@ -81,23 +93,23 @@ class RunLease:
         def renew():
             while not self.beat.wait(LEASE_RENEW):
                 with contextlib.suppress(Exception):
-                    self._edit(lambda v: setattr(v, "expires", env.now() + LEASE_TTL))
+                    self._edit(_set(expires=env.now() + LEASE_TTL))
         threading.Thread(target=renew, daemon=True).start()
 
-    def worker_started(self, pid, start):
-        self._edit(lambda v: (setattr(v, "worker_pid", pid), setattr(v, "worker_start", start)))
+    def worker_started(self, pid: int, start: str | None):
+        self._edit(_set(worker_pid=pid, worker_start=start))
 
-    def stamp_event(self, wall):
-        self._edit(lambda v: setattr(v, "last_event", wall))
+    def stamp_event(self, wall: float):
+        self._edit(_set(last_event=wall))
 
-    def stamp_ref(self, ref):
-        self._edit(lambda v: setattr(v, "ref", ref))
+    def stamp_ref(self, ref: str):
+        self._edit(_set(ref=ref))
 
     def release(self):
         """Stop the heartbeat and drop the lease; the peers that were running meanwhile are kept for the history row."""
         self.beat.set()
 
-        def release(st):
+        def release(st: StateDoc):
             self.ended_peers = [k for k in LeaseBook(st.leases).live(env.now()) if k != self.rid]
             st.leases.pop(self.rid, None)
         with contextlib.suppress(Exception):

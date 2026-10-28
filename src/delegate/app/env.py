@@ -10,12 +10,15 @@ import os
 import sys
 import time
 import types
+from collections.abc import Callable
 from pathlib import Path
 
 from child_env import scrub_current
 
 from delegate.contracts import codec
+from delegate.contracts.history import HistoryRow
 from delegate.contracts.routing import Routing, split_retired
+from delegate.contracts.state import StateDoc
 from delegate.contracts.stores import ConfigStore, HistoryStore, StateStore
 
 Args = argparse.Namespace | types.SimpleNamespace      # the parsed command line (a stand-in namespace in tests)
@@ -120,11 +123,11 @@ def load_state():
     return states().load()
 
 
-def update_state(fn):
+def update_state(fn: Callable[[StateDoc], object]):
     return states().update(fn)
 
 
-def update_config(fn):
+def update_config(fn: Callable[[dict], object]):
     return config_store().update(fn)
 
 
@@ -132,13 +135,13 @@ def profile_lanes() -> dict:
     return dict(config_store().profile().lanes)
 
 
-def set_profile_lane(name, value) -> None:
+def set_profile_lane(name: str, value: str | None) -> None:
     config_store().set_lane(name, value)
 
 
 
 
-def history_add(row) -> None:
+def history_add(row: HistoryRow) -> None:
     history_store().add(row)
 
 

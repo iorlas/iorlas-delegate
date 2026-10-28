@@ -42,7 +42,8 @@ class Router:
         tiers = self.plan.tiers(role, args)
         if tiers is None:
             return Error(error=self._tier_error(role, args))
-        s, picker, trace = self.r.settings, self._picker(lanes, role_name), []
+        s, picker = self.r.settings, self._picker(lanes, role_name)
+        trace: list[str] = []
         steps = [x for tier in tiers for x in tier]
         first = next((x for x in steps if any(lane.family == x.on for lane in lanes.values())), steps[0] if steps else None)
         mine = [lane for lane in lanes.values() if first and lane.family == first.on]

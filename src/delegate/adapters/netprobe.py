@@ -10,10 +10,13 @@ import re
 import socket
 import threading
 import time
+from collections.abc import Callable, Iterable
 from pathlib import Path
 
 from atomic_io import atomic_write_text
 
+Resolve = Callable[[str, int], str]                  # name, port -> address
+Connect = Callable[[tuple[str, int], float], None]   # (address, port), timeout -> returns or raises OSError
 BUDGET_S = 2.5          # whole probe; route.py net answers in under 3 s
 CONNECT_S = 1.5         # one TCP connect
 FRESH_S = 120           # a cached probe older than this is "unknown"
@@ -26,12 +29,12 @@ DROP_RE = re.compile(r"ENOTFOUND|ECONNRESET|ECONNREFUSED|ECONNABORTED|ETIMEDOUT|
                      r"|dns error|network error|waiting for network|(?:TLS|SSL) handshake|stream disconnected(?!.{0,200}max_output_tokens)", re.I | re.S)
 
 
-def looks_dropped(text):
+def looks_dropped(text: str | None):
     """-> True when `text` (a vendor error event or stderr, never the model's answer) says the connection broke."""
     return bool(DROP_RE.search(text or ""))
 
 
-def split_host(h, default_port=443):
+def split_host(h: str, default_port: int = 443):
     h = h.strip()
     if h.count(":") == 1 and h.rsplit(":", 1)[1].isdigit():
         name, port = h.rsplit(":", 1)
@@ -39,11 +42,11 @@ def split_host(h, default_port=443):
     return h, default_port
 
 
-def literal(name):
+def literal(name: str):
     return bool(re.fullmatch(r"\d+\.\d+\.\d+\.\d+", name))
 
 
-def _try(host, out, connect_s, resolve, connect):
+def _try(host: str, out: dict[str, str], connect_s: float, resolve: Resolve, connect: Connect):
     name, port = split_host(host)
     try:
         addr = name if literal(name) else resolve(name, port)
@@ -57,21 +60,22 @@ def _try(host, out, connect_s, resolve, connect):
         out[host] = "tcp"
 
 
-def _resolve(name, port):
-    return socket.getaddrinfo(name, port, type=socket.SOCK_STREAM)[0][4][0]
+def _resolve(name: str, port: int) -> str:
+    return str(socket.getaddrinfo(name, port, type=socket.SOCK_STREAM)[0][4][0])
 
 
-def _connect(addr, timeout):
+def _connect(addr: tuple[str, int], timeout: float) -> None:
     socket.create_connection(addr, timeout).close()
 
 
-def probe(hosts=None, budget_s=BUDGET_S, connect_s=CONNECT_S, resolve=_resolve, connect=_connect, clock=time.time):
+def probe(hosts: Iterable[str] | None = None, budget_s: float = BUDGET_S, connect_s: float = CONNECT_S, resolve: Resolve = _resolve, connect: Connect = _connect,
+          clock: Callable[[], float] = time.time):
     """-> {up, ip_up, why, ms, hosts: {host: ok|dns|tcp|slow}, at}. `hosts` are vendor hosts ("name" or "name:port"); the neutral ones are added when none is
     given. `why`: ok | dns (names do not resolve, the IP literal connects) | vendor (names resolve, the vendor host refuses, the IP literal connects) | offline."""
     t0 = time.monotonic()
     names = list(dict.fromkeys(hosts or NEUTRAL))
     allh = names + [IP_LITERAL]
-    out = {}
+    out: dict[str, str] = {}
     threads = [threading.Thread(target=_try, args=(h, out, connect_s, resolve, connect), daemon=True) for h in allh]
     for th in threads:
         th.start()
@@ -85,7 +89,7 @@ def probe(hosts=None, budget_s=BUDGET_S, connect_s=CONNECT_S, resolve=_resolve, 
 
 # ---- the cache: written by `route.py net` and by every probe a run makes, read by status --cheap (which opens no socket) --------------
 
-def record(path, res, clock=time.time):
+def record(path: str | Path, res: dict, clock: Callable[[], float] = time.time):
     """Store a probe in `path` (atomic replace). `since` moves only when up flips, so outages are countable. -> the stored dict. Never raises."""
     prev = load(path) or {}
     since = prev.get("since") if prev.get("up") == res["up"] and prev.get("since") else res["at"]
@@ -97,7 +101,7 @@ def record(path, res, clock=time.time):
     return row
 
 
-def load(path):
+def load(path: str | Path):
     try:
         with open(path, encoding="utf-8") as f:
             d = json.load(f)
@@ -106,7 +110,7 @@ def load(path):
         return None
 
 
-def view(cached, hosts, t, fresh_s=FRESH_S):
+def view(cached: dict | None, hosts: Iterable[str], t: float, fresh_s: float = FRESH_S):
     """-> {up: True|False|None, since, age_s} for a set of vendor `hosts` from a cached probe. None = no probe, or one older than fresh_s.
     A host the probe did not test says nothing; when none of them was tested the answer is the probe's overall `up`."""
     if not cached or t - cached["at"] > fresh_s:

@@ -66,15 +66,15 @@ READY_CHECKS = {
 }
 
 
-def lane_configured(lane_cfg):
+def lane_configured(lane_cfg: dict):
     return READY_CHECKS[lane_cfg.get("ready", "always")]()
 
 
-def configured_lanes(cfg):
+def configured_lanes(cfg: dict):
     return {n: lane_configured(c) for n, c in cfg["lanes"].items()}
 
 
-def fix_hint(name):
+def fix_hint(name: str):
     """What to do about a lane that is not ready: one line, or '' when nothing is missing."""
     if name == "OPENAI_SUBSCRIPTION":
         return "run `codex login --device-auth`" if check_codex_cli() else "install the Codex CLI (`npm install -g @openai/codex`), then `codex login --device-auth`"

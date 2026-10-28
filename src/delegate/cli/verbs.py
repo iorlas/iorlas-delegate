@@ -14,7 +14,7 @@ from delegate.domain.policy import worker as policy
 from delegate.domain.time.spec import local, to_epoch
 
 
-def cmd_hold(a, cfg):
+def cmd_hold(a: env.Args, cfg: dict):
     try:
         if a.lane not in cfg["lanes"]:
             raise ValueError(f"unknown lane {a.lane}; lanes: {', '.join(cfg['lanes'])}")
@@ -27,19 +27,19 @@ def cmd_hold(a, cfg):
     return 0
 
 
-def cmd_release(a, cfg):
+def cmd_release(a: env.Args, cfg: dict):
     gone = []
     env.update_state(lambda s: gone.extend(HoldBook(s.holds).release(a.target)))
     print(json.dumps({"ok": bool(gone), "released": [codec.to_json(h) for h in gone]}))
     return 0 if gone else 1
 
 
-def cmd_holds(a, cfg):
+def cmd_holds(a: env.Args, cfg: dict):
     print(json.dumps({"holds": HoldBook(env.load_state().holds).rows(env.now())}))
     return 0
 
 
-def cmd_report(a, cfg):
+def cmd_report(a: env.Args, cfg: dict):
     t = env.now()
     if a.lane not in cfg["lanes"]:
         sys.exit(f"route.py: unknown lane {a.lane}; lanes: {', '.join(cfg['lanes'])}")
@@ -58,7 +58,7 @@ def cmd_report(a, cfg):
     return 0
 
 
-def cmd_capture(a, cfg):
+def cmd_capture(a: env.Args, cfg: dict):
     try:
         d = json.loads(sys.stdin.read())
     except ValueError:
@@ -73,7 +73,7 @@ def cmd_capture(a, cfg):
     return 0
 
 
-def cmd_guard(a, cfg=None):
+def cmd_guard(a: env.Args, cfg: dict | None = None):
     """Claude PreToolUse hook: exit 2 (block, reason on stderr) when a tool call names a secret path, changes git, or, with --read-only, does
     more than read. The verdict is domain/policy's; this is the hook's stdin and exit code."""
     with contextlib.suppress(ValueError, AttributeError):
@@ -85,13 +85,13 @@ def cmd_guard(a, cfg=None):
     return 0
 
 
-def cmd_contract(a, cfg):
+def cmd_contract(a: env.Args, cfg: dict):
     """The handshake: the contract number, every reason with its facts, and the flags `run` accepts."""
     print(json.dumps({"contract": stops.CONTRACT["contract"], "reasons": stops.CONTRACT["reasons"], "run_args": stops.CONTRACT["run_args"]}))
     return 0
 
 
-def cmd_next(a, cfg):
+def cmd_next(a: env.Args, cfg: dict):
     d, lanes, warnings, t = decide.decision(a, cfg)
     d["needs_input"] = cockpit.needs_input(lanes)
     if warnings:
@@ -106,5 +106,5 @@ def cmd_next(a, cfg):
     return 0 if d["action"] != "error" else 1
 
 
-def cmd_run(a, cfg):
+def cmd_run(a: env.Args, cfg: dict):
     return run.Run(a, cfg, unattended=getattr(a, "unattended", False), idle_s=getattr(a, "idle", None)).go()

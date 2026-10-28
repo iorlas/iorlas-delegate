@@ -113,7 +113,8 @@ RETIRED_LANES = ("CLAUDE_CREDIT",)
 def split_retired_state(data: dict) -> tuple[dict, list[str]]:
     """(data without retired top-level keys and without entries of a retired lane, what was dropped as 'key' or 'section.entry', in file order).
     A per-lane entry is one keyed by the lane or carrying `lane`; every other entry, and the input, are untouched."""
-    gone, out = [], {}
+    gone: list[str] = []
+    out: dict = {}
     for k, v in data.items():
         if k in RETIRED_STATE:
             gone.append(k)

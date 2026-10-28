@@ -107,7 +107,8 @@ def apply_health(lane: Lane, models: Mapping[str, ModelSpec], ledger: HealthLedg
 
 def mark_busy(lanes: dict[str, Lane], doc: StateDoc, s: Settings, t: float, jitter: Callable[[], int]) -> dict[str, Lane]:
     """A lane with all its slots taken is skipped like a refused lane (a copy that is out); `jitter` keeps retrying engines from arriving together."""
-    book, out = LeaseBook(doc.leases), {}
+    book = LeaseBook(doc.leases)
+    out: dict[str, Lane] = {}
     for name, lane in lanes.items():
         cap, running = lane.slots(s), book.running(name, t)
         out[name] = lane.with_busy(t + jitter(), running, cap) if cap is not None and running >= cap and not lane.out else lane

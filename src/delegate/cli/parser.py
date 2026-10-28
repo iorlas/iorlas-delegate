@@ -1,6 +1,7 @@
 """The command line: `route.py VERB ...`. A bad flag in `run` is the caller's fault, answered as a bad_request stop (exit 0, no usage text)."""
 import argparse
 import sys
+from typing import NoReturn, override
 
 from delegate.app import answer
 
@@ -34,7 +35,8 @@ class CallParser(argparse.ArgumentParser):
     answers = False
     unattended = False      # the caller is an engine: it gets every field of the answer
 
-    def error(self, message):
+    @override
+    def error(self, message: str) -> NoReturn:
         if not CallParser.answers:
             super().error(message)
         answer.emit(answer.result("bad_request", say=f"route.py: {message}", fix=f"update task-loop or delegate: {message}"), not CallParser.unattended)

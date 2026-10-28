@@ -53,6 +53,7 @@ class LiveSink:
         """One record (a LiveEvent or the WorkerStarted) as one line."""
         if not self.on or self.broken or (self.capped and not final):
             return
+        assert self.path is not None      # `on` is `bool(path)`
         try:
             with self.lock:
                 if self.fd is None:
@@ -68,6 +69,7 @@ class LiveSink:
             print(f"delegate: live event file {self.path} stopped: {e}", file=sys.stderr)
 
     def _first_line(self) -> bool:
+        assert self.path is not None
         try:
             return os.path.getsize(self.path) == 0
         except OSError:

@@ -11,6 +11,7 @@ from dataclasses import dataclass
 from delegate.adapters import netprobe
 from delegate.adapters.harness import classify, reset_parse
 from delegate.app import answer
+from delegate.app.env import Args
 from delegate.contracts.state import OutState
 from delegate.contracts.stores import StateStore
 from delegate.domain.lanes.profiles import LOGIN_CMD
@@ -33,7 +34,7 @@ class Case:
     d: dict
     t: float
     who: str
-    a: object
+    a: Args
     rc: int | None = None
     tail: str = ""
     reset: Callable[[], float | None] | None = None
@@ -68,7 +69,7 @@ class Settler:
             return classify.Outcome("network", o.detail, o.source)
         return o
 
-    def apply(self, res: dict, o: classify.Outcome, d: dict, t: float, who: str, a: object, rc: int | None = None, tail: str = "",
+    def apply(self, res: dict, o: classify.Outcome, d: dict, t: float, who: str, a: Args, rc: int | None = None, tail: str = "",
               reset: Callable[[], float | None] | None = None, login: tuple[str, str] | None = None) -> dict:
         c = Case(res, self.net_pass(o, d), d, t, who, a, rc, tail, reset, login, res.pop("answered", False))
         if c.o.reason != "hung":

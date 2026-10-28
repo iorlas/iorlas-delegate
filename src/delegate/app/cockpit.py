@@ -1,18 +1,23 @@
 """The cockpit: one row per known lane (state, reason, unlock time, windows, model), the pick `next worker` would make, and the text of it.
 `lane_view` is pure given its inputs."""
+from collections.abc import Sequence
+from typing import Any
+
 from delegate.adapters.harness import classify
 from delegate.app import env, harnesses, usage
 from delegate.app.decide import busy_jitter
 from delegate.app.fleet import mark_busy
-from delegate.contracts.routing import CallArgs
+from delegate.contracts.routing import CallArgs, Settings
+from delegate.contracts.state import StateDoc
 from delegate.domain.holds.book import HoldBook
+from delegate.domain.lanes.lane import Lane
 from delegate.domain.lanes.leases import LeaseBook
 from delegate.domain.lanes.profiles import LOGIN_CMD
 from delegate.domain.routing.router import Router
 from delegate.domain.time.spec import fmt_in, local, when
 
 
-def needs_input(lanes):
+def needs_input(lanes: dict[str, Lane]):
     need = []
     cs = lanes.get("CLAUDE_SUBSCRIPTION")
     if cs and not cs.usage_known and env.session_host() == "desktop":
@@ -23,7 +28,7 @@ def needs_input(lanes):
     return need
 
 
-def finished_runs(n):
+def finished_runs(n: int):
     """The last n finished runs, newest last: the dashboard's view of history.jsonl (the file itself stays private)."""
     keys = ("run_id", "ts", "role", "task", "lane", "model", "done", "outcome", "secs", "cost", "tokens", "denials")
     return [{k: getattr(r, k) for k in keys} for r in env.history_store().runs(n)]
@@ -38,7 +43,7 @@ SLOW_WINDOW = 2 * 3600  # a hang or timeout this recent, with no good run on the
 SLOW_KINDS = ("hung", "timeout")
 
 
-def login_state(name, st, t):
+def login_state(name: str, st: StateDoc, t: float):
     """-> (ok, why, checked_at): probe_login cached a few minutes in state, so a status call costs one process per lane at most."""
     c = usage.auth_cache().fresh(name, t, usage.AUTH_TTL, st)
     if c:
@@ -48,7 +53,7 @@ def login_state(name, st, t):
     return ok, why, t
 
 
-def lane_model(cfg, name):
+def lane_model(cfg: dict, name: str):
     """'model effort' the lane's family gets in the worker role (else the first role that uses the family, else its first model)."""
     fam = cfg["lanes"][name]["family"]
     for role in [cfg["roles"].get("worker")] + list(cfg["roles"].values()):
@@ -58,7 +63,7 @@ def lane_model(cfg, name):
     return next((m for m, v in cfg["models"].items() if v["family"] == fam), None)
 
 
-def off_reason(name, cfg, login):
+def off_reason(name: str, cfg: dict, login: tuple):
     flag = {"DEEPSEEK_FREE": "deepseek_free_enabled", "ZAI_CODING_SUBSCRIPTION": "zai_coding_enabled"}.get(name)
     if flag and cfg["settings"].get(flag) is not True:
         return f"disabled: `route.py config set {flag} true` turns it on"
@@ -69,7 +74,7 @@ def off_reason(name, cfg, login):
     return "not configured: `route.py doctor` says what it needs" + (f" ({login[1]})" if login[0] is None and login[1] else "")
 
 
-def classify_out(lane, rec):
+def classify_out(lane: Lane, rec: Any):
     """Why a lane that is out is out -> logged_out | spend | slow | resting. rec is its state.json entry (older ones have no typed reason)."""
     r = lane.out_reason
     text = " ".join([rec.why if rec else ""] + lane.notes)
@@ -82,13 +87,14 @@ def classify_out(lane, rec):
     return "resting"
 
 
-def limit_words(text, lane):
+def limit_words(text: str, lane: Lane):
     top = max((w for w in lane.windows if w["used"] is not None), key=lambda w: w["used"], default=None)
     return classify.limit_words(text, top["name"] if top and top["used"] >= 95 else None)
 
 
-def window_rows(lane, S, t):
-    rows, low = [], []
+def window_rows(lane: Lane, S: Settings, t: float):
+    rows: list[dict] = []
+    low: list[dict] = []
     for w in lane.windows:
         used = w["used"]
         rows.append({"name": w["name"], "used_pct": None if used is None else round(used, 1), "resets_at": w["resets_at"],
@@ -104,10 +110,10 @@ def window_rows(lane, S, t):
     return rows, low
 
 
-def lane_view(name, cfg, lane, st, t, history=(), running=0, login=(None, "", None), off_why=None):
+def lane_view(name: str, cfg: dict, lane: Lane | None, st: StateDoc, t: float, history: Sequence = (), running: int = 0, login: tuple = (None, "", None), off_why: str | None = None):
     """One lane's cockpit row. Pure given its inputs: lane is what gather built (None = disabled or not configured), history the recent finished runs."""
     S, c = env.settings_of(cfg), cfg["lanes"][name]
-    v = {"id": name, "label": c.get("label") or LABELS.get(name, name), "family": c["family"], "kind": c["kind"], "model": lane_model(cfg, name),
+    v: dict[str, Any] = {"id": name, "label": c.get("label") or LABELS.get(name, name), "family": c["family"], "kind": c["kind"], "model": lane_model(cfg, name),
          "state": "off", "emoji": EMOJI["off"], "reason": off_why or "disabled or not configured", "detail": None,
          "unlock": {"locked": False, "known": False, "at": None, "in_s": None, "text": None, "why": "not in use"},
          "windows": [], "low_tokens": [], "warnings": list(lane.warn) if lane else [], "meter": c["reader"] != "none",
@@ -163,7 +169,7 @@ def lane_view(name, cfg, lane, st, t, history=(), running=0, login=(None, "", No
     return v
 
 
-def claude_why(cfg, lanes):
+def claude_why(cfg: dict, lanes: dict[str, Lane]):
     """Why no non-Claude worker lane was usable when a Claude lane got the pick: 'OPENAI_SUBSCRIPTION out until ..; ZAI_CODING_SUBSCRIPTION not set up'."""
     S = env.settings_of(cfg)
     fams = {s["on"] for s in cfg["roles"]["worker"]["steps"] if s["on"] != "claude"}
@@ -176,20 +182,20 @@ def claude_why(cfg, lanes):
     return "; ".join(parts) or "no other lane exists"
 
 
-def next_worker(cfg, lanes, st, t):
+def next_worker(cfg: dict, lanes: dict[str, Lane], st: StateDoc, t: float):
     """The lane `next worker` would pick now: decide() on a copy, nothing written."""
     routing = env.typed_routing(cfg)
     cur = mark_busy(lanes, st, routing.settings, t, busy_jitter)
     d = Router(routing, HoldBook(st.holds), st.prev, t).route("worker", CallArgs(), cur).as_dict()
     if d["action"] == "run":
-        r = {"action": "run", "lane": d["lane"], "model": d["model"], "effort": d["effort"], "pass": d["pass"], "fallback": d["fallback"], "why": None}
+        r: dict[str, Any] = {"action": "run", "lane": d["lane"], "model": d["model"], "effort": d["effort"], "pass": d["pass"], "fallback": d["fallback"], "why": None}
         if cfg["lanes"][d["lane"]]["family"] == "claude":
             r["why"] = claude_why(cfg, cur)
         return r
     return {"action": d["action"], "lane": d.get("lane"), "model": None, "effort": None, "say": d.get("say") or d.get("error")}
 
 
-def cockpit(cfg, lanes, st, t):
+def cockpit(cfg: dict, lanes: dict[str, Lane], st: StateDoc, t: float):
     """The cockpit dict: one row per known lane, configured or not, plus the pick `next worker` would make."""
     hist = finished_runs(60)
     book = LeaseBook(st.leases)
@@ -202,7 +208,7 @@ def cockpit(cfg, lanes, st, t):
     return {"v": 1, "at": t, "legend": {EMOJI[k]: LEGEND[k] for k in EMOJI}, "next_worker": next_worker(cfg, lanes, st, t), "lanes": rows}
 
 
-def cockpit_text(ck):
+def cockpit_text(ck: dict):
     t, nw = ck["at"], ck["next_worker"]
     pick = f"{nw['lane']} {nw['model']} {nw['effort']}" if nw["action"] == "run" else f"none ({(nw.get('say') or nw['action'])[:60]})"
     width = max(len(r["id"]) for r in ck["lanes"])

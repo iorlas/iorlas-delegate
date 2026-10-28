@@ -8,7 +8,7 @@ import shutil
 import subprocess
 import sys
 from pathlib import Path
-from typing import Any
+from typing import Any, override
 
 from delegate.adapters import procs
 from delegate.adapters.harness import opencode_sandbox as box
@@ -128,13 +128,16 @@ class OpenCodeHarness(Quiet):
     write_shell = staticmethod(box.write_shell)
 
     @property
+    @override
     def log_dir(self) -> Path:
         return Path(os.environ.get("XDG_DATA_HOME") or Path.home() / ".local" / "share") / "opencode" / "log"
 
+    @override
     def echoes_input(self, line: str) -> bool:
         """A log line that quotes the worker's own tool input (`evaluated permission=bash pattern="..."`): its words are the worker's, not OpenCode's."""
         return bool(ECHO_RE.search(line))
 
+    @override
     def cleanup(self) -> None:
         if self.shell:
             self.shell.unlink(missing_ok=True)
@@ -246,6 +249,7 @@ class OpenCodeHarness(Quiet):
         self.evidence.denials.append(d)
         return [d]
 
+    @override
     def parse_log_line(self, line: str) -> list[ev.HarnessEvent]:
         """A permission line of OpenCode's log is the earliest sign a tool started: a provisional Cmd or Tool, closed by the completed tool_use."""
         m = PERMISSION_RE.search(line)
@@ -281,6 +285,7 @@ class OpenCodeHarness(Quiet):
         f = self.root / "opencode-sessions" / f"{ref}.json" if ref and self.root else None
         return str(f) if f and f.is_file() else None
 
+    @override
     def export(self, env: dict[str, str]) -> None:
         """OpenCode keeps sessions in its database: export one to a file, so `transcript` is a path like the other harnesses'."""
         ref = self.evidence.ref

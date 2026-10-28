@@ -43,7 +43,8 @@ def without_excluded(text: str) -> str | None:
         t = shlex.split(unwrap(text))
     except ValueError:
         return None
-    out, prev, prev2 = [], "", ""
+    out: list[str] = []
+    prev, prev2 = "", ""
     for x in t:
         glob_excl = prev in EXCL_OPTS and (x.startswith("!") or prev.startswith("--exclude"))
         path_excl = prev in EXCL_PATH_OPTS and prev2 in ("-not", "!")

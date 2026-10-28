@@ -82,7 +82,7 @@ def vendor_error(j: dict) -> str:
 
 class ClaudeHarness(Quiet):
     kind = "claude"
-    secret_event = None           # its PreToolUse hook blocks the call
+    secret_event: type | None = None           # its PreToolUse hook blocks the call
     EXE = "claude"
 
     def __init__(self) -> None:

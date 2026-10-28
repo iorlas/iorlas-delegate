@@ -1,4 +1,5 @@
 """The only code that runs git for delegate: the repo root of a folder, and the HEAD and branch a worker must leave alone."""
+import os
 import shutil
 import subprocess
 from pathlib import Path
@@ -9,7 +10,7 @@ def _git(cwd: object, *args: str) -> str | None:
     return r.stdout if r.returncode == 0 else None
 
 
-def repo_root(cwd: object) -> Path:
+def repo_root(cwd: str | os.PathLike[str]) -> Path:
     """The work tree's top folder, or cwd resolved when it is not in one."""
     wd = Path(cwd).resolve()
     top = (_git(wd, "rev-parse", "--show-toplevel") or "").strip() if shutil.which("git") else ""

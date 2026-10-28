@@ -7,6 +7,9 @@ Call sites, and what a rewrite must keep: docs/dev/integrations.md.
 
 import json
 import time
+from collections.abc import Iterable
+from pathlib import Path
+from typing import Any
 
 from app_dirs import config_dir
 from atomic_io import atomic_write_json
@@ -18,18 +21,18 @@ def root():
     return config_dir("agent-runs")
 
 
-def _write(path, rec):
+def _write(path: Path, rec: dict):
     atomic_write_json(path, rec, fsync=False, keep_mode=True)
 
 
-def run(run_id, **fields):
+def run(run_id: str, **fields: Any):
     """Create or update one run record (v1). Call with the required fields first, then with ended/status/exit."""
     try:
         f = root() / "runs" / (run_id + ".json")
         try:
             rec = json.loads(f.read_text(encoding="utf-8"))
         except (OSError, ValueError):
-            rec = {"v": 1, "producer": "delegate", "id": run_id}
+            rec: dict[str, Any] = {"v": 1, "producer": "delegate", "id": run_id}
         rec.update({k: v for k, v in fields.items() if v is not None})
         _write(f, rec)
         cut = time.time() - RETAIN
@@ -43,7 +46,7 @@ def run(run_id, **fields):
         pass
 
 
-def lanes(items, now):
+def lanes(items: Iterable[tuple[str, float | None, str | None, Iterable[tuple[str, float | None, float | None]]]], now: float):
     """items: [(name, out_until or None, why or None, [(window, used_pct, resets_at), ...]), ...]"""
     try:
         _write(root() / "lanes" / "delegate.json", {

@@ -1,12 +1,13 @@
 """The answer of a `run`: the contract 3 object (`result`), its validation against the caller's JSON schema (`schema_problem`), and the one JSON line
 on stdout (`emit`)."""
 import json
+from typing import Any
 
 from delegate.contracts import codec, stops, wire
 from delegate.domain.cost import accounting
 
 
-def schema_problem(data, schema, at="$"):
+def schema_problem(data: Any, schema: dict, at: str = "$"):
     """None when `data` fits the JSON schema subset delegate checks (type, required, properties, items, enum), else what is wrong."""
     if not isinstance(schema, dict):
         return None
@@ -34,7 +35,7 @@ def schema_problem(data, schema, at="$"):
     return None
 
 
-def parse_data(text, schema):
+def parse_data(text: str, schema: str | None):
     if not schema or not text:
         return None
     try:
@@ -43,7 +44,7 @@ def parse_data(text, schema):
         return None
 
 
-def result(outcome=None, **kw):
+def result(outcome: str | None = None, **kw: Any):
     """The contract 3 answer. `outcome` is the contract.json reason behind a non-done answer (contracts/stops.py); None = done, or the agent-tool
     handoff (`agent_model` set). `stop` is null exactly when outcome is None; its facts (scope, permanence, retry) come from the reason's row, and
     `retry_after` (a kw, never an answer field) becomes `stop.retry.at`."""
@@ -55,7 +56,7 @@ def result(outcome=None, **kw):
         stop["ref"] = kw.get("ref")        # ref on every outcome that has one
         if outcome in ("network", "killed"):       # resumable: the vendor session can be continued; partial: work was done before the stop
             stop.update(resumable=bool(resumable), partial=bool(partial))
-    r = {"contract": stops.CONTRACT["contract"], "data": None, "text": "", "ref": None, "lane": None, "model": None, "effort": None, "family": None,
+    r: dict[str, Any] = {"contract": stops.CONTRACT["contract"], "data": None, "text": "", "ref": None, "lane": None, "model": None, "effort": None, "family": None,
          "flag": None, "cost": 0, "tokens": None, "denied": [], "secs": 0, "run_id": None, "transcript": None, "say": "", "git_violation": [],
          "call_id": None, "transcript_info": None, "transcript_status": None, "stop": stop,
          "usage": {"tokens": None, "cost": 0, "secs": 0, "turns": None, "context_k": None, "answer_bytes": 0, **accounting.fields(None, None, 0)}}
@@ -63,7 +64,7 @@ def result(outcome=None, **kw):
     return r
 
 
-def emit(r, interactive):
+def emit(r: dict, interactive: bool):
     """One object on stdout. A model reads it when a Claude session is behind us, so empty fields are dropped there; scripts get every field.
     The answer passes through RunResult first: a key or a type the contract does not know is a bug here, never an answer."""
     r = codec.to_json(codec.from_json(wire.RunResult, r))

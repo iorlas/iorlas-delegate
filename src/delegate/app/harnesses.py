@@ -11,7 +11,7 @@ OC_PROFILES = {"GROK_SUBSCRIPTION": Profile(auth_key="xai"),
 ZAI_MODELS = ("zai-coding-plan/glm-5.3", "zai-coding-plan/glm-5.3-flash")
 
 
-def probe_login(name):
+def probe_login(name: str):
     """-> (True | False | None, why): is the lane's login really there? A status command or a file, never a model call."""
     if name == "OPENAI_SUBSCRIPTION":
         return CodexHarness().login_probe(AUTH_TIMEOUT)
@@ -22,7 +22,7 @@ def probe_login(name):
     return None, "no check for this lane"
 
 
-def find_transcript(ref, family):
+def find_transcript(ref: str | None, family: str):
     hx = {"openai": CodexHarness(), "claude": ClaudeHarness()}.get(family) or OpenCodeHarness(root=env.config_dir())        # opencode: exported after the run
     return hx.transcript(ref)
 

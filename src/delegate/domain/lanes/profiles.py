@@ -15,12 +15,12 @@ LANE_HOSTS = {"CLAUDE_SUBSCRIPTION": ("api.anthropic.com",), "OPENAI_SUBSCRIPTIO
 FAMILY_HOSTS = {"claude": ("api.anthropic.com",), "openai": ("chatgpt.com",), "xai": ("api.x.ai",), "deepseek": ("opencode.ai",), "zai": ("api.z.ai",)}
 
 
-def hosts_of(lane):
-    return LANE_HOSTS.get(lane, ())
+def hosts_of(lane: str | None):
+    return LANE_HOSTS.get(lane or "", ())
 
 
-def hosts_for_family(family):
-    return FAMILY_HOSTS.get(family, ())
+def hosts_for_family(family: str | None):
+    return FAMILY_HOSTS.get(family or "", ())
 
 
 def all_hosts():

@@ -3,16 +3,20 @@
 Pure: the caller passes a domain `Router`, the lanes, and the cached network probe. No process, no socket. A full `status` computes the
 rows; `status --cheap` replays them from the snapshot and refreshes the parts that move without a spawn: `net` (the probe cache), live holds.
 """
+from typing import Any
+
 from delegate.adapters import netprobe
 from delegate.contracts.routing import CallArgs, Run
 from delegate.domain.lanes import profiles
+from delegate.domain.lanes.lane import Lane
+from delegate.domain.routing.router import Router
 
 
-def families(node):
+def families(node: Any):
     """-> every runner family a role's chain names (`"on": family` anywhere inside the role, in order, once)."""
-    found = []
+    found: list[str] = []
 
-    def walk(x):
+    def walk(x: Any):
         if isinstance(x, dict):
             if isinstance(x.get("on"), str):
                 found.append(x["on"])
@@ -25,18 +29,18 @@ def families(node):
     return list(dict.fromkeys(found))
 
 
-def role_hosts(role):
+def role_hosts(role: Any):
     return list(dict.fromkeys(h for f in families(role) for h in profiles.hosts_for_family(f)))
 
 
-def roles_view(cfg, lanes, router, doc, t, cached_net=None):
+def roles_view(cfg: dict, lanes: dict[str, Lane], router: Router, doc: Any, t: float, cached_net: dict | None = None):
     """-> {role: {usable, lane, model, why, until, hosts, net}}. `usable` is what `next ROLE` would answer with no flags, in the unattended view
     `until` = when a stopped role is expected back (the soonest lane return), else None.
     `router` is a domain Router; nothing is mutated."""
-    out = {}
+    out: dict[str, dict[str, Any]] = {}
     for name, role in cfg["roles"].items():
         hosts = role_hosts(role)
-        row = {"usable": None, "lane": None, "model": None, "why": None, "until": None, "hosts": hosts, "net": netprobe.view(cached_net, hosts, t)}
+        row: dict[str, Any] = {"usable": None, "lane": None, "model": None, "why": None, "until": None, "hosts": hosts, "net": netprobe.view(cached_net, hosts, t)}
         try:
             d = router.decide(name, CallArgs(unattended=True), lanes)
         except Exception as e:      # one odd role must not take the status down
@@ -54,10 +58,10 @@ def roles_view(cfg, lanes, router, doc, t, cached_net=None):
     return out
 
 
-def refresh(roles, holds, cached_net, t):
+def refresh(roles: dict | None, holds: list[dict] | None, cached_net: dict | None, t: float):
     """-> `roles` (from a snapshot) with what moves without a spawn brought up to date: `net` from the probe cache; `usable` False while a live hold
     names the role's lane; `due` True when a stopped role's `until` has passed (run a full status to learn whether it is back)."""
-    out = {}
+    out: dict[str, dict] = {}
     for name, r in (roles or {}).items():
         r = dict(r)
         r["net"] = netprobe.view(cached_net, r.get("hosts") or [], t)

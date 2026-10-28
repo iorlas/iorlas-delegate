@@ -102,7 +102,8 @@ class HealthLedger:
         elif f.what == DONE:        # a run that worked proves the lane and resets the ladder of its pair
             state.lanes.pop(f.lane, None)
             p = state.pairs.setdefault(f"{f.lane}|{f.model}", PairFact())
-            p.streak, p.rung, p.until, p.kind, p.fp, p.evidence, p.source, p.last_done = [], 0, 0.0, None, None, "", None, f.ts
+            p.streak = []
+            p.rung, p.until, p.kind, p.fp, p.evidence, p.source, p.last_done = 0, 0.0, None, None, "", None, f.ts
         elif f.what in LANE_KINDS:
             state.lanes[f.lane] = self._lane_fact(f)
         else:
@@ -114,9 +115,10 @@ class HealthLedger:
             until, src = f.ts + pol.credit_probe_s, "probe"
         elif f.what == "logged_out":
             until, src = f.ts + pol.logout_s, "probe"
+        elif f.until is not None and f.until > f.ts:
+            until, src = f.until, "vendor"
         else:
-            src = "vendor" if f.until is not None and f.until > f.ts else "guess"
-            until = f.until if src == "vendor" else f.ts + pol.guess_s
+            until, src = f.ts + pol.guess_s, "guess"
         return LaneFact(kind=f.what, until=float(until), source=src, evidence=f.say[:240], ts=f.ts)
 
     def _pair_fact(self, p: PairFact, f: Fact) -> None:
@@ -132,7 +134,8 @@ class HealthLedger:
         same = [s for s in p.streak if s.fp == fp]
         if probation or (len(same) >= n and len({s.task for s in same}) >= rule["tasks"]):
             rung = min(p.rung + 1, len(pol.ladder_min))
-            p.rung, p.until, p.kind, p.fp, p.evidence, p.source, p.streak = rung, ts + pol.ladder_min[rung - 1] * 60, f.what, fp, f.say[:240], "breaker", []
+            p.rung, p.until, p.kind, p.fp, p.evidence, p.source = rung, ts + pol.ladder_min[rung - 1] * 60, f.what, fp, f.say[:240], "breaker"
+            p.streak = []
 
     def fold(self, rows: list[HistoryRow], state: HealthState | None = None) -> HealthState:
         """The state after `rows` on top of `state` (a checkpoint, else empty). Rows at or before the checkpoint's ts are skipped, so

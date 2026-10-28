@@ -4,11 +4,13 @@ An accounting record `acct` is {in_fresh, cache_read, cache_write, out, cost_usd
 Counts are per call, never cumulative. cache_write and cost_usd are None where the vendor does not report them. No price table here:
 cost is what the harness returned, or unknown. warm_until is telemetry (when the vendor's prompt cache probably expires); nothing routes on it."""
 import datetime as dt
+from collections.abc import Iterable
+from typing import Any
 
 CODEX_TTL_S = 3600                    # measured 65 min (study 85); the vendor states 5-10 min to 24 h
 
 
-def per_call(total, before):
+def per_call(total: dict | None, before: dict | None):
     """A running thread total ({in, cached, out}) minus the total the thread held before this call. `codex exec resume` reports the
     running total; a total lower than before is not a running total of that thread, so it stands as given."""
     if not total or not before or (total.get("in") or 0) < before["in"]:
@@ -16,7 +18,7 @@ def per_call(total, before):
     return {k: max(0, (total.get(k) or 0) - before[k]) for k in before}
 
 
-def last_cumulative(rows, ref):
+def last_cumulative(rows: Iterable[dict], ref: str | None):
     """The thread total a history row recorded for `ref` (newest wins), or None."""
     for r in reversed(list(rows)):
         if r.get("ref") == ref and isinstance(r.get("cumulative"), dict):
@@ -24,7 +26,7 @@ def last_cumulative(rows, ref):
     return None
 
 
-def codex(tokens):
+def codex(tokens: dict | None):
     """Per-call {in, cached, out} (already net of a resumed thread's earlier total) -> acct. Codex returns no cost."""
     t = tokens or {}
     cached = t.get("cached") or 0
@@ -32,10 +34,10 @@ def codex(tokens):
             "cost_usd": None, "cost_source": "unknown", "accounting": "exact", "ttl_s": CODEX_TTL_S, "ttl_source": "observed"} if tokens else None
 
 
-def opencode_step(acct, tokens, cost):
+def opencode_step(acct: dict | None, tokens: dict, cost: Any):
     """Fold one opencode step-finish (tokens {input, output, reasoning, cache{read,write}}, cost) into the running acct."""
     c = tokens.get("cache") or {}
-    a = acct or {"in_fresh": 0, "cache_read": 0, "cache_write": 0, "out": 0, "cost_usd": None, "ttl_s": None, "ttl_source": "unknown"}
+    a: dict[str, Any] = acct or {"in_fresh": 0, "cache_read": 0, "cache_write": 0, "out": 0, "cost_usd": None, "ttl_s": None, "ttl_source": "unknown"}
     a["in_fresh"] += tokens.get("input") or 0
     a["cache_read"] += c.get("read") or 0
     a["cache_write"] += c.get("write") or 0
@@ -45,7 +47,7 @@ def opencode_step(acct, tokens, cost):
     return a
 
 
-def opencode_close(acct, lane):
+def opencode_close(acct: dict | None, lane: str):
     """Name the cost's source once the steps are in. Grok: opencode's catalog price per step. zai: its steps carry 0 and study 81 found
     that unverifiable, so unknown. Free DeepSeek: free."""
     if not acct:
@@ -61,7 +63,7 @@ def opencode_close(acct, lane):
     return acct
 
 
-def merge(a, b):
+def merge(a: dict | None, b: dict | None):
     """Two calls of one run (the schema re-ask) -> one acct; unknown cost stays unknown only if both are."""
     if not a or not b:
         return a or b
@@ -76,20 +78,20 @@ def merge(a, b):
     return out
 
 
-def iso(ts):
+def iso(ts: float):
     return dt.datetime.fromtimestamp(ts, dt.UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
-def fields(acct, ref, ended_at):
+def fields(acct: dict | None, ref: str | None, ended_at: float):
     """-> the additive `usage` keys for a finished call (acct may be None: a call that reported nothing)."""
-    a = acct or {}
+    a: dict[str, Any] = acct or {}
     ttl = a.get("ttl_s") if ref else None
     return {"ref": ref, "last_activity_at": iso(ended_at) if ref else None,
             "warm_until": iso(ended_at + ttl) if ttl else None, "ttl_s": ttl or None, "ttl_source": a.get("ttl_source") if ttl else "unknown",
             "cost_usd": a.get("cost_usd"), "cost_source": a.get("cost_source") or "unknown", "accounting": a.get("accounting") or "unknown"}
 
 
-def token_fields(acct):
+def token_fields(acct: dict | None) -> dict[str, Any]:
     """The per-call counts, added to usage.tokens beside the old in/cached/out."""
     if not acct:
         return {}

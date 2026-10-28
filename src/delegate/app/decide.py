@@ -5,14 +5,17 @@ import os
 import random
 import sys
 from pathlib import Path
+from typing import Any
 
 from delegate.adapters import agent_runs, git
 from delegate.app import env, onboard
 from delegate.app.fleet import FleetBuilder, drift_warnings, mark_busy, settle_holds
 from delegate.app.usage import READERS
 from delegate.contracts.routing import CallArgs, Run
+from delegate.contracts.state import StateDoc
 from delegate.contracts.stores import CheckpointStore
 from delegate.domain.holds.book import HoldBook
+from delegate.domain.lanes.lane import Lane
 from delegate.domain.routing.router import Router
 
 # Every codex run and resume gets these, so neither the user's config nor a repo file widens or narrows them. The sandbox has no network and
@@ -23,7 +26,7 @@ CODEX_ACCESS = ["--ignore-user-config", "--ignore-rules", "-c", "sandbox_workspa
                 "-c", "sandbox_workspace_write.writable_roots=[]", "-c", "approval_policy=on-request", "-c", "approvals_reviewer=auto_review"]
 
 
-def repo_dirs(cwd):
+def repo_dirs(cwd: str):
     """The folders from the repo root (or cwd outside a repo) down to cwd."""
     wd = Path(cwd).resolve()
     root = git.repo_root(wd)
@@ -33,7 +36,7 @@ def repo_dirs(cwd):
     return out[::-1]
 
 
-def repo_instructions(cwd):
+def repo_instructions(cwd: str):
     """The repo's instruction files, the same for both lanes (Codex's own rule): in each folder from the root down to cwd, AGENTS.md, else CLAUDE.md."""
     found = []
     for d in repo_dirs(cwd):
@@ -43,7 +46,7 @@ def repo_instructions(cwd):
     return found
 
 
-def codex_isolation(cwd):
+def codex_isolation(cwd: str):
     """Codex sees only what delegate sends plus the repo's instruction files: every skill it would list (its own system skills, the user's,
     the repo's .agents/skills) is turned off by path, and a repo with only CLAUDE.md is read as Claude would. Sub-agents cannot be turned off
     (codex 0.162.1: features.multi_agent=false and agents.max_depth=0 still let a brief that asks spawn one); NO_SUBAGENTS_RULE asks, and their
@@ -55,7 +58,7 @@ def codex_isolation(cwd):
             "-c", 'project_doc_fallback_filenames=["CLAUDE.md"]']
 
 
-def how(lane, step, cfg, cwd=None, unattended=False):
+def how(lane: Lane, step: dict, cfg: dict, cwd: str | None = None, unattended: bool = False):
     """What a step runs on. Unattended callers have no Agent tool, so the subscription lane runs `claude -p` on the logged-in account."""
     m = cfg["models"][step["model"]]
     runner = cfg["lanes"][lane.name]["runner"]
@@ -77,7 +80,7 @@ def how(lane, step, cfg, cwd=None, unattended=False):
     return {"kind": "codex", "model": m["api"], "cli": cli, "cwd": wd, "sandbox": sandbox, "isolation": iso}
 
 
-def parse_json_arg(v):
+def parse_json_arg(v: str | None):
     if not v:
         return None
     if v == "-":
@@ -94,17 +97,17 @@ def busy_jitter():
     return random.randint(60, 120)
 
 
-def fleet_builder(cfg):
+def fleet_builder(cfg: dict):
     return FleetBuilder(env.typed_routing(cfg), env.states(), env.history_store(), CheckpointStore(env.config_dir() / "health-checkpoint.json"), env.config_store(),
                         READERS, lambda: onboard.configured_lanes(cfg))
 
 
-def call_args(a, unattended):
+def call_args(a: env.Args, unattended: bool):
     return CallArgs(authored_by=a.authored_by, premium=a.premium,
                     allow_degraded=a.allow_degraded, unattended=unattended, resume=getattr(a, "resume", None), cap=getattr(a, "cap", None))
 
 
-def decision(a, cfg, unattended=False):
+def decision(a: env.Args, cfg: dict, unattended: bool = False):
     """next and run share this: build the fleet, route, remember the lane choice. -> (d, lanes, warnings, t); d is the JSON answer of `next`."""
     t = env.now()
     st = env.load_state()
@@ -119,7 +122,7 @@ def decision(a, cfg, unattended=False):
     pick = router.route(a.role, args, lanes, st.refs.get(args.resume or ""))
     d = pick.as_dict()
     if isinstance(pick, Run):
-        step = {"model": pick.model, "effort": pick.effort, "mode": pick.mode}
+        step: dict[str, Any] = {"model": pick.model, "effort": pick.effort, "mode": pick.mode}
         if pick.cap is not None or pick.pass_ == "resume":
             step["cap"] = pick.cap
         d["how"] = how(lanes[pick.lane], step, cfg, a.cwd, unattended)
@@ -128,7 +131,7 @@ def decision(a, cfg, unattended=False):
             if args.cap:
                 d["cap"] = d["how"]["cap"] = args.cap if d["how"]["kind"] == "claude_p" else d["how"].get("cap")
 
-            def mark(s):
+            def mark(s: StateDoc):
                 new = router.dwell.note(fam, pick.lane, t)
                 if new:
                     s.prev[fam] = new
@@ -140,7 +143,7 @@ def decision(a, cfg, unattended=False):
     return d, lanes, warnings, t
 
 
-def publish_lanes(lanes, st, t):
+def publish_lanes(lanes: dict[str, Lane], st: StateDoc, t: float):
     """Lane limits as agent-runs v1 (agent_runs.py), for dashboards. Never fails the caller."""
     try:
         outs = st.out

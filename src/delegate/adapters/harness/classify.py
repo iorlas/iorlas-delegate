@@ -6,7 +6,7 @@ error event, or the CLI's own error result) and `stderr`; the model's answer tex
 "rate limit" cannot take its lane out.
 """
 import re
-from collections import namedtuple
+from typing import NamedTuple
 
 # ---- PATTERNS: every regex that turns vendor text into a reason lives here --------------------------------------------------------
 LIMIT_RE = re.compile(r"usage limit|rate.?limit|quota|too many requests|\b429\b|try again (later|in)|credit balance", re.I)
@@ -20,10 +20,14 @@ BAD_REQUEST_RE = re.compile(CODEX_STATUS_RE.pattern + r"|invalid_request_error|i
 PATTERNS = {"limit": LIMIT_RE, "credit": CREDIT_RE, "spend": SPEND_RE, "login": LOGIN_RE, "network": NETWORK_RE, "codex_status": CODEX_STATUS_RE,
             "bad_request": BAD_REQUEST_RE}
 
-Outcome = namedtuple("Outcome", "reason detail source")        # source: ours | event | stderr | exit
+class Outcome(NamedTuple):
+    reason: str
+    detail: str
+    source: str        # ours | event | stderr | exit
 
 
-def classify(rc, vendor_err="", stderr="", timed_out=False, work_seen=False, structured=None):
+def classify(rc: int | None, vendor_err: str | None = "", stderr: str | None = "", timed_out: bool = False, work_seen: bool = False,
+             structured: dict | None = None):
     """-> Outcome, or None when the run is done. First match wins.
 
     rc: exit code (negative = a signal); vendor_err: the vendor's error text from its event stream; stderr: the CLI's stderr; timed_out: our
@@ -70,15 +74,15 @@ def classify(rc, vendor_err="", stderr="", timed_out=False, work_seen=False, str
     return None
 
 
-def says_login(text):
+def says_login(text: str):
     return bool(LOGIN_RE.search(text))
 
 
-def says_spend(text):
+def says_spend(text: str):
     return bool(SPEND_RE.search(text))
 
 
-def limit_words(text, top):
+def limit_words(text: str, top: str | None):
     """The window a limit message names ("weekly limit hit"), else `top` (the fullest window's name) or the plain words."""
     if re.search(r"free usage", text, re.I):
         return "free usage limit reached"

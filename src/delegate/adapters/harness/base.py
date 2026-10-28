@@ -85,7 +85,9 @@ class Summary:
 class Quiet:
     """What a harness with no log to watch, no per-run files and no export leaves at its default."""
 
-    log_dir: Path | None = None
+    @property
+    def log_dir(self) -> Path | None:
+        return None
 
     def echoes_input(self, line: str) -> bool:
         return False
@@ -109,6 +111,7 @@ class Harness(Protocol):
         ...
 
     evidence: Evidence
+
     @property
     def log_dir(self) -> Path | None:
         """A log of the CLI's own the supervisor watches for a limit it retries forever."""

@@ -71,7 +71,8 @@ class LaneGoneWatcher:
     """Stops a worker whose lane another process marked out for a limit, credit or login reason: it is burning an exhausted lane."""
 
     def __init__(self, gone: Callable[[], str | None], every: float = LANE_GONE_EVERY) -> None:
-        self.gone, self.every, self.last = gone, every, None
+        self.gone, self.every = gone, every
+        self.last: float | None = None
 
     def poll(self) -> Stop | None:
         if self.last is not None and time.monotonic() - self.last < self.every:
@@ -86,7 +87,8 @@ class LogWatcher:
     echoes the worker's own tool input is never one."""
 
     def __init__(self, log_dir: Path, is_limit: Callable[[str], object], echoes: Callable[[str], bool]) -> None:
-        self.dir, self.is_limit, self.echoes, self.offs = log_dir, is_limit, echoes, {}
+        self.dir, self.is_limit, self.echoes = log_dir, is_limit, echoes
+        self.offs: dict[Path, int] = {}
         with contextlib.suppress(OSError):
             self.offs = {f: f.stat().st_size for f in log_dir.glob("*.log")}
 
@@ -192,7 +194,9 @@ class Supervisor:
         if self.hooks.started:
             with contextlib.suppress(Exception):
                 self.hooks.started(worker)
-        out, err, killed = [], [], []
+        out: list[str] = []
+        err: list[str] = []
+        killed: list[int] = []
 
         def feed_stdin() -> None:
             with contextlib.suppress(OSError):

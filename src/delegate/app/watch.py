@@ -7,13 +7,21 @@ Silence limits per CLI (spikes P7, P7b): Claude's longest healthy gap was 225 s,
 (rollout gaps up to 2,298 s, longest live gap 225.8 s), so 3600; opencode 900. Every gap over LONG_GAP_S is kept (`Watchdog.flush`) to learn the real distribution. A first event must arrive within 120 s (longest seen 35 s).
 """
 import time
+from collections.abc import Callable, Sequence
+from typing import TypedDict
 
 from delegate.contracts import events as ev
 from delegate.contracts.history import GapRow
 
-LIMITS = {"claude": {"first_event_s": 120, "silence_s": 600},
-          "codex": {"first_event_s": 120, "silence_s": 3600},
-          "opencode": {"first_event_s": 120, "silence_s": 900}}
+
+class Limit(TypedDict):
+    first_event_s: int
+    silence_s: int
+
+
+LIMITS: dict[str, Limit] = {"claude": {"first_event_s": 120, "silence_s": 600},
+                            "codex": {"first_event_s": 120, "silence_s": 3600},
+                            "opencode": {"first_event_s": 120, "silence_s": 900}}
 CLI_OF_KIND = {"claude_p": "claude", "codex": "codex", "opencode": "opencode"}      # a runner kind (route.how) -> its CLI
 SLEEP_GAP_S = 15       # poll() runs every 0.5 s: a gap this long between two polls is a suspended machine, not a quiet worker
 LONG_GAP_S = 1800      # an inter-event gap longer than this is written to history (role "gap")
@@ -24,11 +32,11 @@ STALL_S = 900          # the worker owes a model response (no tool running) and 
 BEAT_S = 30            # at most one heartbeat callback per this many seconds
 
 
-def limits(cli):
-    return dict(LIMITS[cli])
+def limits(cli: str) -> Limit:
+    return Limit(**LIMITS[cli])
 
 
-def grace_s(cli):
+def grace_s(cli: str):
     return GRACE_OF.get(cli, ANSWER_GRACE_S)
 
 
@@ -38,9 +46,11 @@ class Turn:
     `tool(id, open_)` (a tool call in flight keeps the long silence limit). `verdict(wd)` -> "answer" once finished and quiet for the grace, "stall" once the model
     owes a response and the stream has printed nothing for STALL_S, else None. Only the clock is injected."""
 
-    def __init__(self, cli, clock=time.monotonic):
+    def __init__(self, cli: str, clock: Callable[[], float] = time.monotonic):
         self.cli, self.clock = cli, clock
-        self.done_t, self.open, self.stop = None, set(), None
+        self.done_t: float | None = None
+        self.open: set[str] = set()
+        self.stop: str | None = None
 
     def finished(self):
         self.done_t = self.clock()
@@ -48,11 +58,11 @@ class Turn:
     def more(self):
         self.done_t = None
 
-    def tool(self, ident, open_):
+    def tool(self, ident: str | None, open_: bool):
         if ident is not None:
             (self.open.add if open_ else self.open.discard)(ident)
 
-    def apply(self, events):
+    def apply(self, events: Sequence[ev.HarnessEvent]):
         """One parsed line (its HarnessEvents): a turn end or a final message finishes the turn, a tool in flight keeps the long silence limit,
         anything else means the turn goes on."""
         if any(isinstance(e, ev.TurnDone) or (isinstance(e, ev.Msg) and e.final) for e in events):
@@ -65,7 +75,7 @@ class Turn:
             elif isinstance(e, (ev.CmdEnd, ev.ToolEnd)):
                 self.tool(e.id, False)
 
-    def verdict(self, wd):
+    def verdict(self, wd: "Watchdog"):
         if self.done_t is not None and self.clock() - self.done_t >= grace_s(self.cli):
             self.stop = "answer"
         elif wd.events and not self.open and self.done_t is None and wd.idle_s > STALL_S:
@@ -76,7 +86,7 @@ class Turn:
         return f"owed a model response and printed nothing for {STALL_S}s"
 
 
-def tail(out, n=20, width=2000):
+def tail(out: str, n: int = 20, width: int = 2000):
     """The last n raw lines of a worker's stdout, cut to width: what the call record keeps when we stopped the worker."""
     return [x[:width] for x in out.splitlines()[-n:]]
 
@@ -85,13 +95,15 @@ class Watchdog:
     """first_event_s: no line at all within this long after start -> hung("first_event"). silence_s: no line for this long after the first -> hung("silence").
     `beat(wall_time)` (optional) is called from touch(), at most every BEAT_S: route stamps the lease with it, so a quiet lease can be called suspect."""
 
-    def __init__(self, first_event_s, silence_s, clock=time.monotonic, beat=None, wall=time.time):
+    def __init__(self, first_event_s: float, silence_s: float, clock: Callable[[], float] = time.monotonic, beat: Callable[[float], None] | None = None,
+                 wall: Callable[[], float] = time.time):
         self.first_event_s, self.silence_s, self.clock, self.beat, self.wall = first_event_s, silence_s, clock, beat, wall
         now = clock()
         self.start = self.last = self.polled = now
-        self.events, self.why, self.idle_s = 0, None, 0.0
-        self._beat_at = None
-        self.gaps = []        # inter-event gaps over LONG_GAP_S (sleep time already taken out), in seconds
+        self.events, self.idle_s = 0, 0.0
+        self.why: str | None = None
+        self._beat_at: float | None = None
+        self.gaps: list[float] = []        # inter-event gaps over LONG_GAP_S (sleep time already taken out), in seconds
 
     def touch(self):
         now = self.clock()
@@ -126,7 +138,7 @@ class Watchdog:
             return f"printed nothing within {self.first_event_s}s"
         return f"was silent for {self.silence_s}s"
 
-    def flush(self, add, lane, model, finished, now=time.time):
+    def flush(self, add: Callable[[GapRow], object], lane: str, model: str, finished: bool, now: Callable[[], float] = time.time):
         """One history row per long gap (a stream that died inside one counts too). `add` is the history writer; this never raises."""
         try:
             tail = self.clock() - self.last

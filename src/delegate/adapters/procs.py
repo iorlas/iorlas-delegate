@@ -38,7 +38,8 @@ class Orphan:
     """A worker delegate recorded but no longer owns (its route.py was SIGKILLed): the part of a Popen that stream_proc.stop_tree reads, by pid and start token."""
 
     def __init__(self, w: Worker) -> None:
-        self.pid, self.start, self.returncode = w.pid, w.start, None
+        self.pid, self.start = w.pid, w.start
+        self.returncode: int | None = None
 
     def poll(self) -> int | None:
         if self.returncode is None and not alive(self.pid, self.start):
@@ -87,4 +88,4 @@ def run_capture(argv: list[str], timeout: float, **kw: object) -> subprocess.Com
     res = stream_proc.run(argv, env=kw.get("env"), cwd=kw.get("cwd"), on_stdout=out.append, on_stderr=err.append, timeout=timeout, grace=GRACE_S)  # type: ignore[arg-type]
     if res.timed_out:
         raise subprocess.TimeoutExpired(argv, timeout, "".join(out), "".join(err))
-    return subprocess.CompletedProcess(argv, -res.signal if res.signal else res.returncode, "".join(out), "".join(err))
+    return subprocess.CompletedProcess(argv, -res.signal if res.signal else -1 if res.returncode is None else res.returncode, "".join(out), "".join(err))

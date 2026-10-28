@@ -9,13 +9,15 @@ from atomic_io import atomic_write_text
 from delegate.adapters import netprobe
 from delegate.app import cockpit, decide, env, net, roles, usage
 from delegate.app.fleet import settle_holds
+from delegate.contracts.state import StateDoc
 from delegate.domain.health import ledger as health_ledger
 from delegate.domain.holds.book import HoldBook
+from delegate.domain.lanes.lane import Lane
 from delegate.domain.lanes.leases import LeaseBook, suspect
 from delegate.domain.routing.router import Router
 
 
-def status_payload(cfg, lanes, ck, st, t):
+def status_payload(cfg: dict, lanes: dict[str, Lane], ck: dict, st: StateDoc, t: float):
     return {"v": 1, "ts": t,
             "lanes": {n: {"family": l.family, "kind": l.kind, "out": l.out, "out_until": l.out_until, "reason": l.out_reason if l.out else None, "five": l.five, "week": l.week,
                           "pace": l.pace, "burn": l.burn, "notes": l.notes} for n, l in lanes.items()},
@@ -25,7 +27,7 @@ def status_payload(cfg, lanes, ck, st, t):
             "health": health_rows(cfg, lanes, st, t), **roles_payload(cfg, lanes, st, t)}
 
 
-def roles_payload(cfg, lanes, st, t):
+def roles_payload(cfg: dict, lanes: dict[str, Lane], st: StateDoc, t: float):
     """roles{} (usable and net per role) and network{} for status --json; the probe is read from its cache, never run here."""
     cached = netprobe.load(str(env.net_cache_path()))
     routing = env.typed_routing(cfg)
@@ -33,9 +35,10 @@ def roles_payload(cfg, lanes, st, t):
     return {"roles": roles.roles_view(cfg, lanes, router, st, t, cached), "network": net.network_view(cached, t)}
 
 
-def health_rows(cfg, lanes, st, t):
+def health_rows(cfg: dict, lanes: dict[str, Lane], st: StateDoc, t: float):
     """One row per (lane, model): state (up|busy|exhausted|logged_out|held|broken), until, source, evidence, leases{live,suspect}, last_failures[3]."""
-    rows, pol = [], env.settings_of(cfg).breaker
+    rows: list[dict] = []
+    pol = env.settings_of(cfg).breaker
     for name, l in lanes.items():
         cnt = LeaseBook(st.leases).counts(name, t)
         rec = st.out.get(name)
@@ -54,24 +57,24 @@ def health_rows(cfg, lanes, st, t):
     return rows
 
 
-def running_rows(st, t):
+def running_rows(st: StateDoc, t: float):
     return [{"run_id": k, "lane": v.lane, "role": v.role, "task": v.task, "started": v.start, "age_s": int(t - v.start),
              "pid": v.pid, "worker_pid": v.worker_pid, "suspect": suspect(v, t)}
             for k, v in sorted(LeaseBook(st.leases).live(t).items(), key=lambda kv: kv[1].start)]
 
 
-def write_snapshot(payload):
+def write_snapshot(payload: dict):
     with contextlib.suppress(Exception):
         p = env.snapshot_path()
         atomic_write_text(p, json.dumps(payload), fsync=False)
 
 
-def cmd_status_cheap(a, cfg):
+def cmd_status_cheap(a: env.Args, cfg: dict):
     """Zero process spawns and no network: the last full status (status-snapshot.json) with `running` read fresh from the leases and the
     cached logins from auth-cache.json. `age_s` = seconds since the snapshot was taken (null when no status has run yet)."""
     t = env.now()
     st = env.load_state()
-    snap = {}
+    snap: dict = {}
     with contextlib.suppress(OSError, ValueError):
         d = json.loads(env.snapshot_path().read_text(encoding="utf-8"))
         snap = d if isinstance(d, dict) else {}
@@ -86,7 +89,7 @@ def cmd_status_cheap(a, cfg):
     return 0
 
 
-def cmd_status(a, cfg):
+def cmd_status(a: env.Args, cfg: dict):
     if a.cheap:
         return cmd_status_cheap(a, cfg)
     t = env.now()

@@ -2,6 +2,7 @@
 Nothing here installs, logs in or decides for the owner: the fix column says what to run."""
 import json
 import os
+from typing import Any
 
 from delegate.app import env, onboard
 from delegate.contracts.routing import split_retired
@@ -9,10 +10,10 @@ from delegate.contracts.routing import split_retired
 OPT_IN = {"DEEPSEEK_FREE": "deepseek_free_enabled", "ZAI_CODING_SUBSCRIPTION": "zai_coding_enabled"}
 
 
-def lane_rows(cfg):
+def lane_rows(cfg: dict):
     """One row per lane: {lane, enabled, ready, fix}. enabled = the router may use it (not declined, its opt-in set); ready = the machine can run it."""
     ready, declined = onboard.configured_lanes(cfg), env.profile_lanes()
-    rows = []
+    rows: list[dict[str, Any]] = []
     for name in cfg["lanes"]:
         flag = OPT_IN.get(name)
         enabled = declined.get(name) != "declined" and (flag is None or cfg["settings"].get(flag) is True)
@@ -26,15 +27,15 @@ LEFTOVER_ENV = "CLAUDE_CREDIT_WORKER_KEY"
 
 def leftovers():
     """Notes for what the deleted CLAUDE_CREDIT lane left behind. Nothing reads or deletes them."""
-    out = [{"id": "unused_file", "file": str(env.config_dir() / n), "say": f"{env.config_dir() / n}: unused, safe to delete."}
+    out: list[dict[str, str]] = [{"id": "unused_file", "file": str(env.config_dir() / n), "say": f"{env.config_dir() / n}: unused, safe to delete."}
            for n in LEFTOVER_FILES if (env.config_dir() / n).exists()]
     if os.environ.get(LEFTOVER_ENV):
         out.append({"id": "unused_env", "key": LEFTOVER_ENV, "say": f"env {LEFTOVER_ENV}: unused, safe to unset."})
     return out
 
 
-def notes(cfg):
-    out = [{"id": "retired_key", "key": k, "file": str(env.config_store().path), "say": f"{env.config_store().path}: '{k}' is retired and ignored; safe to delete from config.json."}
+def notes(cfg: dict):
+    out: list[dict[str, str]] = [{"id": "retired_key", "key": k, "file": str(env.config_store().path), "say": f"{env.config_store().path}: '{k}' is retired and ignored; safe to delete from config.json."}
            for k in env.retired_keys_present()]
     with open(env.SKILL_DIR / "routing.json", encoding="utf-8") as f:
         out += [{"id": "retired_key", "key": k, "file": str(env.SKILL_DIR / "routing.json"), "say": f"{env.SKILL_DIR / 'routing.json'}: '{k}' is retired and ignored."}
@@ -42,11 +43,11 @@ def notes(cfg):
     return out + leftovers()
 
 
-def doctor(cfg):
+def doctor(cfg: dict):
     return {"v": 1, "harness": env.session_host(), "lanes": lane_rows(cfg), "notes": notes(cfg)}
 
 
-def print_doctor(d):
+def print_doctor(d: dict):
     w = max(len(r["lane"]) for r in d["lanes"])
     print(f"{'lane':<{w}}  enabled  ready  fix")
     for r in d["lanes"]:
@@ -55,7 +56,7 @@ def print_doctor(d):
         print(f"note [{n['id']}]: {n['say']}")
 
 
-def cmd_doctor(a, cfg):
+def cmd_doctor(a: env.Args, cfg: dict):
     d = doctor(cfg)
     if a.json:
         print(json.dumps(d, indent=1))
@@ -64,13 +65,13 @@ def cmd_doctor(a, cfg):
     return 0
 
 
-def config_set(key, value):
+def config_set(key: str, value: str):
     try:
         val = json.loads(value)
     except ValueError:
         val = value
 
-    def put(cur):
+    def put(cur: dict):
         node = cur
         parts = key.split(".")
         for part in parts[:-1]:
@@ -81,12 +82,12 @@ def config_set(key, value):
     return env.update_config(put)
 
 
-def config_show(cfg):
+def config_show(cfg: dict):
     p = env.config_dir() / "config.json"
     return {"file": str(p), "overrides": json.loads(p.read_text(encoding="utf-8")) if p.exists() else {}, "effective_settings": cfg["settings"]}
 
 
-def cmd_config(a, cfg):
+def cmd_config(a: env.Args, cfg: dict):
     if a.action == "set":
         if not a.key or a.value is None:
             raise SystemExit("route.py: config set KEY VALUE")
