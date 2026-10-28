@@ -23,8 +23,10 @@ Per-user settings: <config dir>/config.json (same keys as "settings"); profile, 
 Workers never create branches or worktrees and never commit, merge, push or stash: the coordinator owns git.
 """
 import argparse
+import collections
 import contextlib
 import copy
+import dataclasses
 import datetime as dt
 import json
 import os
@@ -51,21 +53,21 @@ HERE = Path(__file__).resolve().parent
 if str(HERE) not in sys.path:
     sys.path.insert(0, str(HERE))
 sys.path.insert(0, str(HERE.parents[1] / "src"))     # delegate.*: the typed records and the harness classes ship in the plugin dir, next to skills/
-from lanes import classify, health, live as livemod, supervisor      # the one outcome ladder (delegate-e05); the health fold and breaker (rdt, a9x); the idle watchdog (go0)
-from delegate.adapters import netprobe
+from lanes import classify, health                  # the one outcome ladder (delegate-e05); the health fold and breaker (rdt, a9x)
+from delegate.adapters import netprobe, procs
 from lanes import profiles, usage as accounting                # network facts (4n7); the lane adapter registry (dlz)
 from lanes import cockpit as role_view              # roles{} for status (0sf)
-from lanes import reaper                            # a worker dies with its call: process-tree stop with a survivor report (own)
-import osproc                                       # the one module that lists processes
 from delegate.adapters.harness import reset_parse
 from delegate.adapters.harness.base import LaunchInputs
 from delegate.adapters.harness.claude import ClaudeHarness
+from delegate.adapters.harness.opencode import OpenCodeHarness, Profile
+from delegate.adapters.harness import opencode_sandbox
 from delegate.adapters.harness.codex import CodexHarness
-from delegate.app.publish import LiveSink, end_status
+from delegate.app import watch
+from delegate.app.publish import LiveSink
+from delegate.app.supervisor import LogWatcher, RunHooks, Supervisor
 from delegate.contracts import codec, wire
 from delegate.contracts import events as harness_events
-proc_start, pid_alive, descendants = osproc.proc_start, osproc.alive, osproc.descendants
-stop_tree, kill_tree = reaper.stop_tree, reaper.kill_tree
 WEEK_MIN = 7 * 24 * 60
 
 
@@ -502,7 +504,7 @@ def fetch_codex_limits():
     except BrokenPipeError:         # the server exited under us
         return None, "codex app-server closed its input"
     finally:
-        kill_tree(p)
+        procs.kill_tree(p)
         p.wait()
         for f in (p.stdin, p.stdout):
             with contextlib.suppress(OSError):
@@ -592,7 +594,7 @@ def claude_logged_out():
     if not exe:
         return False
     try:
-        r = run_tree([exe, "auth", "status"], 15)
+        r = procs.run_capture([exe, "auth", "status"], 15)
         v = json.loads(r.stdout).get("loggedIn")
     except (OSError, subprocess.TimeoutExpired, ValueError, AttributeError):
         return False
@@ -1241,15 +1243,6 @@ def when(epoch, t):
     return f"{local(epoch)} (in {fmt_in(epoch - t)})"
 
 
-def opencode_auth_has(key, need_key=False):
-    f = Path(os.environ.get("XDG_DATA_HOME") or Path.home() / ".local" / "share") / "opencode" / "auth.json"
-    try:
-        v = json.loads(f.read_text(encoding="utf-8")).get(key)
-    except (OSError, ValueError, TypeError, AttributeError):
-        return False
-    return bool(v) and (not need_key or (isinstance(v, dict) and bool(v.get("key"))))
-
-
 def probe_login(name):
     """-> (True | False | None, why): is the lane's login really there? A status command or a file, never a model call."""
     if name == "OPENAI_SUBSCRIPTION":
@@ -1258,14 +1251,8 @@ def probe_login(name):
         return ClaudeHarness().login_probe(AUTH_TIMEOUT)
     if name == "CLAUDE_CREDIT":
         return (True, "API key stored") if find_key(quiet=True) else (False, "no API key stored")
-    if name in ("GROK_SUBSCRIPTION", "ZAI_CODING_SUBSCRIPTION", "DEEPSEEK_FREE"):
-        if not opencode_exe():
-            return None, "opencode CLI not installed"
-        if name == "DEEPSEEK_FREE":
-            return True, "free access needs no login"        # the zero-price check runs at launch
-        key = "xai" if name == "GROK_SUBSCRIPTION" else "zai-coding-plan"
-        ok = opencode_auth_has(key, need_key=name != "GROK_SUBSCRIPTION")
-        return ok, f"{key} login in opencode's auth file" if ok else f"no {key} login in opencode's auth file"
+    if name in OC_PROFILES:
+        return OpenCodeHarness(OC_PROFILES[name]).login_probe(AUTH_TIMEOUT)
     return None, "no check for this lane"
 
 
@@ -1632,15 +1619,15 @@ def lease_counts(st, t, lane):
 def orphan(v):
     """True when the lease's route.py process is gone (pid plus start time: an expired lease alone may be a laptop waking up) but its worker
     is still running: a SIGKILL on route.py leaves the worker, which is its own process group, editing the tree."""
-    gone = proc_start(v.get("pid")) != v.get("pid_start")
-    return gone and bool(v.get("worker_start")) and proc_start(v.get("worker_pid")) == v.get("worker_start")
+    gone = procs.start_token(v.get("pid")) != v.get("pid_start")
+    return gone and bool(v.get("worker_start")) and procs.start_token(v.get("worker_pid")) == v.get("worker_start")
 
 
 def reap(v):
     """Stop an orphaned worker's whole tree: SIGTERM, a short grace, SIGKILL (stop_tree). -> True when the worker is gone."""
     pg = int(v["worker_pid"])
-    stop_tree(pg, grace=3, done=lambda: proc_start(pg) != v.get("worker_start"))
-    return proc_start(pg) != v.get("worker_start")
+    procs.stop_tree(pg, grace=3, done=lambda: procs.start_token(pg) != v.get("worker_start"))
+    return procs.start_token(pg) != v.get("worker_start")
 
 
 def slots(lane, S):
@@ -2037,20 +2024,6 @@ def publish_lanes(lanes, st, t):
 
 
 
-def run_tree(cmd, timeout, **kw):
-    """subprocess.run with captured text output whose timeout stops the whole tree, not just the direct child. -> CompletedProcess; TimeoutExpired on timeout."""
-    sess = {"start_new_session": True}
-    p = subprocess.Popen(cmd, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, **sess, **kw)
-    try:
-        out, err = p.communicate(timeout=timeout)
-    except BaseException:
-        kill_tree(p)
-        with contextlib.suppress(Exception):
-            p.communicate(timeout=5)
-        raise
-    return subprocess.CompletedProcess(cmd, p.returncode, out, err)
-
-
 CREDENTIAL_RE = re.compile(r"(TOKEN|SECRET|PASSW|CREDENTIAL|API_?KEY|ACCESS_?KEY|PRIVATE_?KEY)|^(AWS_|GH_|GITHUB_|SSH_AUTH_SOCK$)", re.I)
 
 
@@ -2063,117 +2036,9 @@ def child_env(extra=None):
     return env
 
 
-WORKER_TICK = []           # the idle watchdog's touch(): run_proc calls it for every line the worker prints (launchers set it before run_proc)
-REF_SEEN = []              # callbacks run with the vendor session id the moment the vendor reveals it (run_once registers one per run)
-WORKER_STARTED = []        # callbacks run with the worker's pid right after it starts (run_once registers one per run)
-
-
-def note_ref(ref):
-    """The vendor named its session: tell run_once now (it stores the ref and prints it), not when the call ends, so a killed route.py still leaves the ref."""
-    for cb in REF_SEEN:
-        with contextlib.suppress(Exception):
-            cb(ref)
-
-
-def live_for(cli, d, a, rid):
-    """The live event file writer for this launch (a no-op unless DELEGATE_LIVE_FILE is set); its WorkerStarted and start event go out once the
-    process has a pid. Codex's events come from its harness class; Claude's and OpenCode's from lanes/live.py until they have one."""
-    lv = LiveSink(cli, run_id=rid) if cli != "opencode" else livemod.Live(cli, run_id=rid)
-    lv.start(lane=d.get("lane"), model=d.get("model"), effort=d.get("effort"), role=d.get("role") or getattr(a, "role", None))
-    WORKER_STARTED.append(lv.started)
-    return lv
-
-
-def live_end(lv, turn, dog, timed_out, rc, cost=None):
-    with contextlib.suppress(ValueError):
-        WORKER_STARTED.remove(lv.started)
-    lv.end(end_status(timed_out, dog["why"], turn.stop, rc), cost)
-
-
-def run_proc(cmd, text, cwd, env, timeout, on_line=None, poll=None):
-    """-> (returncode, stdout, stderr, timed_out). Own process group; the timeout kills the group; stdin carries `text` then closes; UTF-8, errors replaced.
-    `on_line(line)` returning True stops the worker now; a number stops it that many seconds later unless it exits first.
-    `poll()` runs about every half second; a truthy answer stops the worker (its own process tree only). `tick()` runs for every line the
-    worker prints on stdout or stderr (any stream delta is activity): the callback in WORKER_TICK, which the launcher sets just before the call."""
-    kw = {"start_new_session": True}
-    tick = WORKER_TICK[0] if WORKER_TICK else None
-    p = subprocess.Popen(cmd, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=cwd, env=env, **kw)
-    for cb in WORKER_STARTED:
-        with contextlib.suppress(Exception):
-            cb(p.pid)
-    out, err, stop_at, killed = [], [], [], []
-
-    def pump(stream, sink, cb):
-        for raw in iter(stream.readline, b""):
-            line = raw.decode("utf-8", "replace")
-            sink.append(line)
-            if tick:
-                with contextlib.suppress(Exception):
-                    tick()
-            ask = cb(line) if cb else None
-            if ask is True:        # the callback asks to stop the worker now
-                killed.append(1)
-                kill_tree(p)
-            elif ask and not stop_at:
-                stop_at.append(time.time() + ask)
-
-    def feed():
-        with contextlib.suppress(OSError):
-            p.stdin.write(text.encode("utf-8"))
-            p.stdin.close()
-    threads = [threading.Thread(target=pump, args=(p.stdout, out, on_line), daemon=True),
-               threading.Thread(target=pump, args=(p.stderr, err, None), daemon=True), threading.Thread(target=feed, daemon=True)]
-    for th in threads:
-        th.start()
-    timed_out, ppid, end = False, os.getppid(), time.time() + timeout if timeout else None
-
-    def bye(signum, frame):
-        raise SystemExit(128 + signum)
-    old = {g: signal.signal(g, bye) for g in (getattr(signal, n, None) for n in ("SIGTERM", "SIGHUP")) if g is not None}
-    try:
-        while True:
-            try:
-                p.wait(timeout=(0.5 if poll else 2) if end is None else max(0.01, min(0.5 if poll else 2, end - time.time())))
-                break
-            except subprocess.TimeoutExpired:
-                if end is not None and time.time() >= end:
-                    timed_out = True
-                    killed.append(1)
-                    kill_tree(p)
-                    p.wait()
-                    break
-                if (stop_at and time.time() >= stop_at[0]) or (poll and poll()):
-                    killed.append(1)
-                    kill_tree(p)
-                    p.wait()
-                    break
-                if UNATTENDED and os.getppid() != ppid:     # SIGKILL on the engine cannot be caught: the parent changing is the only sign
-                    raise SystemExit(1)
-    except BaseException:       # SIGTERM, SIGHUP, Ctrl-C, parent gone: the worker is in its own process group, so stop it here or it keeps burning the plan
-        kill_tree(p)
-        p.wait()
-        raise
-    finally:
-        for g, h_ in old.items():
-            signal.signal(g, h_)
-    for th in threads:
-        th.join(5)
-    rc = p.returncode
-    if killed and rc == 0:      # we stopped it, but a shell wrapper can exit 0 in the instant its child dies, before our SIGKILL lands: it was killed all the same
-        rc = -signal.SIGKILL
-    return rc, "".join(out), "".join(err), timed_out
-
-
 def find_transcript(ref, family):
-    if not ref:
-        return None
-    if family == "openai":
-        return CodexHarness().transcript(ref)
-    if family != "claude":
-        f = opencode_transcript(ref)        # exported after the run
-        return str(f) if f.is_file() else None
-    hits = sorted((Path.home() / ".claude" / "projects").glob("*/" + ref + ".jsonl"))
-    return str(hits[0]) if hits else None
+    hx = {"openai": CodexHarness(), "claude": ClaudeHarness()}.get(family) or OpenCodeHarness(root=config_dir())        # opencode: exported after the run
+    return hx.transcript(ref)
 
 
 def schema_problem(data, schema, at="$"):
@@ -2309,7 +2174,7 @@ def settle(res, o, d, t, who, a, rc=None, tail="", reset=None, credit_until=None
     elif r == "hung":
         words, kind = res.pop("hung_words", "printed nothing"), res.pop("hung_kind", "first_event")
         if kind == "first_event":       # nothing came at all: the lane is the suspect, it rests; a worker that went quiet mid-run is the pair's (the breaker counts it)
-            until = t + OC_HUNG_OUT_SECS
+            until = t + HUNG_OUT_SECS
             mark_out(lane, until, f"hung: {words}", t, "hung")
             res.update(retry_after=until, say=f"{who} {words} and was stopped; {lane} out until {local(until)}")
         else:
@@ -2364,423 +2229,6 @@ def codex_context_k(thread):
     return None
 
 
-def launch_codex(d, brief, a, rid, t, meta):
-    """-> dict of result fields."""
-    h = d["how"]
-    hold = real_hold(d.get("lane") or "OPENAI_SUBSCRIPTION", d.get("role", getattr(a, "role", None)), load_state(), t)
-    if hold:
-        return refusal_fields(hold, "no worker was launched")
-    exe = shutil.which("codex")
-    if not exe:
-        return {"outcome": "setup", "say": "codex CLI not found on PATH (route.py doctor --lane OPENAI_SUBSCRIPTION)"}
-    out_file = config_dir() / f"codex-last-{rid[:8]}.txt"
-    hx = CodexHarness(a.resume)
-    spec = hx.launch_spec(LaunchInputs(
-        exe=exe, cwd=h["cwd"], model=h["model"], effort=d["effort"], sandbox=h["sandbox"], out_file=str(out_file), env=child_env(), cli=h["cli"],
-        access=CODEX_ACCESS, isolation=h["isolation"], schema=a.schema, resume=a.resume,
-        prompt=" ".join((SECRET_RULE, GIT_RULES, EDIT_RULE, NO_SUBAGENTS_RULE, ESCALATE_RULE, DENIED_RULE)) + "\n\n" + brief))
-    turn = supervisor.Turn("codex")
-    live = live_for("codex", d, a, rid)
-    denied, secret, net = [], [], []
-    if a.resume:
-        note_ref(a.resume)
-
-    def on_line(line):      # the harness parsed the line; this routes the facts to their owners and applies the secret policy
-        events = hx.parse_line(line)
-        turn.apply(events)
-        for e in events:
-            live.feed(e)
-            if isinstance(e, harness_events.Started):
-                note_ref(e.ref)
-                if agent_runs:
-                    agent_runs.run(rid, thread=e.ref)
-            elif isinstance(e, harness_events.Denied):
-                denied.append(denial("policy", e.tool, e.input))      # the reviewer refused an escalation
-            elif isinstance(e, harness_events.Cmd) and secret_hit(e.text):
-                denied.append(denial("secret", "Bash", {"command": e.text}))
-                secret.append(e.text)
-                return True             # codex has no hook under exec: stop the worker before it can use what it read
-    if agent_runs:
-        agent_runs.run(rid, kind="codex", lane=d["lane"], model=d["model"], cwd=h["cwd"], started=t, status="running", **meta)
-    started = time.time()       # wall clock, not now(): it is compared with file times
-    before = (codex_thread_total(a.resume) or history_cumulative(a.resume)) if a.resume else None
-    poll0, tick, dog = worker_watch("codex", d["lane"])
-    WORKER_TICK[:] = [tick]
-    base_poll = stream_poll(poll0, turn, dog, live)
-    seen = hx.evidence
-
-    def poll():
-        """Codex waits for the network by itself, for as long as it takes. Past NET_GRACE_S of that, one probe: still offline -> stop it now and hand the
-        wait to the caller (the thread resumes), instead of holding the slot for the whole silence limit."""
-        if base_poll():
-            return True
-        if seen.net_at is not None and time.monotonic() - seen.net_at >= NET_GRACE_S:
-            seen.net_at = None
-            if not net_up(d["lane"]):
-                net.append(1)
-                return True
-        return False
-    rc, out, err, timed_out = run_proc(spec.argv, spec.stdin, spec.cwd, spec.env, a.timeout, on_line, poll)
-    live_end(live, turn, dog, timed_out, rc)
-    log_gaps(dog, d)
-    text = ""
-    with contextlib.suppress(OSError):
-        text = out_file.read_text(encoding="utf-8", errors="replace").strip()
-        out_file.unlink()
-    final = bool(text) or bool(seen.last and (seen.turns or turn.stop == "answer"))        # the turn finished: codex writes -o only at its end
-    text = text or seen.last
-    tokens = accounting.per_call(seen.tokens, before)      # a running total: keep this run's part
-    if seen.ref:             # the reviewer's tokens are the run's too
-        extra, n = codex_child_tokens(seen.ref, started - 1)
-        if n:
-            base = tokens or {"in": 0, "cached": 0, "out": 0}
-            tokens = {k: (base.get(k) or 0) + extra[k] for k in extra}
-    res = {"text": text, "ref": seen.ref, "stderr": err, "tokens": tokens, "denied": denied, "turns": seen.turns or None,
-           "context_k": codex_context_k(seen.ref), "started": bool(seen.ref), "partial": seen.work, "answered": final,
-           "acct": accounting.codex(tokens), "cumulative": seen.cumulative}
-    o = classify.classify(rc, hx.vendor_error(rc), err, timed_out, seen.work, dict(watch_fields(res, dog), secret=secret[0] if secret else None))
-    if turn.stop == "answer" and o and o.reason == "killed" and final and not seen.error and not timed_out:       # we stopped it after its answer: the answer stands
-        o = None
-        res["warnings"] = ["answer_done_process_alive"]
-    if dog["why"] or turn.stop or timed_out:        # the raw tail of the stream, so the call record shows what the CLI last said before it was stopped
-        res["stream_tail"] = supervisor.tail(out)
-    if net and (o is None or o.reason == "killed"):       # we stopped it because the network is down
-        o = classify.Outcome("network", seen.transient, "event")
-    if o:       # codex's error or stderr, never the model's answer
-        settle(res, o, d, t, "codex", a, rc, err or text, reset=lambda: codex_reset_now(t),
-               login=("logged out: run `codex login`", f"codex is not logged in: {{why}} (route.py doctor --lane {d['lane']})"))
-    else:
-        update_state(lambda s: s.setdefault("out", {}).pop(d["lane"], None))
-        res.update(data=parse_data(text, a.schema))
-    return res
-
-
-OC_SECRETS = (".ssh", ".aws", ".gnupg", ".azure", ".config/gh", ".docker", ".netrc", ".git-credentials", ".codex", ".grok", ".claude", ".claude.json",
-              ".local/share/opencode", "Library/Keychains")
-OC_RULE = ("You run unattended. Every command runs in a sandbox: no network, no credential files, no writes outside this directory. If a command "
-           "fails because of it, do not work around it or change code to avoid it: say which command and why in your final message, and go on without it.")
-
-
-def opencode_transcript(ref):
-    return config_dir() / "opencode-sessions" / (ref + ".json")
-
-
-OC_FINAL_REASONS = ("stop", "end_turn", "end-turn")       # step_finish part.reason of a step that ends the turn (not "tool-calls")
-OC_HUNG_OUT_SECS = 1800       # a lane whose worker printed nothing at all rests this long
-
-
-def opencode_log_dir():
-    return Path(os.environ.get("XDG_DATA_HOME") or Path.home() / ".local" / "share") / "opencode" / "log"
-
-
-OPENCODE_ECHO_RE = re.compile(r"\b(?:permission|pattern|input|command|args)=")     # log lines that quote the worker's own tool input
-
-
-def opencode_log_poll():
-    """-> (poll, state). poll() is truthy once opencode's own log gained a LIMIT_RE line since launch (it retries a limit forever without exiting);
-    lines echoing tool input (`evaluated permission=bash pattern="..."`) never count. state["why"] is then "limit" and state["msg"] the log line."""
-    logs = opencode_log_dir()
-    state = {"why": None, "msg": ""}
-    offs = {}
-    with contextlib.suppress(OSError):
-        offs = {f: f.stat().st_size for f in logs.glob("*.log")}
-
-    def poll():
-        with contextlib.suppress(OSError):
-            for f in logs.glob("*.log"):
-                size, off = f.stat().st_size, offs.get(f, 0)
-                if size > off:
-                    with open(f, "rb") as fh:
-                        fh.seek(off)
-                        new = fh.read(size - off).decode("utf-8", "replace")
-                    offs[f] = size
-                    m = next((ln for ln in new.splitlines() if classify.LIMIT_RE.search(ln) and not OPENCODE_ECHO_RE.search(ln)), None)
-                    if m:
-                        state.update(why="limit", msg=m.strip())
-                        return True
-        return False
-    return poll, state
-
-
-WORKER_BEAT = []        # callbacks run with the wall time at a worker's heartbeat (run_once registers one: it stamps the lease)
-LANE_GONE_EVERY = 10    # seconds between looks at whether the lane was marked out by someone else
-
-
-def lane_gone_poll(lane, since):
-    """-> (poll, state). poll() is truthy when another process marked `lane` out for a limit, credit or login reason after `since` (wall clock):
-    the worker still running there is burning an exhausted lane and is stopped within LANE_GONE_EVERY seconds."""
-    state, last = {"why": None, "msg": ""}, [None]
-
-    def poll():
-        if last[0] is not None and time.monotonic() - last[0] < LANE_GONE_EVERY:
-            return False
-        last[0] = time.monotonic()
-        o = (load_state().get("out") or {}).get(lane) or {}
-        if o.get("set", 0) >= since and o.get("until", 0) > now() and o.get("reason", "limit") in ("limit", "credit", "logged_out"):
-            state.update(why="limit", msg=o.get("why") or "lane marked out")
-            return True
-        return False
-    return poll, state
-
-
-IDLE_S = None           # run --idle: seconds of silence before the worker is hung (None = the CLI's limit in lanes/supervisor.py)
-NET_GRACE_S = 15        # how long a worker may say "waiting for network" before one probe decides whether to stop it
-
-
-def worker_watch(cli, lane, extra=None):
-    """-> (poll, tick, state) for run_proc: stop the worker when its lane was marked out under it, when `extra` fires (opencode's log), or when it is
-    hung (no first line within first_event_s, silence longer than the CLI's silence_s: lanes/supervisor.py). `tick` is for every line printed.
-    state["why"] ends as "limit" | "hung"; "kind" says which deadline; "words" is the sentence for the answer; "msg" the limit line."""
-    lim = supervisor.limits(cli)
-    wd = supervisor.Watchdog(lim["first_event_s"], IDLE_S or lim["silence_s"], beat=WORKER_BEAT[0] if WORKER_BEAT else None)
-    gone, gstate = lane_gone_poll(lane, time.time())
-    state = {"why": None, "msg": "", "kind": None, "words": "", "wd": wd}
-    polls = [(gone, gstate)] + ([extra] if extra else [])
-
-    def poll():
-        for p_, st_ in polls:
-            if p_():
-                state.update(why=st_["why"], msg=st_["msg"])
-                return True
-        if wd.poll():
-            state.update(why="hung", kind=wd.why, words=wd.describe())
-            return True
-        return False
-    return poll, wd.touch, state
-
-
-def stream_poll(poll0, turn, dog, live=None):
-    """poll for run_proc: `poll0` (limit, silence), then the shared Turn rules: answer-then-grace and stall (lanes/supervisor.py, delegate-np7). The stall is
-    reported as a hung worker of kind "stall"; the answer as turn.stop == "answer" (the launcher keeps the answer)."""
-    def poll():
-        if poll0():
-            return True
-        if live:
-            live.poll(dog["wd"].idle_s)
-        v = turn.verdict(dog["wd"])
-        if v == "stall":
-            dog.update(why="hung", kind="stall", words=turn.stall_words())
-        return bool(v)
-    return poll
-
-
-def log_gaps(w, d):
-    """After a worker run: one history row per inter-event gap over supervisor.LONG_GAP_S (role "gap", no run_id: the health fold ignores it). Never raises."""
-    with contextlib.suppress(Exception):
-        w["wd"].flush(history_add, d["lane"], d["model"], w["why"] is None)
-
-
-def watch_fields(res, w):
-    """What a hung worker's launcher tells settle (the sentence and the deadline) and the structured facts for classify."""
-    if w["why"] == "hung":
-        res["hung_words"], res["hung_kind"] = w["words"], w["kind"]
-    return {"watchdog": w["why"], "msg": w["msg"]}
-
-
-def opencode_exe():
-    return shutil.which("opencode") or next((str(p) for p in [Path.home() / ".opencode" / "bin" / "opencode"] if p.is_file()), None)
-
-
-def network_refusal(outp):
-    """True when a command's output shows it was refused the network (the shell's sandbox blocks it): that is not an owner decision."""
-    return any(x in outp for x in ("tcp connect error", "Network is unreachable", "Failed to connect", "error sending request"))
-
-
-def opencode_shell(cwd, write, path):
-    """The $SHELL OpenCode runs commands with: each one under sandbox-exec (no network, no secret paths or .env files, writes only in cwd and temp).
-    OpenCode itself stays outside: it needs the network for its model, and macOS cannot nest a sandbox inside another."""
-    H = Path.home()
-    q = lambda x: json.dumps(os.path.realpath(str(x)))
-    secrets = " ".join(f"(subpath {q(H / x)})" for x in OC_SECRETS)
-    scratch = Path(cwd) / ".task"        # the task-loop engine's git-ignored scratch folder: a reviewer's test run writes its temp files there
-    writable = [cwd if write else scratch] + ["/private/tmp", "/private/var/folders", H / "Library" / "Caches", H / ".cache"]
-    keep = " ".join(f"(require-not (subpath {q(x)}))" for x in writable)
-    prof = ('(version 1)(allow default)(deny network-outbound (remote ip))'
-            f'(deny file-read* file-write* {secrets} (regex #"/\\.env$") (regex #"/\\.env\\.[^/]*$"))'
-            '(allow file-read* (regex #"/\\.env\\.(example|sample|template|dist)$"))'
-            f'(deny file-write* (require-all {keep} (require-not (regex #"^/dev/"))))' + ("" if write else f"(deny file-write* (require-all (subpath {q(cwd)}) (require-not (subpath {q(scratch)}))))"))
-    xdg = os.environ.get("XDG_CONFIG_HOME")
-    head = f"export XDG_CONFIG_HOME={shlex.quote(xdg)}" if xdg else "unset XDG_CONFIG_HOME"      # commands get the user's config root back
-    path.write_text(f"#!/bin/sh\n{head}\nexport SHELL=/bin/zsh\nexport UV_OFFLINE=1\nexec /usr/bin/sandbox-exec -p {shlex.quote(prof)} /bin/zsh \"$@\"\n", encoding="utf-8")
-    path.chmod(0o700)
-
-
-def opencode_readable_outside():
-    """Folders outside cwd a read-only lane may read: the task-loop runs folder (the engine points reviewers at its files) and temp dirs."""
-    xdg = os.environ.get("XDG_CONFIG_HOME")
-    runs = (Path(xdg) if xdg else Path.home() / ".config") / "task-loop" / "runs"
-    return [str(runs), "/private/tmp", "/private/var/folders", "/tmp", "/var/folders"]
-
-
-def opencode_permissions(write):
-    reads = {"*": "allow", ".env": "deny", "*.env": "deny", "*.env.*": "deny", "*.env.example": "allow", "*.env.sample": "allow", "*.env.template": "allow"}
-    for x in OC_SECRETS:
-        reads[str(Path.home() / x)] = reads[str(Path.home() / x) + "/*"] = "deny"
-    return {"*": "allow", "read": reads, "webfetch": "deny", "websearch": "deny", "external_directory": "deny" if write else {"*": "deny", **{x + "/**": "allow" for x in opencode_readable_outside()}}, "task": "deny", **({} if write else {"edit": "deny"})}
-
-
-def opencode_free_model(exe, model, env):
-    """Fail closed if the exact free model disappears or its catalog costs change."""
-    if model != "opencode/deepseek-v4.1-flash-free":
-        return False
-    try:
-        x = subprocess.run([exe, "models", "opencode", "--verbose"], env=env,
-                           capture_output=True, text=True, timeout=30)
-        if x.returncode:
-            return False
-        marker = model + "\n"
-        if marker not in x.stdout:
-            return False
-        obj, _ = json.JSONDecoder().raw_decode(x.stdout.split(marker, 1)[1].lstrip())
-        cost = obj.get("cost") or {}
-        cache = cost.get("cache") or {}
-        return (obj.get("providerID") == "opencode" and obj.get("id") == model.split("/", 1)[1]
-                and obj.get("status") == "active"
-                and all(type(v) in (int, float) and v == 0 for v in
-                        (cost.get("input"), cost.get("output"), cache.get("read"), cache.get("write"))))
-    except (OSError, ValueError, TypeError, AttributeError, subprocess.TimeoutExpired):
-        return False
-
-
-def launch_opencode(d, brief, a, rid, t, meta):
-    """OpenCode headless runner for subscription and isolated free-only lanes."""
-    h = d["how"]
-    exe = opencode_exe()
-    if not exe or sys.platform != "darwin":
-        return {"outcome": "setup", "say": f"{d['lane']} needs macOS and the opencode CLI (route.py doctor --lane {d['lane']})"}
-    home = config_dir() / "opencode-home"       # an empty config root: the user's ~/.config/opencode (MCP servers, providers, permissions) stays out
-    home.mkdir(parents=True, exist_ok=True)
-    shell = config_dir() / f"opencode-shell-{rid[:8]}.sh"
-    opencode_shell(h["cwd"], h["write"], shell)
-    env = child_env({"SHELL": str(shell), "XDG_CONFIG_HOME": str(home), "OPENCODE_CONFIG_CONTENT": json.dumps({"permission": opencode_permissions(h["write"])}),
-                     "OPENCODE_DISABLE_PROJECT_CONFIG": "1", "OPENCODE_DISABLE_CLAUDE_CODE": "1", "OPENCODE_DISABLE_EXTERNAL_SKILLS": "1",
-                     "OPENCODE_DISABLE_AUTOUPDATE": "1", "OPENCODE_DISABLE_SHARE": "1", "OPENCODE_DISABLE_LSP_DOWNLOAD": "1"})
-    if d["lane"] == "DEEPSEEK_FREE":
-        # No saved provider logins or API keys: this lane cannot consume a paid balance.
-        for key in ("OPENCODE_CONFIG", "OPENCODE_CONFIG_DIR", "OPENCODE_AUTH_JSON"):
-            env.pop(key, None)
-        env["XDG_DATA_HOME"] = str(config_dir() / "opencode-free-data")
-        env["XDG_CACHE_HOME"] = str(config_dir() / "opencode-free-cache")
-        env["OPENCODE_CONFIG_CONTENT"] = json.dumps({"permission": opencode_permissions(h["write"]), "enabled_providers": ["opencode"]})
-        if not opencode_free_model(exe, h["model"], env):
-            with contextlib.suppress(OSError):
-                shell.unlink()
-            until = t + 900
-            mark_out(d["lane"], until, "exact free model unavailable or zero catalog price unverified", t, "limit", "guess")
-            return {"outcome": "rate_limited", "retry_after": until,
-                    "say": "Free DeepSeek is unavailable or its zero price could not be verified; rerun to use the next configured lane."}
-    if d["lane"] == "ZAI_CODING_SUBSCRIPTION":
-        # Pin subscription routing; never substitute the pay-as-you-go `zai` provider.
-        if h["model"] not in ("zai-coding-plan/glm-5.3", "zai-coding-plan/glm-5.3-flash"):
-            with contextlib.suppress(OSError):
-                shell.unlink()
-            return {"outcome": "setup", "say": "Z.ai Coding Plan model must use the subscription provider."}
-        for key in ("OPENCODE_CONFIG", "OPENCODE_CONFIG_DIR", "OPENCODE_AUTH_JSON", "ZHIPU_API_KEY", "ZAI_API_KEY"):
-            env.pop(key, None)
-        env["OPENCODE_CONFIG_CONTENT"] = json.dumps({"permission": opencode_permissions(h["write"]),
-            "enabled_providers": ["zai-coding-plan"]})
-    cmd = [exe, "run", "--pure", "--format", "json", "-m", h["model"], "--variant", d["effort"], "--dir", h["cwd"]] + (["--session", a.resume] if a.resume else [])
-    rules = " ".join((SECRET_RULE, GIT_RULES, EDIT_RULE, NO_SUBAGENTS_RULE, OC_RULE, DENIED_RULE))
-    if not any((x / "AGENTS.md").is_file() for x in repo_dirs(h["cwd"])):
-        rules += "\n\n" + repo_instruction_text(h["cwd"])         # opencode reads AGENTS.md itself; CLAUDE.md only through what is turned off
-    if a.schema:
-        rules += "\n\nYour final message must be only a JSON object matching this JSON Schema:\n" + Path(a.schema).read_text(encoding="utf-8")
-    seen = {"ref": a.resume, "last": "", "tokens": None, "denied": [], "error": "", "work": False, "turns": 0, "ctx": None, "acct": None}
-    if a.resume:
-        note_ref(a.resume)
-
-    poll, tick, dog = worker_watch("opencode", d["lane"], opencode_log_poll())
-    WORKER_TICK[:] = [tick]
-    turn = supervisor.Turn("opencode")
-    live = live_for("opencode", d, a, rid)
-    poll = stream_poll(poll, turn, dog, live)
-
-    def on_line(line):
-        try:
-            ev = json.loads(line)
-        except ValueError:
-            return None
-        if not isinstance(ev, dict):
-            return None
-        live.feed(ev)
-        if ev.get("sessionID") and not seen["ref"]:
-            seen["ref"] = ev["sessionID"]
-            note_ref(seen["ref"])
-            if agent_runs:
-                agent_runs.run(rid, session=seen["ref"])
-        p = ev.get("part") or {}
-        if ev.get("type") == "step_finish" and p.get("reason") in OC_FINAL_REASONS:
-            turn.finished()         # the last step of the turn (a "tool-calls" step is followed by another); a later event resets the grace
-        else:
-            turn.more()
-        if ev.get("type") == "tool_use" and (p.get("callID") or p.get("id")) and (p.get("state") or {}).get("status") in ("pending", "running", "completed", "error"):
-            turn.tool(p.get("callID") or p.get("id"), (p.get("state") or {}).get("status") in ("pending", "running"))      # opencode prints a tool call when it ends: usually no open call is seen
-        if ev.get("type") == "step_finish" and isinstance(p.get("tokens"), dict):
-            u, c = p["tokens"], p["tokens"].get("cache") or {}
-            tk = seen["tokens"] or {"in": 0, "cached": 0, "out": 0}
-            seen["tokens"] = {"in": tk["in"] + (u.get("input") or 0) + (c.get("read") or 0) + (c.get("write") or 0), "cached": tk["cached"] + (c.get("read") or 0),
-                              "out": tk["out"] + (u.get("output") or 0) + (u.get("reasoning") or 0)}
-            seen["acct"] = accounting.opencode_step(seen["acct"], u, p.get("cost"))
-            seen["turns"] += 1
-            seen["ctx"] = round(((u.get("input") or 0) + (c.get("read") or 0) + (c.get("write") or 0)) / 1000, 1)
-        if ev.get("type") == "text":
-            seen["last"] = p.get("text", "")
-            seen["work"] = True
-        if ev.get("type") == "error":
-            e = ev.get("error") or {}
-            seen["error"] = str((e.get("data") or {}).get("message") or e.get("name") or e)
-        if ev.get("type") == "tool_use":
-            seen["work"] = True
-            st = p.get("state") or {}
-            inp, outp = st.get("input") or {}, str(st.get("output") or st.get("error") or "")
-            if p.get("tool") == "bash" and secret_hit(inp.get("command")):      # reported after it ran: the sandbox already refused the read
-                seen["denied"].append(denial("secret", "bash", inp))
-                seen["secret"] = inp.get("command")
-                return True
-            if "prevents you from using this specific tool call" in outp:
-                seen["denied"].append(denial("policy", p.get("tool"), inp))
-            elif "Operation not permitted" in outp and not network_refusal(outp):
-                seen["denied"].append(denial("sandbox_limit", p.get("tool"), inp))
-        return None
-    if agent_runs:
-        agent_runs.run(rid, kind="opencode", lane=d["lane"], model=d["model"], cwd=h["cwd"], started=t, status="running", **meta)
-    try:
-        rc, out, err, timed_out = run_proc(cmd, rules + "\n\n" + brief, h["cwd"], env, a.timeout, on_line, poll)
-        live_end(live, turn, dog, timed_out, rc)
-        log_gaps(dog, d)
-    finally:
-        with contextlib.suppress(OSError):
-            shell.unlink()
-    if seen["ref"]:     # opencode keeps sessions in its database: export one to a file, so `transcript` is a path like the other lanes'
-        with contextlib.suppress(OSError, subprocess.TimeoutExpired):
-            x = run_tree([exe, "export", seen["ref"]], 60, env=env)
-            if x.returncode == 0 and x.stdout.strip():
-                f = opencode_transcript(seen["ref"])
-                f.parent.mkdir(parents=True, exist_ok=True)
-                f.write_text(x.stdout, encoding="utf-8")
-                private(f)
-    text = seen["last"].strip()
-    res = {"text": text, "ref": seen["ref"], "stderr": err, "tokens": seen["tokens"], "denied": seen["denied"], "turns": seen["turns"] or None, "context_k": seen["ctx"],
-           "started": bool(seen["ref"]), "partial": seen["work"], "acct": accounting.opencode_close(seen["acct"], d["lane"])}       # no `answered`: opencode has no resume-tested finished-answer signal (62-spikes-resume.md)
-    res["cost"] = (res["acct"] or {}).get("cost_usd") or 0         # opencode's per-step cost where it states one (Grok); zai and free steps carry none
-    why = seen["error"] or (err if rc != 0 and turn.stop != "answer" else "")       # stderr after we stopped it ourselves is the shell reporting our kill
-    o = classify.classify(rc, why, "", timed_out, seen["work"], dict(watch_fields(res, dog), secret=seen.get("secret")))
-    if turn.stop == "answer" and o and o.reason == "killed" and text and not seen["error"] and not timed_out:       # we stopped it after its last step: the answer stands
-        o = None
-        res["warnings"] = ["answer_done_process_alive"]
-    if dog["why"] or turn.stop or timed_out:        # the raw tail of the stream, so the call record shows what the CLI last said before it was stopped
-        res["stream_tail"] = supervisor.tail(out)
-    if o:       # opencode's error event, stderr or log, never the model's answer
-        hint = "free OpenCode access refused; no paid credentials will be used" if d["lane"] == "DEEPSEEK_FREE" else "run `opencode auth login` (xAI, SuperGrok Subscription)"
-        if d["lane"] == "ZAI_CODING_SUBSCRIPTION":
-            hint = "run `opencode auth login` and choose Z.AI Coding Plan; enter your Coding Plan key in your own terminal"
-        settle(res, o, d, t, "opencode", a, rc, err or text, login=(hint, f"{d['lane']}: {hint}: {{why}}"))
-    else:
-        update_state(lambda s_: s_.setdefault("out", {}).pop(d["lane"], None))
-        res.update(data=parse_data(text, a.schema))
-    return res
-
-
 def repo_instruction_text(cwd, cap=32768):
     """--restricted keeps Claude from loading the repo's CLAUDE.md; Codex reads AGENTS.md. Both lanes get the same files (repo_instructions),
     capped like Codex's project_doc_max_bytes."""
@@ -2795,14 +2243,67 @@ def repo_instruction_text(cwd, cap=32768):
     return out
 
 
-def claude_denials(events, read_only):
-    """The denied items of a claude run: what its own classifier or our guard refused, minus git writes and read-only breaches (delegate's policy, not the owner's call)."""
-    return [denial("secret" if x.tool == "Bash" and secret_hit((x.input or {}).get("command")) else "policy", x.tool, x.input)
-            for x in events if not policy_denial({"tool_name": x.tool, "tool_input": x.input}, read_only)]
+HUNG_OUT_SECS = 1800       # a lane whose worker printed nothing at all rests this long
+IDLE_S = None              # run --idle: seconds of silence before the worker is hung (None = the CLI's limit in app/watch.py)
+Prep = collections.namedtuple("Prep", "hx spec extra")       # the harness, its launch, and what the ladder needs from before the launch
+OC_PROFILES = {"GROK_SUBSCRIPTION": Profile(auth_key="xai"),
+               "ZAI_CODING_SUBSCRIPTION": Profile(providers=("zai-coding-plan",), price="unknown", auth_key="zai-coding-plan", need_key=True),
+               "DEEPSEEK_FREE": Profile(providers=("opencode",), own_data=True, price="free")}
+ZAI_MODELS = ("zai-coding-plan/glm-5.3", "zai-coding-plan/glm-5.3-flash")
 
 
-def launch_claude(d, brief, a, rid, t, cfg, meta):
-    """claude -p on the credit key (CLAUDE_CREDIT) or the logged-in subscription (CLAUDE_SUBSCRIPTION, unattended). -> dict of result fields."""
+def opencode_exe():
+    return OpenCodeHarness.find_exe()
+
+
+def lane_gone_check(lane, since):
+    """-> a function: the words of a limit, credit or login mark another process set on `lane` after `since` (wall clock), else None. The worker
+    still running there is burning an exhausted lane."""
+    def gone():
+        o = (load_state().get("out") or {}).get(lane) or {}
+        if o.get("set", 0) >= since and o.get("until", 0) > now() and o.get("reason", "limit") in ("limit", "credit", "logged_out"):
+            return o.get("why") or "lane marked out"
+        return None
+    return gone
+
+
+def secret_in(e):
+    """The command a Cmd or CmdEnd event names a secret path in, else None (delegate polices the stream of the CLIs that have no hook)."""
+    return e.text if secret_hit(e.text) else None
+
+
+def denied_items(hx, read_only):
+    """The `denied` items of a run, from the denials its harness reported. A git write the coordinator forbids, or a write on a read-only step, is
+    delegate's policy, not the owner's call, and Claude's own record of it is dropped."""
+    out = []
+    for x in hx.evidence.denials:
+        cmd = (x.input or {}).get("command")
+        if hx.kind == "claude" and policy_denial({"tool_name": x.tool, "tool_input": x.input}, read_only):
+            continue
+        kind = x.kind if x.kind != "policy" else "secret" if hx.kind == "opencode" and x.tool == "Bash" and secret_hit(cmd) else "policy"
+        out.append(denial(kind, x.tool, x.input))
+    return out
+
+
+def prepare_codex(d, brief, a, rid, t, cfg):
+    h = d["how"]
+    hold = real_hold(d.get("lane") or "OPENAI_SUBSCRIPTION", d.get("role", getattr(a, "role", None)), load_state(), t)
+    if hold:
+        return refusal_fields(hold, "no worker was launched")
+    exe = shutil.which("codex")
+    if not exe:
+        return {"outcome": "setup", "say": "codex CLI not found on PATH (route.py doctor --lane OPENAI_SUBSCRIPTION)"}
+    hx = CodexHarness(a.resume)
+    spec = hx.launch_spec(LaunchInputs(
+        exe=exe, cwd=h["cwd"], model=h["model"], effort=d["effort"], sandbox=h["sandbox"], out_file=str(config_dir() / f"codex-last-{rid[:8]}.txt"), env=child_env(),
+        cli=h["cli"], access=CODEX_ACCESS, isolation=h["isolation"], schema=a.schema, resume=a.resume,
+        prompt=" ".join((SECRET_RULE, GIT_RULES, EDIT_RULE, NO_SUBAGENTS_RULE, ESCALATE_RULE, DENIED_RULE)) + "\n\n" + brief))
+    before = (codex_thread_total(a.resume) or history_cumulative(a.resume)) if a.resume else None
+    return Prep(hx, spec, {"before": before, "started": time.time()})       # wall clock, not now(): it is compared with file times
+
+
+def prepare_claude(d, brief, a, rid, t, cfg):
+    """claude -p on the credit key (CLAUDE_CREDIT) or the logged-in subscription (CLAUDE_SUBSCRIPTION, unattended)."""
     h = d["how"]
     credit = cfg["lanes"][d["lane"]]["kind"] == "credit"
     exe = shutil.which("claude")
@@ -2823,37 +2324,115 @@ def launch_claude(d, brief, a, rid, t, cfg, meta):
         exe=exe, cwd=h["cwd"], model=h["model"], effort=d["effort"], prompt=brief, env=child_env(extra), schema=a.schema, resume=a.resume, session=rid,
         system=PREAMBLE + repo_instruction_text(h["cwd"]), settings=json.dumps(guard_settings(h.get("read_only"))), write=bool(h["write"]),
         budget=cap if credit else None))
-    ref = hx.evidence.ref
-    note_ref(ref)               # claude takes the session id from us (--session-id): known before the first event
-    if agent_runs:
-        agent_runs.run(rid, kind="claude-p", session=ref, lane=d["lane"], model=d["model"], cwd=h["cwd"], started=t, status="running", **meta)
-    turn = supervisor.Turn("claude")
-    live = live_for("claude", d, a, rid)
+    return Prep(hx, spec, {"credit": credit, "credit_until": nxt})
 
-    def on_line(line):
-        events = hx.parse_line(line)
-        turn.apply(events)
-        for e in events:
-            live.feed(e)
-    poll, tick, dog = worker_watch("claude", d["lane"])
-    WORKER_TICK[:] = [tick]
-    rc, out, err, timed_out = run_proc(spec.argv, spec.stdin, spec.cwd, spec.env, a.timeout, on_line, stream_poll(poll, turn, dog, live))
-    sm = hx.summary(rc, out, err, turn.stop, timed_out)
-    live_end(live, turn, dog, timed_out, rc, sm.cost or None)
-    log_gaps(dog, d)
-    res = dict(sm.res, stderr=err, denied=claude_denials(hx.evidence.denials, h.get("read_only")))
-    if credit and sm.cost > 0:
+
+def prepare_opencode(d, brief, a, rid, t, cfg):
+    """OpenCode headless runner for subscription and isolated free-only lanes."""
+    h, lane = d["how"], d["lane"]
+    exe = opencode_exe()
+    if not exe or not OpenCodeHarness.supported():
+        return {"outcome": "setup", "say": f"{lane} needs macOS and the opencode CLI (route.py doctor --lane {lane})"}
+    if lane == "ZAI_CODING_SUBSCRIPTION" and h["model"] not in ZAI_MODELS:       # pin subscription routing; never substitute the pay-as-you-go `zai` provider
+        return {"outcome": "setup", "say": "Z.ai Coding Plan model must use the subscription provider."}
+    rules = " ".join((SECRET_RULE, GIT_RULES, EDIT_RULE, NO_SUBAGENTS_RULE, opencode_sandbox.RULE, DENIED_RULE))
+    if not any((x / "AGENTS.md").is_file() for x in repo_dirs(h["cwd"])):
+        rules += "\n\n" + repo_instruction_text(h["cwd"])         # opencode reads AGENTS.md itself; CLAUDE.md only through what is turned off
+    if a.schema:
+        rules += "\n\nYour final message must be only a JSON object matching this JSON Schema:\n" + Path(a.schema).read_text(encoding="utf-8")
+    hx = OpenCodeHarness(OC_PROFILES.get(lane, Profile()), config_dir())
+    spec = hx.launch_spec(LaunchInputs(exe=exe, cwd=h["cwd"], model=h["model"], effort=d["effort"], prompt=rules + "\n\n" + brief, env=child_env(),
+                                       resume=a.resume, session=rid, write=bool(h["write"])))
+    if lane == "DEEPSEEK_FREE" and not hx.free_model_ok(h["model"], spec.env):        # fail closed if the exact free model or its zero price is gone
+        hx.cleanup()
+        until = t + 900
+        mark_out(lane, until, "exact free model unavailable or zero catalog price unverified", t, "limit", "guess")
+        return {"outcome": "rate_limited", "retry_after": until,
+                "say": "Free DeepSeek is unavailable or its zero price could not be verified; rerun to use the next configured lane."}
+    return Prep(hx, spec, {})
+
+
+PREPARE = {"codex": prepare_codex, "claude_p": prepare_claude, "opencode": prepare_opencode}
+REF_FIELD = {"codex": "thread", "claude_p": "session", "opencode": "session"}        # the agent-runs field the vendor's session id goes in
+AGENT_KIND = {"codex": "codex", "claude_p": "claude-p", "opencode": "opencode"}
+
+
+def login_text(kind, lane):
+    """(the hint stored with a lane that is logged out, the text of the answer with {why})."""
+    if kind == "codex":
+        return "logged out: run `codex login`", f"codex is not logged in: {{why}} (route.py doctor --lane {lane})"
+    if kind == "claude_p":
+        return "logged out: run `claude auth login`", "claude is not logged in: {why} (claude auth login)"
+    hint = ("free OpenCode access refused; no paid credentials will be used" if lane == "DEEPSEEK_FREE" else "run `opencode auth login` and choose Z.AI Coding Plan; enter your Coding Plan key in your own terminal"
+            if lane == "ZAI_CODING_SUBSCRIPTION" else "run `opencode auth login` (xAI, SuperGrok Subscription)")
+    return hint, f"{lane}: {hint}: {{why}}"
+
+
+def codex_usage(res, x):
+    """Codex's usage is a thread's running total: keep this run's part, add the reviewer's tokens (its own child thread), and read the context size."""
+    tokens = accounting.per_call(res["tokens"], x["before"])
+    if res["ref"]:
+        extra, n = codex_child_tokens(res["ref"], x["started"] - 1)
+        if n:
+            base = tokens or {"in": 0, "cached": 0, "out": 0}
+            tokens = {k: (base.get(k) or 0) + extra[k] for k in extra}
+    res.update(tokens=tokens, context_k=codex_context_k(res["ref"]), acct=accounting.codex(tokens))
+
+
+def launch_worker(d, brief, a, rid, t, cfg, meta, hooks):
+    """One worker, end to end: its harness builds the launch, the supervisor runs it, the one ladder settles it. -> dict of result fields."""
+    h = d["how"]
+    prep = PREPARE[h["kind"]](d, brief, a, rid, t, cfg)
+    if isinstance(prep, dict):
+        return prep
+    hx, spec, x = prep
+    field = REF_FIELD[h["kind"]]
+
+    def on_ref(ref):
+        if hooks.ref:
+            hooks.ref(ref)
+        if agent_runs:
+            agent_runs.run(rid, **{field: ref})
+    if hx.evidence.ref:
+        on_ref(hx.evidence.ref)        # known before the first event: a resume, or claude's own --session-id
+    if agent_runs:
+        agent_runs.run(rid, kind=AGENT_KIND[h["kind"]], lane=d["lane"], model=d["model"], cwd=h["cwd"], started=t, status="running",
+                       **({field: hx.evidence.ref} if hx.evidence.ref else {}), **meta)
+    live = LiveSink(hx.kind, run_id=rid)
+    live.start(lane=d.get("lane"), model=d.get("model"), effort=d.get("effort"), role=d.get("role") or getattr(a, "role", None))
+    log = LogWatcher(hx.log_dir, classify.LIMIT_RE.search, hx.echoes_input) if hx.log_dir else None
+    sup = Supervisor(hx, watch.CLI_OF_KIND[h["kind"]], dataclasses.replace(hooks, ref=on_ref), live, gone=lane_gone_check(d["lane"], time.time()), log=log,
+                     policy=secret_in if hx.secret_event else None, net_up=lambda: net_up(d["lane"]))
+    try:
+        out = sup.run(spec, a.timeout)
+    finally:
+        hx.cleanup()
+    hx.export(spec.env)
+    with contextlib.suppress(Exception):        # one history row per inter-event gap over watch.LONG_GAP_S (role "gap"): the health fold ignores it
+        sup.dog.flush(history_add, d["lane"], d["model"], out.watch.why is None)
+    sm, w = out.summary, out.watch
+    res = dict(sm.res, stderr=out.err, denied=denied_items(hx, h.get("read_only")))
+    if h["kind"] == "codex":
+        codex_usage(res, x)
+    if x.get("credit") and sm.cost > 0:
         ledger_add(sm.cost, d["model"], t)
-    if dog["why"] or turn.stop or timed_out:        # the raw tail of the stream, so the call record shows what the CLI last said before it was stopped
-        res["stream_tail"] = supervisor.tail(out)
-    j = hx.evidence.final or {}
-    o = classify.classify(sm.rc, sm.vendor, sm.stderr, timed_out, sm.work, dict(watch_fields(res, dog), http_status=j.get("api_error_status"))) if sm.check else None
-    if o:       # the CLI's own error and stderr, never the model's answer (a worker may write "rate limit")
-        settle(res, o, d, t, "claude", a, sm.rc, sm.text, credit_until=nxt, login=("logged out: run `claude auth login`", "claude is not logged in: {why} (claude auth login)"))
+    if out.stream_tail:
+        res["stream_tail"] = out.stream_tail
+    if w.why == "hung":
+        res["hung_words"], res["hung_kind"] = w.words, w.kind
+    facts = dict(sm.facts, watchdog=w.why, msg=w.msg, secret=out.secret)
+    o = classify.classify(sm.rc, sm.vendor, sm.stderr, out.timed_out, sm.work, facts) if sm.check else None
+    if out.stop == "answer" and o and o.reason == "killed" and sm.stands and not out.timed_out:       # we stopped it after its answer: the answer stands
+        o = None
+        res["warnings"] = ["answer_done_process_alive"]
+    if out.net and (o is None or o.reason == "killed"):       # we stopped it because the network is down
+        o = classify.Outcome("network", hx.evidence.transient, "event")
+    if o:       # the CLI's own error or stderr, never the model's answer
+        settle(res, o, d, t, hx.kind, a, sm.rc, sm.tail, reset=(lambda: codex_reset_now(t)) if hx.kind == "codex" else None,
+               credit_until=x.get("credit_until"), login=login_text(h["kind"], d["lane"]))
     else:
         update_state(lambda s: s.setdefault("out", {}).pop(d["lane"], None))
-        data = j.get("structured_output") if isinstance(j.get("structured_output"), (dict, list)) else parse_data(sm.text, a.schema)
-        res.update(data=data)
+        res.update(data=sm.data if sm.data is not None else parse_data(sm.text, a.schema))
         if sm.warnings:
             res["warnings"] = sm.warnings
     return res
@@ -2863,12 +2442,6 @@ def policy_denial(x, read_only=False):
     """A git write the coordinator forbids, or a write on a read-only step, is delegate's policy, not a decision for the owner (a secret path stays one)."""
     cmd = ((x.get("tool_input") or {}).get("command") or "").strip()
     return x.get("tool_name") == "Bash" and not secret_hit(cmd) and bool(git_write(cmd) or read_only and read_only_problem(cmd))
-
-
-profiles.register("codex", "codex", "codex", lambda d, b, a, rid, t, cfg, meta: launch_codex(d, b, a, rid, t, meta))
-profiles.register("opencode", "opencode", "opencode", lambda d, b, a, rid, t, cfg, meta: launch_opencode(d, b, a, rid, t, meta), resume="untested")
-profiles.register("claude_p", "claude", "claude", launch_claude)
-LAUNCHERS = profiles.launchers()      # by how()'s `kind`; an unknown kind is a setup error, not a silent `claude -p`
 
 
 def transcript_info(path, family, start=0):
@@ -3028,8 +2601,7 @@ def run_once(a, cfg):
         ni = [n["what"] for n in needs_input(lanes)]
         if ni:
             extra["needs_input"] = ni
-    runner = LAUNCHERS.get(h["kind"])
-    if runner is None and h["kind"] != "agent_tool":
+    if h["kind"] not in profiles.REGISTRY and h["kind"] != "agent_tool":
         return refuse(a, "setup", f"no launcher for runner kind {h['kind']!r}: route.py has codex, opencode and claude_p", None, extra, **who)
     if h["kind"] == "agent_tool":
         return emit(result(None, **who, call_id=getattr(a, "call_id", None), transcript_status="unsupported", agent_model=h["model"], brief_prefix=SECRET_RULE + " " + GIT_RULES, cwd=h["cwd"], **extra))
@@ -3043,8 +2615,8 @@ def run_once(a, cfg):
     resets = [(lane.week or 0, lane.week_reset), (lane.five or 0, lane.five_reset)]
     d["limit_reset"] = min((r for _, r in resets if r and r > t), default=None)     # a guess: the soonest reset (too early costs one refused call, too late days)
     cap, taken = slots(lane, S), {}
-    canary_due = bool(lane.canary.get(d["model"])) and h["kind"] in LAUNCHERS
-    silence_s = IDLE_S or supervisor.LIMITS[supervisor.CLI_OF_KIND[h["kind"]]]["silence_s"]
+    canary_due = bool(lane.canary.get(d["model"])) and h["kind"] in profiles.REGISTRY
+    silence_s = IDLE_S or watch.LIMITS[watch.CLI_OF_KIND[h["kind"]]]["silence_s"]
 
     def claim(st):      # the authoritative count: inside the lock, never from the snapshot decision() read
         live = live_leases(st, now())
@@ -3056,7 +2628,7 @@ def run_once(a, cfg):
                     live.pop(k, None)
                 else:           # still running: its lease stays, so the same task or a full lane waits
                     live[k] = dict(v, expires=now() + LEASE_TTL)
-            elif k not in live and v.get("pid_start") and proc_start(v.get("pid")) == v["pid_start"]:
+            elif k not in live and v.get("pid_start") and procs.start_token(v.get("pid")) == v["pid_start"]:
                 live[k] = v     # expired only because route.py could not renew it (the laptop slept): it is still running
         st["leases"] = live
         if a.task and any(v.get("task") == a.task for v in live.values()):
@@ -3069,7 +2641,7 @@ def run_once(a, cfg):
             taken["peers"] = sorted(live)
             live[rid] = {"lane": d["lane"], "role": a.role, "pid": os.getpid(), "pid_start": me_start, "start": now(), "expires": now() + LEASE_TTL, "task": a.task or "",
                          "silence_s": silence_s, **({"canary": d["model"]} if canary_due else {})}
-    me_start = proc_start(os.getpid())
+    me_start = procs.start_token(os.getpid())
     launched = {}
     update_state(claim)
     if "no" in taken:
@@ -3085,19 +2657,19 @@ def run_once(a, cfg):
                 update_state(renew)
     threading.Thread(target=keep_lease, daemon=True).start()
 
-    def worker_started(pid):
+    hooks = RunHooks(idle_s=IDLE_S, unattended=UNATTENDED)
+
+    def worker_started(w):
         """The worker runs in its own process group (pgid = pid), so a SIGKILL on route.py leaves it running: say where it is, before any
         work, on stderr and in the lease (status --json `running`), so the caller can kill the group itself."""
-        print(f"delegate: worker pid={pid} pgid={pid} run_id={rid}", file=sys.stderr, flush=True)
-
-        started_at = proc_start(pid)
-        launched.update(pid=pid, pgid=pid, start=started_at)       # the worker is its own session leader: its group is its pid
+        print(f"delegate: worker pid={w.pid} pgid={w.pgid} run_id={rid}", file=sys.stderr, flush=True)
+        launched.update(pid=w.pid, pgid=w.pgid, start=w.start)
 
         def note(st):
             if rid in (st.get("leases") or {}):
-                st["leases"][rid].update(worker_pid=pid, worker_start=started_at)
+                st["leases"][rid].update(worker_pid=w.pid, worker_start=w.start)
         update_state(note)
-    WORKER_STARTED[:] = [worker_started]
+    hooks.started = worker_started
 
     def stamp_beat(wall):
         """The worker printed something: stamp the lease (at most every 30 s)."""
@@ -3105,7 +2677,7 @@ def run_once(a, cfg):
             if rid in (st.get("leases") or {}):
                 st["leases"][rid]["last_event"] = wall
         update_state(stamp)
-    WORKER_BEAT[:] = [stamp_beat]
+    hooks.beat = stamp_beat
     ref_rec = {"lane": d["lane"], "model": d["model"], "effort": d["effort"], "mode": d["mode"], "cap": d.get("cap"),
                "rung": d.get("rung"), "fallback": d.get("fallback"), "fallback_reason": d.get("fallback_reason"), "first_lane": d.get("first_lane")}
 
@@ -3127,13 +2699,13 @@ def run_once(a, cfg):
             if rid in (st.get("leases") or {}):
                 st["leases"][rid]["ref"] = ref
         update_state(stamp)
-    REF_SEEN[:] = [ref_seen]
+    hooks.ref = ref_seen
     meta = {"parent_session": a.parent or "", "title": a.title or brief.strip().splitlines()[0][:120]}
     if a.task:
         meta["task"] = a.task
     git_before = git_state(cwd)
     t0, ends = time.time(), {}
-    launch = lambda b, a_: runner(d, b, a_, rid, t, cfg, meta)
+    launch = lambda b, a_: launch_worker(d, b, a_, rid, t, cfg, meta, hooks)
     t_from = file_size(find_transcript(a.resume, fam)) if a.resume else 0
     try:
         res = canary(launch, d, rid, a) if canary_due else None      # the one probe before full traffic; None = it passed
@@ -3206,7 +2778,7 @@ def run_once(a, cfg):
                context={"instructions": [str(f) for f in repo_instructions(cwd)], "env_keys": sorted(child_env().keys())},
                transcript=transcript, call_id=getattr(a, "call_id", None), usage=usage, transcript_info=info,
                transcript_status="ok" if info else "ref_unresolvable" if res.get("ref") else "died_before_session_id", **extra)
-    wk = reaper.worker_end(res.get("outcome"))
+    wk = procs.worker_end(hooks.stops, res.get("outcome"))
     if launched:
         wk.pid, wk.pgid, wk.start = launched["pid"], launched["pgid"], launched["start"]
     if wk.survivors and res.get("outcome") is None:      # a done answer must not hide a worker still running

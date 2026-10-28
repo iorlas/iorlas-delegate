@@ -1,18 +1,14 @@
 """Idle watchdog for a worker (delegate-go0): first-event and silence deadlines, on a clock that does not run while the laptop sleeps.
 
 Pure but for the clock it is given. `Watchdog.touch()` is called for every line the worker prints (stdout or stderr: any stream delta is
-activity); `poll()` is called about every half second and is truthy once the worker is hung. route.run_proc stops a hung worker through
-route.stop_tree (the whole process tree).
+activity); `poll()` is called about every half second and is truthy once the worker is hung. The Supervisor stops a hung worker's whole tree.
 
 Silence limits per CLI (spikes P7, P7b): Claude's longest healthy gap was 225 s, so 600; `codex exec --json` is silent during pure reasoning
 (rollout gaps up to 2,298 s, longest live gap 225.8 s), so 3600; opencode 900. Every gap over LONG_GAP_S is kept (`Watchdog.flush`) to learn the real distribution. A first event must arrive within 120 s (longest seen 35 s).
 """
-import sys
 import time
-from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[3] / "src"))
-from delegate.contracts import events as ev  # noqa: E402
+from delegate.contracts import events as ev
 
 LIMITS = {"claude": {"first_event_s": 120, "silence_s": 600},
           "codex": {"first_event_s": 120, "silence_s": 3600},
@@ -36,8 +32,8 @@ def grace_s(cli):
 
 
 class Turn:
-    """One worker's turn as the three launchers see it (Codex exec --json, claude -p stream-json, opencode run --format json): one rule set (delegate-np7).
-    The launcher's on_line maps a harness event to `finished()` (its completion event or final assistant message), `more()` (anything else: the turn goes on) and
+    """One worker's turn as the three harnesses report it (Codex exec --json, claude -p stream-json, opencode run --format json): one rule set (delegate-np7).
+    `apply` maps a parsed line's HarnessEvents to `finished()` (a turn end or a final message), `more()` (anything else: the turn goes on) and
     `tool(id, open_)` (a tool call in flight keeps the long silence limit). `verdict(wd)` -> "answer" once finished and quiet for the grace, "stall" once the model
     owes a response and the stream has printed nothing for STALL_S, else None. Only the clock is injected."""
 
@@ -56,9 +52,9 @@ class Turn:
             (self.open.add if open_ else self.open.discard)(ident)
 
     def apply(self, events):
-        """One parsed stream line (its HarnessEvents): the answer or turn end finishes the turn, a tool in flight keeps the long silence limit,
+        """One parsed line (its HarnessEvents): a turn end or a final message finishes the turn, a tool in flight keeps the long silence limit,
         anything else means the turn goes on."""
-        if any(isinstance(e, (ev.Msg, ev.TurnDone)) for e in events):
+        if any(isinstance(e, ev.TurnDone) or isinstance(e, ev.Msg) and e.final for e in events):
             self.finished()
         else:
             self.more()

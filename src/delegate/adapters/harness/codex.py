@@ -1,5 +1,6 @@
 """CodexHarness: `codex exec --json`. Its argv, its event parser (each line parsed once, into HarnessEvents and Evidence), its transcript
 file and its login status."""
+import contextlib
 import json
 import re
 import shutil
@@ -8,7 +9,7 @@ import time
 from collections.abc import Callable
 from pathlib import Path
 
-from delegate.adapters.harness.base import Evidence, LaunchInputs, LaunchSpec
+from delegate.adapters.harness.base import Evidence, LaunchInputs, LaunchSpec, Quiet, Summary
 from delegate.contracts import events as ev
 
 RECONNECT_RE = re.compile(r"^\s*Reconnecting\.\.\.\s*(\d+)/(\d+)")        # codex retrying its stream: progress until n == of
@@ -50,16 +51,19 @@ def tool_parts(item: dict) -> tuple[str, str]:
     return kind.split("_")[0], _s(item.get("query"))
 
 
-class CodexHarness:
+class CodexHarness(Quiet):
     kind = "codex"
+    secret_event = ev.Cmd            # no hook under `codex exec`: stop the worker before it can use what it read
     EXE = "codex"
 
     def __init__(self, resume: str | None = None, clock: Callable[[], float] = time.monotonic) -> None:
         self.clock = clock
         self.evidence = Evidence(ref=resume)
+        self.out_file = ""
 
     # -- launch ----------------------------------------------------------------------------------------------------------------------------
     def launch_spec(self, i: LaunchInputs) -> LaunchSpec:
+        self.out_file = i.out_file
         out = ["--json", "-o", i.out_file]
         schema = ["--output-schema", i.schema] if i.schema else []
         if i.resume:
@@ -154,8 +158,20 @@ class CodexHarness:
                 if isinstance(x, ev.WaitingForNetwork):
                     e.net_at = self.clock()
 
-    def parse_log_line(self, line: str) -> list[ev.HarnessEvent]:
-        return []
+    def summary(self, rc: int | None, out: str, err: str, stop: str | None, timed_out: bool) -> Summary:
+        """The answer is the file `-o` wrote at the turn's end, else the last agent message; the usage is raw (the caller subtracts a resumed thread's earlier total)."""
+        e = self.evidence
+        text = ""
+        if self.out_file:
+            p = Path(self.out_file)
+            with contextlib.suppress(OSError):
+                text = p.read_text(encoding="utf-8", errors="replace").strip()
+                p.unlink()
+        final = bool(text) or bool(e.last and (e.turns or stop == "answer"))        # the turn finished: codex writes -o only at its end
+        text = text or e.last
+        res = {"text": text, "ref": e.ref, "tokens": e.tokens, "turns": e.turns or None, "started": bool(e.ref), "partial": e.work, "answered": final,
+               "cumulative": e.cumulative}
+        return Summary(text=text, rc=rc, res=res, vendor=self.vendor_error(rc), stderr=err, work=e.work, stands=final and not e.error, tail=err or text)
 
     def vendor_error(self, rc: int | None) -> str:
         """The failure text the classifier reads: codex's error event, else a retry that never recovered (only when the exit was a failure)."""

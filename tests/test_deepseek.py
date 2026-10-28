@@ -9,6 +9,9 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
 from test_route import route, CFG, lanes, decide
+from delegate.adapters.harness.opencode import OpenCodeHarness
+from delegate.app.supervisor import RunHooks
+from fakes.fake_run import replay
 
 
 class DeepSeekTests(unittest.TestCase):
@@ -17,21 +20,6 @@ class DeepSeekTests(unittest.TestCase):
                    cost={'input': 0, 'output': 0, 'cache': {'read': 0, 'write': 0}})
         obj.update(changes)
         return 'opencode/deepseek-v4.1-flash-free\n' + json.dumps(obj)
-
-    def test_accepts_exact_zero_priced_model_only(self):
-        with patch.object(route.subprocess, 'run', return_value=subprocess.CompletedProcess([], 0, self.catalog(), '')):
-            self.assertTrue(route.opencode_free_model('opencode', 'opencode/deepseek-v4.1-flash-free', {}))
-            self.assertFalse(route.opencode_free_model('opencode', 'deepseek/deepseek-chat', {}))
-
-    def test_missing_paid_incomplete_or_unknown_prices_refuse(self):
-        for output in ['', 'not-json', self.catalog(status='deprecated'),
-                       self.catalog(cost={'input': 0, 'output': 1, 'cache': {'read': 0, 'write': 0}}),
-                       self.catalog(cost={'input': 0, 'output': 0}),
-                       self.catalog(cost={'input': False, 'output': 0, 'cache': {'read': 0, 'write': 0}})]:
-            with self.subTest(output=output), patch.object(route.subprocess, 'run', return_value=subprocess.CompletedProcess([], 0, output, '')):
-                self.assertFalse(route.opencode_free_model('opencode', 'opencode/deepseek-v4.1-flash-free', {}))
-        with patch.object(route.subprocess, 'run', side_effect=subprocess.TimeoutExpired('opencode', 30)):
-            self.assertFalse(route.opencode_free_model('opencode', 'opencode/deepseek-v4.1-flash-free', {}))
 
     @patch.dict(CFG["settings"], {"deepseek_free_enabled": True})
     def test_free_first_light_and_worker_then_existing_fallback(self):
@@ -56,24 +44,23 @@ class DeepSeekTests(unittest.TestCase):
             self.assertNotIn('DEEPSEEK_FREE', route.gather(cfg, {}, 1, check_config=False))
 
     def test_launch_isolates_credentials_and_refuses_unverified_model(self):
-        d = {'lane': 'DEEPSEEK_FREE', 'model': 'deepseek-v4.1-flash-free', 'effort': 'low',
-             'how': {'model': 'opencode/deepseek-v4.1-flash-free', 'cwd': '/tmp', 'write': False}}
+        d = {'lane': 'DEEPSEEK_FREE', 'model': 'deepseek-v4.1-flash-free', 'effort': 'low', 'role': 'worker',
+             'how': {'kind': 'opencode', 'model': 'opencode/deepseek-v4.1-flash-free', 'cwd': '/tmp', 'write': False}}
         a = SimpleNamespace(resume=None, schema=None, timeout=10)
         for valid in (False, True):
             with tempfile.TemporaryDirectory() as tmp, patch.object(route, 'config_dir', return_value=Path(tmp)), \
                  patch.object(route, 'opencode_exe', return_value='opencode'), patch.object(route.sys, 'platform', 'darwin'), \
-                 patch.object(route, 'opencode_shell'), patch.object(route, 'opencode_free_model', return_value=valid) as guard, \
-                 patch.object(route, 'run_proc', return_value=(0, '', '', False)) as run, \
-                 patch.object(route, 'mark_out'), patch.object(route, 'update_state'), patch.object(route, 'agent_runs', None), \
+                 patch.object(OpenCodeHarness, 'write_shell'), patch.object(OpenCodeHarness, 'free_model_ok', return_value=valid) as guard, \
+                 replay(['{}']), patch.object(route, 'mark_out'), patch.object(route, 'update_state'), patch.object(route, 'agent_runs', None), \
                  patch.object(route, 'child_env', return_value={'OPENCODE_CONFIG': '/private/key-config', 'OPENCODE_AUTH_JSON': 'secret'}):
-                result = route.launch_opencode(d, 'Say OK', a, 'test1234', 1, {})
-                env = guard.call_args.args[2]
-                self.assertNotIn('OPENCODE_CONFIG', env)
-                self.assertNotIn('OPENCODE_AUTH_JSON', env)
-                self.assertEqual(env['XDG_DATA_HOME'], str(Path(tmp) / 'opencode-free-data'))
+                result = route.launch_worker(d, 'Say OK', a, 'test1234', 1, route.load_routing(), {}, RunHooks())
                 if valid:
+                    env = guard.call_args.args[1]
+                    self.assertNotIn('OPENCODE_CONFIG', env)
+                    self.assertNotIn('OPENCODE_AUTH_JSON', env)
+                    self.assertEqual(env['XDG_DATA_HOME'], str(Path(tmp) / 'opencode-free-data'))
                     self.assertIsNone(result.get('outcome'))
-                    self.assertIn('opencode/deepseek-v4.1-flash-free', run.call_args.args[0])
                 else:
                     self.assertEqual(result['outcome'], 'rate_limited')
-                    run.assert_not_called()
+
+

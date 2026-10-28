@@ -14,7 +14,9 @@ from unittest import mock
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "skills" / "delegate"))
 import route                                  # noqa: E402
 from delegate.adapters.harness import claude   # noqa: E402
-from lanes import supervisor                # noqa: E402
+from delegate.adapters.harness.opencode import OpenCodeHarness   # noqa: E402
+from delegate.app.supervisor import RunHooks   # noqa: E402
+from delegate.app import watch                # noqa: E402
 
 T = 1_000_000.0
 
@@ -49,13 +51,13 @@ class Replay(unittest.TestCase):
         self.cfg = self.base / "cfg"
         self.cfg.mkdir()
         for k, v in (("ANSWER_GRACE_S", 1), ("STALL_S", 1)):
-            self.addCleanup(setattr, supervisor, k, getattr(supervisor, k))
-            setattr(supervisor, k, v)
-        self.addCleanup(setattr, supervisor, "GRACE_OF", supervisor.GRACE_OF)
-        supervisor.GRACE_OF = {}
+            self.addCleanup(setattr, watch, k, getattr(watch, k))
+            setattr(watch, k, v)
+        self.addCleanup(setattr, watch, "GRACE_OF", watch.GRACE_OF)
+        watch.GRACE_OF = {}
         env = dict(os.environ, DELEGATE_CONFIG_DIR=str(self.cfg), HOME=str(self.base), CODEX_HOME=str(self.base))
         for p in (mock.patch.dict(os.environ, env), mock.patch.object(route, "agent_runs", None), mock.patch.object(route.sys, "platform", "darwin"),
-                  mock.patch.object(route, "opencode_shell"), mock.patch.object(route, "child_env", side_effect=lambda extra=None: dict(os.environ, **(extra or {}))),
+                  mock.patch.object(OpenCodeHarness, "write_shell"), mock.patch.object(route, "child_env", side_effect=lambda extra=None: dict(os.environ, **(extra or {}))),
                   mock.patch.object(route, "codex_thread_total", return_value=None), mock.patch.object(route, "codex_child_tokens", return_value=({"in": 0, "cached": 0, "out": 0}, 0)),
                   mock.patch.object(route, "codex_context_k", return_value=None)):
             p.start()
@@ -82,18 +84,14 @@ class Replay(unittest.TestCase):
 
     def d(self, kind):
         lane = {"codex": "OPENAI_SUBSCRIPTION", "claude": "CLAUDE_SUBSCRIPTION", "opencode": "GROK_SUBSCRIPTION"}[kind]
-        how = dict(model="m", cwd=str(self.base), write=False, read_only=False, cap=1, sandbox="read-only", cli=["codex", "exec"], isolation=[])
+        how = dict(kind={"codex": "codex", "claude": "claude_p", "opencode": "opencode"}[kind], model="m", cwd=str(self.base), write=False, read_only=False, cap=1, sandbox="read-only", cli=["codex", "exec"], isolation=[])
         return dict(lane=lane, model="m", effort="high", role="worker", how=how)
 
     def launch(self, kind, exe, a=None):
         a = a or self.a
         d = self.d(kind)
         with mock.patch.object(route.shutil, "which", return_value=exe), mock.patch.object(route, "opencode_exe", return_value=exe):
-            if kind == "codex":
-                return route.launch_codex(d, "brief", a, "rid12345", T, {})
-            if kind == "claude":
-                return route.launch_claude(d, "brief", a, "rid12345", T, route.load_routing(), {})
-            return route.launch_opencode(d, "brief", a, "rid12345", T, {})
+            return route.launch_worker(d, "brief", a, "rid12345", T, route.load_routing(), {}, RunHooks())
 
     CASES = {"codex": ([CODEX_STARTED, CODEX_CMD, CODEX_MSG, CODEX_DONE], "codex answer"),
              "claude": ([CLAUDE_TOOL, CLAUDE_TOOL_DONE, CLAUDE_FINAL, CLAUDE_RESULT], "claude answer"),
@@ -152,8 +150,8 @@ class Replay(unittest.TestCase):
 
     def test_turn_rules_with_an_injected_clock(self):
         now = [0.0]
-        wd = supervisor.Watchdog(120, 600, clock=lambda: now[0])
-        turn = supervisor.Turn("codex", clock=lambda: now[0])
+        wd = watch.Watchdog(120, 600, clock=lambda: now[0])
+        turn = watch.Turn("codex", clock=lambda: now[0])
         wd.touch()
         turn.finished()
         now[0] = 0.5

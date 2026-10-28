@@ -8,7 +8,8 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "skills" / "delegate"))
-from lanes import classify, health, supervisor      # noqa: E402
+from delegate.app import watch      # noqa: E402
+from lanes import classify, health      # noqa: E402
 
 FIX = ROOT / "tests" / "contract" / "fixtures"
 POL = health.policy()
@@ -282,7 +283,7 @@ class Clock:
 def run_watch(cli, events_at, until, tick=0.5, jump=None):
     """Drive a Watchdog on a fake clock like run_proc does (a poll every `tick` s). -> the second it fired, or None."""
     clk = Clock()
-    wd = supervisor.Watchdog(clock=clk, **supervisor.limits(cli))
+    wd = watch.Watchdog(clock=clk, **watch.limits(cli))
     events = sorted(events_at)
     while clk.t < until:
         clk.t = round(clk.t + tick, 3)
@@ -299,14 +300,14 @@ def run_watch(cli, events_at, until, tick=0.5, jump=None):
 class Watchdog(unittest.TestCase):
     def test_answer_grace_is_30s_and_the_codex_silence_limit_is_unchanged(self):
         """delegate-itn: the grace after a final answer is 120 s, a stalled model request 900 s; a stream with no final message still waits the 3600 s silence limit."""
-        self.assertEqual(supervisor.ANSWER_GRACE_S, 120)
-        self.assertEqual(supervisor.STALL_S, 900)
-        self.assertEqual(supervisor.LIMITS["codex"]["silence_s"], 3600)
+        self.assertEqual(watch.ANSWER_GRACE_S, 120)
+        self.assertEqual(watch.STALL_S, 900)
+        self.assertEqual(watch.LIMITS["codex"]["silence_s"], 3600)
         at, _ = run_watch("codex", [5], 6000)
         self.assertEqual(at, 3605.5)
 
     def test_limits(self):
-        L = supervisor.LIMITS
+        L = watch.LIMITS
         self.assertEqual({c: (L[c]["first_event_s"], L[c]["silence_s"]) for c in L}, {"claude": (120, 600), "codex": (120, 3600), "opencode": (120, 900)})
         self.assertGreaterEqual(L["codex"]["silence_s"], 3600)         # P7: healthy Codex reasoning gaps up to 2,298 s
         self.assertNotEqual(L["codex"]["silence_s"], 600)
@@ -366,7 +367,7 @@ class Watchdog(unittest.TestCase):
         rnd, lat = random.Random(7), []
         for i in range(200):
             cli = ("claude", "codex", "opencode")[i % 3]
-            lim = supervisor.LIMITS[cli]
+            lim = watch.LIMITS[cli]
             last_event = rnd.uniform(1, 300)                 # the worker dies after a random amount of healthy output
             at, wd = run_watch(cli, [last_event / 2, last_event], last_event + lim["silence_s"] + 300)
             self.assertIsNotNone(at, cli)
@@ -377,7 +378,7 @@ class Watchdog(unittest.TestCase):
 
     def test_heartbeat_is_throttled(self):
         clk, beats = Clock(), []
-        wd = supervisor.Watchdog(120, 600, clock=clk, beat=beats.append, wall=lambda: 1e9 + clk.t)
+        wd = watch.Watchdog(120, 600, clock=clk, beat=beats.append, wall=lambda: 1e9 + clk.t)
         for i in range(100):
             clk.t = i
             wd.touch()

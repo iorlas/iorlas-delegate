@@ -14,9 +14,13 @@ from unittest import mock
 from test_route import route, ROOT
 
 sys.path.insert(0, str(ROOT / "skills" / "delegate"))
-import osproc                          # noqa: E402
+from delegate.adapters import procs    # noqa: E402
+from delegate.adapters.harness.base import LaunchSpec    # noqa: E402
+from delegate.adapters.harness.codex import CodexHarness    # noqa: E402
+from delegate.app import watch    # noqa: E402
+from delegate.app.publish import LiveSink    # noqa: E402
+from delegate.app.supervisor import RunHooks, Supervisor    # noqa: E402
 from delegate.contracts import codec, wire    # noqa: E402
-from lanes import reaper, supervisor   # noqa: E402
 
 FAKE = str(Path(__file__).resolve().parent / "fakes" / "fake_agent.py")
 
@@ -34,7 +38,7 @@ def wait_pid(path, secs=10):
 def dead(pid, secs=10):
     end = time.time() + secs
     while time.time() < end:
-        if not osproc.alive(pid):
+        if not procs.alive(pid):
             return True
         time.sleep(0.1)
     return False
@@ -42,7 +46,6 @@ def dead(pid, secs=10):
 
 class RealProcesses(unittest.TestCase):
     def setUp(self):
-        del reaper.REPORTS[:]
         self.pidfile = os.path.join(os.environ["TMPDIR"], "child.pid")
         self.procs = []
         self.addCleanup(self.reap_leftovers)
@@ -67,7 +70,7 @@ class RealProcesses(unittest.TestCase):
     def test_process_group_stop_takes_the_sessions_child_too(self):
         p = self.start("spawner")
         child = wait_pid(self.pidfile)
-        rep = reaper.kill_tree(p, grace=1)
+        rep = procs.kill_tree(p, grace=1)
         p.wait()
         self.assertTrue(dead(child), "the child in its own session survived")
         self.assertEqual((rep.end, rep.survivors, rep.term_sent, rep.kill_sent), (wire.END_OK, [], True, True))
@@ -75,7 +78,7 @@ class RealProcesses(unittest.TestCase):
     def test_sigkill_escalation_when_sigterm_is_ignored(self):
         p = self.start("hang")
         t0 = time.time()
-        rep = reaper.kill_tree(p, grace=1)
+        rep = procs.kill_tree(p, grace=1)
         self.assertEqual(p.wait(), -signal.SIGKILL)
         self.assertTrue(rep.term_sent and rep.kill_sent)
         self.assertGreaterEqual(time.time() - t0, 1)         # it waited the grace before SIGKILL
@@ -83,64 +86,63 @@ class RealProcesses(unittest.TestCase):
 
     def test_a_worker_that_obeys_sigterm_is_never_sigkilled(self):
         p = self.start("stall")
-        rep = reaper.kill_tree(p, grace=5)
+        rep = procs.kill_tree(p, grace=5)
         self.assertEqual(p.wait(), -signal.SIGTERM)
         self.assertEqual((rep.term_sent, rep.kill_sent, rep.survivors), (True, False, []))
 
     def test_worker_survived_names_the_pids_and_ends_the_run_so(self):
         p = self.start("stall")
         pid = p.pid
-        with mock.patch.object(osproc, "alive", side_effect=lambda x: x == pid):      # a pid the kernel will not let go
-            rep = reaper.kill_tree(p, grace=0)
+        with mock.patch.object(procs, "alive", side_effect=lambda x: x == pid):      # a pid the kernel will not let go
+            rep = procs.stop_tree(pid, grace=0)
         self.assertEqual(rep.end, wire.END_SURVIVED)
         self.assertEqual([s.pid for s in rep.survivors], [pid])
-        end = reaper.worker_end(None)
+        end = procs.worker_end([rep], None)
         self.assertEqual((end.end, [s.pid for s in end.survivors]), (wire.END_SURVIVED, [pid]))
         self.assertEqual(codec.from_json(wire.WorkerEnd, codec.to_json(end)), end)
 
-    def run_fake(self, scenario, timeout=0, poll=None):
-        route.WORKER_STARTED[:] = [lambda pid: self.__dict__.setdefault("pid", pid)]
-        self.addCleanup(route.WORKER_STARTED.clear)
-        return route.run_proc([sys.executable, FAKE, scenario, self.pidfile], "brief", os.environ["TMPDIR"], dict(os.environ), timeout, poll=poll)
+    def run_fake(self, scenario, timeout=0, **limits):
+        """-> (the outcome, the hooks): a fake agent under the real Supervisor, with the watchdog limits `limits` for the codex CLI."""
+        hooks = RunHooks(started=lambda w: self.__dict__.setdefault("pid", w.pid))
+        with mock.patch.dict(watch.LIMITS["codex"], **limits):
+            sup = Supervisor(CodexHarness(), "codex", hooks, LiveSink("codex", ""))
+        spec = LaunchSpec(argv=[sys.executable, FAKE, scenario, self.pidfile], env=dict(os.environ), cwd=os.environ["TMPDIR"], stdin="brief")
+        return sup.run(spec, timeout), hooks
 
     def test_normal_run_is_ok_and_nothing_was_stopped(self):
-        rc, out, err, timed_out = self.run_fake("normal")
-        self.assertEqual((rc, timed_out), (0, False))
-        self.assertEqual(json.loads(out.splitlines()[-1])["result"], "fake answer")
-        end = reaper.worker_end(None)
+        out, hooks = self.run_fake("normal")
+        self.assertEqual((out.rc, out.timed_out), (0, False))
+        self.assertEqual(json.loads(out.out.splitlines()[-1])["result"], "fake answer")
+        end = procs.worker_end(hooks.stops, None)
         self.assertEqual((end.end, end.stopped), (wire.END_OK, False))
+        self.assertEqual((out.worker.pgid, bool(out.worker.start)), (out.worker.pid, procs.has_proc()))
 
     def test_call_timeout_stops_a_worker_that_ignores_sigterm(self):
         t0 = time.time()
-        rc, out, err, timed_out = self.run_fake("spawner", timeout=2)
-        self.assertTrue(timed_out)
+        out, hooks = self.run_fake("spawner", timeout=2)
+        self.assertTrue(out.timed_out)
         self.assertLess(time.time() - t0, 20)
-        end = reaper.worker_end("timeout")
+        end = procs.worker_end(hooks.stops, "timeout")
         self.assertEqual((end.end, end.stopped, end.survivors), (wire.END_TIMEOUT, True, []))
         self.assertTrue(dead(wait_pid(self.pidfile)))
         self.assertTrue(dead(self.pid))
 
     def test_idle_worker_is_stopped_by_the_watchdog_not_the_wall_clock(self):
-        dog = supervisor.Watchdog(first_event_s=5, silence_s=1)
-        route.WORKER_TICK[:] = [dog.touch]
-        self.addCleanup(route.WORKER_TICK.clear)
         t0 = time.time()
-        rc, out, err, timed_out = self.run_fake("stall", timeout=60, poll=dog.poll)
-        self.assertEqual((timed_out, dog.why), (False, "silence"))
+        out, _ = self.run_fake("stall", timeout=60, first_event_s=5, silence_s=1)
+        self.assertEqual((out.timed_out, out.watch.why, out.watch.kind), (False, "hung", "silence"))
         self.assertLess(time.time() - t0, 15)
         self.assertTrue(dead(self.pid))
 
     def test_a_streaming_worker_is_never_idle(self):
-        dog = supervisor.Watchdog(first_event_s=5, silence_s=1)
-        route.WORKER_TICK[:] = [dog.touch]
-        self.addCleanup(route.WORKER_TICK.clear)
-        rc, out, err, timed_out = self.run_fake("slow", timeout=60, poll=dog.poll)
-        self.assertEqual((rc, dog.why), (0, None))
+        out, _ = self.run_fake("slow", timeout=60, first_event_s=5, silence_s=1)
+        self.assertEqual((out.rc, out.watch.why), (0, None))
 
     def test_sigterm_to_the_delegate_stops_the_worker_tree_first(self):
-        code = ("import sys; sys.path.insert(0, %r); sys.argv = ['x']; import route; "
-                "route.run_proc([sys.executable, %r, 'spawner', %r], 'b', '.', dict(__import__('os').environ), 0)") % (
-                    str(ROOT / "skills" / "delegate"), FAKE, self.pidfile)
+        code = ("import os, sys; sys.path.insert(0, %r); from delegate.adapters.harness.base import LaunchSpec; from delegate.adapters.harness.codex import CodexHarness; "
+                "from delegate.app.publish import LiveSink; from delegate.app.supervisor import RunHooks, Supervisor; "
+                "Supervisor(CodexHarness(), 'codex', RunHooks(), LiveSink('codex', '')).run("
+                "LaunchSpec(argv=[sys.executable, %r, 'spawner', %r], env=dict(os.environ), cwd='.', stdin='b'), 0)") % (str(ROOT / "src"), FAKE, self.pidfile)
         h = subprocess.Popen([sys.executable, "-c", code], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         self.procs.append(h)
         child = wait_pid(self.pidfile)

@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Any
 
 from delegate.adapters import netprobe
-from delegate.adapters.harness.base import Evidence, LaunchInputs, LaunchSpec, Summary
+from delegate.adapters.harness.base import Evidence, LaunchInputs, LaunchSpec, Quiet, Summary
 from delegate.contracts import events as ev
 
 ARG_KEYS = ("file_path", "filePath", "path", "pattern", "url", "query", "description", "command")      # a tool's main argument, first one present
@@ -80,8 +80,9 @@ def vendor_error(j: dict) -> str:
     return ""
 
 
-class ClaudeHarness:
+class ClaudeHarness(Quiet):
     kind = "claude"
+    secret_event = None           # its PreToolUse hook blocks the call
     EXE = "claude"
 
     def __init__(self, credit: bool = False) -> None:
@@ -181,9 +182,6 @@ class ClaudeHarness:
                 out.append(d)
         return out
 
-    def parse_log_line(self, line: str) -> list[ev.HarnessEvent]:
-        return []
-
     # -- the finished stream ---------------------------------------------------------------------------------------------------------------
     def summary(self, rc: int | None, out: str, err: str, stop: str | None, timed_out: bool) -> Summary:
         e = self.evidence
@@ -199,7 +197,9 @@ class ClaudeHarness:
                "turns": j.get("num_turns"), "context_k": e.context_k, "started": e.work, "partial": e.work}
         warn = ["answer_done_process_alive"] if by_message else ["net_after_answer"] if e.final and netprobe.looks_dropped(err) else []     # ae6v: the answer was in first
         return Summary(text=text, rc=(rc or 1) if failed else 0, res=res, vendor=vendor_error(j), stderr=err, work=(j.get("num_turns") or 0) > 1,
-                       check=failed or timed_out, warnings=warn, cost=cost)
+                       check=failed or timed_out, warnings=warn, cost=cost, tail=text,
+                       data=j.get("structured_output") if isinstance(j.get("structured_output"), (dict, list)) else None,
+                       facts={"http_status": j.get("api_error_status")})
 
     def vendor_error(self, rc: int | None) -> str:
         return vendor_error(self.evidence.final or {})

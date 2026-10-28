@@ -8,6 +8,9 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
 from test_route import route, CFG, lanes, T
+from delegate.adapters.harness.opencode import OpenCodeHarness
+from delegate.app.supervisor import RunHooks
+from fakes.fake_run import replay
 import onboard
 
 
@@ -54,26 +57,35 @@ class ZaiTests(unittest.TestCase):
                 self.assertEqual(onboard.check_opencode_zai_coding(route),expected)
 
     def test_launch_pins_provider_and_removes_override(self):
-        d=dict(lane='ZAI_CODING_SUBSCRIPTION',model='glm-5.3',effort='high',how=dict(model='zai-coding-plan/glm-5.3',cwd='/tmp',write=False))
+        d=dict(lane='ZAI_CODING_SUBSCRIPTION',model='glm-5.3',effort='high',role='worker',how=dict(kind='opencode',model='zai-coding-plan/glm-5.3',cwd='/tmp',write=False))
         a=SimpleNamespace(resume=None,schema=None,timeout=10)
-        with tempfile.TemporaryDirectory() as tmp, patch.object(route,'config_dir',return_value=Path(tmp)), patch.object(route,'opencode_exe',return_value='opencode'),patch.object(route.sys,'platform','darwin'),patch.object(route,'opencode_shell'),patch.object(route,'run_proc',return_value=(0,'','',False)) as run,patch.object(route,'agent_runs',None),patch.object(route,'child_env',return_value={'OPENCODE_AUTH_JSON':'override','OPENCODE_CONFIG':'override','ZHIPU_API_KEY':'override'}):
-            self.assertEqual(route.launch_opencode(d,'OK',a,'test1234',1,{}).get('outcome'),None)
+        env_in={'OPENCODE_AUTH_JSON':'override','OPENCODE_CONFIG':'override','ZHIPU_API_KEY':'override'}
+        with tempfile.TemporaryDirectory() as tmp, patch.object(route,'config_dir',return_value=Path(tmp)), patch.object(route,'opencode_exe',return_value='opencode'),patch.object(route.sys,'platform','darwin'),patch.object(OpenCodeHarness,'write_shell'),patch.object(route,'agent_runs',None),patch.object(route,'child_env',return_value=env_in):
+            run=replay(['{}'])
+            with run:
+                self.assertEqual(route.launch_worker(d,'OK',a,'test1234',1,route.load_routing(),{},RunHooks()).get('outcome'),None)
             # Inspect the actual child process environment.
-            env=run.call_args.args[3]
+            env=run.specs[0].env
             self.assertEqual(json.loads(env['OPENCODE_CONFIG_CONTENT'])['enabled_providers'],['zai-coding-plan'])
             self.assertNotIn('ZHIPU_API_KEY',env)
             self.assertNotIn('OPENCODE_AUTH_JSON',env)
             d['how']['model']='zai/glm-5.3'
-            run.reset_mock()
-            self.assertEqual(route.launch_opencode(d,'OK',a,'test1234',1,{})['outcome'],'setup')
-            run.assert_not_called()
+            run=replay(['{}'])
+            with run:
+                self.assertEqual(route.launch_worker(d,'OK',a,'test1234',1,route.load_routing(),{},RunHooks())['outcome'],'setup')
+            self.assertEqual(run.specs,[])
 
     def test_both_ported_lanes_run_under_the_opencode_watchdog(self):
         a=SimpleNamespace(resume=None,schema=None,timeout=10)
         for lane,model in (('ZAI_CODING_SUBSCRIPTION','zai-coding-plan/glm-5.3'),('DEEPSEEK_FREE','opencode/deepseek-v4.1-flash-free')):
-            d=dict(lane=lane,model='m',effort='high',how=dict(model=model,cwd='/tmp',write=False))
-            with self.subTest(lane=lane), tempfile.TemporaryDirectory() as tmp, patch.object(route,'config_dir',return_value=Path(tmp)), patch.object(route,'opencode_exe',return_value='opencode'),patch.object(route.sys,'platform','darwin'),patch.object(route,'opencode_shell'),patch.object(route,'opencode_free_model',return_value=True),patch.object(route,'run_proc',return_value=(0,'','',False)) as run,patch.object(route,'agent_runs',None),patch.object(route,'child_env',return_value={}):
-                route.launch_opencode(d,'OK',a,'test1234',1,{})
-                self.assertTrue(callable(run.call_args.args[6]), 'run_proc got no watchdog poll')
+            d=dict(lane=lane,model='m',effort='high',role='worker',how=dict(kind='opencode',model=model,cwd='/tmp',write=False))
+            seen=[]
+            real=route.Supervisor.__init__
+            def spy(self,*args,**kw):
+                real(self,*args,**kw); seen.append(self)
+            with self.subTest(lane=lane), tempfile.TemporaryDirectory() as tmp, patch.object(route,'config_dir',return_value=Path(tmp)), patch.object(route,'opencode_exe',return_value='opencode'),patch.object(route.sys,'platform','darwin'),patch.object(OpenCodeHarness,'write_shell'),patch.object(OpenCodeHarness,'free_model_ok',return_value=True),patch.object(route.Supervisor,'__init__',spy),replay(['{}']),patch.object(route,'agent_runs',None),patch.object(route,'child_env',return_value={}):
+                route.launch_worker(d,'OK',a,'test1234',1,route.load_routing(),{},RunHooks())
+                self.assertEqual((seen[0].dog.first_event_s, seen[0].dog.silence_s), (route.watch.LIMITS['opencode']['first_event_s'], route.watch.LIMITS['opencode']['silence_s']))
+                self.assertIsNotNone(seen[0].log, 'no watch on opencode\'s own log')
 
 if __name__=='__main__':unittest.main()

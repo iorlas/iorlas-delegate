@@ -12,7 +12,7 @@ from typing import Any
 
 from delegate.adapters import procs
 from delegate.adapters.harness import opencode_sandbox as box
-from delegate.adapters.harness.base import Evidence, LaunchInputs, LaunchSpec, Summary
+from delegate.adapters.harness.base import Evidence, LaunchInputs, LaunchSpec, Quiet, Summary
 from delegate.contracts import events as ev
 from delegate.contracts.codec import record
 
@@ -21,6 +21,7 @@ SHELL_TOOLS = ("bash", "shell")
 ARG_KEYS = ("file_path", "filePath", "path", "pattern", "url", "query", "description", "command")
 # The log line OpenCode prints the moment a tool starts: `... service=permission evaluated permission=bash pattern="sleep 6" action=allow`.
 PERMISSION_RE = re.compile(r'evaluated permission=(\S+) pattern=("(?:[^"\\]|\\.)*"|\S+)')
+ECHO_RE = re.compile(r"\b(?:permission|pattern|input|command|args)=")
 NOT_TOOLS = ("external_directory",)
 ENV_OFF = {"OPENCODE_DISABLE_PROJECT_CONFIG": "1", "OPENCODE_DISABLE_CLAUDE_CODE": "1", "OPENCODE_DISABLE_EXTERNAL_SKILLS": "1", "OPENCODE_DISABLE_AUTOUPDATE": "1",
            "OPENCODE_DISABLE_SHARE": "1", "OPENCODE_DISABLE_LSP_DOWNLOAD": "1"}
@@ -81,8 +82,9 @@ def acct_fold(steps: list[dict]) -> dict | None:
     return acct
 
 
-class OpenCodeHarness:
+class OpenCodeHarness(Quiet):
     kind = "opencode"
+    secret_event = ev.CmdEnd        # a declined or failed call still ran no further than its end row
 
     def __init__(self, profile: Profile | None = None, root: Path | None = None) -> None:
         self.profile, self.root = profile or Profile(), root
@@ -124,6 +126,14 @@ class OpenCodeHarness:
         return LaunchSpec(argv=argv, env=env, cwd=i.cwd, stdin=i.prompt)
 
     write_shell = staticmethod(box.write_shell)
+
+    @property
+    def log_dir(self) -> Path:
+        return Path(os.environ.get("XDG_DATA_HOME") or Path.home() / ".local" / "share") / "opencode" / "log"
+
+    def echoes_input(self, line: str) -> bool:
+        """A log line that quotes the worker's own tool input (`evaluated permission=bash pattern="..."`): its words are the worker's, not OpenCode's."""
+        return bool(ECHO_RE.search(line))
 
     def cleanup(self) -> None:
         if self.shell:
@@ -260,7 +270,7 @@ class OpenCodeHarness:
         res = {"text": text, "ref": e.ref, "tokens": e.tokens, "turns": e.turns or None, "context_k": e.context_k, "started": bool(e.ref), "partial": e.work,
                "acct": acct, "cost": (acct or {}).get("cost_usd") or 0}       # no `answered`: opencode has no resume-tested finished-answer signal (62-spikes-resume.md)
         why = e.error or (err if rc != 0 and stop != "answer" else "")       # stderr after we stopped it ourselves is the shell reporting our kill
-        return Summary(text=text, rc=rc, res=res, vendor=why, stderr="", work=e.work, stands=bool(text) and not e.error, cost=float(res["cost"]))
+        return Summary(text=text, rc=rc, res=res, vendor=why, stderr="", work=e.work, stands=bool(text) and not e.error, cost=float(res["cost"]), tail=err or text)
 
     def vendor_error(self, rc: int | None) -> str:
         return self.evidence.error
@@ -271,9 +281,11 @@ class OpenCodeHarness:
         f = self.root / "opencode-sessions" / f"{ref}.json" if ref and self.root else None
         return str(f) if f and f.is_file() else None
 
-    def export(self, ref: str, env: dict[str, str]) -> None:
+    def export(self, env: dict[str, str]) -> None:
         """OpenCode keeps sessions in its database: export one to a file, so `transcript` is a path like the other harnesses'."""
-        assert self.root is not None
+        ref = self.evidence.ref
+        if not ref or self.root is None:
+            return
         try:
             x = procs.run_capture([self.exe, "export", ref], 60, env=env)
             if x.returncode == 0 and x.stdout.strip():

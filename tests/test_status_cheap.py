@@ -9,6 +9,7 @@ import tempfile
 import unittest
 from unittest import mock
 
+from delegate.adapters import procs
 from test_route import route, T
 
 
@@ -28,7 +29,7 @@ class Cheap(unittest.TestCase):
     def cheap(self):
         out = io.StringIO()
         with mock.patch.object(subprocess, "run", side_effect=boom), mock.patch.object(subprocess, "Popen", side_effect=boom), \
-                mock.patch.object(route, "run_tree", side_effect=boom), contextlib.redirect_stdout(out):
+                mock.patch.object(procs, "run_capture", side_effect=boom), contextlib.redirect_stdout(out):
             rc = route.main(["status", "--json", "--cheap"])
         return rc, json.loads(out.getvalue())
 
@@ -81,7 +82,7 @@ class AuthCache(unittest.TestCase):
         def fake(cmd, timeout, **kw):
             calls.append(list(cmd))
             return subprocess.CompletedProcess(cmd, 0, json.dumps({"loggedIn": True}), "")
-        with mock.patch.object(route, "run_tree", side_effect=fake), mock.patch.object(route, "fetch_codex_limits", return_value=(None, "no codex")), \
+        with mock.patch.object(procs, "run_capture", side_effect=fake), mock.patch.object(route, "fetch_codex_limits", return_value=(None, "no codex")), \
                 mock.patch.object(route.shutil, "which", side_effect=lambda n, *a, **k: "/bin/" + n if n == "claude" else None), \
                 contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
             route.main(["next", "worker"])
@@ -99,7 +100,7 @@ class AuthCache(unittest.TestCase):
 
     def test_cached_logout_is_honoured(self):
         route.write_auth("CLAUDE_SUBSCRIPTION", False, "x", route.now())
-        with mock.patch.object(route, "run_tree", side_effect=AssertionError("spawned")):
+        with mock.patch.object(procs, "run_capture", side_effect=AssertionError("spawned")):
             self.assertTrue(route.claude_logged_out())
 
     def test_ttl_is_ten_minutes(self):

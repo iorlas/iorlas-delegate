@@ -19,7 +19,12 @@ spec = importlib.util.spec_from_file_location("route", ROOT / "skills" / "delega
 route = importlib.util.module_from_spec(spec)
 sys.modules["route"] = route
 spec.loader.exec_module(route)
-from delegate.adapters.harness import reset_parse  # noqa: E402  (route put src/ on sys.path)
+from delegate.adapters import procs  # noqa: E402  (route put src/ on sys.path)
+from delegate.adapters.harness import opencode_sandbox as box, reset_parse  # noqa: E402
+from delegate.adapters.harness.base import LaunchSpec  # noqa: E402
+from delegate.adapters.harness.codex import CodexHarness  # noqa: E402
+from delegate.app.publish import LiveSink  # noqa: E402
+from delegate.app.supervisor import RunHooks, Supervisor  # noqa: E402
 
 route.REAL_NET_PROBE = route.net_probe
 route.net_probe = lambda hosts=None: {"up": True, "ip_up": True, "why": "ok", "ms": 1, "hosts": {}, "at": time.time()}     # tests open no socket; tests/test_net.py swaps it per case
@@ -912,9 +917,9 @@ printf '{"type":"result","result":"claude says hi","session_id":"sess-1","total_
 
     def test_answer_done_process_alive_is_done_after_the_grace(self):
         """delegate-itn: turn.completed after the final agent message, then the process never exits: done after the grace, whole tree stopped."""
-        from lanes import supervisor
-        self.addCleanup(setattr, supervisor, "ANSWER_GRACE_S", supervisor.ANSWER_GRACE_S)
-        supervisor.ANSWER_GRACE_S = 1
+        from delegate.app import watch
+        self.addCleanup(setattr, watch, "ANSWER_GRACE_S", watch.ANSWER_GRACE_S)
+        watch.ANSWER_GRACE_S = 1
         t0 = time.time()
         _, r = self.run_it(mode="answer_alive", timeout=0)
         self.assertLess(time.time() - t0, 40)
@@ -928,10 +933,10 @@ printf '{"type":"result","result":"claude says hi","session_id":"sess-1","total_
             os.kill(int(Path(os.environ["FAKE_PIDFILE"]).read_text()), 0)
 
     def fast_clock(self, grace=1, stall=1):
-        from lanes import supervisor
+        from delegate.app import watch
         for name, v in (("ANSWER_GRACE_S", grace), ("STALL_S", stall)):
-            self.addCleanup(setattr, supervisor, name, getattr(supervisor, name))
-            setattr(supervisor, name, v)
+            self.addCleanup(setattr, watch, name, getattr(watch, name))
+            setattr(watch, name, v)
 
     def pid_dead(self):
         time.sleep(0.3)
@@ -1048,7 +1053,7 @@ echo '{"type":"step_finish","sessionID":"ses_1","part":{"type":"step-finish","co
     @unittest.skipIf(sys.platform != "darwin", "the Grok lane runs commands under sandbox-exec: macOS only")
     def test_opencode_with_no_first_event_is_stopped_and_the_lane_marked_hung(self):
         pid = self.watchdog_fake("sleep 60")
-        with mock.patch.dict(route.supervisor.LIMITS["opencode"], first_event_s=1):
+        with mock.patch.dict(route.watch.LIMITS["opencode"], first_event_s=1):
             t0 = time.time()
             _, r = self.run_it(timeout=0)
         self.assertLess(time.time() - t0, 20)
@@ -1063,7 +1068,7 @@ echo '{"type":"step_finish","sessionID":"ses_1","part":{"type":"step-finish","co
         (log / "opencode.log").write_text("old: Free usage limit reached\n")        # before launch: ignored
         self.grok_ready()
         self.codex_out()
-        with mock.patch.dict(route.supervisor.LIMITS["opencode"], first_event_s=20):
+        with mock.patch.dict(route.watch.LIMITS["opencode"], first_event_s=20):
             _, r = self.run_it(timeout=0)
         self.assertEqual((r["stop"], r["text"]), (None, "grok did it"))
         self.assertNotIn("GROK_SUBSCRIPTION", route.load_state().get("out", {}))
@@ -1095,7 +1100,7 @@ echo '{"type":"step_finish","sessionID":"ses_1","part":{"type":"step-finish","co
         (repo / ".env.example").write_text("EX=1")
         sh = self.base / "sh"
         for write in (True, False):
-            route.opencode_shell(self.repo, write, sh)
+            box.write_shell(self.repo, write, sh)
             run = lambda c: sp.run([str(sh), "-c", c], cwd=self.repo, capture_output=True, text=True)
             self.assertNotEqual(run("cat .env").returncode, 0)
             self.assertEqual(run("cat .env.example").stdout, "EX=1")
@@ -1107,7 +1112,7 @@ echo '{"type":"step_finish","sessionID":"ses_1","part":{"type":"step-finish","co
         import subprocess as sp
         repo = Path(self.repo)
         sh = self.base / "sh-task"
-        route.opencode_shell(self.repo, False, sh)
+        box.write_shell(self.repo, False, sh)
         run = lambda c: sp.run([str(sh), "-c", c], cwd=self.repo, capture_output=True, text=True)
         self.assertEqual(run("mkdir -p .task && touch .task/tmp1").returncode, 0)
         self.assertTrue((repo / ".task" / "tmp1").exists())
@@ -1117,23 +1122,23 @@ echo '{"type":"step_finish","sessionID":"ses_1","part":{"type":"step-finish","co
 
     def test_external_directory_lets_read_only_lanes_read_runs_and_temp_only(self):
         with mock.patch.dict(os.environ, {"XDG_CONFIG_HOME": "/x/cfg"}):
-            ext = route.opencode_permissions(False)["external_directory"]
+            ext = box.permissions(False)["external_directory"]
         self.assertEqual(ext["*"], "deny")
         for want in ("/x/cfg/task-loop/runs/**", "/private/tmp/**", "/private/var/folders/**", "/tmp/**", "/var/folders/**"):
             self.assertEqual(ext[want], "allow")
         self.assertEqual(len(ext), 6)
         with mock.patch.dict(os.environ, {}, clear=False):
             os.environ.pop("XDG_CONFIG_HOME", None)
-            self.assertIn(str(Path.home() / ".config" / "task-loop" / "runs") + "/**", route.opencode_permissions(False)["external_directory"])
-        self.assertEqual(route.opencode_permissions(True)["external_directory"], "deny")
-        self.assertEqual(route.opencode_permissions(False)["read"][str(Path.home() / ".ssh")], "deny")
+            self.assertIn(str(Path.home() / ".config" / "task-loop" / "runs") + "/**", box.permissions(False)["external_directory"])
+        self.assertEqual(box.permissions(True)["external_directory"], "deny")
+        self.assertEqual(box.permissions(False)["read"][str(Path.home() / ".ssh")], "deny")
 
     def test_opencode_shell_is_offline_for_uv_and_network_refusals_are_not_denials(self):
         sh = self.base / "sh-offline"
-        route.opencode_shell(self.repo, True, sh)
+        box.write_shell(self.repo, True, sh)
         self.assertIn("export UV_OFFLINE=1\n", sh.read_text())
-        self.assertTrue(route.network_refusal("error: tcp connect error\n  Operation not permitted (os error 1)"))
-        self.assertFalse(route.network_refusal("cat: /Users/x/.ssh/id_rsa: Operation not permitted"))
+        self.assertTrue(box.network_refusal("error: tcp connect error\n  Operation not permitted (os error 1)"))
+        self.assertFalse(box.network_refusal("cat: /Users/x/.ssh/id_rsa: Operation not permitted"))
 
     @unittest.skipIf(sys.platform != "darwin", "macOS only")
     def test_grok_limit_and_secret_answers(self):
@@ -1412,12 +1417,12 @@ echo '{"type":"step_finish","sessionID":"ses_1","part":{"type":"step-finish","co
     def test_codex_stuck_waiting_for_the_network_is_stopped_after_one_probe_and_handed_back(self):
         down = lambda hosts=None: {"up": False, "ip_up": False, "why": "offline", "ms": 1, "hosts": {}, "at": time.time()}
         t0 = time.time()
-        with mock.patch.object(route, "net_probe", down), mock.patch.object(route, "NET_GRACE_S", 1):
+        with mock.patch.object(route, "net_probe", down), mock.patch("delegate.app.supervisor.NET_GRACE_S", 1):
             _, r = self.run_it(mode="wait_stuck", timeout=60)
         self.assertLess(time.time() - t0, 25)
         self.assertEqual((why(r), r["ref"]), ("network", "thread-123"))
         self.assertTrue(r["stop"]["resumable"])
-        self.assertIsNone(route.proc_start(int(Path(os.environ["FAKE_PIDFILE"]).read_text())))
+        self.assertIsNone(procs.start_token(int(Path(os.environ["FAKE_PIDFILE"]).read_text())))
 
     def test_a_claude_worker_waiting_on_a_background_task_is_stopped_after_its_answer(self):
         self.codex_out()
@@ -1426,7 +1431,7 @@ echo '{"type":"step_finish","sessionID":"ses_1","part":{"type":"step-finish","co
         self.assertEqual((r["stop"], r["text"]), (None, "answered"))
         self.assertLess(time.time() - t0, 20)
         bg = int(Path(os.environ["FAKE_PIDFILE"]).read_text())
-        self.assertIsNone(route.proc_start(bg))          # its own process group, stopped too
+        self.assertIsNone(procs.start_token(bg))          # its own process group, stopped too
 
     def test_a_logged_out_claude_sends_the_planner_to_codex(self):
         _, r = self.run_it(mode="authout", role="planner")
@@ -1573,7 +1578,7 @@ echo '{"type":"step_finish","sessionID":"ses_1","part":{"type":"step-finish","co
                 for i in range(n)]
 
     def test_codex_that_goes_quiet_is_stopped_through_the_tree_kill_and_the_lane_is_not_marked_out(self):
-        with mock.patch.dict(route.supervisor.LIMITS["codex"], silence_s=1), mock.patch.object(route.reaper, "stop_tree", wraps=route.reaper.stop_tree) as st:
+        with mock.patch.dict(route.watch.LIMITS["codex"], silence_s=1), mock.patch.object(procs, "stop_tree", wraps=procs.stop_tree) as st:
             t0 = time.time()
             _, r = self.run_it(mode="hang", timeout=0)
         self.assertLess(time.time() - t0, 15)
@@ -1588,26 +1593,25 @@ echo '{"type":"step_finish","sessionID":"ses_1","part":{"type":"step-finish","co
         last = json.loads(route.history_path().read_text().splitlines()[-1])
         self.assertEqual((last["outcome"], last["v"], last["model"], len(last["fingerprint"])), ("hung", 1, "gpt-6.1-sol", 12))
 
-    def test_a_gap_over_1800s_is_written_to_history_through_worker_watch_and_the_fold_ignores_it(self):
-        import functools
+    def test_a_gap_over_1800s_is_written_to_history_through_the_watchdog_and_the_fold_ignores_it(self):
+        from delegate.app import watch
         from lanes import health
         t = [0.0]
         d = {"lane": "OPENAI_SUBSCRIPTION", "model": "gpt-6.1-sol"}
-        with mock.patch.object(route.supervisor, "Watchdog", functools.partial(route.supervisor.Watchdog, clock=lambda: t[0])):
-            poll, tick, w = route.worker_watch("codex", d["lane"])
+        dog = watch.Watchdog(120, 3600, clock=lambda: t[0])
         for at in (5, 1805, 4005):       # gaps of 1800 s (not logged) and 2200 s (logged)
             t[0] = at
-            tick()
-        self.assertFalse(poll())
-        route.log_gaps(w, d)
+            dog.touch()
+        self.assertFalse(dog.poll())
+        dog.flush(route.history_add, d["lane"], d["model"], True)
         rows = [json.loads(x) for x in route.history_path().read_text().splitlines()]
         self.assertEqual([(r["role"], r["lane"], r["model"], r["gap_s"], r["finished"], r["run_id"]) for r in rows],
                          [("gap", "OPENAI_SUBSCRIPTION", "gpt-6.1-sol", 2200.0, True, None)])
         self.assertEqual(health.fold(rows)["pairs"], {})
-        route.log_gaps({"wd": None}, d)       # never raises
+        dog.flush(None, d["lane"], d["model"], True)       # never raises
 
     def test_any_stream_line_counts_as_activity_even_on_stderr(self):
-        with mock.patch.dict(route.supervisor.LIMITS["codex"], silence_s=1):      # the fake prints to stderr every 0.4 s for 3 s
+        with mock.patch.dict(route.watch.LIMITS["codex"], silence_s=1):      # the fake prints to stderr every 0.4 s for 3 s
             _, r = self.run_it(mode="chatter", timeout=0)
         self.assertEqual(r["stop"], None)
 
@@ -1676,15 +1680,15 @@ echo '{"type":"step_finish","sessionID":"ses_1","part":{"type":"step-finish","co
         self.assertEqual([r["suspect"] for r in route.running_rows({"leases": {"a": dict(quiet, start=now - 3000)}}, now)], [True])
 
     def test_workers_of_a_lane_marked_out_by_someone_else_are_stopped_within_the_poll_interval(self):
+        from delegate.app.supervisor import LaneGoneWatcher
         started = time.time()
-        poll, state = route.lane_gone_poll("OPENAI_SUBSCRIPTION", started)
-        self.assertFalse(poll())
+        w = LaneGoneWatcher(route.lane_gone_check("OPENAI_SUBSCRIPTION", started), every=0)
+        self.assertIsNone(w.poll())
         route.mark_out("OPENAI_SUBSCRIPTION", route.now() + 3600, "limit refusal: usage limit", route.now())
-        with mock.patch.object(route, "LANE_GONE_EVERY", 0):
-            self.assertTrue(poll())
-        self.assertEqual(state["why"], "limit")
-        late, _ = route.lane_gone_poll("OPENAI_SUBSCRIPTION", time.time() + 5)           # a worker that started after the mark is not affected
-        self.assertFalse(late())
+        stop = w.poll()
+        self.assertEqual(stop.why, "limit")
+        late = LaneGoneWatcher(route.lane_gone_check("OPENAI_SUBSCRIPTION", time.time() + 5), every=0)     # a worker that started after the mark is not affected
+        self.assertIsNone(late.poll())
 
     def test_git_changes_are_reported_not_failed(self):
         code, r = self.run_it(mode="git")
@@ -1707,7 +1711,7 @@ echo '{"type":"step_finish","sessionID":"ses_1","part":{"type":"step-finish","co
         dead = sp.Popen(["true"]); dead.wait()
         orphan = sp.Popen(["sleep", "300"], start_new_session=True)
         try:
-            start = route.proc_start(orphan.pid)
+            start = procs.start_token(orphan.pid)
             route.update_state(lambda st: st.setdefault("leases", {}).__setitem__("old-run", {
                 "lane": "OPENAI_SUBSCRIPTION", "role": "worker", "pid": dead.pid, "pid_start": "Mon Jan  1 00:00:00 2001", "start": route.now() - 300,
                 "expires": route.now() + 60, "task": "T-7", "worker_pid": orphan.pid, "worker_start": start}))
@@ -1724,8 +1728,8 @@ echo '{"type":"step_finish","sessionID":"ses_1","part":{"type":"step-finish","co
         worker = sp.Popen(["sleep", "300"], start_new_session=True)
         try:
             route.update_state(lambda st: st.setdefault("leases", {}).__setitem__("old-run", {
-                "lane": "OPENAI_SUBSCRIPTION", "role": "worker", "pid": os.getpid(), "pid_start": route.proc_start(os.getpid()), "start": route.now() - 300,
-                "expires": route.now() - 1, "task": "T-9", "worker_pid": worker.pid, "worker_start": route.proc_start(worker.pid)}))
+                "lane": "OPENAI_SUBSCRIPTION", "role": "worker", "pid": os.getpid(), "pid_start": procs.start_token(os.getpid()), "start": route.now() - 300,
+                "expires": route.now() - 1, "task": "T-9", "worker_pid": worker.pid, "worker_start": procs.start_token(worker.pid)}))
             _, r = self.run_it("--task", "T-9")
             self.assertEqual(why(r), "duplicate_task")
             self.assertIsNone(worker.poll())
@@ -1890,7 +1894,7 @@ class Holds(unittest.TestCase):
             d, _, _, _ = route.decision(a, copy.deepcopy(CFG))
         self.assertEqual((d["action"], d["retry_after"], d["outcome"]), ("stop", h["until"], "held"))
         self.assertIn("owner", d["say"])
-        res = route.launch_codex({"role": "worker", "lane": "OPENAI_SUBSCRIPTION", "how": {"sandbox": "workspace-write"}}, "b", argparse_ns("worker"), "rid", T, {})
+        res = route.launch_worker({"role": "worker", "lane": "OPENAI_SUBSCRIPTION", "how": {"kind": "codex", "sandbox": "workspace-write"}}, "b", argparse_ns("worker"), "rid", T, CFG, {}, RunHooks())
         self.assertEqual((res["retry_after"], res["outcome"]), (h["until"], "held"))
 
     def test_release_and_status_show_the_holder_and_expiry(self):
@@ -2227,7 +2231,7 @@ class Breaker(unittest.TestCase):
     def test_every_opencode_lane_runs_under_the_watchdog_and_the_breaker(self):
         lanes_ = [n for n, c in CFG["lanes"].items() if c["runner"] == "opencode"]
         self.assertEqual(sorted(lanes_), ["DEEPSEEK_FREE", "GROK_SUBSCRIPTION", "ZAI_CODING_SUBSCRIPTION"])
-        lim = route.supervisor.LIMITS["opencode"]
+        lim = route.watch.LIMITS["opencode"]
         self.assertEqual((lim["first_event_s"], lim["silence_s"] >= 900), (120, True))
         for name in lanes_:
             fam = CFG["lanes"][name]["family"]
@@ -2240,11 +2244,7 @@ class Breaker(unittest.TestCase):
                     route.apply_health(lane, CFG, health.fold(self.rows(name, model, outcome="vendor_blip")), T + 1)
                     self.assertFalse(route.usable(lane, CFG["settings"], True, model)[0])
         import inspect
-        src = inspect.getsource(route.launch_opencode)
-        self.assertIn('worker_watch("opencode"', src)
-        self.assertIn("WORKER_TICK", src)
-        for fn, cli in ((route.launch_codex, "codex"), (route.launch_claude, "claude")):
-            self.assertIn(f'worker_watch("{cli}"', inspect.getsource(fn))
+        self.assertIn("Supervisor(", inspect.getsource(route.launch_worker))         # all three harnesses run under the one supervisor, so under its watchdog
 
     def test_history_rotation_survives_a_corrupt_line(self):
         with tempfile.TemporaryDirectory() as d, mock.patch.object(route, "config_dir", return_value=Path(d)), mock.patch.object(route, "HISTORY_MAX", 100):
@@ -2266,14 +2266,12 @@ class WatchdogProc(unittest.TestCase):
         self.addCleanup(p.stop)
 
     def run_child(self, code, **limits):
-        route.WORKER_TICK[:] = []
-        with mock.patch.dict(route.supervisor.LIMITS["codex"], **limits):
-            poll, tick, state = route.worker_watch("codex", "OPENAI_SUBSCRIPTION")
-        route.WORKER_TICK[:] = [tick]
-        with mock.patch.object(route.reaper, "stop_tree", wraps=route.reaper.stop_tree) as st:
+        with mock.patch.dict(route.watch.LIMITS["codex"], **limits):
+            sup = Supervisor(CodexHarness(), "codex", RunHooks(), LiveSink("codex", ""))
+        with mock.patch.object(procs, "stop_tree", wraps=procs.stop_tree) as st:
             t0 = time.time()
-            rc, out, err, timed_out = route.run_proc([sys.executable, "-c", code], "", None, dict(os.environ), None, None, poll)
-        return rc, state, st, time.time() - t0
+            out = sup.run(LaunchSpec(argv=[sys.executable, "-c", code], env=dict(os.environ), cwd=self.tmp.name, stdin=""), 0)
+        return out.rc, {"why": out.watch.why, "kind": out.watch.kind}, st, time.time() - t0
 
     def test_dead_stream_is_stopped_through_stop_tree(self):
         rc, state, st, secs = self.run_child("import time;print('started',flush=True);time.sleep(60)", first_event_s=5, silence_s=1)

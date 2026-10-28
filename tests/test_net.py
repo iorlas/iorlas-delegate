@@ -18,7 +18,7 @@ from unittest import mock
 from test_route import route, CFG, T, lanes
 
 LANES = Path(__file__).resolve().parent.parent / "src" / "delegate" / "adapters"
-from delegate.adapters import netprobe
+from delegate.adapters import netprobe, procs
 from lanes import classify, cockpit, health, profiles          # noqa: E402  (test_route put skills/delegate on sys.path)
 
 
@@ -229,7 +229,7 @@ class Cheap(unittest.TestCase):
     def cheap(self):
         boom = mock.Mock(side_effect=AssertionError("a process was spawned"))
         out = io.StringIO()
-        with mock.patch.object(subprocess, "run", boom), mock.patch.object(subprocess, "Popen", boom), mock.patch.object(route, "run_tree", boom), \
+        with mock.patch.object(subprocess, "run", boom), mock.patch.object(subprocess, "Popen", boom), mock.patch.object(procs, "run_capture", boom), \
                 mock.patch.object(socket, "create_connection", boom), contextlib.redirect_stdout(out):
             rc = route.main(["status", "--json", "--cheap"])
         return rc, json.loads(out.getvalue())
@@ -258,22 +258,13 @@ class Cheap(unittest.TestCase):
 
 
 class Adapters(unittest.TestCase):
-    def test_the_three_launchers_are_registered_and_route_dispatches_through_the_registry(self):
+    def test_the_three_runners_are_data_and_every_cli_has_watchdog_limits(self):
         self.assertEqual(set(profiles.REGISTRY), {"codex", "opencode", "claude_p"})
-        self.assertEqual(set(route.LAUNCHERS), {"codex", "opencode", "claude_p"})
-        self.assertIs(route.LAUNCHERS["claude_p"], route.launch_claude)
-        from lanes import supervisor
+        from delegate.app import watch
         for a in profiles.REGISTRY.values():
-            self.assertIn(a.cli, supervisor.LIMITS)
-            self.assertTrue(callable(a.launch))
+            self.assertIn(a.cli, watch.LIMITS)
         self.assertEqual(profiles.REGISTRY["opencode"].resume, "untested")
-
-    def test_a_sixth_runner_is_one_register_call(self):
-        try:
-            profiles.register("fake", "codex", "fake", lambda *a: {})
-            self.assertIn("fake", profiles.launchers())
-        finally:
-            profiles.REGISTRY.pop("fake", None)
+        self.assertEqual(set(route.PREPARE), set(profiles.REGISTRY))          # each runner has one harness preparation, and launch_worker is the only launcher
 
     def test_every_lane_in_routing_json_has_hosts_to_probe(self):
         for lane in CFG["lanes"]:

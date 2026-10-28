@@ -8,6 +8,9 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
 from test_route import route, ROOT, T
+from delegate.adapters.harness.opencode import OpenCodeHarness
+from delegate.app.supervisor import RunHooks
+from fakes.fake_run import replay as replay_run
 
 classify = route.classify
 FIXTURES = sorted((ROOT / "tests" / "contract" / "fixtures").glob("*.json"))
@@ -315,33 +318,28 @@ class Ladder(unittest.TestCase):
 
 
 class Launchers(unittest.TestCase):
-    """The three real launch_* functions end in the same ladder; the CLI is replaced by run_proc feeding the events of a fixture row."""
+    """The three harnesses end in the same ladder; the CLI is replaced by the supervisor replaying the events of a fixture row (tests/fakes/fake_run.py)."""
 
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
         for p in (patch.object(route, "config_dir", return_value=Path(self.tmp.name)), patch.object(route, "agent_runs", None),
                   patch.object(route.shutil, "which", return_value="cli"), patch.object(route, "opencode_exe", return_value="opencode"),
-                  patch.object(route.sys, "platform", "darwin"), patch.object(route, "opencode_shell"), patch.object(route, "child_env", return_value={}),
+                  patch.object(route.sys, "platform", "darwin"), patch.object(OpenCodeHarness, "write_shell"), patch.object(route, "child_env", return_value={}),
                   patch.object(route, "codex_thread_total", return_value=None), patch.object(route, "codex_child_tokens", return_value=({"in": 0, "cached": 0, "out": 0}, 0))):
             p.start()
             self.addCleanup(p.stop)
         self.addCleanup(self.tmp.cleanup)
         self.a = SimpleNamespace(resume=None, schema=None, timeout=30, role="worker")
 
-    def run_cli(self, fn, lines, rc, err="", lane="OPENAI_SUBSCRIPTION", kind="codex", **how):
-        def fake(cmd, text, cwd, env, timeout, on_line=None, poll=None):
-            for line in lines:
-                if on_line:
-                    on_line(json.dumps(line))
-            return rc, "", err, False
-        d = dict(lane=lane, model="m", effort="high", role="worker", how=dict(model="m", cwd=self.tmp.name, write=False, sandbox="read-only", cli=["codex", "exec"], isolation=[], **how))
-        with patch.object(route, "run_proc", fake):
-            res = fn(d, "brief", self.a, "rid12345", T, {}) if fn is not route.launch_claude else fn(d, "brief", self.a, "rid12345", T, route.load_routing(), {})
+    def run_cli(self, kind, lines, rc, err="", lane="OPENAI_SUBSCRIPTION", **how):
+        d = dict(lane=lane, model="m", effort="high", role="worker", how=dict(kind=kind, model="m", cwd=self.tmp.name, write=False, sandbox="read-only", cli=["codex", "exec"], isolation=[], **how))
+        with replay_run(lines, rc, err):
+            res = route.launch_worker(d, "brief", self.a, "rid12345", T, route.load_routing(), {}, RunHooks())
         res.pop("stderr", None)
         return res
 
     def opencode(self, lines, rc=1, **kw):
-        return self.run_cli(route.launch_opencode, lines, rc, lane=kw.pop("lane", "GROK_SUBSCRIPTION"), kind="opencode", **kw)
+        return self.run_cli("opencode", lines, rc, lane=kw.pop("lane", "GROK_SUBSCRIPTION"), **kw)
 
     def test_a_grok_row_through_the_opencode_launcher_marks_the_lane_out_without_a_time(self):
         row = load(ROOT / "tests" / "contract" / "fixtures" / "grok_spending_limit_24oct.json")["rows"][0]
@@ -351,7 +349,7 @@ class Launchers(unittest.TestCase):
 
     def test_a_bad_request_row_through_the_codex_launcher_leaves_the_lane_alone(self):
         for row in load(ROOT / "tests" / "contract" / "fixtures" / "bad_request_22oct.json")["rows"][:3]:
-            res = self.run_cli(route.launch_codex, [{"type": "turn.failed", "error": {"message": row["evidence"]["vendor_err"]}}], 1)
+            res = self.run_cli("codex", [{"type": "turn.failed", "error": {"message": row["evidence"]["vendor_err"]}}], 1)
             self.assertEqual(res["outcome"], "bad_request")
         self.assertEqual(route.load_state().get("out"), None)
 
@@ -362,20 +360,20 @@ class Launchers(unittest.TestCase):
         self.assertEqual(route.load_state().get("out"), None)
 
     def test_codex_stream_retries_do_not_fail_a_run_that_finished(self):
-        res = self.run_cli(route.launch_codex, [{"type": "error", "message": "Reconnecting... 2/5 (idle timeout waiting for websocket)"},
+        res = self.run_cli("codex", [{"type": "error", "message": "Reconnecting... 2/5 (idle timeout waiting for websocket)"},
                                                 {"type": "item.completed", "item": {"type": "agent_message", "text": "all done"}},
                                                 {"type": "turn.completed", "usage": {"input_tokens": 9, "output_tokens": 1}}], 0)
         self.assertEqual((res.get("outcome"), res["text"], res["turns"]), (None, "all done", 1))
-        res = self.run_cli(route.launch_codex, [{"type": "item.completed", "item": {"type": "command_execution", "command": "ls", "status": "completed"}},
+        res = self.run_cli("codex", [{"type": "item.completed", "item": {"type": "command_execution", "command": "ls", "status": "completed"}},
                                                 {"type": "error", "message": "Reconnecting... 5/5 (websocket closed by server)"}], 1)
         self.assertEqual(res["outcome"], "worker_failed")
         self.assertIn("Reconnecting... 5/5", res["say"])
 
     def test_a_workers_own_words_about_a_rate_limit_never_take_a_lane_out(self):
         words = "The batch is queued behind a rate limit on the Unity side; quota 429 seen in the log."
-        res = self.run_cli(route.launch_codex, [{"type": "item.completed", "item": {"type": "agent_message", "text": words}}], 1)
+        res = self.run_cli("codex", [{"type": "item.completed", "item": {"type": "agent_message", "text": words}}], 1)
         self.assertEqual(res["outcome"], "worker_failed")
-        res = self.run_cli(route.launch_claude, [{"type": "result", "is_error": True, "result": words, "num_turns": 6, "session_id": "s1"}], 1, lane="CLAUDE_SUBSCRIPTION", kind="claude_p",
+        res = self.run_cli("claude_p", [{"type": "result", "is_error": True, "result": words, "num_turns": 6, "session_id": "s1"}], 1, lane="CLAUDE_SUBSCRIPTION",
                            cap=1, read_only=False)
         self.assertEqual(res["outcome"], "worker_failed")
         res = self.opencode([{"type": "text", "part": {"text": words}}], rc=1)
@@ -383,8 +381,8 @@ class Launchers(unittest.TestCase):
         self.assertEqual(route.load_state().get("out"), None)
 
     def test_the_clis_own_error_still_does(self):
-        res = self.run_cli(route.launch_claude, [{"type": "result", "is_error": True, "result": "API Error: 429 rate limit exceeded", "num_turns": 1}], 1,
-                           lane="CLAUDE_SUBSCRIPTION", kind="claude_p", cap=1, read_only=False)
+        res = self.run_cli("claude_p", [{"type": "result", "is_error": True, "result": "API Error: 429 rate limit exceeded", "num_turns": 1}], 1,
+                           lane="CLAUDE_SUBSCRIPTION", cap=1, read_only=False)
         self.assertEqual(res["outcome"], "rate_limited")
         self.assertIn("CLAUDE_SUBSCRIPTION", route.load_state()["out"])
 
@@ -396,7 +394,7 @@ class Launchers(unittest.TestCase):
 
     def test_a_runner_kind_that_is_not_a_launcher_is_a_setup_error(self):
         kinds = {c["runner"] for c in route.load_routing()["lanes"].values()}
-        self.assertEqual(set(route.LAUNCHERS), {"codex", "opencode", "claude_p"})
+        self.assertEqual(set(route.profiles.REGISTRY), {"codex", "opencode", "claude_p"})
         self.assertLessEqual(kinds, {"codex", "opencode", "claude_p", "agent_tool"})
         d = {"action": "run", "role": "worker", "lane": "OPENAI_SUBSCRIPTION", "model": "m", "effort": "high", "mode": "write", "how": {"kind": "codexx", "cwd": self.tmp.name}}
         a = argparse.Namespace(role="worker", authored_by=None, failed="", premium=None, allow_degraded=False, claude_usage=None, cwd=None, resume=None, cap=None,
