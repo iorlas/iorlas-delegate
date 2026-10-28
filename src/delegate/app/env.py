@@ -67,7 +67,7 @@ def load_routing() -> dict:
     for k in retired_keys_present():
         if k not in _RETIRED_WARNED:
             _RETIRED_WARNED.add(k)
-            print(f"route.py: {config_store().path}: '{k}' is retired and ignored; it can be deleted from config.json", file=sys.stderr)
+            print(f"route.py: {config_store().path}: '{k}' is retired and ignored; it is safe to delete from config.json (nothing rewrites the file)", file=sys.stderr)
     typed_routing(cfg)
     return cfg
 

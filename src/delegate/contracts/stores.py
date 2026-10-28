@@ -18,7 +18,7 @@ from process_lock import LockHeldError, ProcessLock
 from delegate.contracts import codec
 from delegate.contracts.history import ROWS, HealthCheckpoint, HealthState, HistoryRow, RunRow
 from delegate.contracts.routing import BreakerPolicy
-from delegate.contracts.state import Profile, StateDoc
+from delegate.contracts.state import Profile, StateDoc, split_retired_state
 
 HISTORY_MAX, HISTORY_DAYS = 1_000_000, 14
 
@@ -63,7 +63,7 @@ def read_json(path: Path) -> object | None:
         return None
 
 
-_STATE_WARNED: set[Path] = set()
+_STATE_WARNED: set[tuple[Path, str]] = set()
 
 
 class StateStore:
@@ -74,11 +74,17 @@ class StateStore:
 
     def load(self) -> StateDoc:
         data = read_json(self.path)
+        if isinstance(data, dict):
+            data, gone = split_retired_state(data)
+            for k in gone:
+                if (self.path, k) not in _STATE_WARNED:
+                    _STATE_WARNED.add((self.path, k))
+                    print(f"delegate: {self.path}: '{k}' is retired and ignored; it is safe to leave (the file is not touched)", file=sys.stderr)
         try:
             return codec.from_json(StateDoc, data)
         except codec.CodecError as e:
-            if data is not None and self.path not in _STATE_WARNED:      # a file from before the typed state: dropped, never migrated
-                _STATE_WARNED.add(self.path)
+            if data is not None and (self.path, "") not in _STATE_WARNED:      # a file from before the typed state: dropped, never migrated
+                _STATE_WARNED.add((self.path, ""))
                 print(f"delegate: {self.path} is not a v{StateDoc.V} state file ({e}); starting from empty state", file=sys.stderr)
             return StateDoc()
 

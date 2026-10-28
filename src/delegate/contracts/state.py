@@ -105,6 +105,31 @@ class StateDoc:
     claude_usage: UsageCache | None = None
 
 
+# State keys and lanes an older state.json may still carry. Loading drops them with one warning each; any other unknown key resets the file.
+RETIRED_STATE = ("codex_login_pid",)
+RETIRED_LANES = ("CLAUDE_CREDIT",)
+
+
+def split_retired_state(data: dict) -> tuple[dict, list[str]]:
+    """(data without retired top-level keys and without entries of a retired lane, what was dropped as 'key' or 'section.entry', in file order).
+    A per-lane entry is one keyed by the lane or carrying `lane`; every other entry, and the input, are untouched."""
+    gone, out = [], {}
+    for k, v in data.items():
+        if k in RETIRED_STATE:
+            gone.append(k)
+        elif isinstance(v, dict) and k in ("out", "holds", "leases", "refs", "prev", "auth", "warned_at"):
+            keep = {}
+            for name, e in v.items():
+                if name in RETIRED_LANES or (isinstance(e, dict) and e.get("lane") in RETIRED_LANES):
+                    gone.append(f"{k}.{name}")
+                else:
+                    keep[name] = e
+            out[k] = keep
+        else:
+            out[k] = v
+    return out, gone
+
+
 @mutable
 class Profile:
     """The owner's lane choices, `config.json` `profile`: never a setting, never merged into one."""

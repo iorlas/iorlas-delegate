@@ -1,0 +1,12 @@
+{"v": 1,
+ "out": {"OPENAI_SUBSCRIPTION": {"until": 4102444800.0, "why": "reported out", "at": 1000.0, "set": 1000.0, "reason": "limit", "source": "vendor", "zone": null, "guess_n": 0},
+         "CLAUDE_CREDIT": {"until": 4102444800.0, "why": "cap reached", "at": 1000.0, "set": 1000.0, "reason": "limit", "source": "guess", "zone": null, "guess_n": 1}},
+ "leases": {"r-live": {"lane": "CLAUDE_SUBSCRIPTION", "pid": 4242, "start": 1000.0, "expires": 4102444800.0, "pid_start": null, "role": "worker", "task": "t", "silence_s": null, "canary": null, "worker_pid": null, "worker_start": null, "last_event": null, "ref": null}},
+ "refs": {},
+ "holds": {"h1": {"id": "h1", "lane": "OPENAI_SUBSCRIPTION", "until": 4102444800.0, "set_at": 1000.0, "roles": ["worker"], "set_by": "owner", "reason": "keep for me", "stale_at": null}},
+ "prev": {},
+ "auth": {"OPENAI_SUBSCRIPTION": {"at": 1000.0, "ok": true, "why": ""}},
+ "warned_at": {},
+ "codex_limits": null,
+ "claude_usage": null,
+ "codex_login_pid": 31337}

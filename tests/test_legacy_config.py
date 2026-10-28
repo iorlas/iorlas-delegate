@@ -43,7 +43,7 @@ class LegacyConfig(unittest.TestCase):
         self.assertEqual(len(warned), 3)
         for key in ("codex_weekly_used_override", "codex_resume_after_stall", "credit"):
             self.assertEqual(len([w for w in warned if f"'{key}'" in w]), 1)
-        self.assertTrue(all("config.json" in w and "can be deleted" in w for w in warned))
+        self.assertTrue(all("config.json" in w and "safe to delete" in w for w in warned))
         self.assertEqual(json.loads(Path(self.tmp.name, "config.json").read_text())["codex_weekly_used_override"], None)   # the owner's file is never touched
 
     def test_overrides_of_the_old_config_still_apply(self):

@@ -1,6 +1,7 @@
 """`route.py doctor` (and `init`): a plain lane table (lane, enabled, ready, fix) and the notes about retired config keys; and `config set|show`.
 Nothing here installs, logs in or decides for the owner: the fix column says what to run."""
 import json
+import os
 
 from delegate.app import env, onboard
 from delegate.contracts.routing import split_retired
@@ -19,13 +20,26 @@ def lane_rows(cfg):
     return rows
 
 
+LEFTOVER_FILES = ("claude-credit.key", "ledger.jsonl")       # of the deleted CLAUDE_CREDIT lane
+LEFTOVER_ENV = "CLAUDE_CREDIT_WORKER_KEY"
+
+
+def leftovers():
+    """Notes for what the deleted CLAUDE_CREDIT lane left behind. Nothing reads or deletes them."""
+    out = [{"id": "unused_file", "file": str(env.config_dir() / n), "say": f"{env.config_dir() / n}: unused, safe to delete."}
+           for n in LEFTOVER_FILES if (env.config_dir() / n).exists()]
+    if os.environ.get(LEFTOVER_ENV):
+        out.append({"id": "unused_env", "key": LEFTOVER_ENV, "say": f"env {LEFTOVER_ENV}: unused, safe to unset."})
+    return out
+
+
 def notes(cfg):
-    out = [{"id": "retired_key", "key": k, "file": str(env.config_store().path), "say": f"{env.config_store().path}: '{k}' is retired and ignored; delete it from config.json."}
+    out = [{"id": "retired_key", "key": k, "file": str(env.config_store().path), "say": f"{env.config_store().path}: '{k}' is retired and ignored; safe to delete from config.json."}
            for k in env.retired_keys_present()]
     with open(env.SKILL_DIR / "routing.json", encoding="utf-8") as f:
         out += [{"id": "retired_key", "key": k, "file": str(env.SKILL_DIR / "routing.json"), "say": f"{env.SKILL_DIR / 'routing.json'}: '{k}' is retired and ignored."}
                 for k in split_retired(json.load(f).get("settings") or {})[1]]
-    return out
+    return out + leftovers()
 
 
 def doctor(cfg):
