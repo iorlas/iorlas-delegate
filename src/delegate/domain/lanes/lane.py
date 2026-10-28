@@ -18,7 +18,7 @@ from delegate.domain.time.spec import local
 class Lane:
     name: str
     family: str
-    kind: str                            # subscription | credit
+    kind: str                            # subscription
     shared: bool = False                 # shared with the orchestrator: keeps its reserve
     out: bool = False
     out_until: float | None = None
@@ -31,9 +31,6 @@ class Lane:
     five_reset: float | None = None
     pace: float | None = None            # weekly pace in points: elapsed share minus used share
     burn: bool = False                   # weekly window about to reset with allowance left
-    reset_in_days: float | None = None   # credit lanes
-    spend: float = 0.0
-    cap: float | None = None
     notes: list[str] = field(default_factory=list)
     windows: list[dict] = field(default_factory=list)       # every window the vendor exposes, for the cockpit
     spend_blocked: bool = False          # the vendor says a spend or credit limit stopped it (not a usage window)
@@ -108,9 +105,6 @@ class Lane:
         if self.week is not None:
             reset = f" (resets {fmt_span(self.week_reset - t)}, {local(self.week_reset)})" if self.week_reset and self.week_reset > t else ""
             bits.append(f"week {self.week:.0f}%" + reset + (f" pace {self.pace:+.0f}" if self.pace is not None else ""))
-        if self.kind == "credit":
-            bits.append(f"cycle ${self.spend:.2f} of ${self.cap or 0:.0f} cap by this tool"
-                        + (f", resets in {self.reset_in_days:.1f}d" if self.reset_in_days is not None else ""))
         if self.out:
             bits.append("OUT" + (f" until {local(self.out_until)}" if self.out_until else ""))
         elif self.burn:

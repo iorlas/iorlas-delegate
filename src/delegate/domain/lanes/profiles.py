@@ -10,7 +10,7 @@ Adapter = namedtuple("Adapter", "kind cli exe resume")
 REGISTRY = {"codex": Adapter("codex", "codex", "codex", "tested"), "opencode": Adapter("opencode", "opencode", "opencode", "untested"),
             "claude_p": Adapter("claude_p", "claude", "claude", "tested")}
 
-LANE_HOSTS = {"CLAUDE_SUBSCRIPTION": ("api.anthropic.com",), "CLAUDE_CREDIT": ("api.anthropic.com",), "OPENAI_SUBSCRIPTION": ("chatgpt.com",),
+LANE_HOSTS = {"CLAUDE_SUBSCRIPTION": ("api.anthropic.com",), "OPENAI_SUBSCRIPTION": ("chatgpt.com",),
               "GROK_SUBSCRIPTION": ("api.x.ai",), "DEEPSEEK_FREE": ("opencode.ai",), "ZAI_CODING_SUBSCRIPTION": ("api.z.ai",)}
 FAMILY_HOSTS = {"claude": ("api.anthropic.com",), "openai": ("chatgpt.com",), "xai": ("api.x.ai",), "deepseek": ("opencode.ai",), "zai": ("api.z.ai",)}
 
@@ -27,6 +27,6 @@ def all_hosts():
     return tuple(dict.fromkeys(h for hs in LANE_HOSTS.values() for h in hs))
 
 
-LOGIN_CMD = {"OPENAI_SUBSCRIPTION": "codex login", "CLAUDE_SUBSCRIPTION": "claude auth login", "CLAUDE_CREDIT": "route.py set-key",
+LOGIN_CMD = {"OPENAI_SUBSCRIPTION": "codex login", "CLAUDE_SUBSCRIPTION": "claude auth login",
              "GROK_SUBSCRIPTION": "opencode auth login", "ZAI_CODING_SUBSCRIPTION": "opencode auth login, choose Z.AI Coding Plan",
-             "DEEPSEEK_FREE": "route.py doctor --lane DEEPSEEK_FREE"}
+             "DEEPSEEK_FREE": "route.py config set deepseek_free_enabled true"}

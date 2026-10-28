@@ -17,7 +17,7 @@ from delegate.domain.routing.router import Router
 def status_payload(cfg, lanes, ck, st, t):
     return {"v": 1, "ts": t,
             "lanes": {n: {"family": l.family, "kind": l.kind, "out": l.out, "out_until": l.out_until, "reason": l.out_reason if l.out else None, "five": l.five, "week": l.week,
-                          "pace": l.pace, "burn": l.burn, "spend": l.spend, "cap": l.cap, "notes": l.notes} for n, l in lanes.items()},
+                          "pace": l.pace, "burn": l.burn, "notes": l.notes} for n, l in lanes.items()},
             "cockpit": ck,
             "running": running_rows(st, t),
             "needs_input": cockpit.needs_input(lanes), "holds": HoldBook(st.holds).rows(t), "asks": [x.as_dict() for x in settle_holds(env.states(), lanes, st, t)[0]],

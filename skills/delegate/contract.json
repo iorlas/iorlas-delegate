@@ -202,7 +202,7 @@
   "ref": "the vendor session or thread id the call ran in (same as the top-level ref)",
   "last_activity_at": "ISO 8601 UTC time the call ended; null without a ref",
   "warm_until": "last_activity_at + ttl_s: when the vendor prompt cache probably expires. Telemetry only; no routing uses it. null = unknown",
-  "ttl_s": "cache lifetime assumed: claude subscription 3600, claude credit 300, codex 3600; null for opencode lanes",
+  "ttl_s": "cache lifetime assumed: claude subscription 3600, codex 3600; null for opencode lanes",
   "ttl_source": "vendor_default | observed | unknown",
   "cost_usd": "what the harness returned for this call (claude total_cost_usd, opencode step cost summed); null when it returns none (codex, zai)",
   "cost_source": "harness | unknown | free",

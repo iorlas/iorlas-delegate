@@ -40,8 +40,8 @@ class LegacyConfig(unittest.TestCase):
         self.assertEqual(p.returncode, 0, p.stderr)
         self.assertIsNone(json.loads(p.stdout)["stop"])                  # stdout is still exactly the answer
         warned = [ln for ln in p.stderr.splitlines() if "is retired" in ln]
-        self.assertEqual(len(warned), 2)
-        for key in ("codex_weekly_used_override", "codex_resume_after_stall"):
+        self.assertEqual(len(warned), 3)
+        for key in ("codex_weekly_used_override", "codex_resume_after_stall", "credit"):
             self.assertEqual(len([w for w in warned if f"'{key}'" in w]), 1)
         self.assertTrue(all("config.json" in w and "can be deleted" in w for w in warned))
         self.assertEqual(json.loads(Path(self.tmp.name, "config.json").read_text())["codex_weekly_used_override"], None)   # the owner's file is never touched
@@ -65,7 +65,7 @@ class LegacyConfig(unittest.TestCase):
         p = self.run_py("doctor", "--json")
         d = json.loads(p.stdout)
         notes = [n for n in d["notes"] if n["id"] == "retired_key"]
-        self.assertEqual(sorted(n["key"] for n in notes), ["codex_resume_after_stall", "codex_weekly_used_override"])
+        self.assertEqual(sorted(n["key"] for n in notes), ["codex_resume_after_stall", "codex_weekly_used_override", "credit"])
         self.assertTrue(all(n["file"].endswith("config.json") for n in notes))
 
     def test_an_old_unversioned_state_file_is_reset_with_one_warning(self):

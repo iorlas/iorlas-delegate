@@ -2,7 +2,7 @@
 Nothing here installs, logs in or decides for the owner: the fix column says what to run."""
 import json
 
-from delegate.app import env, keys, onboard
+from delegate.app import env, onboard
 from delegate.contracts.routing import split_retired
 
 OPT_IN = {"DEEPSEEK_FREE": "deepseek_free_enabled", "ZAI_CODING_SUBSCRIPTION": "zai_coding_enabled"}
@@ -80,9 +80,3 @@ def cmd_config(a, cfg):
     else:
         print(json.dumps(config_show(cfg), indent=1))
     return 0
-
-
-def cmd_set_key(a, cfg):
-    if a.web:
-        return keys.set_key_web(host=a.host, port=a.port, timeout=a.timeout, force=a.force)
-    return keys.set_key(from_stdin=a.stdin, force=a.force)

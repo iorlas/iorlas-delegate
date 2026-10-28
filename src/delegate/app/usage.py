@@ -10,7 +10,6 @@ from delegate.adapters.harness.claude import ClaudeHarness
 from delegate.app import env, harnesses
 from delegate.app.fleet import AuthCache
 from delegate.contracts.state import UsageCache
-from delegate.domain.cost.cycle import credit_cycle
 from delegate.domain.lanes.lane import apply_burn, window
 from delegate.domain.time.spec import WEEK_MIN, local, next_weekly, to_epoch
 
@@ -153,22 +152,5 @@ def read_claude_subscription(lane, S, st, t, ai_usage=None):
             lane.notes.append(f"weekly reset {local(nxt)} (config); use unknown")
 
 
-def read_claude_credit(lane, S, st, t, ai_usage=None):
-    c = S.credit
-    start, nxt = credit_cycle(c.reset_day, t)
-    lane.cap = float(c.monthly_cap)
-    lane.spend = env.ledger_spend(start)
-    lane.reset_in_days = (nxt - t) / 86400.0
-    lane.week_reset = nxt
-    add_window(lane, 100.0 * lane.spend / lane.cap if lane.cap else None, nxt, 43200, "estimated from history (this tool's ledger)", env.ledger_last_ts())
-    out = st.out.get(lane.name)
-    if out and out.until > t:
-        lane.out, lane.out_until, lane.out_reason = True, out.until, out.reason
-        lane.notes.append(out.why)
-    elif lane.spend >= lane.cap:
-        lane.out, lane.out_until, lane.out_reason = True, nxt, "limit"
-        lane.notes.append("own cycle cap reached")
-
-
-READERS = {"codex_app_server": read_codex, "claude_subscription": read_claude_subscription, "claude_credit": read_claude_credit,
+READERS = {"codex_app_server": read_codex, "claude_subscription": read_claude_subscription,
            "none": lambda lane, S, st, t, ai_usage=None: None}      # no usage reading (Grok): only refusals mark it out

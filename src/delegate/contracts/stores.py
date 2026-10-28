@@ -16,7 +16,7 @@ from jsonl_log import append_line, open_append
 from process_lock import LockHeldError, ProcessLock
 
 from delegate.contracts import codec
-from delegate.contracts.history import ROWS, HealthCheckpoint, HealthState, HistoryRow, LedgerRow, RunRow
+from delegate.contracts.history import ROWS, HealthCheckpoint, HealthState, HistoryRow, RunRow
 from delegate.contracts.routing import BreakerPolicy
 from delegate.contracts.state import Profile, StateDoc
 
@@ -141,28 +141,6 @@ class HistoryStore:
             if isinstance(r, RunRow) and r.ref == ref and r.cumulative:
                 return r.cumulative
         return None
-
-
-class LedgerStore:
-    """`ledger.jsonl`: what the credit lane spent."""
-
-    def __init__(self, path: Path) -> None:
-        self.path = path
-
-    def rows(self) -> list[LedgerRow]:
-        out = []
-        try:
-            lines = self.path.read_text(encoding="utf-8").splitlines()
-        except OSError:
-            return out
-        for ln in lines:
-            with contextlib.suppress(ValueError):
-                out.append(codec.from_json(LedgerRow, json.loads(ln)))
-        return out
-
-    def add(self, cost: float, model: str, t: float) -> None:
-        append_json(self.path, codec.to_json(LedgerRow(ts=t, model=model, cost=cost)))      # one O_APPEND write per line: no lock needed
-        private(self.path)
 
 
 class CheckpointStore:

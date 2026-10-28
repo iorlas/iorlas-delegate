@@ -8,7 +8,7 @@ from pathlib import Path
 
 from delegate.adapters import statusline
 from delegate.adapters.harness.opencode import OpenCodeHarness
-from delegate.app import env, harnesses
+from delegate.app import env
 
 
 def codex_home():
@@ -21,14 +21,6 @@ def check_codex_cli():
 
 def check_codex_login():
     return (codex_home() / "auth.json").exists()
-
-
-def check_claude_cli():
-    return bool(shutil.which("claude"))
-
-
-def check_credit_key():
-    return bool(harnesses.find_key(quiet=True))
 
 
 def check_usage_source():
@@ -70,7 +62,6 @@ READY_CHECKS = {
     "opencode_xai": check_opencode_xai,
     "opencode_deepseek_free": check_opencode_deepseek_free,
     "codex": lambda: check_codex_cli() and check_codex_login(),
-    "claude_credit": lambda: check_claude_cli() and check_credit_key(),
     "always": lambda: True,
 }
 
@@ -87,8 +78,6 @@ def fix_hint(name):
     """What to do about a lane that is not ready: one line, or '' when nothing is missing."""
     if name == "OPENAI_SUBSCRIPTION":
         return "run `codex login --device-auth`" if check_codex_cli() else "install the Codex CLI (`npm install -g @openai/codex`), then `codex login --device-auth`"
-    if name == "CLAUDE_CREDIT":
-        return "run `route.py set-key` in your own terminal (never paste the key in chat)"
     if name == "GROK_SUBSCRIPTION":
         return "macOS: install OpenCode (https://opencode.ai), then `opencode auth login` and pick xAI"
     if name == "DEEPSEEK_FREE":

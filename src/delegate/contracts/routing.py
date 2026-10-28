@@ -12,7 +12,7 @@ V = 1
 
 # Settings keys an older config.json or routing.json may still carry. Loading drops them with one warning each; any other unknown key fails.
 RETIRED_SETTINGS = ("codex_weekly_used_override", "codex_resume_after_stall", "claude_resume_after_stall", "opencode_resume_after_stall",
-                    "codex_plan_review_only", "host_lanes", "contained_network", "cache_roots")
+                    "codex_plan_review_only", "host_lanes", "contained_network", "cache_roots", "credit")
 
 
 def split_retired(settings: dict) -> tuple[dict, list[str]]:
@@ -48,14 +48,6 @@ class Burn:
 
 
 @record
-class CreditPolicy:
-    use_before_reset_days: float
-    under_cap_fraction: float
-    monthly_cap: float
-    reset_day: int
-
-
-@record
 class BreakerPolicy:
     n: int = 3
     window_min: float = 10
@@ -74,7 +66,6 @@ class Settings:
     strain: Strain
     recover: Strain
     burn: Burn
-    credit: CreditPolicy
     max_parallel: int | None
     min_dwell_minutes: float
     usage_stale_minutes: float

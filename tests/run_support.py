@@ -111,16 +111,16 @@ printf '{"type":"result","result":"claude says hi","session_id":"sess-1","total_
         for c in (["init", "-q"], ["-c", "user.name=t", "-c", "user.email=t@t", "commit", "-q", "--allow-empty", "-m", "i"]):
             sp.run(["git", "-C", str(base / "repo")] + c, check=True, capture_output=True)
         keys = ("PATH", "HOME", "USERPROFILE", "XDG_CONFIG_HOME", "DELEGATE_CONFIG_DIR", "CODEX_HOME", "FAKE_MODE", "FAKE_PIDFILE", "FAKE_ARGS", "FAKE_ENV",
-                "DELEGATE_NOW", "CLAUDE_CODE_ENTRYPOINT", "CLAUDE_FOO", "ANTHROPIC_FOO", "CLAUDE_CREDIT_WORKER_KEY")
+                "DELEGATE_NOW", "CLAUDE_CODE_ENTRYPOINT", "CLAUDE_FOO", "ANTHROPIC_FOO")
         self.saved = {k: os.environ.get(k) for k in keys}
         os.environ.update(PATH=str(base / "bin") + os.pathsep + os.environ["PATH"], HOME=self.tmp.name, USERPROFILE=self.tmp.name,
                           XDG_CONFIG_HOME=self.tmp.name, DELEGATE_CONFIG_DIR=self.tmp.name, CODEX_HOME=str(base / "codex_home"), FAKE_PIDFILE=str(base / "pid"),
                           FAKE_ARGS=str(base / "args"), FAKE_ENV=str(base / "env"), CLAUDE_FOO="1", ANTHROPIC_FOO="1")
-        for k in ("DELEGATE_NOW", "CLAUDE_CODE_ENTRYPOINT", "CLAUDE_CREDIT_WORKER_KEY"):
+        for k in ("DELEGATE_NOW", "CLAUDE_CODE_ENTRYPOINT"):
             os.environ.pop(k, None)
         self.repo = str(base / "repo")
         self.real = dict(usage.READERS)
-        usage.READERS.update({k: (lambda lane, S, st_, t, *a: None) for k in ("codex_app_server", "claude_credit")})   # the real subscription reader reads the status-line file
+        usage.READERS.update({k: (lambda lane, S, st_, t, *a: None) for k in ("codex_app_server",)})   # the real subscription reader reads the status-line file
         self.fresh_usage()
 
     def fresh_usage(self, age=0):

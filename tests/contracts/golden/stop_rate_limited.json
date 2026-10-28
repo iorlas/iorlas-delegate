@@ -21,7 +21,7 @@
  "git_violation": [],
  "lane": "OPENAI_SUBSCRIPTION",
  "model": "gpt-6.1-sol",
- "notice": "not set up: CLAUDE_CREDIT, GROK_SUBSCRIPTION (route.py doctor)",
+ "notice": "not set up: GROK_SUBSCRIPTION (route.py doctor)",
  "ref": "thread-123",
  "run_id": "bc2ea651-0685-4c03-ace4-5fa37d5e892c",
  "rung": 0,

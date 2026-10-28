@@ -1,7 +1,7 @@
 """Settler: the one place a classified outcome (adapters/harness/classify.py) is applied to the answer and, for a lane-scoped reason, to the lane's
 state. All three launchers end here. `apply` is the only entry; one method per reason, found by name.
 
-`reset` is the default end of a limit when the message names no time; `credit_until` the end of a credit cycle, when known; `login` the hint stored
+`reset` is the default end of a limit when the message names no time; `login` the hint stored
 with a logged-out lane and the text of the answer with {why}.
 """
 import time
@@ -37,7 +37,6 @@ class Case:
     rc: int | None = None
     tail: str = ""
     reset: Callable[[], float | None] | None = None
-    credit_until: float | None = None
     login: tuple[str, str] | None = None
     answered: bool = False       # the final answer was captured before the run failed
 
@@ -70,8 +69,8 @@ class Settler:
         return o
 
     def apply(self, res: dict, o: classify.Outcome, d: dict, t: float, who: str, a: object, rc: int | None = None, tail: str = "",
-              reset: Callable[[], float | None] | None = None, credit_until: float | None = None, login: tuple[str, str] | None = None) -> dict:
-        c = Case(res, self.net_pass(o, d), d, t, who, a, rc, tail, reset, credit_until, login, res.pop("answered", False))
+              reset: Callable[[], float | None] | None = None, login: tuple[str, str] | None = None) -> dict:
+        c = Case(res, self.net_pass(o, d), d, t, who, a, rc, tail, reset, login, res.pop("answered", False))
         if c.o.reason != "hung":
             res.pop("hung_words", None), res.pop("hung_kind", None)
         res["outcome"] = c.o.reason
@@ -108,9 +107,9 @@ class Settler:
         c.res.update(retry_after=until, say=f"{c.lane} hit a limit" + (f" ({c.why[:120]}); worker stopped, lane" if ours else ";") + f" out until {local(until)}")
 
     def _credit_exhausted(self, c: Case) -> None:
-        until = c.credit_until or c.t + CREDIT_PROBE
-        self.mark_out(c.lane, until, "out of credits: " + c.why[:120].replace("\n", " "), c.t, "credit", "vendor" if c.credit_until else "guess")
-        c.res.update(retry_after=c.credit_until, say=f"{c.lane} is out of credits ({c.why[:120]}); out until {local(until)}")
+        until = c.t + CREDIT_PROBE
+        self.mark_out(c.lane, until, "out of credits: " + c.why[:120].replace("\n", " "), c.t, "credit", "guess")
+        c.res.update(retry_after=None, say=f"{c.lane} is out of credits ({c.why[:120]}); out until {local(until)}")
 
     def _logged_out(self, c: Case) -> None:
         cmd = LOGIN_CMD.get(c.lane, "route.py doctor")

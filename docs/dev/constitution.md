@@ -11,7 +11,7 @@ Read this before changing anything in this repo. Rules are Denis's; the lessons 
 5. **The script decides.** The model supplies only what the script cannot read (today: Desktop usage from `get_usage`). Portability lives in the script, never in per-OS branches in markdown.
 6. **Workers never touch git.** The coordinator owns branches, worktrees, commits, merges.
 7. **Nothing blocks delegation.** Setup is optional; sub-agent-only works with nothing installed; a lane nobody set up is offered once, never nagged.
-8. **The API key never enters chat.** Env var, `set-key` in the user's terminal, or `set-key --web`.
+8. **No secret enters chat.** A login is the user's, in their own terminal.
 9. **Claim only what was checked.** Say "built" vs "bead"; report test and CI status of the exact commit.
 10. **Read `docs/dev/integrations.md`** before changing how workers launch or how limits are computed (agent-runs v1 is a public format).
 

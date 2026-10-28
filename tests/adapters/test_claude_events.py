@@ -12,12 +12,12 @@ from unittest import mock
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE.parent.parent / "src"))
 from delegate.adapters.harness.base import LaunchInputs      # noqa: E402
-from delegate.adapters.harness.claude import ClaudeHarness, acct_of, stream_usage, tokens_of      # noqa: E402
+from delegate.adapters.harness.claude import ClaudeHarness, stream_usage, tokens_of      # noqa: E402
 from delegate.contracts import events as ev                 # noqa: E402
 
 
-def stream(name, credit=False):
-    h = ClaudeHarness(credit)
+def stream(name):
+    h = ClaudeHarness()
     return h, [h.parse_line(x) for x in (HERE / "golden" / f"claude_{name}.jsonl").read_text().splitlines()]
 
 
@@ -49,7 +49,6 @@ class Stream(unittest.TestCase):
         self.assertEqual((s.text, s.rc, s.check, s.vendor, s.cost, s.warnings, s.work), ("all done", 0, False, "", 0.25, [], True))
         self.assertEqual((s.res["ref"], s.res["tokens"], s.res["turns"], s.res["context_k"]), ("sess-1", {"in": 120, "cached": 100, "out": 9}, 2, 0.1))
         self.assertEqual((s.res["acct"]["cost_usd"], s.res["acct"]["ttl_s"]), (0.25, 3600))
-        self.assertEqual(acct_of({"input_tokens": 1}, 0.1, True)["ttl_s"], 300)
 
     def test_an_api_error_result_is_the_clis_words(self):
         h, _ = stream("api_error")
@@ -93,14 +92,14 @@ class World(unittest.TestCase):
         self.assertEqual(s.argv[s.argv.index("--tools") + 1], "Read,Glob,Grep,Bash")
         self.assertEqual((s.stdin, s.cwd, s.env, "--max-budget-usd" in s.argv, "--json-schema" in s.argv), ("brief", "/w", {"A": "1"}, False, False))
 
-    def test_a_resumed_write_launch_on_credit_with_a_schema(self):
+    def test_a_resumed_write_launch_with_a_schema(self):
         with tempfile.TemporaryDirectory() as d:
             (Path(d) / "s.json").write_text('{"type": "object"}')
-            h = ClaudeHarness(True)
-            s = h.launch_spec(LaunchInputs(**self.I, write=True, budget=2.0, resume="old", schema=str(Path(d) / "s.json")))
+            h = ClaudeHarness()
+            s = h.launch_spec(LaunchInputs(**self.I, write=True, resume="old", schema=str(Path(d) / "s.json")))
         self.assertEqual(s.argv[s.argv.index("--resume") + 1], "old")
         self.assertNotIn("--session-id", s.argv)
-        self.assertEqual((s.argv[s.argv.index("--tools") + 1], s.argv[s.argv.index("--max-budget-usd") + 1], s.argv[-1]), ("Read,Glob,Grep,Edit,Write,Bash", "2.0", '{"type": "object"}'))
+        self.assertEqual((s.argv[s.argv.index("--tools") + 1], "--max-budget-usd" in s.argv, s.argv[-1]), ("Read,Glob,Grep,Edit,Write,Bash", False, '{"type": "object"}'))
         self.assertEqual(h.evidence.ref, "old")
 
     def test_the_transcript_is_the_session_file(self):

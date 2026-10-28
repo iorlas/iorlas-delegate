@@ -14,8 +14,7 @@ from child_env import scrub_current
 
 from delegate.contracts import codec
 from delegate.contracts.routing import Routing, split_retired
-from delegate.contracts.stores import ConfigStore, HistoryStore, LedgerStore, StateStore
-from delegate.domain.cost.ledger import CostLedger
+from delegate.contracts.stores import ConfigStore, HistoryStore, StateStore
 
 SKILL_DIR = Path(__file__).resolve().parents[3] / "skills" / "delegate"        # routing.json, contract.json, SKILL.md: next to src/ in the plugin tree
 
@@ -37,7 +36,7 @@ def plugin_data_dir(here: Path | None = None) -> Path | None:
 
 
 def config_dir() -> Path:
-    """Where settings, profile, state, ledger and the key live: DELEGATE_CONFIG_DIR, else Claude Code's data dir for the installed plugin.
+    """Where settings, profile and state live: DELEGATE_CONFIG_DIR, else Claude Code's data dir for the installed plugin.
     CLAUDE_PLUGIN_DATA is deliberately not read (it names whichever plugin launched the process). A checkout has no default: two places would split the state."""
     explicit = os.environ.get("DELEGATE_CONFIG_DIR")
     p = Path(explicit) if explicit else plugin_data_dir()
@@ -45,7 +44,7 @@ def config_dir() -> Path:
         sys.exit("route.py: not running from an installed plugin; set DELEGATE_CONFIG_DIR to the folder for settings and state")
     p.mkdir(parents=True, exist_ok=True)
     with contextlib.suppress(OSError):
-        os.chmod(p, 0o700)        # holds the API key file, state and ledger: private to the user
+        os.chmod(p, 0o700)        # holds state and history: private to the user
     return p
 
 
@@ -106,10 +105,6 @@ def history_store() -> HistoryStore:
     return HistoryStore(history_path())
 
 
-def ledger_store() -> LedgerStore:
-    return LedgerStore(config_dir() / "ledger.jsonl")
-
-
 def snapshot_path() -> Path:
     return config_dir() / "status-snapshot.json"
 
@@ -142,18 +137,6 @@ def set_profile_lane(name, value) -> None:
 
 def history_add(row) -> None:
     history_store().add(row)
-
-
-def ledger_add(cost, model, now_t) -> None:
-    ledger_store().add(cost, model, now_t)
-
-
-def ledger_spend(since_epoch) -> float:
-    return CostLedger(ledger_store().rows()).spend(since_epoch)
-
-
-def ledger_last_ts():
-    return CostLedger(ledger_store().rows()).last_ts()
 
 
 def in_container() -> bool:

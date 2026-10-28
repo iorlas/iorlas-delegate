@@ -13,7 +13,7 @@ from delegate.app.usage import READERS
 from delegate.contracts.routing import CallArgs, Run
 from delegate.contracts.stores import CheckpointStore
 from delegate.domain.holds.book import HoldBook
-from delegate.domain.routing.router import Router, callable_lanes
+from delegate.domain.routing.router import Router
 
 # Every codex run and resume gets these, so neither the user's config nor a repo file widens or narrows them. The sandbox has no network and
 # writes only the working directory; a command it blocks may ask to run outside it, and Codex's automatic reviewer (a model, no human)
@@ -113,7 +113,7 @@ def decision(a, cfg, unattended=False):
     warnings = drift_warnings(env.states(), fleet.lanes, st, t)
     _, st = settle_holds(env.states(), fleet.lanes, st, t)
     publish_lanes(fleet.lanes, st, t)
-    lanes = callable_lanes(mark_busy(fleet.lanes, st, routing.settings, t, busy_jitter), unattended)
+    lanes = mark_busy(fleet.lanes, st, routing.settings, t, busy_jitter)
     args = call_args(a, unattended)
     router = Router(routing, HoldBook(st.holds), st.prev, t)
     pick = router.route(a.role, args, lanes, st.refs.get(args.resume or ""))

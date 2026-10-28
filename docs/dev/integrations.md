@@ -4,7 +4,7 @@ Read this before changing how delegate launches workers, computes limits, or sto
 only `skills/` and `commands/`, so nothing here is loaded when someone just uses delegate.
 
 Delegate has users besides the orchestrating session: today the iorlas-task-loop plugin's dashboard. They depend on
-**two things only**. Everything else (route.py's internals, `routing.json`, `state.json`, the ledger, mode files,
+**two things only**. Everything else (route.py's internals, `routing.json`, `state.json`, mode files,
 command names and flags) is private and may change in any release.
 
 ## 1. The agent-runs v1 records (a public format)
@@ -48,14 +48,13 @@ as a script, with no Claude session behind it. The contract is `skills/delegate/
   that is only busy (slots full, otherwise usable) answers `busy` with its `at` instead of falling to the next rung.
 - Roles own models: the caller picks the role, never the model. The reviewer's Claude rungs run Sonnet.
 - `context` (per run, scripts only; interactive answers leave it out): `{instructions: [repo instruction files given], env_keys: [names passed]}`;
-  the credit lane's key is passed but not listed.
 - With `--schema`, delegate checks the answer (type, required, properties, items, enum), re-asks once in the same thread, and answers
   `schema_invalid` when it still does not fit; tokens and denials of both turns add up.
 - stdout is exactly one JSON object (`contract` = 3, `stop`, `context`, `data`, `text`, `ref`, `lane`, `model`, `effort`, `family`, `flag`, `cost`, `tokens`, `secs`, `run_id`,
   `transcript`, `say`, `git_violation`, plus `usage`, `call_id`, `transcript_info`, `transcript_status`; `agent_model`, `brief_prefix`, `cwd` on the interactive handoff); `tokens` is `{in, cached, out}` or null, and `in` counts all input including cache reads
   (and Claude cache writes); exit 0 whenever it was printed, a bad flag or argument of `run` included (`bad_request`, `fix` names the argparse message, no worker started).
 - `--unattended` is how an engine says no Claude session is behind it. Without it the caller is a Claude session and may get `agent`. With it: never `agent`, `ask_user`
-  or `needs_input`; CLAUDE_CREDIT is never picked; CLAUDE_SUBSCRIPTION runs `claude -p` on the logged-in account. No time or token limit by default: `--timeout` is
+  or `needs_input`; CLAUDE_SUBSCRIPTION runs `claude -p` on the logged-in account. No time or token limit by default: `--timeout` is
   opt-in and an unknown plan reading does not stop a run. `orchestrator_reserve` still applies when a reading exists.
 - Everything else about access is delegate-internal and fixed (never set by the caller or a repo file). Codex, every run and resume: `-s workspace-write` (write steps) or
   `-s read-only`, no network, no extra writable folders, `--ignore-user-config --ignore-rules`, and `approval_policy=on-request` + `approvals_reviewer=auto_review`: a command
@@ -103,7 +102,7 @@ as a script, with no Claude session behind it. The contract is `skills/delegate/
   the `cumulative` field of the newest history row for that ref). Cost is what the harness returned, with no price table: Claude `total_cost_usd` on every lane
   (subscription included; top-level `cost` is no longer zeroed there), Codex `cost_usd: null`/`cost_source: "unknown"`, Grok the summed opencode step `cost`, zai `unknown`,
   free DeepSeek `0`/`free`. Also `ref`, `last_activity_at`, `warm_until`, `ttl_s`, `ttl_source`, `cost_usd`, `cost_source`, `accounting`. `warm_until` is telemetry
-  (Claude subscription 3600 s, Claude credit 300 s, Codex 3600 s observed, opencode unknown = null): no routing reads it.
+  (Claude subscription 3600 s, Codex 3600 s observed, opencode unknown = null): no routing reads it.
 - A state-lock timeout answers `lock` (transient, poll). A Codex turn that fails (`turn.failed`/`error` event) before any
   work answers `vendor_blip` (transient, poll) with Codex's own message, or `network` when the message words a dropped connection or the probe finds the net down; after work it is `worker_failed`;
   an HTTP 4xx other than 401/403/429 is `bad_request`, 401/403 is `logged_out`, 429 is `rate_limited`.
@@ -121,7 +120,7 @@ as a script, with no Claude session behind it. The contract is `skills/delegate/
   (`leases`; 120 s, renewed every 30 s, so a killed `route.py` frees its slot by itself). With `--task ID`, a second `run` for the same task while the first is alive answers `duplicate_task`.
 - SIGTERM, SIGHUP or Ctrl-C on `route.py run` stops its worker too (workers run in their own process group, so nothing else would). With `--unattended` a changed parent pid
   (the engine was SIGKILLed) does the same. Without this, an orphaned Codex keeps burning the plan.
-- `route.py status --json` (v1, one line, the dashboard's only read): `{v, ts, lanes{name:{family,kind,out,out_until,reason,five,week,pace,burn,spend,cap,notes}}, running[{run_id,lane,role,task,started,age_s}],
+- `route.py status --json` (v1, one line, the dashboard's only read): `{v, ts, lanes{name:{family,kind,out,out_until,reason,five,week,pace,burn,notes}}, running[{run_id,lane,role,task,started,age_s}],
   needs_input[], cockpit}`. `cockpit` (`route.py status` prints it as text): `{v, at, legend, next_worker{action,lane,model,effort,pass,fallback,why}, lanes[{id,label,family,kind,model,state,emoji,reason,detail,unlock{locked,known,at,in_s,text,why},windows[{name,used_pct,resets_at,resets_in_s,source,age_s}],warnings[],low_tokens[],meter,login{ok,why,checked_at},running}]}`, one row for every lane in routing.json, configured or not; `state` is ready, resting, logged_out, spend, slow, off or unknown; login checks (`codex login status`, `claude auth status`, opencode's auth file) are cached 5 minutes in state.json `auth` and never call a model. Every login answer (a non-cheap `status`, `doctor`, a successful `run`) is also written to `auth-cache.json` (config dir, TTL 10 min); `next` reads it instead of spawning `claude auth status`. `five`/`week` are null when unknown. `doctor --json` carries `v: 1`. `route.py status --json --cheap`: zero process spawns, no network, no keychain: it prints the last full `status` (kept in `status-snapshot.json`) with `cheap: true`, `ts` (now), `age_s` (seconds since that snapshot; `null` when no full status has run), `running` re-read from the leases, and `auth{lane:{ok,why,age_s}}` from `auth-cache.json`. Read `age_s` to decide whether to pay for a full `status`. A non-cheap `status` writes the snapshot. Dashboards read these, never
   `state.json` or `history.jsonl`.
   A lane's `reason` (when `out`): limit, logged_out, busy or error.

@@ -63,8 +63,7 @@ class Breaker(unittest.TestCase):
         self.assertTrue(ls["OPENAI_SUBSCRIPTION"].usable(S, True)[0])
 
     def test_all_pairs_benched_stops_with_the_bench_ends_listed(self):
-        ls = self.lanes_with(self.rows("OPENAI_SUBSCRIPTION", "gpt-6.1-sol") + self.rows("CLAUDE_SUBSCRIPTION", "sonnet-5.5") + self.rows("CLAUDE_SUBSCRIPTION", "opus-5.5")
-                             + self.rows("CLAUDE_CREDIT", "sonnet-5.5") + self.rows("GROK_SUBSCRIPTION", "grok-4.7"))
+        ls = self.lanes_with(self.rows("OPENAI_SUBSCRIPTION", "gpt-6.1-sol") + self.rows("CLAUDE_SUBSCRIPTION", "sonnet-5.5") + self.rows("CLAUDE_SUBSCRIPTION", "opus-5.5") + self.rows("GROK_SUBSCRIPTION", "grok-4.7"))
         d = support.decide("worker", CFG, ls, {}, T + 1, {"authored_by": None, "premium": None, "allow_degraded": False})
         self.assertEqual(d["action"], "stop")
         self.assertIn("OPENAI_SUBSCRIPTION/gpt-6.1-sol", d["resets"])

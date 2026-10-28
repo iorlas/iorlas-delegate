@@ -1,4 +1,4 @@
-"""`history.jsonl` (one `HistoryRow` per line, `v` 1, tagged by `kind`), `ledger.jsonl` and `health-checkpoint.json`.
+"""`history.jsonl` (one `HistoryRow` per line, `v` 1, tagged by `kind`), and `health-checkpoint.json`.
 
 A row is a fact, appended once and never edited. The health fold (domain/health) reads `run`, `canary` and `release` rows; the rest are for
 calibration and the dashboard. A line of another shape is skipped, never migrated.
@@ -115,14 +115,6 @@ class ReapRow:
 
 HistoryRow = RunRow | RefusalRow | CanaryRow | GapRow | ReleaseRow | ReapRow
 ROWS = table_of(RunRow, RefusalRow, CanaryRow, GapRow, ReleaseRow, ReapRow)
-
-
-@record
-class LedgerRow:
-    V = V
-    ts: float
-    model: str
-    cost: float
 
 
 @mutable

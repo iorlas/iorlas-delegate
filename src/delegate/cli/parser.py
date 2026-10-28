@@ -18,12 +18,11 @@ The model supplies only what the script cannot read itself; the script decides.
   route.py report --lane LANE --event out|ok [--until EPOCH|ISO]
   route.py capture-limits [--print]  (status line JSON on stdin)
   route.py doctor [--json]   (also `init`) a table of every lane: enabled, ready, and what to run to fix it
-  route.py set-key [--stdin] [--force] | --web [--host IP|tailscale] [--port N] [--timeout S]   the key is handed over by the USER (terminal prompt or one-shot page); the agent never handles it
   route.py config set KEY VALUE | show
   route.py hold LANE --until EPOCH|ISO|+2h|+3d [--roles worker,light] [--reason TEXT] | release ID|LANE | holds   an owner hold stops a lane for some roles; --until is mandatory
 
 Data: routing.json next to this file (lanes, models, roles, thresholds).
-Per-user settings: <config dir>/config.json (same keys as "settings"); profile, state, ledger and key live in <config dir>:
+Per-user settings: <config dir>/config.json (same keys as "settings"); profile and state live in <config dir>:
   $DELEGATE_CONFIG_DIR, else Claude Code's plugin data dir (~/.claude/plugins/data/<plugin>-<marketplace>); a checkout must set the variable.
 Workers never create branches or worktrees and never commit, merge, push or stash: the coordinator owns git.
 """
@@ -53,8 +52,6 @@ def build():
     r.add_argument("--until")
     cl = sub.add_parser("capture-limits"); cl.add_argument("--print", action="store_true")
     dr = sub.add_parser("doctor", aliases=["init"]); dr.add_argument("--json", action="store_true")
-    sk = sub.add_parser("set-key"); sk.add_argument("--stdin", action="store_true"); sk.add_argument("--force", action="store_true")
-    sk.add_argument("--web", action="store_true"); sk.add_argument("--host", default="127.0.0.1"); sk.add_argument("--port", type=int, default=0); sk.add_argument("--timeout", type=int, default=300)
     sub.add_parser("guard").add_argument("--read-only", action="store_true")
     nt = sub.add_parser("net", help="is the machine online? stdlib sockets, no quota"); nt.add_argument("--lane"); nt.add_argument("--host", action="append", help="a host or host:port; repeatable")
     sub.add_parser("contract").add_argument("--json", action="store_true")

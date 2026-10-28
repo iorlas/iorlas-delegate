@@ -27,12 +27,6 @@
       "minutes": 120,
       "min_left_percent": 10
     },
-    "credit": {
-      "use_before_reset_days": 3,
-      "under_cap_fraction": 0.7,
-      "monthly_cap": 150,
-      "reset_day": 1
-    },
     "max_parallel": 4,
     "min_dwell_minutes": 30,
     "usage_stale_minutes": 30,
@@ -105,13 +99,6 @@
       "runner": "agent_tool",
       "shared_with_orchestrator": true,
       "ready": "always"
-    },
-    "CLAUDE_CREDIT": {
-      "family": "claude",
-      "kind": "credit",
-      "reader": "claude_credit",
-      "runner": "claude_p",
-      "ready": "claude_credit"
     },
     "OPENAI_SUBSCRIPTION": {
       "family": "openai",

@@ -46,15 +46,6 @@
     "pace": 0,
     "shared": true,
     "week": 40
-   },
-   {
-    "cap": 150.0,
-    "family": "claude",
-    "kind": "credit",
-    "name": "CLAUDE_CREDIT",
-    "reset_in_days": 20.0,
-    "shared": false,
-    "spend": 0.0
    }
   ],
   "name": "planner_healthy",
@@ -109,15 +100,6 @@
     "pace": 0,
     "shared": true,
     "week": 40
-   },
-   {
-    "cap": 150.0,
-    "family": "claude",
-    "kind": "credit",
-    "name": "CLAUDE_CREDIT",
-    "reset_in_days": 20.0,
-    "shared": false,
-    "spend": 0.0
    }
   ],
   "name": "planner_unattended",
@@ -172,15 +154,6 @@
     "pace": 0,
     "shared": true,
     "week": 40
-   },
-   {
-    "cap": 150.0,
-    "family": "claude",
-    "kind": "credit",
-    "name": "CLAUDE_CREDIT",
-    "reset_in_days": 20.0,
-    "shared": false,
-    "spend": 0.0
    }
   ],
   "name": "worker_healthy",
@@ -235,15 +208,6 @@
     "pace": 0,
     "shared": true,
     "week": 40
-   },
-   {
-    "cap": 150.0,
-    "family": "claude",
-    "kind": "credit",
-    "name": "CLAUDE_CREDIT",
-    "reset_in_days": 20.0,
-    "shared": false,
-    "spend": 0.0
    }
   ],
   "name": "worker_unattended",
@@ -298,15 +262,6 @@
     "pace": 0,
     "shared": true,
     "week": 40
-   },
-   {
-    "cap": 150.0,
-    "family": "claude",
-    "kind": "credit",
-    "name": "CLAUDE_CREDIT",
-    "reset_in_days": 20.0,
-    "shared": false,
-    "spend": 0.0
    }
   ],
   "name": "reviewer_healthy",
@@ -361,15 +316,6 @@
     "pace": 0,
     "shared": true,
     "week": 40
-   },
-   {
-    "cap": 150.0,
-    "family": "claude",
-    "kind": "credit",
-    "name": "CLAUDE_CREDIT",
-    "reset_in_days": 20.0,
-    "shared": false,
-    "spend": 0.0
    }
   ],
   "name": "reviewer_unattended",
@@ -424,15 +370,6 @@
     "pace": 0,
     "shared": true,
     "week": 40
-   },
-   {
-    "cap": 150.0,
-    "family": "claude",
-    "kind": "credit",
-    "name": "CLAUDE_CREDIT",
-    "reset_in_days": 20.0,
-    "shared": false,
-    "spend": 0.0
    }
   ],
   "name": "light_healthy",
@@ -487,15 +424,6 @@
     "pace": 0,
     "shared": true,
     "week": 40
-   },
-   {
-    "cap": 150.0,
-    "family": "claude",
-    "kind": "credit",
-    "name": "CLAUDE_CREDIT",
-    "reset_in_days": 20.0,
-    "shared": false,
-    "spend": 0.0
    }
   ],
   "name": "light_unattended",
@@ -551,15 +479,6 @@
     "pace": 0,
     "shared": true,
     "week": 40
-   },
-   {
-    "cap": 150.0,
-    "family": "claude",
-    "kind": "credit",
-    "name": "CLAUDE_CREDIT",
-    "reset_in_days": 20.0,
-    "shared": false,
-    "spend": 0.0
    }
   ],
   "name": "worker_codex_week_over_gate",
@@ -595,8 +514,7 @@
    "trace": [
     "OPENAI_SUBSCRIPTION: rejected, weekly 99% >= 95 (lane gate)",
     "OPENAI_SUBSCRIPTION: rejected, weekly 99% >= 98 (hard ceiling)",
-    "CLAUDE_SUBSCRIPTION: usable",
-    "CLAUDE_CREDIT: usable"
+    "CLAUDE_SUBSCRIPTION: usable"
    ]
   },
   "lanes": [
@@ -617,15 +535,6 @@
     "pace": 0,
     "shared": true,
     "week": 40
-   },
-   {
-    "cap": 150.0,
-    "family": "claude",
-    "kind": "credit",
-    "name": "CLAUDE_CREDIT",
-    "reset_in_days": 20.0,
-    "shared": false,
-    "spend": 0.0
    }
   ],
   "name": "worker_codex_over_ceiling",
@@ -661,8 +570,7 @@
    "trace": [
     "OPENAI_SUBSCRIPTION: rejected, out until Sun 09 Sep 03:46",
     "OPENAI_SUBSCRIPTION: rejected, out until Sun 09 Sep 03:46",
-    "CLAUDE_SUBSCRIPTION: usable",
-    "CLAUDE_CREDIT: usable"
+    "CLAUDE_SUBSCRIPTION: usable"
    ]
   },
   "lanes": [
@@ -686,15 +594,6 @@
     "pace": 0,
     "shared": true,
     "week": 40
-   },
-   {
-    "cap": 150.0,
-    "family": "claude",
-    "kind": "credit",
-    "name": "CLAUDE_CREDIT",
-    "reset_in_days": 20.0,
-    "shared": false,
-    "spend": 0.0
    }
   ],
   "name": "worker_codex_out",
@@ -730,8 +629,7 @@
    "trace": [
     "OPENAI_SUBSCRIPTION: rejected, out",
     "OPENAI_SUBSCRIPTION: rejected, out",
-    "CLAUDE_SUBSCRIPTION: usable",
-    "CLAUDE_CREDIT: usable"
+    "CLAUDE_SUBSCRIPTION: usable"
    ]
   },
   "lanes": [
@@ -754,15 +652,6 @@
     "pace": 0,
     "shared": true,
     "week": 40
-   },
-   {
-    "cap": 150.0,
-    "family": "claude",
-    "kind": "credit",
-    "name": "CLAUDE_CREDIT",
-    "reset_in_days": 20.0,
-    "shared": false,
-    "spend": 0.0
    }
   ],
   "name": "worker_codex_logged_out",
@@ -784,7 +673,6 @@
   "expect": {
    "action": "stop",
    "resets": {
-    "CLAUDE_CREDIT": "Sun 09 Sep 02:53",
     "CLAUDE_SUBSCRIPTION": "Sun 09 Sep 04:16",
     "OPENAI_SUBSCRIPTION": "Sun 09 Sep 03:10"
    },
@@ -794,9 +682,7 @@
     "OPENAI_SUBSCRIPTION: rejected, out until Sun 09 Sep 03:10",
     "OPENAI_SUBSCRIPTION: rejected, out until Sun 09 Sep 03:10",
     "CLAUDE_SUBSCRIPTION: rejected, out until Sun 09 Sep 04:16",
-    "CLAUDE_CREDIT: rejected, out until Sun 09 Sep 02:53",
-    "CLAUDE_SUBSCRIPTION: rejected, out until Sun 09 Sep 04:16",
-    "CLAUDE_CREDIT: rejected, out until Sun 09 Sep 02:53"
+    "CLAUDE_SUBSCRIPTION: rejected, out until Sun 09 Sep 04:16"
    ]
   },
   "lanes": [
@@ -823,18 +709,6 @@
     "pace": 0,
     "shared": true,
     "week": 40
-   },
-   {
-    "cap": 150.0,
-    "family": "claude",
-    "kind": "credit",
-    "name": "CLAUDE_CREDIT",
-    "out": true,
-    "out_reason": "limit",
-    "out_until": 1000004000.0,
-    "reset_in_days": 20.0,
-    "shared": false,
-    "spend": 0.0
    }
   ],
   "name": "worker_all_out",
@@ -861,75 +735,6 @@
    "fallback_reason": "out",
    "first_lane": "OPENAI_SUBSCRIPTION",
    "flag": null,
-   "lane": "CLAUDE_CREDIT",
-   "mode": "write",
-   "model": "sonnet-5.5",
-   "pass": "strict",
-   "role": "worker",
-   "rung": 2,
-   "trace": [
-    "OPENAI_SUBSCRIPTION: rejected, out until Sun 09 Sep 03:46",
-    "OPENAI_SUBSCRIPTION: rejected, out until Sun 09 Sep 03:46",
-    "CLAUDE_SUBSCRIPTION: rejected, 5h 85% >= 85 (orchestrator reserve)",
-    "CLAUDE_CREDIT: usable"
-   ]
-  },
-  "lanes": [
-   {
-    "family": "openai",
-    "five": 10,
-    "kind": "subscription",
-    "name": "OPENAI_SUBSCRIPTION",
-    "out": true,
-    "out_reason": "limit",
-    "out_until": 1000007200.0,
-    "pace": 0,
-    "shared": false,
-    "week": 5
-   },
-   {
-    "family": "claude",
-    "five": 85,
-    "kind": "subscription",
-    "name": "CLAUDE_SUBSCRIPTION",
-    "pace": 0,
-    "shared": true,
-    "week": 40
-   },
-   {
-    "cap": 150.0,
-    "family": "claude",
-    "kind": "credit",
-    "name": "CLAUDE_CREDIT",
-    "reset_in_days": 20.0,
-    "shared": false,
-    "spend": 0.0
-   }
-  ],
-  "name": "worker_sub_strained_credit",
-  "settings": {},
-  "state": {},
-  "unattended": false
- },
- {
-  "args": {
-   "allow_degraded": false,
-   "authored_by": null,
-   "cap": null,
-   "claude_usage": null,
-   "cwd": null,
-   "premium": null,
-   "resume": null,
-   "role": "worker"
-  },
-  "expect": {
-   "action": "run",
-   "cap": 2,
-   "effort": "medium",
-   "fallback": true,
-   "fallback_reason": "out",
-   "first_lane": "OPENAI_SUBSCRIPTION",
-   "flag": null,
    "lane": "CLAUDE_SUBSCRIPTION",
    "mode": "write",
    "model": "sonnet-5.5",
@@ -939,9 +744,7 @@
    "trace": [
     "OPENAI_SUBSCRIPTION: rejected, out until Sun 09 Sep 03:46",
     "OPENAI_SUBSCRIPTION: rejected, out until Sun 09 Sep 03:46",
-    "CLAUDE_SUBSCRIPTION: usable",
-    "CLAUDE_CREDIT: usable",
-    "CLAUDE_SUBSCRIPTION: BURN"
+    "CLAUDE_SUBSCRIPTION: usable"
    ]
   },
   "lanes": [
@@ -966,313 +769,11 @@
     "pace": 0,
     "shared": true,
     "week": 40
-   },
-   {
-    "cap": 150.0,
-    "family": "claude",
-    "kind": "credit",
-    "name": "CLAUDE_CREDIT",
-    "reset_in_days": 20.0,
-    "shared": false,
-    "spend": 0.0
    }
   ],
   "name": "worker_sub_burn",
   "settings": {},
   "state": {},
-  "unattended": false
- },
- {
-  "args": {
-   "allow_degraded": false,
-   "authored_by": null,
-   "cap": null,
-   "claude_usage": null,
-   "cwd": null,
-   "premium": null,
-   "resume": null,
-   "role": "worker"
-  },
-  "expect": {
-   "action": "run",
-   "cap": 2,
-   "effort": "medium",
-   "fallback": true,
-   "fallback_reason": "out",
-   "first_lane": "OPENAI_SUBSCRIPTION",
-   "flag": null,
-   "lane": "CLAUDE_CREDIT",
-   "mode": "write",
-   "model": "sonnet-5.5",
-   "pass": "strict",
-   "role": "worker",
-   "rung": 2,
-   "trace": [
-    "OPENAI_SUBSCRIPTION: rejected, out until Sun 09 Sep 03:46",
-    "OPENAI_SUBSCRIPTION: rejected, out until Sun 09 Sep 03:46",
-    "CLAUDE_SUBSCRIPTION: usable",
-    "CLAUDE_CREDIT: usable",
-    "CLAUDE_CREDIT: resets in 2.0d with the allowance unspent"
-   ]
-  },
-  "lanes": [
-   {
-    "family": "openai",
-    "five": 10,
-    "kind": "subscription",
-    "name": "OPENAI_SUBSCRIPTION",
-    "out": true,
-    "out_reason": "limit",
-    "out_until": 1000007200.0,
-    "pace": 0,
-    "shared": false,
-    "week": 5
-   },
-   {
-    "family": "claude",
-    "five": 30,
-    "kind": "subscription",
-    "name": "CLAUDE_SUBSCRIPTION",
-    "pace": 0,
-    "shared": true,
-    "week": 40
-   },
-   {
-    "cap": 150.0,
-    "family": "claude",
-    "kind": "credit",
-    "name": "CLAUDE_CREDIT",
-    "reset_in_days": 2.0,
-    "shared": false,
-    "spend": 10.0
-   }
-  ],
-  "name": "worker_credit_resets_soon",
-  "settings": {},
-  "state": {},
-  "unattended": false
- },
- {
-  "args": {
-   "allow_degraded": false,
-   "authored_by": null,
-   "cap": null,
-   "claude_usage": null,
-   "cwd": null,
-   "premium": null,
-   "resume": null,
-   "role": "worker"
-  },
-  "expect": {
-   "action": "run",
-   "cap": 2,
-   "effort": "medium",
-   "fallback": true,
-   "fallback_reason": "out",
-   "first_lane": "OPENAI_SUBSCRIPTION",
-   "flag": null,
-   "lane": "CLAUDE_CREDIT",
-   "mode": "write",
-   "model": "sonnet-5.5",
-   "pass": "strict",
-   "role": "worker",
-   "rung": 2,
-   "trace": [
-    "OPENAI_SUBSCRIPTION: rejected, out until Sun 09 Sep 03:46",
-    "OPENAI_SUBSCRIPTION: rejected, out until Sun 09 Sep 03:46",
-    "CLAUDE_SUBSCRIPTION: usable",
-    "CLAUDE_CREDIT: usable",
-    "CLAUDE_SUBSCRIPTION: usage unknown, so CLAUDE_CREDIT first"
-   ]
-  },
-  "lanes": [
-   {
-    "family": "openai",
-    "five": 10,
-    "kind": "subscription",
-    "name": "OPENAI_SUBSCRIPTION",
-    "out": true,
-    "out_reason": "limit",
-    "out_until": 1000007200.0,
-    "pace": 0,
-    "shared": false,
-    "week": 5
-   },
-   {
-    "family": "claude",
-    "five": null,
-    "kind": "subscription",
-    "name": "CLAUDE_SUBSCRIPTION",
-    "pace": null,
-    "shared": true,
-    "week": null
-   },
-   {
-    "cap": 150.0,
-    "family": "claude",
-    "kind": "credit",
-    "name": "CLAUDE_CREDIT",
-    "reset_in_days": 20.0,
-    "shared": false,
-    "spend": 0.0
-   }
-  ],
-  "name": "worker_sub_usage_unknown",
-  "settings": {},
-  "state": {},
-  "unattended": false
- },
- {
-  "args": {
-   "allow_degraded": false,
-   "authored_by": null,
-   "cap": null,
-   "claude_usage": null,
-   "cwd": null,
-   "premium": null,
-   "resume": null,
-   "role": "worker"
-  },
-  "expect": {
-   "action": "run",
-   "cap": 2,
-   "effort": "medium",
-   "fallback": true,
-   "fallback_reason": "out",
-   "first_lane": "OPENAI_SUBSCRIPTION",
-   "flag": null,
-   "lane": "CLAUDE_CREDIT",
-   "mode": "write",
-   "model": "sonnet-5.5",
-   "pass": "strict",
-   "role": "worker",
-   "rung": 2,
-   "trace": [
-    "OPENAI_SUBSCRIPTION: rejected, out until Sun 09 Sep 03:46",
-    "OPENAI_SUBSCRIPTION: rejected, out until Sun 09 Sep 03:46",
-    "CLAUDE_SUBSCRIPTION: usable",
-    "CLAUDE_CREDIT: usable",
-    "dwell: keep CLAUDE_CREDIT for 30 min"
-   ]
-  },
-  "lanes": [
-   {
-    "family": "openai",
-    "five": 10,
-    "kind": "subscription",
-    "name": "OPENAI_SUBSCRIPTION",
-    "out": true,
-    "out_reason": "limit",
-    "out_until": 1000007200.0,
-    "pace": 0,
-    "shared": false,
-    "week": 5
-   },
-   {
-    "family": "claude",
-    "five": 30,
-    "kind": "subscription",
-    "name": "CLAUDE_SUBSCRIPTION",
-    "pace": 0,
-    "shared": true,
-    "week": 40
-   },
-   {
-    "cap": 150.0,
-    "family": "claude",
-    "kind": "credit",
-    "name": "CLAUDE_CREDIT",
-    "reset_in_days": 20.0,
-    "shared": false,
-    "spend": 0.0
-   }
-  ],
-  "name": "worker_dwell_keeps_credit",
-  "settings": {},
-  "state": {
-   "prev": {
-    "claude": {
-     "lane": "CLAUDE_CREDIT",
-     "since": 999999940.0
-    }
-   }
-  },
-  "unattended": false
- },
- {
-  "args": {
-   "allow_degraded": false,
-   "authored_by": null,
-   "cap": null,
-   "claude_usage": null,
-   "cwd": null,
-   "premium": null,
-   "resume": null,
-   "role": "worker"
-  },
-  "expect": {
-   "action": "run",
-   "cap": 2,
-   "effort": "medium",
-   "fallback": true,
-   "fallback_reason": "out",
-   "first_lane": "OPENAI_SUBSCRIPTION",
-   "flag": null,
-   "lane": "CLAUDE_SUBSCRIPTION",
-   "mode": "write",
-   "model": "sonnet-5.5",
-   "pass": "strict",
-   "role": "worker",
-   "rung": 2,
-   "trace": [
-    "OPENAI_SUBSCRIPTION: rejected, out until Sun 09 Sep 03:46",
-    "OPENAI_SUBSCRIPTION: rejected, out until Sun 09 Sep 03:46",
-    "CLAUDE_SUBSCRIPTION: usable",
-    "CLAUDE_CREDIT: usable"
-   ]
-  },
-  "lanes": [
-   {
-    "family": "openai",
-    "five": 10,
-    "kind": "subscription",
-    "name": "OPENAI_SUBSCRIPTION",
-    "out": true,
-    "out_reason": "limit",
-    "out_until": 1000007200.0,
-    "pace": 0,
-    "shared": false,
-    "week": 5
-   },
-   {
-    "family": "claude",
-    "five": 30,
-    "kind": "subscription",
-    "name": "CLAUDE_SUBSCRIPTION",
-    "pace": 0,
-    "shared": true,
-    "week": 40
-   },
-   {
-    "cap": 150.0,
-    "family": "claude",
-    "kind": "credit",
-    "name": "CLAUDE_CREDIT",
-    "reset_in_days": 20.0,
-    "shared": false,
-    "spend": 0.0
-   }
-  ],
-  "name": "worker_dwell_expired",
-  "settings": {},
-  "state": {
-   "prev": {
-    "claude": {
-     "lane": "CLAUDE_CREDIT",
-     "since": 999992800.0
-    }
-   }
-  },
   "unattended": false
  },
  {
@@ -1303,8 +804,7 @@
    "trace": [
     "OPENAI_SUBSCRIPTION: rejected, held: owner until Sun 09 Sep 02:46 (why)",
     "OPENAI_SUBSCRIPTION: rejected, held: owner until Sun 09 Sep 02:46 (why)",
-    "CLAUDE_SUBSCRIPTION: usable",
-    "CLAUDE_CREDIT: usable"
+    "CLAUDE_SUBSCRIPTION: usable"
    ]
   },
   "lanes": [
@@ -1325,15 +825,6 @@
     "pace": 0,
     "shared": true,
     "week": 40
-   },
-   {
-    "cap": 150.0,
-    "family": "claude",
-    "kind": "credit",
-    "name": "CLAUDE_CREDIT",
-    "reset_in_days": 20.0,
-    "shared": false,
-    "spend": 0.0
    }
   ],
   "name": "worker_hold_codex_all_roles",
@@ -1400,15 +891,6 @@
     "pace": 0,
     "shared": true,
     "week": 40
-   },
-   {
-    "cap": 150.0,
-    "family": "claude",
-    "kind": "credit",
-    "name": "CLAUDE_CREDIT",
-    "reset_in_days": 20.0,
-    "shared": false,
-    "spend": 0.0
    }
   ],
   "name": "worker_hold_codex_other_role",
@@ -1477,15 +959,6 @@
     "pace": 0,
     "shared": true,
     "week": 40
-   },
-   {
-    "cap": 150.0,
-    "family": "claude",
-    "kind": "credit",
-    "name": "CLAUDE_CREDIT",
-    "reset_in_days": 20.0,
-    "shared": false,
-    "spend": 0.0
    }
   ],
   "name": "worker_hold_expired",
@@ -1533,8 +1006,7 @@
    "trace": [
     "OPENAI_SUBSCRIPTION: rejected, gpt-6.1-sol benched (vendor_blip, breaker) until Sun 09 Sep 02:01",
     "OPENAI_SUBSCRIPTION: rejected, gpt-6.1-sol benched (vendor_blip, breaker) until Sun 09 Sep 02:01",
-    "CLAUDE_SUBSCRIPTION: usable",
-    "CLAUDE_CREDIT: usable"
+    "CLAUDE_SUBSCRIPTION: usable"
    ]
   },
   "lanes": [
@@ -1562,15 +1034,6 @@
     "pace": 0,
     "shared": true,
     "week": 40
-   },
-   {
-    "cap": 150.0,
-    "family": "claude",
-    "kind": "credit",
-    "name": "CLAUDE_CREDIT",
-    "reset_in_days": 20.0,
-    "shared": false,
-    "spend": 0.0
    }
   ],
   "name": "worker_benched_pair",
@@ -1628,15 +1091,6 @@
     "pace": 0,
     "shared": true,
     "week": 40
-   },
-   {
-    "cap": 150.0,
-    "family": "claude",
-    "kind": "credit",
-    "name": "CLAUDE_CREDIT",
-    "reset_in_days": 20.0,
-    "shared": false,
-    "spend": 0.0
    }
   ],
   "name": "worker_canary_pair",
@@ -1688,15 +1142,6 @@
     "pace": 0,
     "shared": true,
     "week": 40
-   },
-   {
-    "cap": 150.0,
-    "family": "claude",
-    "kind": "credit",
-    "name": "CLAUDE_CREDIT",
-    "reset_in_days": 20.0,
-    "shared": false,
-    "spend": 0.0
    }
   ],
   "name": "worker_busy_wait",
@@ -1732,8 +1177,7 @@
    "trace": [
     "OPENAI_SUBSCRIPTION: rejected, out until Sun 09 Sep 01:48",
     "OPENAI_SUBSCRIPTION: rejected, out until Sun 09 Sep 01:48",
-    "CLAUDE_SUBSCRIPTION: usable",
-    "CLAUDE_CREDIT: usable"
+    "CLAUDE_SUBSCRIPTION: usable"
    ]
   },
   "lanes": [
@@ -1761,15 +1205,6 @@
     "pace": 0,
     "shared": true,
     "week": 40
-   },
-   {
-    "cap": 150.0,
-    "family": "claude",
-    "kind": "credit",
-    "name": "CLAUDE_CREDIT",
-    "reset_in_days": 20.0,
-    "shared": false,
-    "spend": 0.0
    }
   ],
   "name": "worker_busy_attended",
@@ -1805,8 +1240,7 @@
    "trace": [
     "OPENAI_SUBSCRIPTION: rejected, out until Sun 09 Sep 01:47",
     "OPENAI_SUBSCRIPTION: rejected, out until Sun 09 Sep 01:47",
-    "CLAUDE_SUBSCRIPTION: usable",
-    "CLAUDE_CREDIT: usable"
+    "CLAUDE_SUBSCRIPTION: usable"
    ]
   },
   "lanes": [
@@ -1827,15 +1261,6 @@
     "pace": 0,
     "shared": true,
     "week": 40
-   },
-   {
-    "cap": 150.0,
-    "family": "claude",
-    "kind": "credit",
-    "name": "CLAUDE_CREDIT",
-    "reset_in_days": 20.0,
-    "shared": false,
-    "spend": 0.0
    }
   ],
   "name": "worker_slots_taken_by_leases",
@@ -1877,132 +1302,6 @@
    "cap": null,
    "claude_usage": null,
    "cwd": null,
-   "premium": null,
-   "resume": null,
-   "role": "worker"
-  },
-  "expect": {
-   "action": "run",
-   "cap": null,
-   "effort": "medium",
-   "fallback": false,
-   "fallback_reason": null,
-   "first_lane": null,
-   "flag": null,
-   "lane": "OPENAI_SUBSCRIPTION",
-   "mode": "write",
-   "model": "gpt-6.1-sol",
-   "pass": "strict",
-   "role": "worker",
-   "rung": 0,
-   "trace": [
-    "OPENAI_SUBSCRIPTION: usable"
-   ]
-  },
-  "lanes": [
-   {
-    "family": "openai",
-    "five": 10,
-    "kind": "subscription",
-    "name": "OPENAI_SUBSCRIPTION",
-    "pace": 0,
-    "shared": false,
-    "week": 5
-   },
-   {
-    "family": "claude",
-    "five": 30,
-    "kind": "subscription",
-    "name": "CLAUDE_SUBSCRIPTION",
-    "pace": 0,
-    "shared": true,
-    "week": 40
-   },
-   {
-    "cap": 150.0,
-    "family": "claude",
-    "kind": "credit",
-    "name": "CLAUDE_CREDIT",
-    "reset_in_days": 20.0,
-    "shared": false,
-    "spend": 0.0
-   }
-  ],
-  "name": "worker_failed_0",
-  "settings": {},
-  "state": {},
-  "unattended": false
- },
- {
-  "args": {
-   "allow_degraded": false,
-   "authored_by": null,
-   "cap": null,
-   "claude_usage": null,
-   "cwd": null,
-   "premium": null,
-   "resume": null,
-   "role": "worker"
-  },
-  "expect": {
-   "action": "run",
-   "cap": null,
-   "effort": "medium",
-   "fallback": false,
-   "fallback_reason": null,
-   "first_lane": null,
-   "flag": null,
-   "lane": "OPENAI_SUBSCRIPTION",
-   "mode": "write",
-   "model": "gpt-6.1-sol",
-   "pass": "strict",
-   "role": "worker",
-   "rung": 0,
-   "trace": [
-    "OPENAI_SUBSCRIPTION: usable"
-   ]
-  },
-  "lanes": [
-   {
-    "family": "openai",
-    "five": 10,
-    "kind": "subscription",
-    "name": "OPENAI_SUBSCRIPTION",
-    "pace": 0,
-    "shared": false,
-    "week": 5
-   },
-   {
-    "family": "claude",
-    "five": 30,
-    "kind": "subscription",
-    "name": "CLAUDE_SUBSCRIPTION",
-    "pace": 0,
-    "shared": true,
-    "week": 40
-   },
-   {
-    "cap": 150.0,
-    "family": "claude",
-    "kind": "credit",
-    "name": "CLAUDE_CREDIT",
-    "reset_in_days": 20.0,
-    "shared": false,
-    "spend": 0.0
-   }
-  ],
-  "name": "worker_failed_0_1",
-  "settings": {},
-  "state": {},
-  "unattended": false
- },
- {
-  "args": {
-   "allow_degraded": false,
-   "authored_by": null,
-   "cap": null,
-   "claude_usage": null,
-   "cwd": null,
    "premium": "claude",
    "resume": null,
    "role": "worker"
@@ -2022,8 +1321,7 @@
    "role": "worker",
    "rung": 0,
    "trace": [
-    "CLAUDE_SUBSCRIPTION: usable",
-    "CLAUDE_CREDIT: usable"
+    "CLAUDE_SUBSCRIPTION: usable"
    ]
   },
   "lanes": [
@@ -2044,15 +1342,6 @@
     "pace": 0,
     "shared": true,
     "week": 40
-   },
-   {
-    "cap": 150.0,
-    "family": "claude",
-    "kind": "credit",
-    "name": "CLAUDE_CREDIT",
-    "reset_in_days": 20.0,
-    "shared": false,
-    "spend": 0.0
    }
   ],
   "name": "worker_premium_claude",
@@ -2093,15 +1382,6 @@
     "pace": 0,
     "shared": true,
     "week": 40
-   },
-   {
-    "cap": 150.0,
-    "family": "claude",
-    "kind": "credit",
-    "name": "CLAUDE_CREDIT",
-    "reset_in_days": 20.0,
-    "shared": false,
-    "spend": 0.0
    }
   ],
   "name": "worker_premium_openai_none",
@@ -2142,15 +1422,6 @@
     "pace": 0,
     "shared": true,
     "week": 40
-   },
-   {
-    "cap": 150.0,
-    "family": "claude",
-    "kind": "credit",
-    "name": "CLAUDE_CREDIT",
-    "reset_in_days": 20.0,
-    "shared": false,
-    "spend": 0.0
    }
   ],
   "name": "worker_unknown_premium",
@@ -2191,15 +1462,6 @@
     "pace": 0,
     "shared": true,
     "week": 40
-   },
-   {
-    "cap": 150.0,
-    "family": "claude",
-    "kind": "credit",
-    "name": "CLAUDE_CREDIT",
-    "reset_in_days": 20.0,
-    "shared": false,
-    "spend": 0.0
    }
   ],
   "name": "unknown_role",
@@ -2255,15 +1517,6 @@
     "pace": 0,
     "shared": true,
     "week": 40
-   },
-   {
-    "cap": 150.0,
-    "family": "claude",
-    "kind": "credit",
-    "name": "CLAUDE_CREDIT",
-    "reset_in_days": 20.0,
-    "shared": false,
-    "spend": 0.0
    }
   ],
   "name": "reviewer_by_openai",
@@ -2318,15 +1571,6 @@
     "pace": 0,
     "shared": true,
     "week": 40
-   },
-   {
-    "cap": 150.0,
-    "family": "claude",
-    "kind": "credit",
-    "name": "CLAUDE_CREDIT",
-    "reset_in_days": 20.0,
-    "shared": false,
-    "spend": 0.0
    }
   ],
   "name": "reviewer_by_claude",
@@ -2383,15 +1627,6 @@
     "week": 40
    },
    {
-    "cap": 150.0,
-    "family": "claude",
-    "kind": "credit",
-    "name": "CLAUDE_CREDIT",
-    "reset_in_days": 20.0,
-    "shared": false,
-    "spend": 0.0
-   },
-   {
     "family": "xai",
     "five": null,
     "kind": "subscription",
@@ -2438,15 +1673,6 @@
     "pace": 0,
     "shared": true,
     "week": 40
-   },
-   {
-    "cap": 150.0,
-    "family": "claude",
-    "kind": "credit",
-    "name": "CLAUDE_CREDIT",
-    "reset_in_days": 20.0,
-    "shared": false,
-    "spend": 0.0
    }
   ],
   "name": "reviewer_by_bad",
@@ -2482,8 +1708,7 @@
    "trace": [
     "OPENAI_SUBSCRIPTION: rejected, out until Sun 09 Sep 03:46",
     "OPENAI_SUBSCRIPTION: rejected, out until Sun 09 Sep 03:46",
-    "CLAUDE_SUBSCRIPTION: usable",
-    "CLAUDE_CREDIT: usable"
+    "CLAUDE_SUBSCRIPTION: usable"
    ]
   },
   "lanes": [
@@ -2507,15 +1732,6 @@
     "pace": 0,
     "shared": true,
     "week": 40
-   },
-   {
-    "cap": 150.0,
-    "family": "claude",
-    "kind": "credit",
-    "name": "CLAUDE_CREDIT",
-    "reset_in_days": 20.0,
-    "shared": false,
-    "spend": 0.0
    }
   ],
   "name": "reviewer_codex_out_same_family_warn",
@@ -2551,8 +1767,7 @@
    "trace": [
     "OPENAI_SUBSCRIPTION: rejected, out until Sun 09 Sep 03:46",
     "OPENAI_SUBSCRIPTION: rejected, out until Sun 09 Sep 03:46",
-    "CLAUDE_SUBSCRIPTION: usable",
-    "CLAUDE_CREDIT: usable"
+    "CLAUDE_SUBSCRIPTION: usable"
    ]
   },
   "lanes": [
@@ -2576,15 +1791,6 @@
     "pace": 0,
     "shared": true,
     "week": 40
-   },
-   {
-    "cap": 150.0,
-    "family": "claude",
-    "kind": "credit",
-    "name": "CLAUDE_CREDIT",
-    "reset_in_days": 20.0,
-    "shared": false,
-    "spend": 0.0
    }
   ],
   "name": "reviewer_only_claude",
@@ -2613,7 +1819,6 @@
     "then": "route.py next planner --allow-degraded"
    },
    "resets": {
-    "CLAUDE_CREDIT": "Sun 09 Sep 02:53",
     "CLAUDE_SUBSCRIPTION": "Sun 09 Sep 04:16",
     "OPENAI_SUBSCRIPTION": "Sun 09 Sep 03:46"
    },
@@ -2623,9 +1828,7 @@
     "OPENAI_SUBSCRIPTION: rejected, out until Sun 09 Sep 03:46",
     "OPENAI_SUBSCRIPTION: rejected, out until Sun 09 Sep 03:46",
     "CLAUDE_SUBSCRIPTION: rejected, out until Sun 09 Sep 04:16",
-    "CLAUDE_CREDIT: rejected, out until Sun 09 Sep 02:53",
-    "CLAUDE_SUBSCRIPTION: rejected, out until Sun 09 Sep 04:16",
-    "CLAUDE_CREDIT: rejected, out until Sun 09 Sep 02:53"
+    "CLAUDE_SUBSCRIPTION: rejected, out until Sun 09 Sep 04:16"
    ]
   },
   "lanes": [
@@ -2652,18 +1855,6 @@
     "pace": 0,
     "shared": true,
     "week": 40
-   },
-   {
-    "cap": 150.0,
-    "family": "claude",
-    "kind": "credit",
-    "name": "CLAUDE_CREDIT",
-    "out": true,
-    "out_reason": "limit",
-    "out_until": 1000004000.0,
-    "reset_in_days": 20.0,
-    "shared": false,
-    "spend": 0.0
    }
   ],
   "name": "planner_degraded_ask",
@@ -2685,7 +1876,6 @@
   "expect": {
    "action": "stop",
    "resets": {
-    "CLAUDE_CREDIT": "Sun 09 Sep 02:53",
     "CLAUDE_SUBSCRIPTION": "Sun 09 Sep 04:16",
     "OPENAI_SUBSCRIPTION": "Sun 09 Sep 03:46"
    },
@@ -2695,13 +1885,9 @@
     "OPENAI_SUBSCRIPTION: rejected, out until Sun 09 Sep 03:46",
     "OPENAI_SUBSCRIPTION: rejected, out until Sun 09 Sep 03:46",
     "CLAUDE_SUBSCRIPTION: rejected, out until Sun 09 Sep 04:16",
-    "CLAUDE_CREDIT: rejected, out until Sun 09 Sep 02:53",
     "CLAUDE_SUBSCRIPTION: rejected, out until Sun 09 Sep 04:16",
-    "CLAUDE_CREDIT: rejected, out until Sun 09 Sep 02:53",
     "CLAUDE_SUBSCRIPTION: rejected, out until Sun 09 Sep 04:16",
-    "CLAUDE_CREDIT: rejected, out until Sun 09 Sep 02:53",
-    "CLAUDE_SUBSCRIPTION: rejected, out until Sun 09 Sep 04:16",
-    "CLAUDE_CREDIT: rejected, out until Sun 09 Sep 02:53"
+    "CLAUDE_SUBSCRIPTION: rejected, out until Sun 09 Sep 04:16"
    ]
   },
   "lanes": [
@@ -2728,18 +1914,6 @@
     "pace": 0,
     "shared": true,
     "week": 40
-   },
-   {
-    "cap": 150.0,
-    "family": "claude",
-    "kind": "credit",
-    "name": "CLAUDE_CREDIT",
-    "out": true,
-    "out_reason": "limit",
-    "out_until": 1000004000.0,
-    "reset_in_days": 20.0,
-    "shared": false,
-    "spend": 0.0
    }
   ],
   "name": "planner_degraded_consent",
@@ -2799,15 +1973,6 @@
     "week": 40
    },
    {
-    "cap": 150.0,
-    "family": "claude",
-    "kind": "credit",
-    "name": "CLAUDE_CREDIT",
-    "reset_in_days": 20.0,
-    "shared": false,
-    "spend": 0.0
-   },
-   {
     "family": "deepseek",
     "kind": "subscription",
     "name": "DEEPSEEK_FREE",
@@ -2842,7 +2007,6 @@
   "expect": {
    "action": "stop",
    "resets": {
-    "CLAUDE_CREDIT": "Sun 09 Sep 02:53",
     "OPENAI_SUBSCRIPTION": "Sun 09 Sep 03:46"
    },
    "role": "worker",
@@ -2851,9 +2015,7 @@
     "OPENAI_SUBSCRIPTION: rejected, out until Sun 09 Sep 03:46",
     "OPENAI_SUBSCRIPTION: rejected, out until Sun 09 Sep 03:46",
     "CLAUDE_SUBSCRIPTION: rejected, weekly 96% >= 90 (orchestrator reserve)",
-    "CLAUDE_CREDIT: rejected, out until Sun 09 Sep 02:53",
-    "CLAUDE_SUBSCRIPTION: rejected, weekly 96% >= 95 (hard ceiling)",
-    "CLAUDE_CREDIT: rejected, out until Sun 09 Sep 02:53"
+    "CLAUDE_SUBSCRIPTION: rejected, weekly 96% >= 95 (hard ceiling)"
    ]
   },
   "lanes": [
@@ -2877,18 +2039,6 @@
     "pace": 0,
     "shared": true,
     "week": 96
-   },
-   {
-    "cap": 150.0,
-    "family": "claude",
-    "kind": "credit",
-    "name": "CLAUDE_CREDIT",
-    "out": true,
-    "out_reason": "limit",
-    "out_until": 1000004000.0,
-    "reset_in_days": 20.0,
-    "shared": false,
-    "spend": 0.0
    }
   ],
   "name": "worker_sub_over_gate_relaxed_ok",
@@ -2929,15 +2079,6 @@
     "pace": 0,
     "shared": true,
     "week": 40
-   },
-   {
-    "cap": 150.0,
-    "family": "claude",
-    "kind": "credit",
-    "name": "CLAUDE_CREDIT",
-    "reset_in_days": 20.0,
-    "shared": false,
-    "spend": 0.0
    }
   ],
   "name": "resume_unknown_ref",
@@ -2988,15 +2129,6 @@
     "pace": 0,
     "shared": true,
     "week": 40
-   },
-   {
-    "cap": 150.0,
-    "family": "claude",
-    "kind": "credit",
-    "name": "CLAUDE_CREDIT",
-    "reset_in_days": 20.0,
-    "shared": false,
-    "spend": 0.0
    }
   ],
   "name": "resume_ok",
@@ -3013,79 +2145,6 @@
      "mode": "write",
      "model": "gpt-6.1-sol",
      "rung": 0
-    }
-   }
-  },
-  "unattended": false
- },
- {
-  "args": {
-   "allow_degraded": false,
-   "authored_by": null,
-   "cap": 5,
-   "claude_usage": null,
-   "cwd": null,
-   "premium": null,
-   "resume": "ref1",
-   "role": "worker"
-  },
-  "expect": {
-   "action": "run",
-   "cap": 5,
-   "effort": "high",
-   "fallback": true,
-   "fallback_reason": "out",
-   "first_lane": "OPENAI_SUBSCRIPTION",
-   "lane": "CLAUDE_CREDIT",
-   "mode": "write",
-   "model": "sonnet-5.5",
-   "pass": "resume",
-   "role": "worker",
-   "rung": 1
-  },
-  "lanes": [
-   {
-    "family": "openai",
-    "five": 10,
-    "kind": "subscription",
-    "name": "OPENAI_SUBSCRIPTION",
-    "pace": 0,
-    "shared": false,
-    "week": 5
-   },
-   {
-    "family": "claude",
-    "five": 30,
-    "kind": "subscription",
-    "name": "CLAUDE_SUBSCRIPTION",
-    "pace": 0,
-    "shared": true,
-    "week": 40
-   },
-   {
-    "cap": 150.0,
-    "family": "claude",
-    "kind": "credit",
-    "name": "CLAUDE_CREDIT",
-    "reset_in_days": 20.0,
-    "shared": false,
-    "spend": 0.0
-   }
-  ],
-  "name": "resume_cap_override",
-  "settings": {},
-  "state": {
-   "refs": {
-    "ref1": {
-     "cap": 2,
-     "effort": "high",
-     "fallback": true,
-     "fallback_reason": "out",
-     "first_lane": "OPENAI_SUBSCRIPTION",
-     "lane": "CLAUDE_CREDIT",
-     "mode": "write",
-     "model": "sonnet-5.5",
-     "rung": 1
     }
    }
   },
@@ -3127,15 +2186,6 @@
     "pace": 0,
     "shared": true,
     "week": 40
-   },
-   {
-    "cap": 150.0,
-    "family": "claude",
-    "kind": "credit",
-    "name": "CLAUDE_CREDIT",
-    "reset_in_days": 20.0,
-    "shared": false,
-    "spend": 0.0
    }
   ],
   "name": "resume_held",
@@ -3207,15 +2257,6 @@
     "pace": 0,
     "shared": true,
     "week": 40
-   },
-   {
-    "cap": 150.0,
-    "family": "claude",
-    "kind": "credit",
-    "name": "CLAUDE_CREDIT",
-    "reset_in_days": 20.0,
-    "shared": false,
-    "spend": 0.0
    }
   ],
   "name": "resume_lane_out",
@@ -3275,15 +2316,6 @@
     "pace": 0,
     "shared": true,
     "week": 40
-   },
-   {
-    "cap": 150.0,
-    "family": "claude",
-    "kind": "credit",
-    "name": "CLAUDE_CREDIT",
-    "reset_in_days": 20.0,
-    "shared": false,
-    "spend": 0.0
    }
   ],
   "name": "resume_lane_logged_out",
@@ -3348,15 +2380,6 @@
     "pace": 0,
     "shared": true,
     "week": 40
-   },
-   {
-    "cap": 150.0,
-    "family": "claude",
-    "kind": "credit",
-    "name": "CLAUDE_CREDIT",
-    "reset_in_days": 20.0,
-    "shared": false,
-    "spend": 0.0
    }
   ],
   "name": "resume_busy",
@@ -3421,15 +2444,6 @@
     "pace": 0,
     "shared": true,
     "week": 40
-   },
-   {
-    "cap": 150.0,
-    "family": "claude",
-    "kind": "credit",
-    "name": "CLAUDE_CREDIT",
-    "reset_in_days": 20.0,
-    "shared": false,
-    "spend": 0.0
    }
   ],
   "name": "resume_benched",
@@ -3450,71 +2464,5 @@
    }
   },
   "unattended": false
- },
- {
-  "args": {
-   "allow_degraded": false,
-   "authored_by": null,
-   "cap": null,
-   "claude_usage": null,
-   "cwd": null,
-   "premium": null,
-   "resume": "ref1",
-   "role": "worker"
-  },
-  "expect": {
-   "action": "stop",
-   "lane": "CLAUDE_CREDIT",
-   "outcome": "rate_limited",
-   "retry_after": null,
-   "say": "CLAUDE_CREDIT cannot continue ref1 now: not usable by this caller"
-  },
-  "lanes": [
-   {
-    "family": "openai",
-    "five": 10,
-    "kind": "subscription",
-    "name": "OPENAI_SUBSCRIPTION",
-    "pace": 0,
-    "shared": false,
-    "week": 5
-   },
-   {
-    "family": "claude",
-    "five": 30,
-    "kind": "subscription",
-    "name": "CLAUDE_SUBSCRIPTION",
-    "pace": 0,
-    "shared": true,
-    "week": 40
-   },
-   {
-    "cap": 150.0,
-    "family": "claude",
-    "kind": "credit",
-    "name": "CLAUDE_CREDIT",
-    "reset_in_days": 20.0,
-    "shared": false,
-    "spend": 0.0
-   }
-  ],
-  "name": "resume_credit_unattended",
-  "settings": {},
-  "state": {
-   "refs": {
-    "ref1": {
-     "cap": 2,
-     "effort": "high",
-     "fallback": true,
-     "fallback_reason": "out",
-     "first_lane": "OPENAI_SUBSCRIPTION",
-     "lane": "CLAUDE_CREDIT",
-     "mode": "write",
-     "model": "sonnet-5.5",
-     "rung": 1
-    }
-   }
-  },
-  "unattended": true
  }
 ]

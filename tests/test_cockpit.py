@@ -95,12 +95,6 @@ class Emoji(unittest.TestCase):
         self.assertEqual((v["state"], v["emoji"]), ("spend", "💸"))
         self.assertTrue(v["unlock"]["known"])
 
-    def test_credit_lane_over_its_cap_is_a_spend_limit_resting_until_the_cycle_resets(self):
-        l = lane("CLAUDE_CREDIT", out=True, out_until=T + 86400, out_reason="limit", cap=150.0, spend=150.0, notes=["own cycle cap reached"])
-        v = view("CLAUDE_CREDIT", l)
-        self.assertEqual((v["state"], v["emoji"]), ("spend", "💸"))
-        self.assertEqual(v["unlock"]["in_s"], 86400)
-
     def test_codex_spend_control_is_a_spend_limit_without_a_timer(self):
         l = lane("OPENAI_SUBSCRIPTION", out=True, out_until=None, out_reason="limit", spend_blocked=True)
         v = view("OPENAI_SUBSCRIPTION", l)
@@ -169,15 +163,9 @@ class Fmt(unittest.TestCase):
 
 
 class Readers(unittest.TestCase):
-    def test_the_credit_reader_estimates_from_the_ledger_and_the_claude_reader_marks_its_source(self):
+    def test_the_claude_reader_marks_its_source(self):
         S = CFG["settings"]
         with tempfile.TemporaryDirectory() as d, patch.dict(os.environ, {"DELEGATE_CONFIG_DIR": d}):
-            env.ledger_add(30.0, "m", T - 3600)
-            l = lane("CLAUDE_CREDIT")
-            with patch.object(env, "now", return_value=T):
-                usage.read_claude_credit(l, env.settings_of(CFG), support.doc_of({}), T)
-            w = l.windows[0]
-            self.assertEqual((w["name"], round(w["used"]), w["source"], w["at"]), ("monthly", 20, "estimated from history (this tool's ledger)", T - 3600))
             c = lane("CLAUDE_SUBSCRIPTION", shared=True)
             with patch.object(usage, "claude_logged_out", return_value=False), patch.object(env, "update_state"):
                 usage.read_claude_subscription(c, env.settings_of(CFG), support.doc_of({}), T, {"plan": {"windows": [{"label": "5 hour", "percentUsed": 12, "resetsAt": T + HOUR}, {"label": "All weekly", "percentUsed": 40, "resetsAt": T + 86400}]}})

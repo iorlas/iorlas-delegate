@@ -31,7 +31,7 @@ def finished_runs(n):
 EMOJI = {"ready": "✅", "resting": "⏳", "logged_out": "🔑", "spend": "💸", "slow": "🐢", "off": "⛔", "unknown": "❓"}
 LEGEND = {"ready": "ready", "resting": "usage limit", "logged_out": "logged out", "spend": "spend/credit limit",
           "slow": "slow/hung", "off": "disabled", "unknown": "no read yet"}
-LABELS = {"CLAUDE_SUBSCRIPTION": "Claude subscription", "CLAUDE_CREDIT": "Claude API credits", "OPENAI_SUBSCRIPTION": "ChatGPT / Codex",
+LABELS = {"CLAUDE_SUBSCRIPTION": "Claude subscription", "OPENAI_SUBSCRIPTION": "ChatGPT / Codex",
           "GROK_SUBSCRIPTION": "SuperGrok / OpenCode", "DEEPSEEK_FREE": "DeepSeek / OpenCode Free", "ZAI_CODING_SUBSCRIPTION": "Z.ai GLM Coding Plan"}
 SLOW_WINDOW = 2 * 3600  # a hang or timeout this recent, with no good run on the lane since, keeps it marked slow
 SLOW_KINDS = ("hung", "timeout")
@@ -74,7 +74,7 @@ def classify_out(lane, rec):
     text = " ".join([rec.why if rec else ""] + lane.notes)
     if r == "logged_out" or (r in (None, "error") and classify.says_login(text)):
         return "logged_out"
-    if lane.spend_blocked or classify.says_spend(text) or (r == "limit" and lane.kind == "credit"):
+    if lane.spend_blocked or classify.says_spend(text):
         return "spend"
     if r == "hung":
         return "slow"
@@ -93,7 +93,7 @@ def window_rows(lane, S, t):
         rows.append({"name": w["name"], "used_pct": None if used is None else round(used, 1), "resets_at": w["resets_at"],
                      "resets_in_s": None if not w["resets_at"] else max(0, int(w["resets_at"] - t)), "source": w["source"],
                      "age_s": None if w["at"] is None else max(0, int(t - w["at"]))})
-        if used is None or lane.kind == "credit":
+        if used is None:
             continue
         (gwk, gfv, gname), (cwk, cfv, _) = lane.limits(S, False), lane.limits(S, True)
         gate, ceil = (gwk, cwk) if w["span"] > 1440 else (gfv, cfv)

@@ -20,7 +20,6 @@ from delegate.app import answer, decide, env, harnesses, net, settle, watch
 from delegate.app.publish import LiveSink
 from delegate.app.supervisor import LogWatcher, Supervisor
 from delegate.domain.cost import accounting
-from delegate.domain.cost.cycle import credit_cycle
 from delegate.domain.holds.book import HoldBook
 from delegate.domain.policy import worker as policy
 from delegate.domain.policy.matchers import secret_hit
@@ -106,7 +105,7 @@ def prepare_codex(d, brief, a, rid, t, cfg):
         return HoldBook.refusal(hold, "no worker was launched")
     exe = shutil.which("codex")
     if not exe:
-        return {"outcome": "setup", "say": "codex CLI not found on PATH (route.py doctor --lane OPENAI_SUBSCRIPTION)"}
+        return {"outcome": "setup", "say": "codex CLI not found on PATH"}
     hx = CodexHarness(a.resume)
     spec = hx.launch_spec(LaunchInputs(
         exe=exe, cwd=h["cwd"], model=h["model"], effort=d["effort"], sandbox=h["sandbox"], out_file=str(env.config_dir() / f"codex-last-{rid[:8]}.txt"), env=env.child_env(),
@@ -117,28 +116,16 @@ def prepare_codex(d, brief, a, rid, t, cfg):
 
 
 def prepare_claude(d, brief, a, rid, t, cfg):
-    """claude -p on the credit key (CLAUDE_CREDIT) or the logged-in subscription (CLAUDE_SUBSCRIPTION, unattended)."""
+    """claude -p on the logged-in subscription (CLAUDE_SUBSCRIPTION, unattended)."""
     h = d["how"]
-    credit = cfg["lanes"][d["lane"]]["kind"] == "credit"
     exe = shutil.which("claude")
     if not exe:
         return {"outcome": "setup", "say": "claude CLI not found on PATH"}
-    extra, cap, nxt = {}, float(h.get("cap") or 2), None
-    if credit:
-        key = harnesses.find_key()
-        if not key:
-            return {"outcome": "setup", "say": "no API key for the credit lane: route.py doctor --lane CLAUDE_CREDIT (never paste the key in chat)"}
-        c = cfg["settings"]["credit"]
-        start, nxt = credit_cycle(c["reset_day"], t)
-        if env.ledger_spend(start) + cap > float(c["monthly_cap"]):
-            return {"outcome": "rate_limited", "retry_after": nxt, "say": f"cycle cap: ${env.ledger_spend(start):.2f} spent + ${cap:.2f} > ${c['monthly_cap']}"}
-        extra["ANTHROPIC_API_KEY"] = key
-    hx = ClaudeHarness(credit)
+    hx = ClaudeHarness()
     spec = hx.launch_spec(LaunchInputs(
-        exe=exe, cwd=h["cwd"], model=h["model"], effort=d["effort"], prompt=brief, env=env.child_env(extra), schema=a.schema, resume=a.resume, session=rid,
-        system=PREAMBLE + repo_instruction_text(h["cwd"]), settings=json.dumps(guard_settings(h.get("read_only"))), write=bool(h["write"]),
-        budget=cap if credit else None))
-    return Prep(hx, spec, {"credit": credit, "credit_until": nxt})
+        exe=exe, cwd=h["cwd"], model=h["model"], effort=d["effort"], prompt=brief, env=env.child_env(), schema=a.schema, resume=a.resume, session=rid,
+        system=PREAMBLE + repo_instruction_text(h["cwd"]), settings=json.dumps(guard_settings(h.get("read_only"))), write=bool(h["write"])))
+    return Prep(hx, spec, {})
 
 
 def prepare_opencode(d, brief, a, rid, t, cfg):
@@ -146,7 +133,7 @@ def prepare_opencode(d, brief, a, rid, t, cfg):
     h, lane = d["how"], d["lane"]
     exe = OpenCodeHarness.find_exe()
     if not exe or not OpenCodeHarness.supported():
-        return {"outcome": "setup", "say": f"{lane} needs macOS and the opencode CLI (route.py doctor --lane {lane})"}
+        return {"outcome": "setup", "say": f"{lane} needs macOS and the opencode CLI (route.py doctor)"}
     if lane == "ZAI_CODING_SUBSCRIPTION" and h["model"] not in harnesses.ZAI_MODELS:       # pin subscription routing; never substitute the pay-as-you-go `zai` provider
         return {"outcome": "setup", "say": "Z.ai Coding Plan model must use the subscription provider."}
     rules = " ".join((SECRET_RULE, GIT_RULES, EDIT_RULE, NO_SUBAGENTS_RULE, opencode_sandbox.RULE, DENIED_RULE))
@@ -174,7 +161,7 @@ AGENT_KIND = {"codex": "codex", "claude_p": "claude-p", "opencode": "opencode"}
 def login_text(kind, lane):
     """(the hint stored with a lane that is logged out, the text of the answer with {why})."""
     if kind == "codex":
-        return "logged out: run `codex login`", f"codex is not logged in: {{why}} (route.py doctor --lane {lane})"
+        return "logged out: run `codex login`", f"codex is not logged in: {{why}} (route.py doctor)"
     if kind == "claude_p":
         return "logged out: run `claude auth login`", "claude is not logged in: {why} (claude auth login)"
     hint = ("free OpenCode access refused; no paid credentials will be used" if lane == "DEEPSEEK_FREE" else "run `opencode auth login` and choose Z.AI Coding Plan; enter your Coding Plan key in your own terminal"
@@ -226,8 +213,6 @@ def launch_worker(d, brief, a, rid, t, cfg, meta, hooks):
     res = dict(sm.res, stderr=out.err, denied=denied_items(hx, h.get("read_only")))
     if h["kind"] == "codex":
         codex_usage(res, x)
-    if x.get("credit") and sm.cost > 0:
-        env.ledger_add(sm.cost, d["model"], t)
     if out.stream_tail:
         res["stream_tail"] = out.stream_tail
     if w.why == "hung":
@@ -241,7 +226,7 @@ def launch_worker(d, brief, a, rid, t, cfg, meta, hooks):
         o = classify.Outcome("network", hx.evidence.transient, "event")
     if o:       # the CLI's own error or stderr, never the model's answer
         settler().apply(res, o, d, t, hx.kind, a, sm.rc, sm.tail, reset=(lambda: codex_reset_now(t)) if hx.kind == "codex" else None,
-               credit_until=x.get("credit_until"), login=login_text(h["kind"], d["lane"]))
+               login=login_text(h["kind"], d["lane"]))
     else:
         env.update_state(lambda s: s.out.pop(d["lane"], None))
         res.update(data=sm.data if sm.data is not None else answer.parse_data(sm.text, a.schema))

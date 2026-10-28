@@ -10,11 +10,10 @@ from delegate.adapters.harness import opencode_sandbox as box
 from delegate.app import env
 from delegate.app import usage
 from delegate.app import cockpit
-from delegate.app import harnesses
 from delegate.app import decide as dec
 from delegate.app import fleet
 import shutil
-from delegate.app import doctor, keys
+from delegate.app import doctor
 
 
 class Onboarding(unittest.TestCase):
@@ -22,11 +21,10 @@ class Onboarding(unittest.TestCase):
 
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
-        self.saved = {k: os.environ.get(k) for k in ("HOME", "USERPROFILE", "XDG_CONFIG_HOME", "APPDATA", "DELEGATE_CONFIG_DIR", "CODEX_HOME", "CLAUDE_CREDIT_WORKER_KEY")}
+        self.saved = {k: os.environ.get(k) for k in ("HOME", "USERPROFILE", "XDG_CONFIG_HOME", "APPDATA", "DELEGATE_CONFIG_DIR", "CODEX_HOME")}
         for k in ("HOME", "USERPROFILE", "XDG_CONFIG_HOME", "APPDATA", "DELEGATE_CONFIG_DIR"):
             os.environ[k] = self.tmp.name
         os.environ.pop("CODEX_HOME", None)
-        os.environ.pop("CLAUDE_CREDIT_WORKER_KEY", None)
         self.which = shutil.which
         shutil.which = lambda name: None
         shutil.which = lambda name: None
@@ -41,8 +39,6 @@ class Onboarding(unittest.TestCase):
             else:
                 os.environ[k] = v
         self.tmp.cleanup()
-
-
 
 
     def test_doctor_is_a_plain_lane_table_and_nothing_blocks(self):
@@ -122,44 +118,6 @@ class Onboarding(unittest.TestCase):
             if saved is not None:
                 os.environ["CLAUDE_CODE_ENTRYPOINT"] = saved
 
-    def test_set_key_web_takes_the_key_once_and_stays_private(self):
-        import threading
-        import urllib.error
-        import urllib.parse
-        import urllib.request
-        keys.validate_key = lambda k: (True, "HTTP 200")
-        box = {}
-        ready = threading.Event()
-
-        def on_ready(url):
-            box["url"] = url
-            ready.set()
-        th = threading.Thread(target=lambda: box.__setitem__("code", keys.set_key_web(timeout=20, on_ready=on_ready)))
-        th.start()
-        self.assertTrue(ready.wait(15))
-        url = box["url"]
-        with self.assertRaises(urllib.error.HTTPError) as ctx:                     # wrong token
-            urllib.request.urlopen(url[:-3] + "xxx")
-        self.assertEqual(ctx.exception.code, 404)
-        self.assertIn(b"password", urllib.request.urlopen(url).read())              # the form
-        data = urllib.parse.urlencode({"key": "sk-ant-web-key"}).encode()
-        self.assertIn(b"Saved", urllib.request.urlopen(url, data=data).read())
-        th.join(5)
-        self.assertEqual(box["code"], 0)
-        path = env.config_dir() / "claude-credit.key"
-        self.assertEqual(path.read_text().strip(), "sk-ant-web-key")
-        if os.name != "nt":
-            self.assertEqual(path.stat().st_mode & 0o077, 0)
-        self.assertEqual(env.profile_lanes()["CLAUDE_CREDIT"], "enabled")
-
-    def test_set_key_web_refuses_public_and_wildcard_hosts(self):
-        for h in ("0.0.0.0", "8.8.8.8"):
-            self.assertEqual(keys.set_key_web(host=h, timeout=1), 2)
-        self.assertTrue(keys.allowed_host("100.101.102.103"))      # tailnet
-        self.assertTrue(keys.allowed_host("192.168.1.5"))
-
-
-
 
     def test_unset_lanes_are_offered_once_and_never_block(self):
         a = argparse_ns("worker")
@@ -173,43 +131,14 @@ class Onboarding(unittest.TestCase):
         finally:
             os.environ.pop("CLAUDE_CODE_ENTRYPOINT", None) if saved is None else os.environ.__setitem__("CLAUDE_CODE_ENTRYPOINT", saved)
 
-    def test_set_key_enables_a_declined_credit_lane(self):
-        import io
-        keys.validate_key = lambda k: (True, "HTTP 200")
-        env.set_profile_lane("CLAUDE_CREDIT", "declined")
-        real = sys.stdin
-        try:
-            sys.stdin = io.StringIO("sk-ant-test-key\n")
-            keys.set_key(from_stdin=True)
-        finally:
-            sys.stdin = real
-        self.assertEqual(env.profile_lanes()["CLAUDE_CREDIT"], "enabled")
 
     def test_config_set_and_show(self):
-        doctor.config_set("credit.reset_day", "15")
+        doctor.config_set("burn.minutes", "60")
         doctor.config_set("claude_weekly_reset", "Sun 17:00")
         cfg = env.load_routing()
-        self.assertEqual(cfg["settings"]["credit"]["reset_day"], 15)
+        self.assertEqual(cfg["settings"]["burn"]["minutes"], 60)
         self.assertEqual(cfg["settings"]["claude_weekly_reset"], "Sun 17:00")
-        self.assertEqual(cfg["settings"]["credit"]["monthly_cap"], 150)     # untouched defaults survive the merge
-
-    def test_set_key_stdin_is_private_and_not_overwritten(self):
-        import io
-        keys.validate_key = lambda k: (True, "HTTP 200")
-        real = sys.stdin
-        try:
-            sys.stdin = io.StringIO("sk-ant-test-key\n")
-            self.assertEqual(keys.set_key(from_stdin=True), 0)
-            path = env.config_dir() / "claude-credit.key"
-            self.assertEqual(path.read_text().strip(), "sk-ant-test-key")
-            if os.name != "nt":
-                self.assertEqual(path.stat().st_mode & 0o077, 0)
-            sys.stdin = io.StringIO("sk-ant-other\n")
-            self.assertEqual(keys.set_key(from_stdin=True), 1)
-            self.assertEqual(path.read_text().strip(), "sk-ant-test-key")
-        finally:
-            sys.stdin = real
-        self.assertEqual(harnesses.find_key(quiet=True), "sk-ant-test-key")
+        self.assertEqual(cfg["settings"]["burn"]["min_left_percent"], 10)     # untouched defaults survive the merge
 
 
 if __name__ == "__main__":

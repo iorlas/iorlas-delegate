@@ -15,7 +15,7 @@ ARG_KEYS = ("file_path", "filePath", "path", "pattern", "url", "query", "descrip
 STREAM_USAGE = ("input_tokens", "cache_read_input_tokens", "cache_creation_input_tokens", "output_tokens")
 CLAUDE_ERROR_RE = re.compile(r"^(API Error|Credit balance|Invalid API key|Not logged in|Please run /login|Claude (AI )?usage limit|OAuth|Failed to authenticate"
                              r"|Request timed out|Error:)", re.I)       # how `claude -p` words its own failures; anything else in a result is the model talking
-CREDIT_TTL_S, SUBSCRIPTION_TTL_S = 300, 3600        # prompt-cache life: API billing's 5 min default; a -p main conversation on a subscription gets 1 h
+SUBSCRIPTION_TTL_S = 3600        # prompt-cache life: a -p main conversation on a subscription gets 1 h
 
 
 def _s(x: object) -> str:
@@ -55,7 +55,7 @@ def stream_usage(requests: list[dict]) -> dict:
     return {k: sum(r.get(k) or 0 for r in rs) for k in STREAM_USAGE} if rs else {}
 
 
-def acct_of(u: dict | None, cost: float | None, credit: bool) -> dict | None:
+def acct_of(u: dict | None, cost: float | None) -> dict | None:
     """`result` usage + total_cost_usd -> the call's accounting record. The cost is the harness's own figure on every lane; None when absent."""
     if not u and cost is None:
         return None
@@ -65,7 +65,7 @@ def acct_of(u: dict | None, cost: float | None, credit: bool) -> dict | None:
                          "cache_write": u.get("cache_creation_input_tokens") or 0, "out": u.get("output_tokens") or 0,
                          "cost_usd": None if cost is None else float(cost), "cost_source": "unknown" if cost is None else "harness",
                          "accounting": "estimated" if cost is not None else "unknown",
-                         "ttl_s": CREDIT_TTL_S if credit else SUBSCRIPTION_TTL_S, "ttl_source": "vendor_default"}
+                         "ttl_s": SUBSCRIPTION_TTL_S, "ttl_source": "vendor_default"}
     if by_ttl:      # an unexpected downgrade to 5 m shows here
         a["cache_write_by_ttl"] = {"5m": by_ttl.get("ephemeral_5m_input_tokens") or 0, "1h": by_ttl.get("ephemeral_1h_input_tokens") or 0}
     return a
@@ -85,8 +85,7 @@ class ClaudeHarness(Quiet):
     secret_event = None           # its PreToolUse hook blocks the call
     EXE = "claude"
 
-    def __init__(self, credit: bool = False) -> None:
-        self.credit = credit
+    def __init__(self) -> None:
         self.evidence = Evidence()
         self.open: dict[Any, tuple[bool, str, str]] = {}        # tool_use id -> (shell, name, arg), until its tool_result
         self.seen_usage: set[Any] = set()
@@ -95,7 +94,6 @@ class ClaudeHarness(Quiet):
     def launch_spec(self, i: LaunchInputs) -> LaunchSpec:
         tools = ["Read", "Glob", "Grep"] + (["Edit", "Write"] if i.write else []) + ["Bash"]       # read-only steps: Bash limited by the guard
         argv = [i.exe, "-p", "--output-format", "stream-json", "--verbose", "--model", i.model, "--effort", i.effort]
-        argv += ["--max-budget-usd", str(i.budget)] if i.budget is not None else []
         argv += ["--resume", i.resume] if i.resume else ["--session-id", i.session]
         argv += ["--append-system-prompt", i.system, "--restricted", "--tools", ",".join(tools), "--strict-mcp-config",
                  "--permission-mode", "auto", "--permission-prompts", "none", "--settings", i.settings]
@@ -193,7 +191,7 @@ class ClaudeHarness(Quiet):
         cost = float(j.get("total_cost_usd") or 0)          # the harness's own figure on every lane, subscription included (study 85)
         u = j.get("usage") if isinstance(j.get("usage"), dict) else stream_usage(e.steps)     # no result event: what the stream's requests reported
         failed = rc != 0 or bool(j.get("is_error"))
-        res = {"text": text, "ref": j.get("session_id") or e.ref, "cost": cost, "tokens": tokens_of(u), "acct": acct_of(u, j.get("total_cost_usd"), self.credit),
+        res = {"text": text, "ref": j.get("session_id") or e.ref, "cost": cost, "tokens": tokens_of(u), "acct": acct_of(u, j.get("total_cost_usd")),
                "turns": j.get("num_turns"), "context_k": e.context_k, "started": e.work, "partial": e.work}
         warn = ["answer_done_process_alive"] if by_message else ["net_after_answer"] if e.final and netprobe.looks_dropped(err) else []     # ae6v: the answer was in first
         return Summary(text=text, rc=(rc or 1) if failed else 0, res=res, vendor=vendor_error(j), stderr=err, work=(j.get("num_turns") or 0) > 1,

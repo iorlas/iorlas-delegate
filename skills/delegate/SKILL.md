@@ -15,7 +15,7 @@ Roles: planner (plan) · worker (implement) · reviewer (`--authored-by`: family
 | `ask_user` | ask; yes = `--allow-degraded` |
 | `stop.retry.kind` predicted/poll | rerun |
 | `stop.reason` timeout | shrink the task |
-| other `stop` | tell user `say`, `stop.fix`; setup: `modes/init.md`; no key in chat |
+| other `stop` | tell user `say`, `stop.fix`; setup: `modes/init.md`; no secret in chat |
 | `needs_input` `claude_usage` | `get_usage`; rerun with `--claude-usage '<plan.windows>'` |
 | `notice` | tell the user once |
 
@@ -33,4 +33,4 @@ No Python 3.8+: Agent tool only, no worktree, effort in the brief.
 Review never blocks: if only the author's family is up, it reviews itself (`flag` same_family: say so).
 
 Brief: goal, files, constraints, acceptance check, "no commits". Own git; parallel writers: one directory each. `--premium` only if the user names it. Never delegate scope, design, plan, acceptance.
-`modes/`: init codex claude-credit extend zai-coding deepseek-free
+`modes/`: init codex extend zai-coding deepseek-free

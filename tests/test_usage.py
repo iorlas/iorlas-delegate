@@ -59,13 +59,12 @@ class Claude(unittest.TestCase):
     def test_subscription_cost_is_the_harness_figure(self):
         u = {"input_tokens": 3, "cache_read_input_tokens": 50, "cache_creation_input_tokens": 20, "output_tokens": 9,
              "cache_creation": {"ephemeral_5m_input_tokens": 0, "ephemeral_1h_input_tokens": 20}}
-        a = claude.acct_of(u, 0.0123, credit=False)
+        a = claude.acct_of(u, 0.0123)
         self.assertEqual((a["in_fresh"], a["cache_read"], a["cache_write"], a["out"], a["cost_usd"], a["cost_source"]), (3, 50, 20, 9, 0.0123, "harness"))
         self.assertEqual((a["ttl_s"], a["ttl_source"], a["cache_write_by_ttl"]), (3600, "vendor_default", {"5m": 0, "1h": 20}))
-        self.assertEqual(claude.acct_of(u, 0.01, credit=True)["ttl_s"], 300)
 
     def test_no_cost_reported_is_unknown_not_zero(self):
-        a = claude.acct_of({"input_tokens": 1}, None, credit=False)
+        a = claude.acct_of({"input_tokens": 1}, None)
         self.assertEqual((a["cost_usd"], a["cost_source"], a["accounting"]), (None, "unknown", "unknown"))
 
 

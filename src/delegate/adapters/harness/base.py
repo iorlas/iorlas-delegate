@@ -33,7 +33,6 @@ class LaunchInputs:
     system: str = ""                # claude: the appended system prompt
     settings: str = ""              # claude: --settings JSON (the PreToolUse guard)
     write: bool = False             # claude, opencode: may the worker edit
-    budget: float | None = None     # claude: --max-budget-usd on the credit lane
 
 
 @record

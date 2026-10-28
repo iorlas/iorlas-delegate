@@ -51,12 +51,6 @@ class RunCommand(RunBase):
         _, r = self.run_it()
         self.assertEqual(why(r), "no_lane")
 
-    def test_unattended_never_picks_the_credit_lane_even_with_a_key(self):
-        os.environ["CLAUDE_CREDIT_WORKER_KEY"] = "sk-ant-x"
-        support.put_out("OPENAI_SUBSCRIPTION", env.now() + 3600)
-        _, r = self.run_it()
-        self.assertEqual(r["lane"], "CLAUDE_SUBSCRIPTION")
-
     def test_interactive_session_gets_the_agent_step_and_the_consent_question(self):
         self.codex_out()                                                    # Codex plans first, Claude only when it is down
         _, r = self.run_it(role="planner", unattended=False)

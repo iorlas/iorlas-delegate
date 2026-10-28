@@ -45,17 +45,16 @@ def at(r):
     return r["stop"]["retry"]["at"]
 
 
-def lanes(openai=None, sub=None, credit=None):
+def lanes(openai=None, sub=None):
     """Build lane states. Each arg is a dict of Lane attributes; None = healthy default."""
     mk = lambda name, fam, kind, shared=False: Lane(name, fam, kind, shared)
-    o, s, c = mk("OPENAI_SUBSCRIPTION", "openai", "subscription"), mk("CLAUDE_SUBSCRIPTION", "claude", "subscription", True), mk("CLAUDE_CREDIT", "claude", "credit")
+    o, s = mk("OPENAI_SUBSCRIPTION", "openai", "subscription"), mk("CLAUDE_SUBSCRIPTION", "claude", "subscription", True)
     o.five, o.week, o.pace = 10, 5, 0
     s.five, s.week, s.pace = 30, 40, 0
-    c.cap, c.spend, c.reset_in_days = 150.0, 0.0, 20.0
-    for lane, over in ((o, openai), (s, sub), (c, credit)):
+    for lane, over in ((o, openai), (s, sub)):
         for k, v in (over or {}).items():
             setattr(lane, k, v)
-    return {l.name: l for l in (o, s, c)}
+    return {l.name: l for l in (o, s)}
 
 
 def decide(role, ls, st=None, **args):
@@ -95,69 +94,45 @@ class Pick(unittest.TestCase):
         d = decide("worker", lanes(openai={"out": True, "out_until": T + 3600}))
         self.assertEqual((d["lane"], d["model"]), ("CLAUDE_SUBSCRIPTION", "sonnet-5.5"))
 
-    def test_strained_subscription_uses_credit(self):
-        d = decide("worker", lanes(openai={"out": True, "out_until": T + 1}, sub={"five": 85}))
-        self.assertEqual(d["lane"], "CLAUDE_CREDIT")
-
-    def test_credit_out_goes_to_subscription(self):
-        d = decide("worker", lanes(openai={"out": True, "out_until": T + 1}, credit={"out": True, "out_until": T + 999}))
-        self.assertEqual(d["lane"], "CLAUDE_SUBSCRIPTION")
-
     def test_burn_prefers_subscription(self):
         d = decide("worker", lanes(openai={"out": True, "out_until": T + 1}, sub={"burn": True, "five": 30}))
-        self.assertEqual(d["lane"], "CLAUDE_SUBSCRIPTION")
-
-    def test_expiring_credit_is_spent(self):
-        d = decide("worker", lanes(openai={"out": True, "out_until": T + 1}, credit={"reset_in_days": 2.0, "spend": 10.0}))
-        self.assertEqual(d["lane"], "CLAUDE_CREDIT")
-
-    def test_unknown_subscription_usage_prefers_credit(self):
-        d = decide("worker", lanes(openai={"out": True, "out_until": T + 1}, sub={"five": None, "week": None, "pace": None}))
-        self.assertEqual(d["lane"], "CLAUDE_CREDIT")
-
-    def test_dwell_keeps_previous_choice(self):
-        st = {"prev": {"claude": {"lane": "CLAUDE_CREDIT", "since": T - 600}}}
-        d = decide("worker", lanes(openai={"out": True, "out_until": T + 1}), st)
-        self.assertEqual(d["lane"], "CLAUDE_CREDIT")
-        st = {"prev": {"claude": {"lane": "CLAUDE_CREDIT", "since": T - 3600}}}
-        d = decide("worker", lanes(openai={"out": True, "out_until": T + 1}), st)
         self.assertEqual(d["lane"], "CLAUDE_SUBSCRIPTION")
 
 
 class SecondPass(unittest.TestCase):
     def test_relaxed_pass_uses_reserved_subscription_same_step(self):
-        ls = lanes(openai={"out": True, "out_until": T + 1}, credit={"out": True, "out_until": T + 99}, sub={"week": 92, "five": 40})
+        ls = lanes(openai={"out": True, "out_until": T + 1}, sub={"week": 92, "five": 40})
         d = decide("worker", ls)
         self.assertEqual((d["lane"], d["model"], d["effort"], d["pass"]), ("CLAUDE_SUBSCRIPTION", "sonnet-5.5", "medium", "relaxed"))
 
     def test_relaxed_has_a_ceiling(self):
-        ls = lanes(openai={"out": True, "out_until": T + 1}, credit={"out": True, "out_until": T + 99}, sub={"week": 96})
+        ls = lanes(openai={"out": True, "out_until": T + 1}, sub={"week": 96})
         d = decide("worker", ls)
         self.assertEqual(d["action"], "stop")
 
     def test_relaxed_never_changes_model_floor(self):
-        ls = lanes(openai={"out": True, "out_until": T + 1}, credit={"out": True, "out_until": T + 99}, sub={"week": 92})
+        ls = lanes(openai={"out": True, "out_until": T + 1}, sub={"week": 92})
         d = decide("planner", ls)
         self.assertEqual((d["model"], d["effort"]), ("sonnet-5.5", "high"))     # Opus never runs in the loop (delegate-pnz): Sonnet is the planner's Claude rung
 
     def test_normal_relaxed_beats_degraded_strict(self):
-        ls = lanes(openai={"out": True, "out_until": T + 1}, credit={"out": True, "out_until": T + 99}, sub={"week": 92})
+        ls = lanes(openai={"out": True, "out_until": T + 1}, sub={"week": 92})
         d = decide("reviewer", ls, authored_by="openai")
         self.assertEqual((d["model"], d["effort"], d["pass"]), ("sonnet-5.5", "medium", "relaxed"))
 
 
 class Roles(unittest.TestCase):
     def test_planner_stop_asks_consent(self):
-        ls = lanes(openai={"out": True, "out_until": T + 5000}, credit={"out": True, "out_until": T + 9000}, sub={"out": True, "out_until": T + 7000})
+        ls = lanes(openai={"out": True, "out_until": T + 5000}, sub={"out": True, "out_until": T + 7000})
         d = decide("planner", ls)
         self.assertEqual(d["action"], "stop")
         self.assertIn("ask_user", d)
-        self.assertEqual(len(d["resets"]), 3)
+        self.assertEqual(len(d["resets"]), 2)
 
     def test_planner_degraded_only_with_consent(self):
-        ls = lanes(openai={"out": True, "out_until": T + 5000}, credit={"out": True, "out_until": T + 9000}, sub={"week": 96, "five": 10})
+        ls = lanes(openai={"out": True, "out_until": T + 5000}, sub={"week": 96, "five": 10})
         self.assertEqual(decide("planner", ls)["action"], "stop")
-        ls2 = lanes(openai={"out": True, "out_until": T + 5000}, credit={"out": True, "out_until": T + 9000}, sub={"week": 96, "five": 10})
+        ls2 = lanes(openai={"out": True, "out_until": T + 5000}, sub={"week": 96, "five": 10})
         self.assertEqual(decide("planner", ls2, allow_degraded=True)["action"], "stop")   # ceiling still binds
 
     def test_reviewer_prefers_the_other_family_and_authored_by_is_optional(self):
@@ -172,11 +147,11 @@ class Roles(unittest.TestCase):
 
     def test_same_family_review_is_the_last_resort_and_flagged(self):
         out = {"out": True, "out_until": T + 3600}
-        d = decide("reviewer", lanes(sub=out, credit=out), authored_by="openai")                  # Claude is out: Codex reviews Codex
+        d = decide("reviewer", lanes(sub=out), authored_by="openai")                  # Claude is out: Codex reviews Codex
         self.assertEqual((d["action"], d["lane"], d["flag"]), ("run", "OPENAI_SUBSCRIPTION", "same_family"))
         d = decide("reviewer", lanes(openai=out), authored_by="claude")                           # Codex is out: Claude reviews Claude
         self.assertEqual((d["action"], d["lane"], d["flag"]), ("run", "CLAUDE_SUBSCRIPTION", "same_family"))
-        d = decide("reviewer", lanes(openai=out, sub=out, credit=out), authored_by="claude")
+        d = decide("reviewer", lanes(openai=out, sub=out), authored_by="claude")
         self.assertEqual(d["action"], "stop")                                                # nobody left: stop, not an exception
 
     def test_every_reviewer_list_reaches_every_family(self):
@@ -190,7 +165,7 @@ class Roles(unittest.TestCase):
     def test_only_one_family_up_never_stops_and_warns(self):
         out = {"out": True, "out_until": T + 3600}
         grok = Lane("GROK_SUBSCRIPTION", "xai", "subscription")
-        cases = {"openai": lambda: lanes(sub=out, credit=out), "claude": lambda: lanes(openai=out),
+        cases = {"openai": lambda: lanes(sub=out), "claude": lambda: lanes(openai=out),
                  }
         for who, mk in cases.items():
             ls = mk()
@@ -208,7 +183,7 @@ class Roles(unittest.TestCase):
 
     def test_warning_names_why_other_families_are_down(self):
         out = {"out": True, "out_until": T + 3600, "out_reason": "logged_out"}
-        ls = lanes(sub=out, credit=out)
+        ls = lanes(sub=out)
         g = Lane("GROK_SUBSCRIPTION", "xai", "subscription")
         g.out, g.out_until = True, T + 7200
         ls["GROK_SUBSCRIPTION"] = g

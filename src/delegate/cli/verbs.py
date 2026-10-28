@@ -52,7 +52,7 @@ def cmd_report(a, cfg):
     if until is None:
         st = env.load_state()
         lane = decide.fleet_builder(cfg).build(st, t, check_config=False).lanes[a.lane]     # a lane the profile leaves out can still be reported out
-        until = lane.out_until or (lane.week_reset if lane.week_reset and lane.week_reset > t and lane.kind == "credit" else None) or t + 3600
+        until = lane.out_until or t + 3600
     launch.settler().mark_out(a.lane, until, "reported out", t, "limit", "manual" if a.until else "guess")
     print(f"{a.lane}: out until {local(until)}")
     return 0

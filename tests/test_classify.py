@@ -114,8 +114,8 @@ class Stop(unittest.TestCase):
         self.addCleanup(self.patch.stop)
         self.addCleanup(self.tmp.cleanup)
 
-    def answer(self, o, lane, credit_until=None):
-        res = launch.settler().apply({}, o, {"lane": lane}, T, "cli", SimpleNamespace(timeout=30), 1, "tail", reset=lambda: T + 3600, credit_until=credit_until)
+    def answer(self, o, lane):
+        res = launch.settler().apply({}, o, {"lane": lane}, T, "cli", SimpleNamespace(timeout=30), 1, "tail", reset=lambda: T + 3600)
         return answer.result(res.pop("outcome"), **res)
 
     def test_every_fixture_row_answers_with_its_expected_stop_tuple_and_fits_the_schema(self):
@@ -172,10 +172,6 @@ class Stop(unittest.TestCase):
         out = env.load_state().out["GROK_SUBSCRIPTION"]
         self.assertGreater(out.until, T)                  # hidden from the picker (gather needs a time) and probed again later
         self.assertEqual((out.reason, r["stop"]["scope"], r["stop"]["retry"]), ("credit", "lane", {"kind": "none", "at": None}))
-
-    def test_a_credit_cycle_that_names_its_end_is_a_predicted_retry(self):
-        r = self.answer(classify.Outcome("credit_exhausted", "credit balance is too low", "event"), "CLAUDE_CREDIT", credit_until=T + 86400)
-        self.assertEqual((r["stop"]["permanence"], r["stop"]["retry"]), ("transient", {"kind": "predicted", "at": T + 86400}))
 
     def test_answers_that_wait_for_a_time_say_when(self):
         r = self.answer(classify.Outcome("rate_limited", "Usage limit reached for 5 hour", "event"), "ZAI_CODING_SUBSCRIPTION")
