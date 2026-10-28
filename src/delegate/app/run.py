@@ -20,21 +20,11 @@ from delegate.domain.cost import accounting
 from delegate.domain.health import ledger as health_ledger
 from delegate.domain.holds.book import HoldBook
 from delegate.domain.lanes import profiles
-from delegate.domain.lanes.lane import Lane
 from delegate.domain.policy.worker import GIT_RULES, SECRET_RULE
 
 CANARY_BRIEF = "Reply with exactly: OK"
 CANARY_TIMEOUT_S = 30
 IDENTITY = ("lane", "model", "effort", "family", "flag", "rung", "fallback", "fallback_reason", "first_lane")
-
-
-def lane_use(cfg, name, t):
-    """(five_hour %, weekly %) of a lane now; None where unknown."""
-    c = cfg["lanes"][name]
-    lane = Lane(name, c["family"], c["kind"], c.get("shared_with_orchestrator", False))
-    with contextlib.suppress(Exception):
-        usage.READERS[c["reader"]](lane, env.settings_of(cfg), env.load_state(), t)
-    return lane.five, lane.week
 
 
 class Run:
@@ -230,7 +220,6 @@ class Run:
             with contextlib.suppress(Exception):
                 self.keep_ref(res["ref"])
         secs = round(time.time() - t0, 1)
-        five_after, week_after = lane_use(cfg, d["lane"], env.now())
         transcript = harnesses.find_transcript(res.get("ref"), fam)
         detail = res.pop("detail", "")
         if detail:
@@ -239,7 +228,7 @@ class Run:
             ts=env.now(), run_id=rid, call_id=getattr(a, "call_id", None), ref=res.get("ref"), **health_ledger.failure_fields(res.get("outcome"), "", detail or res.get("say"), res.get("retry_after")),
             role=a.role, task=a.task or "", lane=d["lane"], model=d["model"], effort=d["effort"], done=done, warnings=res.get("warnings"), stream_tail=res.pop("stream_tail", None),
             denials=sum(1 for x in res.get("denied") or [] if x.get("kind") != "sandbox_limit"), secs=secs, cost=res.get("cost", 0), tokens=res.get("tokens"),
-            cumulative=res.get("cumulative"), five_before=lane.five, week_before=lane.week, five_after=five_after, week_after=week_after,
+            cumulative=res.get("cumulative"), five_before=lane.five, week_before=lane.week,
             overlap=lease.overlap, slots=cap, transcript=transcript))
         info = transcript_info(transcript, fam, t_from)
         ac = res.pop("acct", None)

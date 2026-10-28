@@ -27,6 +27,17 @@ class RunCommand(RunBase):
         code, r = self.run_it(timeout=None)
         self.assertEqual((code, r["stop"]), (0, None))
 
+    def test_a_codex_run_reads_the_codex_usage_before_the_launch_only(self):
+        """No second read after the run: the codex app-server spawn cost 1-2 s per run (delegate-2ys)."""
+        from delegate.app import usage
+        calls = []
+        usage.READERS["codex_app_server"] = lambda lane, S, st_, t, *a: calls.append(1)
+        self.run_it()
+        after_run = len(calls)
+        calls.clear()
+        route.main(["next", "worker"])
+        self.assertEqual(after_run, len(calls))
+
     def test_unattended_keeps_the_orchestrator_reserve(self):
         support.put_out("OPENAI_SUBSCRIPTION", env.now() + 3600)
         f = Path(self.tmp.name) / ".claude" / "state" / "max-limits.json"
