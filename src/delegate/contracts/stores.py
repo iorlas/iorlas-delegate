@@ -1,0 +1,178 @@
+"""The files the router owns under the config dir, each behind one class: StateStore, HistoryStore, LedgerStore, CheckpointStore.
+
+Every write is atomic (temp file + replace) and private (0600) and, where two processes may race, under `locked`. A file that is missing,
+unreadable or of another shape reads as empty: a store never raises on read and never migrates.
+"""
+import contextlib
+import json
+import os
+import time
+from collections.abc import Callable, Iterator
+from pathlib import Path
+
+from delegate.contracts import codec
+from delegate.contracts.history import ROWS, HealthCheckpoint, HealthState, HistoryRow, LedgerRow, RunRow
+from delegate.contracts.routing import BreakerPolicy
+from delegate.contracts.state import StateDoc
+
+STALE_LOCK_S = 30
+HISTORY_MAX, HISTORY_DAYS = 1_000_000, 14
+
+
+@contextlib.contextmanager
+def locked(path: Path | str, timeout: float = 10.0) -> Iterator[None]:
+    """An exclusive lock on `path` (a sibling `.lock` file made with O_EXCL); a lock older than 30 s is a dead holder's and is broken."""
+    lock = str(path) + ".lock"
+    end = time.time() + timeout
+    fd = None
+    while fd is None:
+        try:
+            fd = os.open(lock, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+        except FileExistsError:
+            with contextlib.suppress(OSError):
+                if time.time() - os.path.getmtime(lock) > STALE_LOCK_S:
+                    os.remove(lock)
+                    continue
+            if time.time() > end:
+                raise TimeoutError("%s is locked by another route.py for more than %.0fs" % (path, timeout)) from None
+            time.sleep(0.05)
+    try:
+        yield
+    finally:
+        os.close(fd)
+        with contextlib.suppress(OSError):
+            os.remove(lock)
+
+
+def private(path: Path | str) -> None:
+    with contextlib.suppress(OSError):
+        os.chmod(path, 0o600)
+
+
+def write_atomic(path: Path, text: str) -> None:
+    tmp = path.with_suffix(".tmp%d" % os.getpid())
+    tmp.write_text(text, encoding="utf-8")
+    os.replace(tmp, path)
+    private(path)
+
+
+def read_json(path: Path) -> object | None:
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+
+
+class StateStore:
+    """`state.json` as a `StateDoc`. All writes go through `transaction()` / `update()`: one lock, read-modify-write."""
+
+    def __init__(self, path: Path) -> None:
+        self.path = path
+
+    def load(self) -> StateDoc:
+        try:
+            return codec.from_json(StateDoc, read_json(self.path))
+        except codec.CodecError:
+            return StateDoc()
+
+    @contextlib.contextmanager
+    def transaction(self) -> Iterator[StateDoc]:
+        with locked(self.path):
+            doc = self.load()
+            yield doc
+            write_atomic(self.path, json.dumps(codec.to_json(doc)))
+
+    def update(self, fn: Callable[[StateDoc], object]) -> StateDoc:
+        with self.transaction() as doc:
+            fn(doc)
+        return doc
+
+
+class HistoryStore:
+    """`history.jsonl`: append a row, read the rows after a time, find a ref's last thread total. A damaged line is skipped."""
+
+    def __init__(self, path: Path) -> None:
+        self.path = path
+
+    def add(self, row: HistoryRow) -> None:
+        """Never fails a run."""
+        with contextlib.suppress(Exception), locked(self.path):
+            if self.path.exists() and self.path.stat().st_size > HISTORY_MAX:
+                self._rotate(time.time() - HISTORY_DAYS * 86400)
+            with open(self.path, "a", encoding="utf-8") as f:
+                f.write(json.dumps(codec.to_json(row)) + "\n")
+            private(self.path)
+
+    def _rotate(self, cut: float) -> None:
+        keep = [r for r in self._read(0.0) if r[0].ts >= cut]
+        self.path.write_text("".join(ln for _, ln in keep), encoding="utf-8")
+
+    def _read(self, since: float) -> list[tuple[HistoryRow, str]]:
+        out = []
+        try:
+            lines = self.path.read_text(encoding="utf-8", errors="replace").splitlines()
+        except OSError:
+            return out
+        for ln in lines:
+            try:
+                row = codec.from_tagged(ROWS, json.loads(ln))
+            except ValueError:      # CodecError is a ValueError: a stale or corrupt line
+                continue
+            if row.ts > since:
+                out.append((row, ln + "\n"))
+        return out
+
+    def rows(self, since: float = 0.0) -> list[HistoryRow]:
+        return [r for r, _ in self._read(since)]
+
+    def runs(self, n: int) -> list[RunRow]:
+        """The last n finished runs, newest last."""
+        return [r for r in self.rows() if isinstance(r, RunRow)][-n:]
+
+    def last_cumulative(self, ref: str) -> dict | None:
+        """The thread total the newest row for `ref` recorded: where the rollout file is gone, a resume still knows what came before."""
+        for r in reversed(self.rows()):
+            if isinstance(r, RunRow) and r.ref == ref and r.cumulative:
+                return r.cumulative
+        return None
+
+
+class LedgerStore:
+    """`ledger.jsonl`: what the credit lane spent."""
+
+    def __init__(self, path: Path) -> None:
+        self.path = path
+
+    def rows(self) -> list[LedgerRow]:
+        out = []
+        try:
+            lines = self.path.read_text(encoding="utf-8").splitlines()
+        except OSError:
+            return out
+        for ln in lines:
+            with contextlib.suppress(ValueError):
+                out.append(codec.from_json(LedgerRow, json.loads(ln)))
+        return out
+
+    def add(self, cost: float, model: str, t: float) -> None:
+        with locked(self.path), open(self.path, "a", encoding="utf-8") as f:
+            f.write(json.dumps(codec.to_json(LedgerRow(ts=t, model=model, cost=cost))) + "\n")
+        private(self.path)
+
+
+class CheckpointStore:
+    """`health-checkpoint.json`: a cache of the health fold. Missing, damaged or built under another breaker policy: no checkpoint."""
+
+    def __init__(self, path: Path) -> None:
+        self.path = path
+
+    def load(self, policy: BreakerPolicy) -> HealthState | None:
+        try:
+            cp = codec.from_json(HealthCheckpoint, read_json(self.path))
+        except codec.CodecError:
+            return None
+        return cp.state if cp.policy == policy else None
+
+    def save(self, state: HealthState, policy: BreakerPolicy) -> None:
+        with contextlib.suppress(OSError):
+            write_atomic(self.path, json.dumps(codec.to_json(HealthCheckpoint(policy=policy, state=state))))
