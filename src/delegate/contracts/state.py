@@ -17,7 +17,7 @@ class OutState:
     """A lane marked out. source: vendor (the vendor stated the end) | guess | manual; `set` is the wall clock of the write (running workers read it)."""
 
     until: float
-    why: str = ""
+    why: str = "reported out"
     at: float = 0.0
     set: float = 0.0
     reason: str = "limit"
@@ -44,9 +44,9 @@ class Lease:
 
     lane: str
     pid: int
-    pid_start: str | None
     start: float
     expires: float
+    pid_start: str | None = None
     role: str | None = None
     task: str = ""
     silence_s: float | None = None
@@ -104,3 +104,12 @@ class StateDoc:
     codex_limits: UsageCache | None = None
     claude_usage: UsageCache | None = None
     codex_login_pid: int | None = None
+
+
+@mutable
+class Profile:
+    """The owner's lane choices, `config.json` `profile`: never a setting, never merged into one."""
+
+    lanes: dict[str, str] = field(default_factory=dict)       # lane -> enabled | declined; a lane not listed is undecided
+    ack: list[str] = field(default_factory=list)
+    offered: list[str] = field(default_factory=list)          # lanes seen not usable for the first time, reported once

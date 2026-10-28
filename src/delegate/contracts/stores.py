@@ -13,7 +13,7 @@ from pathlib import Path
 from delegate.contracts import codec
 from delegate.contracts.history import ROWS, HealthCheckpoint, HealthState, HistoryRow, LedgerRow, RunRow
 from delegate.contracts.routing import BreakerPolicy
-from delegate.contracts.state import StateDoc
+from delegate.contracts.state import Profile, StateDoc
 
 STALE_LOCK_S = 30
 HISTORY_MAX, HISTORY_DAYS = 1_000_000, 14
@@ -176,3 +176,54 @@ class CheckpointStore:
     def save(self, state: HealthState, policy: BreakerPolicy) -> None:
         with contextlib.suppress(OSError):
             write_atomic(self.path, json.dumps(codec.to_json(HealthCheckpoint(policy=policy, state=state))))
+
+
+class ConfigStore:
+    """`config.json`: the owner's overrides. Top-level keys other than `profile` are settings overrides (deep-merged over routing.json by the
+    caller); `profile` is the owner's lane choices and never leaves this class as a setting."""
+
+    def __init__(self, path: Path) -> None:
+        self.path = path
+
+    def read(self) -> dict:
+        d = read_json(self.path)
+        return d if isinstance(d, dict) else {}
+
+    def overrides(self) -> dict:
+        return {k: v for k, v in self.read().items() if k != "profile"}
+
+    def update(self, fn: Callable[[dict], object]) -> dict:
+        """Locked read-modify-write: callers never save a stale snapshot."""
+        with locked(self.path):
+            cur = self.read()
+            fn(cur)
+            write_atomic(self.path, json.dumps(cur, indent=2) + "\n")
+        return cur
+
+    def profile(self) -> Profile:
+        try:
+            return codec.from_json(Profile, self.read().get("profile") or {})
+        except codec.CodecError:
+            return Profile()
+
+    def _put_profile(self, fn: Callable[[Profile], object]) -> None:
+        def put(cur: dict) -> None:
+            try:
+                p = codec.from_json(Profile, cur.get("profile") or {})
+            except codec.CodecError:
+                p = Profile()
+            fn(p)
+            cur["profile"] = codec.to_json(p)
+        self.update(put)
+
+    def set_lane(self, name: str, value: str | None) -> None:
+        """value None removes the entry (back to auto-detect)."""
+        def put(p: Profile) -> None:
+            p.lanes.pop(name, None) if value is None else p.lanes.__setitem__(name, value)
+        self._put_profile(put)
+
+    def set_ack(self, ident: str) -> None:
+        self._put_profile(lambda p: p.ack.append(ident) if ident not in p.ack else None)
+
+    def mark_offered(self, names: list[str]) -> None:
+        self._put_profile(lambda p: p.offered.extend(n for n in names if n not in p.offered))

@@ -6,8 +6,9 @@ import unittest
 from pathlib import Path
 
 SRC = Path(__file__).resolve().parent.parent / "src" / "delegate"
-FORBIDDEN = {"contracts": ("adapters", "app", "domain", "cli"), "adapters": ("app", "domain", "cli"), "app": ("cli",)}
-NO_RE = ("contracts", "app")
+FORBIDDEN = {"contracts": ("adapters", "app", "domain", "cli"), "adapters": ("app", "domain", "cli"), "domain": ("adapters", "app", "cli"), "app": ("cli",)}
+NO_RE = ("contracts", "app", "domain")      # domain: only in a matchers.py
+NO_WORLD = {"os", "subprocess", "socket", "time", "random", "shutil", "pathlib", "sys", "uuid"}      # domain computes; a clock is passed in
 MAX_SLOC = 400
 
 
@@ -34,13 +35,20 @@ class Layers(unittest.TestCase):
 
     def test_no_re_in_contracts_or_app(self):
         for p, layer, tree in modules():
-            if layer in NO_RE:
+            if layer in NO_RE and p.name != "matchers.py":
                 self.assertNotIn("re", set(imported(tree)), p.name)
 
     def test_re_in_the_domain_only_in_matchers(self):
         for p, layer, tree in modules():
             if layer == "domain" and p.name != "matchers.py":
                 self.assertNotIn("re", set(imported(tree)), p.name)
+
+    def test_domain_touches_no_world(self):
+        for p, layer, tree in modules():
+            if layer == "domain":
+                self.assertEqual({n.split(".")[0] for n in imported(tree)} & NO_WORLD, set(), p.name)
+                calls = {n.func.id for n in ast.walk(tree) if isinstance(n, ast.Call) and isinstance(n.func, ast.Name)}
+                self.assertNotIn("open", calls, p.name)
 
     def test_no_import_inside_a_function(self):
         for p, _, tree in modules():
