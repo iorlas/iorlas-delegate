@@ -148,6 +148,11 @@ def prepare_opencode(d: dict, brief: str, a: env.Args, rid: str, t: float, cfg: 
     exe = OpenCodeHarness.find_exe()
     if not exe or not OpenCodeHarness.supported():
         return {"outcome": "setup", "say": f"{lane} needs macOS and the opencode CLI (route.py doctor)"}
+    nested = opencode_sandbox.preflight()
+    if nested:        # before any model token: the lane is out for a while, so the next call routes to the next lane
+        settler().mark_out(lane, t + 3600, f"nested_sandbox: {nested}", t, "limit", "guess")
+        return {"outcome": "setup", "say": f"nested_sandbox: {lane} commands cannot run here ({nested}); this process is already inside a sandbox. "
+                                           "Rerun to use the next lane."}
     if lane == "ZAI_CODING_SUBSCRIPTION" and h["model"] not in harnesses.ZAI_MODELS:       # pin subscription routing; never substitute the pay-as-you-go `zai` provider
         return {"outcome": "setup", "say": "Z.ai Coding Plan model must use the subscription provider."}
     rules = " ".join((SECRET_RULE, GIT_RULES, EDIT_RULE, NO_SUBAGENTS_RULE, opencode_sandbox.RULE, DENIED_RULE))

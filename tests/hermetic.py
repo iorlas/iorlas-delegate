@@ -42,6 +42,8 @@ def home(base):
 if not getattr(sys, "_delegate_hermetic", False):
     sys._delegate_hermetic = True
     sys.addaudithook(_audit)
+    from delegate.adapters.harness import opencode_sandbox
+    opencode_sandbox._probed[:] = [None]        # no test starts a real sandbox-exec; tests of the preflight clear it
     home(ROOT)
     _run = unittest.TestCase.run
 

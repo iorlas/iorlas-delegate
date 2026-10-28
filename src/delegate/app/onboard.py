@@ -74,8 +74,18 @@ def configured_lanes(cfg: dict):
     return {n: lane_configured(c) for n, c in cfg["lanes"].items()}
 
 
+OPENCODE_LANES = {"GROK_SUBSCRIPTION", "DEEPSEEK_FREE", "ZAI_CODING_SUBSCRIPTION"}
+
+
 def fix_hint(name: str):
     """What to do about a lane that is not ready: one line, or '' when nothing is missing."""
+    hint = _fix_hint(name)
+    if name in OPENCODE_LANES and not OpenCodeHarness.supported():
+        return hint + " [unavailable (no sandbox) on this machine: opencode lanes need macOS sandbox-exec]"
+    return hint
+
+
+def _fix_hint(name: str):
     if name == "OPENAI_SUBSCRIPTION":
         return "run `codex login --device-auth`" if check_codex_cli() else "install the Codex CLI (`npm install -g @openai/codex`), then `codex login --device-auth`"
     if name == "GROK_SUBSCRIPTION":

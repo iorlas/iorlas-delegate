@@ -110,11 +110,16 @@ class OpenCodeHarness(Quiet):
         home = self.root / "opencode-home"       # an empty config root: the user's ~/.config/opencode (MCP servers, providers, permissions) stays out
         home.mkdir(parents=True, exist_ok=True)
         self.shell = self.root / f"opencode-shell-{i.session[:8]}.sh"
-        self.write_shell(i.cwd, i.write, self.shell)
-        config: dict[str, Any] = {"permission": box.permissions(i.write)}
         env = dict(i.env, SHELL=str(self.shell), XDG_CONFIG_HOME=str(home), **ENV_OFF)
+        launcher_xdg = ["XDG_CONFIG_HOME"]
         if self.profile.own_data:
             env["XDG_DATA_HOME"], env["XDG_CACHE_HOME"] = str(self.root / "opencode-free-data"), str(self.root / "opencode-free-cache")
+            launcher_xdg += ["XDG_DATA_HOME", "XDG_CACHE_HOME"]
+        roots = [Path(env[k]) for k in launcher_xdg]       # every XDG dir this launcher points commands at
+        for r in roots:
+            r.mkdir(parents=True, exist_ok=True)
+        self.write_shell(i.cwd, i.write, self.shell, roots)
+        config: dict[str, Any] = {"permission": box.permissions(i.write)}
         if self.profile.providers:
             for key in SESSION_VARS:
                 env.pop(key, None)

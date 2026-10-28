@@ -4,7 +4,8 @@ from collections.abc import Sequence
 from typing import Any
 
 from delegate.adapters.harness import classify
-from delegate.app import env, harnesses, usage
+from delegate.adapters.harness.opencode import OpenCodeHarness
+from delegate.app import env, harnesses, onboard, usage
 from delegate.app.decide import busy_jitter
 from delegate.app.fleet import mark_busy
 from delegate.contracts.routing import CallArgs, Settings
@@ -15,6 +16,8 @@ from delegate.domain.lanes.leases import LeaseBook
 from delegate.domain.lanes.profiles import LOGIN_CMD
 from delegate.domain.routing.router import Router
 from delegate.domain.time.spec import fmt_in, local, when
+
+NO_SANDBOX = "unavailable (no sandbox): opencode lanes need macOS sandbox-exec"
 
 
 def needs_input(lanes: dict[str, Lane]):
@@ -69,6 +72,8 @@ def off_reason(name: str, cfg: dict, login: tuple):
         return f"disabled: `route.py config set {flag} true` turns it on"
     if env.profile_lanes().get(name) == "declined":
         return "declined: remove it from the profile in config.json to bring it back"
+    if name in onboard.OPENCODE_LANES and not OpenCodeHarness.supported():
+        return NO_SANDBOX
     if login[0] is False:
         return f"not configured: logged out, run `{LOGIN_CMD[name]}`"
     return "not configured: `route.py doctor` says what it needs" + (f" ({login[1]})" if login[0] is None and login[1] else "")
