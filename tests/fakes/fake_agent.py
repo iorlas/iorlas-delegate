@@ -13,7 +13,7 @@ import subprocess
 import sys
 import time
 
-CHILD = "import signal,time; signal.signal(signal.SIGTERM, signal.SIG_IGN); time.sleep(300)"
+CHILD = "import signal,time; signal.signal(signal.SIGTERM, signal.SIG_IGN); print('ready', flush=True); time.sleep(300)"
 
 
 def say(**kw):
@@ -39,12 +39,13 @@ def main():
             time.sleep(0.3)
         say(**RESULT)
         return 0
-    say(**TOOL)
     if scenario == "hang":
-        signal.signal(signal.SIGTERM, signal.SIG_IGN)
+        signal.signal(signal.SIGTERM, signal.SIG_IGN)      # before the first event: the event tells the test the setup is done
     if scenario == "spawner":
-        c = subprocess.Popen([sys.executable, "-c", CHILD], start_new_session=True)
+        c = subprocess.Popen([sys.executable, "-c", CHILD], start_new_session=True, stdout=subprocess.PIPE, text=True)
+        c.stdout.readline()                                # the child ignores SIGTERM now; a SIGTERM earlier would kill it
         open(sys.argv[2], "w").write(str(c.pid))
+    say(**TOOL)
     time.sleep(300)
     return 0
 
