@@ -10,6 +10,8 @@ import sys
 import time
 from pathlib import Path
 
+from child_env import APP_NAMES, APP_PREFIXES, scrub_current
+
 from delegate.contracts import codec
 from delegate.contracts.routing import Routing, split_retired
 from delegate.contracts.stores import ConfigStore, HistoryStore, LedgerStore, StateStore
@@ -176,24 +178,15 @@ def session_host() -> str:
     return "unknown" if ep else "headless"
 
 
-# What a Claude session (the desktop app, the CLI, the Codex plugin) exports to its children. A standalone `claude` or `codex` started with
-# them misbehaves: ANTHROPIC_BASE_URL/CLAUDE_CODE_OAUTH_SCOPES make the keychain login look expired, CLAUDECODE says "nested session",
-# USE_STAGING_OAUTH switches the login server. Every child CLI delegate starts gets the environment without them.
-APP_ENV_NAMES = ("CLAUDECODE", "AI_AGENT", "API_TIMEOUT_MS", "BAGGAGE", "DISABLE_MICROCOMPACT", "DISABLE_AUTOUPDATER", "USE_LOCAL_OAUTH", "USE_STAGING_OAUTH")
-APP_ENV_PREFIXES = ("CLAUDE_", "ANTHROPIC_", "MCP_", "OTEL_", "CODEX_COMPANION_")
-CREDENTIAL_WORDS = ("TOKEN", "SECRET", "PASSW", "CREDENTIAL", "API_KEY", "APIKEY", "ACCESS_KEY", "ACCESSKEY", "PRIVATE_KEY", "PRIVATEKEY")
-CREDENTIAL_STARTS = ("AWS_", "GH_", "GITHUB_")
+# The child's environment is child_env.scrub (what a Claude session exports and credential-looking variables are removed); CLAUDE_CONFIG_DIR is kept
+# so a worker on a custom Claude login finds it. shelf lacks: an app-only scrub (keep credentials), so app_free_env uses the package's APP_* tuples.
+KEEP = ("CLAUDE_CONFIG_DIR",)
 
 
 def app_free_env() -> dict:
-    return {k: v for k, v in os.environ.items() if k not in APP_ENV_NAMES and not k.startswith(APP_ENV_PREFIXES)}
+    return {k: v for k, v in os.environ.items() if k not in APP_NAMES and not k.startswith(APP_PREFIXES)} | {k: os.environ[k] for k in KEEP if k in os.environ}
 
 
 def child_env(extra: dict | None = None) -> dict:
-    """The worker gets the caller's environment minus what a Claude session exports, delegate's and credential-looking variables (tokens, keys,
-    cloud and git credentials, the ssh agent), plus DELEGATE_DEPTH=1."""
-    out = {k: v for k, v in app_free_env().items()
-           if not k.startswith(("DELEGATE_",) + CREDENTIAL_STARTS) and k != "SSH_AUTH_SOCK" and not any(w in k.upper() for w in CREDENTIAL_WORDS)}
-    out["DELEGATE_DEPTH"] = "1"
-    out.update(extra or {})
-    return out
+    """The worker gets the caller's environment minus what a Claude session exports, delegate's and credential-looking variables, plus DELEGATE_DEPTH=1."""
+    return scrub_current(keep=KEEP) | {"DELEGATE_DEPTH": "1"} | (extra or {})

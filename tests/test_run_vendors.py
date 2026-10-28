@@ -45,6 +45,18 @@ class RunVendors(RunBase):
         self.assertNotIn("--max-budget-usd", seen)                         # a subscription has no dollar cap
         self.assertNotIn("ANTHROPIC_API_KEY", Path(os.environ["FAKE_ENV"]).read_text())
 
+    def test_a_claude_worker_still_sees_a_custom_claude_config_dir(self):
+        support.put_out("OPENAI_SUBSCRIPTION", env.now() + 3600)
+        os.environ["CLAUDE_CONFIG_DIR"] = "/custom/claude-login"
+        try:
+            code, r = self.run_it()
+        finally:
+            os.environ.pop("CLAUDE_CONFIG_DIR")
+        self.assertEqual((code, r["lane"]), (0, "CLAUDE_SUBSCRIPTION"))
+        seen = Path(os.environ["FAKE_ENV"]).read_text().splitlines()
+        self.assertIn("CLAUDE_CONFIG_DIR=/custom/claude-login", seen)
+        self.assertNotIn("CLAUDE_FOO=1", seen)
+
     def test_unattended_runs_when_no_usage_reading_exists(self):
         support.put_out("OPENAI_SUBSCRIPTION", env.now() + 3600)
         Path(self.tmp.name, ".claude", "state", "max-limits.json").unlink()      # an unattended factory: no status line, no get_usage
