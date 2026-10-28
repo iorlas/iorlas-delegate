@@ -2,6 +2,8 @@
 by the `reader` key of the lane in routing.json (READERS). Also the login cache that `status`, `next` and a run share."""
 import os
 
+from timefmt import fmt_span
+
 from delegate.adapters import statusline
 from delegate.adapters.codex_account import rate_limits as fetch_codex_limits
 from delegate.adapters.harness.claude import ClaudeHarness
@@ -10,7 +12,7 @@ from delegate.app.fleet import AuthCache
 from delegate.contracts.state import UsageCache
 from delegate.domain.cost.cycle import credit_cycle
 from delegate.domain.lanes.lane import apply_burn, window
-from delegate.domain.time.spec import WEEK_MIN, fmt_dur, local, next_weekly, to_epoch
+from delegate.domain.time.spec import WEEK_MIN, local, next_weekly, to_epoch
 
 
 def span_name(mins):
@@ -119,7 +121,7 @@ def read_claude_subscription(lane, S, st, t, ai_usage=None):
         if saved and t - saved.at <= stale:
             usage = saved.data
             src = ("manual mark (get_usage passed in)", saved.at)
-            lane.notes.append(f"usage from {fmt_dur(t - saved.at)} ago")
+            lane.notes.append(f"usage from {fmt_span(t - saved.at)} ago")
     if usage is None:
         read = statusline.read(t, stale)
         if read:

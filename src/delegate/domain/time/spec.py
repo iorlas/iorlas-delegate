@@ -6,16 +6,6 @@ DAYS = ("mon", "tue", "wed", "thu", "fri", "sat", "sun")
 UNIT_S = {"m": 60, "h": 3600, "d": 86400}
 
 
-def fmt_dur(secs: float) -> str:
-    s = int(secs)
-    if s <= 0:
-        return "now"
-    d, r = divmod(s, 86400)
-    h, r = divmod(r, 3600)
-    m = r // 60
-    return f"{d}d{h}h" if d else (f"{h}h{m:02d}m" if h else f"{m}m")
-
-
 def fmt_in(secs: float) -> str:
     """'2h 10m', '6d 21h', '45m'."""
     s = int(secs)

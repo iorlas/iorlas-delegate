@@ -9,7 +9,9 @@ from delegate.contracts.routing import Settings
 from delegate.contracts.state import Hold
 from delegate.domain.health.ledger import PairView
 from delegate.domain.holds.book import hold_text
-from delegate.domain.time.spec import fmt_dur, local
+from timefmt import fmt_span
+
+from delegate.domain.time.spec import local
 
 
 @dataclass
@@ -102,9 +104,9 @@ class Lane:
     def brief(self, t: float) -> str:
         bits = []
         if self.five is not None:
-            bits.append(f"5h {self.five:.0f}%" + (f" (resets {fmt_dur(self.five_reset - t)})" if self.five_reset and self.five_reset > t else ""))
+            bits.append(f"5h {self.five:.0f}%" + (f" (resets {fmt_span(self.five_reset - t)})" if self.five_reset and self.five_reset > t else ""))
         if self.week is not None:
-            reset = f" (resets {fmt_dur(self.week_reset - t)}, {local(self.week_reset)})" if self.week_reset and self.week_reset > t else ""
+            reset = f" (resets {fmt_span(self.week_reset - t)}, {local(self.week_reset)})" if self.week_reset and self.week_reset > t else ""
             bits.append(f"week {self.week:.0f}%" + reset + (f" pace {self.pace:+.0f}" if self.pace is not None else ""))
         if self.kind == "credit":
             bits.append(f"cycle ${self.spend:.2f} of ${self.cap or 0:.0f} cap by this tool"
