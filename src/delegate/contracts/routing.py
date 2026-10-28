@@ -138,6 +138,7 @@ class CallArgs:
     unattended: bool = False
     resume: str | None = None
     cap: float | None = None
+    engine_only: tuple[str, ...] = ()       # recipes only the engine runs: a write step needs a lane whose harness can deny them
 
 
 @record

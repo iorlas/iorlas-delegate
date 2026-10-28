@@ -30,7 +30,8 @@ def decide(role, cfg, ls, st, t, args):
     routing = env.typed_routing(cfg)
     doc = doc_of(st)
     ca = CallArgs(authored_by=args.get("authored_by"), premium=args.get("premium"),
-                  allow_degraded=bool(args.get("allow_degraded")), unattended=bool(args.get("unattended")))
+                  allow_degraded=bool(args.get("allow_degraded")), unattended=bool(args.get("unattended")),
+                  engine_only=tuple(args.get("engine_only") or ()))
     d = Router(routing, HoldBook(doc.holds), doc.prev, t).decide(role, ca, ls, wait_busy=bool(args.get("wait_busy")))
     out = d.as_dict()
     if isinstance(d, Run):

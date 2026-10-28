@@ -41,6 +41,9 @@ class WorkerEnd:
     start: str | None | Absent = ABSENT
 
 
+RECIPE_RUNNERS = ("just", "make", "mise", "npm", "yarn", "pnpm", "uv")      # the commands that take an engine-only recipe by name (one list: the Claude hook and the OpenCode rules)
+
+
 @record
 class RunRequest:
     role: str

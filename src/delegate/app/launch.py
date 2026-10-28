@@ -151,13 +151,16 @@ def prepare_opencode(d: dict, brief: str, a: env.Args, rid: str, t: float, cfg: 
     if lane == "ZAI_CODING_SUBSCRIPTION" and h["model"] not in harnesses.ZAI_MODELS:       # pin subscription routing; never substitute the pay-as-you-go `zai` provider
         return {"outcome": "setup", "say": "Z.ai Coding Plan model must use the subscription provider."}
     rules = " ".join((SECRET_RULE, GIT_RULES, EDIT_RULE, NO_SUBAGENTS_RULE, opencode_sandbox.RULE, DENIED_RULE))
+    if h["write"] and getattr(a, "engine_only", None):
+        rules += f" Only the engine runs these recipes: {', '.join(a.engine_only)}. {policy.WRITER_RULE}"
     if not any((x / "AGENTS.md").is_file() for x in decide.repo_dirs(h["cwd"])):
         rules += "\n\n" + repo_instruction_text(h["cwd"])         # opencode reads AGENTS.md itself; CLAUDE.md only through what is turned off
     if a.schema:
         rules += "\n\nYour final message must be only a JSON object matching this JSON Schema:\n" + Path(a.schema).read_text(encoding="utf-8")
     hx = OpenCodeHarness(harnesses.OC_PROFILES.get(lane, Profile()), env.config_dir())
     spec = hx.launch_spec(LaunchInputs(exe=exe, cwd=h["cwd"], model=h["model"], effort=d["effort"], prompt=rules + "\n\n" + brief, env=env.child_env(),
-                                       resume=a.resume, session=rid, write=bool(h["write"])))
+                                       resume=a.resume, session=rid, write=bool(h["write"]),
+                                       engine_only=tuple(getattr(a, "engine_only", None) or ())))
     if lane == "DEEPSEEK_FREE" and not hx.free_model_ok(h["model"], spec.env):        # fail closed if the exact free model or its zero price is gone
         hx.cleanup()
         until = t + 900

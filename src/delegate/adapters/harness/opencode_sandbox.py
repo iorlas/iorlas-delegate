@@ -10,6 +10,8 @@ from pathlib import Path
 
 from app_dirs import config_dir
 
+from delegate.contracts.wire import RECIPE_RUNNERS
+
 SECRETS = (".ssh", ".aws", ".gnupg", ".azure", ".config/gh", ".docker", ".netrc", ".git-credentials", ".codex", ".grok", ".claude", ".claude.json",
            ".local/share/opencode", "Library/Keychains")
 RULE = ("You run unattended. Every command runs in a sandbox: no network, no credential files, no writes outside this directory. If a command "
@@ -22,12 +24,25 @@ def readable_outside() -> list[str]:
     return [str(config_dir("task-loop") / "runs"), "/private/tmp", "/private/var/folders", "/tmp", "/var/folders"]
 
 
-def permissions(write: bool) -> dict:
+# OpenCode matches a bash permission pattern against the command text with `*` for any characters, the last matching rule wins, and it
+# checks every command of a pipeline or `&&` list. These are the shapes a recipe name takes after the runner: `just r`, `just -f x r`,
+# `cd x && just r`, `FOO=1 just r`, `sh -c "just r"`. Declarative deny rules for the harness to evaluate, not a parser of ours.
+LEAD = ("{runner} {recipe}", "{runner} * {recipe}")
+TRAIL = ("", " *", '"*', "'*", ";*", "&*", "|*", ")*")
+
+
+def engine_only_rules(engine_only: Sequence[str]) -> dict[str, str]:
+    """The bash deny rules for the recipes only the engine runs (`--engine-only`), after the `*` allow so that they win."""
+    return {"*" + lead.format(runner=runner, recipe=recipe) + trail: "deny" for recipe in engine_only for runner in RECIPE_RUNNERS for lead in LEAD for trail in TRAIL}
+
+
+def permissions(write: bool, engine_only: Sequence[str] = ()) -> dict:
     reads = {"*": "allow", ".env": "deny", "*.env": "deny", "*.env.*": "deny", "*.env.example": "allow", "*.env.sample": "allow", "*.env.template": "allow"}
     for x in SECRETS:
         reads[str(Path.home() / x)] = reads[str(Path.home() / x) + "/*"] = "deny"
     outside = "deny" if write else {"*": "deny", **{x + "/**": "allow" for x in readable_outside()}}
-    return {"*": "allow", "read": reads, "webfetch": "deny", "websearch": "deny", "external_directory": outside, "task": "deny", **({} if write else {"edit": "deny"})}
+    bash = {"*": "allow", **engine_only_rules(engine_only)} if write and engine_only else None       # a read-only step ignores the list
+    return {"*": "allow", **({"bash": bash} if bash else {}), "read": reads, "webfetch": "deny", "websearch": "deny", "external_directory": outside, "task": "deny", **({} if write else {"edit": "deny"})}
 
 
 def cache_env(cache: Path) -> dict[str, str]:

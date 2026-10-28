@@ -1,6 +1,7 @@
 """What a worker's shell command may do (D3): git is the coordinator's, and a read-only step only reads. Pure functions of the command text."""
 import shlex
 
+from delegate.contracts.wire import RECIPE_RUNNERS
 from delegate.domain.policy.matchers import name_of, pieces, unwrap, writes_or_substitutes
 
 # A read-only Claude step (reviewer, planner, light) gets Bash for reading only: every piece of the command line must start with one of
@@ -81,15 +82,24 @@ def read_only_problem(cmd: str) -> str | None:
 
 KILLERS = {"kill", "killall", "p" + "kill"}       # spelled apart: the no-process-lister rule scans the source for the name
 OWN_PIDS = ("$!", "%")
-RUNNERS = {"just", "make", "mise", "npm", "yarn", "pnpm", "uv"}
+RUNNERS = set(RECIPE_RUNNERS)
 WRITER_RULE = ("a write step may not kill processes or run the engine's checks: the engine owns the editor, the servers and the slow suites it "
                "started, so a kill can take down its run. Do not run them; finish and report, the engine reruns the check.")
+
+
+def after_assignments(t: list[str]) -> list[str]:
+    """The words of a command line after its leading `NAME=value` assignments (`FOO=1 just recipe`)."""
+    n = next((i for i, x in enumerate(t) if not (x.partition("=")[1] and x.partition("=")[0].isidentifier())), len(t))
+    return t[n:]
 
 
 def writer_problem(cmd: str, engine_only: tuple[str, ...] = ()) -> str | None:
     """Why a write step may not run `cmd`, else None: the kill family (on anything but the step's own `$!` or `%job`), or a recipe the
     brief says only the engine runs (`just <recipe>`, `make <recipe>` and kin)."""
-    for t in pieces(cmd) or []:
+    for words in pieces(cmd) or []:
+        t = after_assignments(words)
+        if not t:
+            continue
         name = name_of(t[0])
         args = [x for x in t[1:] if not x.startswith("-")]
         if name in KILLERS and not (name == "kill" and args and all(x.startswith(OWN_PIDS) for x in args)):
