@@ -12,7 +12,8 @@
     "event": "Cmd",
     "id": "c1",
     "text": "ls",
-    "cwd": null
+    "cwd": null,
+    "prov": false
    }
   ],
   [],

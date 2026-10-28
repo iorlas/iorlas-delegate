@@ -152,7 +152,7 @@ class LiveSink:
             return
         match e:
             case ev.Cmd():
-                self.begin(e.id, True, e.text, e.cwd)
+                self.begin(e.id, True, e.text, e.cwd, prov=e.prov)
             case ev.CmdEnd():
                 self.finish(e.id, True, e.text, e.exit, e.out, e.secs)
             case ev.Tool():

@@ -16,6 +16,7 @@ class Cmd:
     id: str | None
     text: str
     cwd: str | None = None
+    prov: bool = False              # provisional: derived from a log line before the harness reported the call (closed by the next CmdEnd of its id)
 
 
 @record
@@ -101,6 +102,7 @@ class RateLimit:
 class Denied:
     tool: str
     input: dict[str, Any]
+    kind: str = "policy"            # "policy" (a reviewer or classifier refused: the owner decides) or "sandbox_limit" (the sandbox blocked a system resource: noise)
 
 
 @record

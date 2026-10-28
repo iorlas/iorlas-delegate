@@ -1,0 +1,5 @@
+INFO  2026-10-27T10:00:00 +1ms service=default creating instance
+INFO  2026-10-27T10:00:01 +3ms service=permission evaluated permission=bash pattern="sleep 6" action=allow
+INFO  2026-10-27T10:00:01 +1ms service=permission evaluated permission=bash pattern="echo done" action=allow
+INFO  2026-10-27T10:00:02 +1ms service=permission evaluated permission=external_directory pattern="/tmp/*" action=allow
+INFO  2026-10-27T10:00:03 +1ms service=permission evaluated permission=read pattern="a.py" action=allow

@@ -1,0 +1,8 @@
+{"type": "step_start", "sessionID": "ses_1", "part": {}}
+{"type": "tool_use", "sessionID": "ses_1", "part": {"callID": "o1", "tool": "bash", "state": {"status": "completed", "input": {"command": "sleep 6; echo done"}, "output": "done", "metadata": {"exit": 0}, "time": {"start": 1000, "end": 7000}}}}
+{"type": "tool_use", "sessionID": "ses_1", "part": {"callID": "o2", "tool": "read", "state": {"status": "completed", "input": {"filePath": "a.py"}, "output": "x", "time": {"start": 1, "end": 501}}}}
+{"type": "tool_use", "sessionID": "ses_1", "part": {"callID": "o3", "tool": "bash", "state": {"status": "completed", "input": {"command": "cat ~/.ssh/id_rsa"}, "output": "cat: Operation not permitted", "metadata": {"exit": 1}}}}
+{"type": "tool_use", "sessionID": "ses_1", "part": {"callID": "o4", "tool": "edit", "state": {"status": "error", "input": {"filePath": "b.py"}, "error": "The user rejected: prevents you from using this specific tool call"}}}
+{"type": "step_finish", "sessionID": "ses_1", "part": {"reason": "tool-calls", "cost": 0.01, "tokens": {"input": 10, "output": 1}}}
+{"type": "text", "sessionID": "ses_1", "part": {"text": "opencode answer"}}
+{"type": "step_finish", "sessionID": "ses_1", "part": {"reason": "stop", "cost": 0.02, "tokens": {"input": 20, "output": 4, "reasoning": 1, "cache": {"read": 5, "write": 3}}}}
