@@ -18,7 +18,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 TESTS = ROOT / "tests"
 CONTRACT_MODULES = ("test_own_contract", "test_kill_tree")      # real processes and signals: never in a unit shard
-WEIGHT = {"test_run_command.RunCommand": 4.0, "test_state_records.WatchdogProc": 3.0, "test_route": 1.0, "test_stream_supervisor": 6.0, "test_live_events": 1.0, "test_status_cheap": 3.0}
+WEIGHT = {"test_run_command.RunCommand": 4.0, "test_run_vendors.RunVendors": 4.0, "test_run_stops.RunStops": 4.0, "test_run_opencode.RunOpenCode": 4.0, "test_state_records.WatchdogProc": 3.0, "test_route": 1.0, "test_stream_supervisor": 6.0, "test_live_events": 1.0, "test_status_cheap": 3.0}
 DEFAULT_WEIGHT = 0.5
 BIG, CHUNK = 20, 8
 
