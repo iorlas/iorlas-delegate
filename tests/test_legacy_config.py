@@ -7,8 +7,9 @@ import sys
 import unittest
 from pathlib import Path
 
-import test_run_command as T
+import run_support as T
 from test_route import route
+from delegate.app import env
 from delegate.contracts.routing import RETIRED_SETTINGS, split_retired
 
 FIXTURE = Path(__file__).parent / "fixtures" / "config_pre_0_45.json"
@@ -17,8 +18,8 @@ ROUTE_PY = Path(route.__file__)
 
 @unittest.skipIf(os.name == "nt", "fake codex/claude are shell scripts")
 class LegacyConfig(unittest.TestCase):
-    FAKE_CODEX, FAKE_CLAUDE = T.RunCommand.FAKE_CODEX, T.RunCommand.FAKE_CLAUDE
-    setUp, tearDown, fresh_usage = T.RunCommand.setUp, T.RunCommand.tearDown, T.RunCommand.fresh_usage
+    FAKE_CODEX, FAKE_CLAUDE = T.RunBase.FAKE_CODEX, T.RunBase.FAKE_CLAUDE
+    setUp, tearDown, fresh_usage = T.RunBase.setUp, T.RunBase.tearDown, T.RunBase.fresh_usage
 
     def put_config(self, extra=None):
         cfg = json.loads(FIXTURE.read_text(encoding="utf-8"))
@@ -47,7 +48,7 @@ class LegacyConfig(unittest.TestCase):
 
     def test_overrides_of_the_old_config_still_apply(self):
         self.put_config()
-        cfg = route.load_routing()
+        cfg = env.load_routing()
         self.assertEqual((cfg["settings"]["max_parallel"], cfg["settings"]["strain"]["five_hour"]), (3, 85))
         self.assertNotIn("codex_weekly_used_override", cfg["settings"])
 
