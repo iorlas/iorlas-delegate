@@ -1,17 +1,22 @@
 """The size caps (88 section 4): a file has at most 400 lines of code (800 for a test file), a function at most 80. KNOWN_OVERSIZE names what is over
 today and may only shrink: a file or function that is not in the table and is over fails, and an entry that is no longer over fails too."""
-import hermetic  # noqa: F401  (a home of its own for every test)
 import ast
+import json
 import re
 import subprocess
 import sys
+import tomllib
 import unittest
 from pathlib import Path
+
+import hermetic  # noqa: F401  (a home of its own for every test)
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "dev"))
 import vendor  # noqa: E402
-import delegate  # noqa: E402,F401  (puts the vendored packages on sys.path)
+
+import delegate  # noqa: E402  (puts the vendored packages on sys.path)
+
 EXEMPT_DIRS = ("skills/delegate/_vendor",)      # the one place the caps skip: the vendored shelf copy, byte-identical to its tag (dev/vendor.py)
 FILE_CAP, TEST_FILE_CAP, FUNCTION_CAP = 400, 800, 80
 KNOWN_OVERSIZE: dict[str, int] = {}          # "path" or "path:function" -> the size it may not grow past; delete the line when it is fixed
@@ -109,6 +114,43 @@ class VendorGuard(unittest.TestCase):
             self.skipTest("no shelf checkout (SHELF_HOME)")
         r = subprocess.run([sys.executable, str(ROOT / "dev" / "vendor.py"), "check", "--shelf", str(shelf)], capture_output=True, text=True)
         self.assertEqual(r.returncode, 0, r.stderr)
+
+
+RATCHET = ROOT / "tests" / "rules_ratchet.json"
+
+
+def shrink_problems(actual, known, label):
+    """An entry in `actual` that is absent from `known` or bigger fails; a `known` entry no longer in `actual` must be deleted."""
+    out = [f"{label}: {k} = {v} is not allowed (recorded {known.get(k)})" for k, v in sorted(actual.items()) if v > known.get(k, 0)]
+    out += [f'{label}: {k} is fixed; delete it from tests/rules_ratchet.json' for k in sorted(set(known) - set(actual))]
+    return out
+
+
+class Gate(unittest.TestCase):
+    """The ratchets behind `just check`: the pyrefly baseline and the ruff ignores may only shrink; src/ gets no new baseline entry."""
+
+    def setUp(self):
+        self.known = json.loads(RATCHET.read_text(encoding="utf-8"))
+
+    def baseline(self):
+        return json.loads((ROOT / "pyrefly-baseline.json").read_text(encoding="utf-8"))["errors"]
+
+    def test_the_pyrefly_baseline_error_count_may_only_shrink(self):
+        count, recorded = len(self.baseline()), self.known["pyrefly_baseline_errors"]
+        self.assertLessEqual(count, recorded, "the baseline grew: fix the new errors instead")
+        self.assertEqual(count, recorded, f"the baseline shrank: lower pyrefly_baseline_errors in tests/rules_ratchet.json to {count}")
+
+    def test_no_file_under_src_joins_the_pyrefly_baseline(self):
+        actual = {}
+        for e in self.baseline():
+            if e["path"].startswith("src/"):
+                actual[e["path"]] = actual.get(e["path"], 0) + 1
+        self.assertEqual(shrink_problems(actual, self.known["pyrefly_baseline_src"], "pyrefly baseline (src is strict)"), [])
+
+    def test_the_ruff_ignores_may_only_shrink(self):
+        table = tomllib.loads((ROOT / "ruff.toml").read_text(encoding="utf-8"))["lint"]["per-file-ignores"]
+        actual = {f"{g}::{c}": 1 for g, codes in table.items() for c in codes}
+        self.assertEqual(shrink_problems(actual, self.known["ruff_baseline"], "ruff baseline"), [])
 
 
 if __name__ == "__main__":

@@ -1,0 +1,22 @@
+# Type checking. `just check` runs `pyrefly check`; the baseline may only shrink (tests/test_rules.py).
+python-version = "3.12"
+project-includes = ["src", "skills", "tests", "dev"]
+# Flat sibling imports resolve through these; skills/delegate/_vendor holds byte-identical shelf copies (dev/vendor.py), never edited.
+search-path = ["src", "skills/delegate", "skills/delegate/_vendor", "tests", "dev"]
+project-excludes = ["skills/delegate/_vendor/**", "**/__pycache__/**", "tests/fixtures/**"]
+check-unannotated-defs = true
+# Off: pyrefly matches .gitignore against absolute paths, so under a worktree it would match no file and pass.
+use-ignore-files = false
+baseline = "pyrefly-baseline.json"
+
+# New code is strict from its first commit; only the old files carry the baseline. A sub-config cannot take `preset`, so the
+# kinds the strict preset adds are spelled out.
+[[sub-config]]
+matches = "src/**"
+[sub-config.errors]
+implicit-any-parameter = "error"
+implicit-any-empty-container = "error"
+implicit-any-lambda = "error"
+implicit-any-attribute = "error"
+missing-override-decorator = "error"
+method-assign = "error"

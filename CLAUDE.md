@@ -87,3 +87,6 @@ Read `docs/dev/integrations.md`: other tools (the iorlas-task-loop dashboard) re
 
 - Python 3.12+, standard library only; macOS, Linux (also in containers), POSIX only.
 - Bump `.claude-plugin/plugin.json` and the iorlas-marketplace entry on every release.
+- Before every release (bump, push, tag) run `just release-check` (= `just check-all`: ruff + pyrefly + the rules test + the whole
+  unittest suite; tools pinned in `mise.toml`, `mise install`). Red means no release. `just check` is the seconds-long gate; the
+  pyrefly baseline, the ruff ignores and the src/ table in `tests/rules_ratchet.json` may only shrink, and src/ takes no new baseline entry.
