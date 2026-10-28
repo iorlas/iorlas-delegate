@@ -1,14 +1,16 @@
 """Per-call usage and cost accounting (delegate-uk0, study 85)."""
-import hermetic  # noqa: F401  (a home of its own for every test)
 import json
 import os
 import tempfile
 import unittest
 from pathlib import Path
+
+import hermetic  # noqa: F401  (a home of its own for every test)
 from test_route import route
-from delegate.domain.cost import accounting as usage
-from delegate.adapters.harness import claude
+
 from delegate.adapters import codex_account
+from delegate.adapters.harness import claude
+from delegate.domain.cost import accounting as usage
 
 # Two consecutive real Codex rollout token_count totals of one thread (2026-10-20, a resumed thread): the second is cumulative, not the second call's own.
 CALL1 = {"input_tokens": 14742, "cached_input_tokens": 12288, "cache_write_input_tokens": 0, "output_tokens": 63, "reasoning_output_tokens": 0, "total_tokens": 14805}

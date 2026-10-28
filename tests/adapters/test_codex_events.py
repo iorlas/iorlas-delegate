@@ -1,6 +1,5 @@
 """CodexHarness: golden event streams (real `codex exec --json` lines from the delegate fixtures) -> HarnessEvents + Evidence -> live lines.
 Regenerate a golden with `python3 tests/adapters/test_codex_events.py --regen` after reading the diff."""
-import hermetic  # noqa: F401  (a home of its own for every test)
 import dataclasses
 import itertools
 import json
@@ -12,12 +11,14 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
+import hermetic  # noqa: F401  (a home of its own for every test)
+
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE.parent.parent / "src"))
-from delegate.adapters.harness.base import LaunchInputs         # noqa: E402
-from delegate.adapters.harness.codex import CodexHarness         # noqa: E402
-from delegate.app.publish import LiveSink                        # noqa: E402
-from delegate.contracts import events as ev                      # noqa: E402
+from delegate.adapters.harness.base import LaunchInputs  # noqa: E402
+from delegate.adapters.harness.codex import CodexHarness  # noqa: E402
+from delegate.app.publish import LiveSink  # noqa: E402
+from delegate.contracts import events as ev  # noqa: E402
 
 GOLDEN = HERE / "golden"
 NAMES = sorted(p.name[len("codex_"):-len(".jsonl")] for p in GOLDEN.glob("codex_*.jsonl"))

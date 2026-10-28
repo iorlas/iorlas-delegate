@@ -1,6 +1,5 @@
 """HealthLedger: the fold, the breaker, the canary and the 24 Oct / 22 Oct incident replays (golden/health_replay.json, taken from the
 pre-D2 fold: every row's admit/refuse decision must be the same). Run: python -m unittest discover -s tests"""
-import hermetic  # noqa: F401  (a home of its own for every test)
 import json
 import sys
 import tempfile
@@ -8,15 +7,16 @@ import unittest
 from dataclasses import replace
 from pathlib import Path
 
+import hermetic  # noqa: F401  (a home of its own for every test)
+
 ROOT = Path(__file__).resolve().parent.parent.parent
 sys.path.insert(0, str(ROOT / "src"))
-from delegate.contracts import codec                                                        # noqa: E402
-from delegate.contracts.history import HealthState, RefusalRow, ReleaseRow, RunRow          # noqa: E402
-from delegate.contracts.routing import BreakerPolicy                                        # noqa: E402
-from delegate.contracts.stores import CheckpointStore, HistoryStore                         # noqa: E402
-from delegate.domain.health.ledger import STATES, HealthLedger, combine, failure_fields, stale_usage   # noqa: E402
-from delegate.domain.health.matchers import fingerprint                                     # noqa: E402
-from delegate.cli import verbs
+from delegate.contracts import codec  # noqa: E402
+from delegate.contracts.history import HealthState, RefusalRow, ReleaseRow, RunRow  # noqa: E402
+from delegate.contracts.routing import BreakerPolicy  # noqa: E402
+from delegate.contracts.stores import CheckpointStore, HistoryStore  # noqa: E402
+from delegate.domain.health.ledger import STATES, HealthLedger, combine, failure_fields, stale_usage  # noqa: E402
+from delegate.domain.health.matchers import fingerprint  # noqa: E402
 
 POL = BreakerPolicy()
 LEDGER = HealthLedger(POL)

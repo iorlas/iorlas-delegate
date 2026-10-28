@@ -1,5 +1,4 @@
 """config.json `profile` (the owner's lane choices) never leaks into the routing settings."""
-import hermetic  # noqa: F401  (a home of its own for every test)
 import json
 import os
 import sys
@@ -8,12 +7,14 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
+import hermetic  # noqa: F401  (a home of its own for every test)
+
 ROOT = Path(__file__).resolve().parent.parent.parent
 sys.path.insert(0, str(ROOT / "src"))
 sys.path.insert(0, str(ROOT / "skills" / "delegate"))
-import route  # noqa: E402
-from delegate.contracts.stores import ConfigStore  # noqa: E402
+
 from delegate.app import env
+from delegate.contracts.stores import ConfigStore
 
 
 class ProfileStaysOut(unittest.TestCase):

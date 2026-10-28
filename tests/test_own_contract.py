@@ -1,6 +1,5 @@
 """delegate-own, the contract set: REAL processes and signals (a fake agent CLI, no model). The worker is dead when the delegate call ends, and a
 survivor is named. Run with `python dev/suite.py --contract`; the unit shards never start these."""
-import hermetic          # noqa: F401
 import json
 import os
 import signal
@@ -11,18 +10,20 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
-from test_route import route, ROOT
+import hermetic  # noqa: F401
+from test_route import ROOT
 
 sys.path.insert(0, str(ROOT / "skills" / "delegate"))
-from delegate.adapters import procs    # noqa: E402
-import stream_proc    # noqa: E402
-from stream_proc import alive, proc_start, procfs    # noqa: E402
-from delegate.adapters.harness.base import LaunchSpec    # noqa: E402
-from delegate.adapters.harness.codex import CodexHarness    # noqa: E402
-from delegate.app import watch    # noqa: E402
-from delegate.app.publish import LiveSink    # noqa: E402
-from delegate.app.supervisor import RunHooks, Supervisor    # noqa: E402
-from delegate.contracts import codec, wire    # noqa: E402
+import stream_proc
+from stream_proc import alive, procfs
+
+from delegate.adapters import procs
+from delegate.adapters.harness.base import LaunchSpec
+from delegate.adapters.harness.codex import CodexHarness
+from delegate.app import watch
+from delegate.app.publish import LiveSink
+from delegate.app.supervisor import RunHooks, Supervisor
+from delegate.contracts import codec, wire
 
 FAKE = str(Path(__file__).resolve().parent / "fakes" / "fake_agent.py")
 

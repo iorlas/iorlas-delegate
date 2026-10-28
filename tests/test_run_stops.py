@@ -1,27 +1,23 @@
 """`route.py run` stops: network drops, canary and bench, schema re-ask, the answer's stop facts and contract."""
-import hermetic  # noqa: F401  (a home of its own for every test)
 import json
 import os
 import subprocess
 import sys
 import time
-from unittest import mock
 from pathlib import Path
-from test_route import route, CFG, at, why
+from unittest import mock
+
+import hermetic  # noqa: F401  (a home of its own for every test)
 import routing_support as support
-from delegate.adapters.harness import reset_parse
-from delegate.app import env
-from delegate.app import usage
-from delegate.app import answer
-from delegate.app import launch
-from delegate.app import decide as dec
-from delegate.contracts import stops
-from delegate.contracts import history as hist
-from delegate.domain.health import ledger as health_ledger
-from delegate.app import net
-from delegate.app import watch
-from delegate.app import decide as dec
 from run_support import RunBase
+from test_route import CFG, at, route, why
+
+from delegate.adapters.harness import reset_parse
+from delegate.app import answer, env, launch, net, usage, watch
+from delegate.app import decide as dec
+from delegate.contracts import history as hist
+from delegate.contracts import stops
+from delegate.domain.health import ledger as health_ledger
 
 
 class RunStops(RunBase):

@@ -1,5 +1,4 @@
 """An install from before 0.48 (CLAUDE_CREDIT lane, codex_login_pid) must upgrade with no hand edits. Run: python -m unittest discover -s tests"""
-import hermetic  # noqa: F401  (a home of its own for every test)
 import contextlib
 import io
 import json
@@ -10,8 +9,10 @@ import sys
 import unittest
 from pathlib import Path
 
+import hermetic  # noqa: F401  (a home of its own for every test)
 import run_support as T
 from test_route import route
+
 from delegate.app import doctor, env
 from delegate.contracts.stores import StateStore
 

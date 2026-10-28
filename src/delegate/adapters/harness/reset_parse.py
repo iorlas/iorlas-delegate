@@ -26,7 +26,7 @@ def parse_reset(msg, t):
         at = ok(t + float(m.group(1))) if m.group(1) else None
         if m.group(2):
             with contextlib.suppress(TypeError, ValueError):
-                at = ok(dt.datetime.strptime(m.group(2), "%a, %d %b %Y %H:%M:%S GMT").replace(tzinfo=dt.timezone.utc).timestamp())
+                at = ok(dt.datetime.strptime(m.group(2), "%a, %d %b %Y %H:%M:%S GMT").replace(tzinfo=dt.UTC).timestamp())
         if at:
             return at, None
     m = RESET_AT_RE.search(msg)
@@ -40,7 +40,7 @@ def parse_reset(msg, t):
                 if at:
                     return at, "local " + (time.tzname[time.localtime(at).tm_isdst > 0] or "")
             else:
-                off = dt.timezone.utc if z in ("Z", "UTC") else dt.timezone(dt.timedelta(hours=int(z[:3]), minutes=int(z[0] + z[-2:])))
+                off = dt.UTC if z in ("Z", "UTC") else dt.timezone(dt.timedelta(hours=int(z[:3]), minutes=int(z[0] + z[-2:])))
                 at = ok(naive.replace(tzinfo=off).timestamp())
                 if at:
                     return at, "UTC" if z in ("Z", "UTC") else z

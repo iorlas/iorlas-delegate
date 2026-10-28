@@ -1,6 +1,5 @@
 """contracts: the codec, the goldens (one answer per status, captured from route.py's output before the typed contract existed), the generated
 answer_schema, the live-file records. Goldens round-trip byte for byte up to key order."""
-import hermetic  # noqa: F401  (a home of its own for every test)
 import importlib.util
 import io
 import json
@@ -8,13 +7,13 @@ import sys
 import unittest
 from contextlib import redirect_stdout
 from pathlib import Path
-from unittest import mock
+
+import hermetic  # noqa: F401  (a home of its own for every test)
 
 ROOT = Path(__file__).resolve().parent.parent.parent
 sys.path.insert(0, str(ROOT / "tests"))
-from test_route import route                       # noqa: E402  (loads route.py and puts src/ on sys.path)
-from delegate.contracts import codec, live, schema, wire   # noqa: E402
 from delegate.app import answer
+from delegate.contracts import codec, live, schema, wire
 from delegate.domain.time import spec
 
 GOLDEN = sorted((Path(__file__).resolve().parent / "golden").glob("*.json"))

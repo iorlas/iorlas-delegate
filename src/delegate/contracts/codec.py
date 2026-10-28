@@ -114,7 +114,7 @@ def from_json[T](cls: type[T], data: Any) -> T:
 
 def table_of(*classes: type) -> dict[str, type]:
     """{KIND: class} of a union's members."""
-    out = {getattr(c, "KIND"): c for c in classes}
+    out = {c.KIND: c for c in classes}
     if len(out) != len(classes):
         raise ValueError("two members of one union share a KIND")
     return out

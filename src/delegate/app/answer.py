@@ -5,6 +5,7 @@ import json
 from delegate.contracts import codec, stops, wire
 from delegate.domain.cost import accounting
 
+
 def schema_problem(data, schema, at="$"):
     """None when `data` fits the JSON schema subset delegate checks (type, required, properties, items, enum), else what is wrong."""
     if not isinstance(schema, dict):
@@ -67,6 +68,6 @@ def emit(r, interactive):
     The answer passes through RunResult first: a key or a type the contract does not know is a bug here, never an answer."""
     r = codec.to_json(codec.from_json(wire.RunResult, r))
     if interactive:
-        r = {k: v for k, v in r.items() if k in ("contract", "stop") or v not in (None, "", [], 0) and k not in ("context", "usage", "transcript_info", "transcript_status")}     # these are for scripts
+        r = {k: v for k, v in r.items() if k in ("contract", "stop") or (v not in (None, "", [], 0) and k not in ("context", "usage", "transcript_info", "transcript_status"))}     # these are for scripts
     print(json.dumps(r))
     return 0        # exit 0 whenever the object was printed; non-zero only if route.py itself crashed

@@ -1,27 +1,23 @@
 """`route.py run` per vendor CLI: what codex and claude are launched with, their tokens, denials, environment and instruction files."""
-import hermetic  # noqa: F401  (a home of its own for every test)
 import json
 import os
 import sys
 import time
-from unittest import mock
 from pathlib import Path
-from test_route import route, _call, at, why
-from delegate.domain.policy.worker import is_policy_denial
+from unittest import mock
+
+import hermetic  # noqa: F401  (a home of its own for every test)
 import routing_support as support
 import stream_proc
-from stream_proc import alive, proc_start
-from delegate.adapters import procs
-from delegate.app import env
-from delegate.app import answer
-from delegate.app import launch
-from delegate.app import decide as dec
-from delegate.domain.policy import worker
-from delegate.contracts import stops
-from delegate.app import net
-from delegate.app import watch
-from delegate.app import decide as dec
 from run_support import RunBase
+from stream_proc import proc_start
+from test_route import _call, at, route, why
+
+from delegate.app import answer, env, launch, net, watch
+from delegate.app import decide as dec
+from delegate.contracts import stops
+from delegate.domain.policy import worker
+from delegate.domain.policy.worker import is_policy_denial
 
 
 class RunVendors(RunBase):

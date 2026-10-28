@@ -1,5 +1,4 @@
 """ClaudeHarness: golden `claude -p --output-format stream-json` streams -> HarnessEvents + Evidence + Summary, its argv and its login probe."""
-import hermetic  # noqa: F401  (a home of its own for every test)
 import json
 import os
 import stat
@@ -9,11 +8,13 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
+import hermetic  # noqa: F401  (a home of its own for every test)
+
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE.parent.parent / "src"))
-from delegate.adapters.harness.base import LaunchInputs      # noqa: E402
-from delegate.adapters.harness.claude import ClaudeHarness, stream_usage, tokens_of      # noqa: E402
-from delegate.contracts import events as ev                 # noqa: E402
+from delegate.adapters.harness.base import LaunchInputs  # noqa: E402
+from delegate.adapters.harness.claude import ClaudeHarness, stream_usage, tokens_of  # noqa: E402
+from delegate.contracts import events as ev  # noqa: E402
 
 
 def stream(name):

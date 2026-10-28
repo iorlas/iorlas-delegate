@@ -1,6 +1,5 @@
 """route.py status --json --cheap prints exactly the bytes in tests/fixtures/status_cheap.golden.json for the fixture config dir (state, snapshot, hold, logins).
 Runs the real launcher in a subprocess from a copy of the plugin tree, as the installed copy runs it."""
-import hermetic  # noqa: F401  (a home of its own for every test)
 import os
 import shutil
 import subprocess
@@ -8,6 +7,8 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+
+import hermetic  # noqa: F401  (a home of its own for every test)
 
 ROOT = Path(__file__).resolve().parent.parent
 FIX = ROOT / "tests" / "fixtures"

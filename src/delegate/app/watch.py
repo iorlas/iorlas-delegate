@@ -55,7 +55,7 @@ class Turn:
     def apply(self, events):
         """One parsed line (its HarnessEvents): a turn end or a final message finishes the turn, a tool in flight keeps the long silence limit,
         anything else means the turn goes on."""
-        if any(isinstance(e, ev.TurnDone) or isinstance(e, ev.Msg) and e.final for e in events):
+        if any(isinstance(e, ev.TurnDone) or (isinstance(e, ev.Msg) and e.final) for e in events):
             self.finished()
         else:
             self.more()

@@ -1,5 +1,4 @@
 """The lane cockpit: one row per known lane, an emoji for each state, a plain reason, the unlock time, usage windows with their source."""
-import hermetic  # noqa: F401  (a home of its own for every test)
 import copy
 import io
 import json
@@ -9,21 +8,16 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
-from types import SimpleNamespace
 from unittest.mock import patch
+
+import hermetic  # noqa: F401  (a home of its own for every test)
 import routing_support as support
-from test_route import route, CFG, lanes, T
-from delegate.app import onboard
-from delegate.app import env
-from delegate.app import usage
-from delegate.app import cockpit
-from delegate.app import harnesses
-from delegate.domain.time import spec
-from delegate.contracts import history as hist
-from delegate.domain.lanes.lane import Lane
-from delegate.contracts.stores import locked
-from delegate.app import status
+from test_route import CFG, T, route
+
 from delegate.adapters.harness.opencode import OpenCodeHarness
+from delegate.app import cockpit, env, harnesses, onboard, status, usage
+from delegate.domain.lanes.lane import Lane
+from delegate.domain.time import spec
 
 HOUR = 3600
 
@@ -211,7 +205,7 @@ class Command(unittest.TestCase):
         cfg = cfg_all()
         with tempfile.TemporaryDirectory() as d, patch.dict(os.environ, {"DELEGATE_CONFIG_DIR": d, "CLAUDE_CODE_ENTRYPOINT": "cli"}):
             (Path(d) / "state.json").write_text(json.dumps({"v": 1, **(state or {})}))
-            ready = ready or {n: True for n in cfg["lanes"]}
+            ready = ready or dict.fromkeys(cfg["lanes"], True)
             noread = {k: (lambda lane_, S, st_, t, *a: None) for k in usage.READERS}
             logins = {"OPENAI_SUBSCRIPTION": (False, "Not logged in"), "GROK_SUBSCRIPTION": (True, "ok")}
             out, sys.stdout = sys.stdout, io.StringIO()

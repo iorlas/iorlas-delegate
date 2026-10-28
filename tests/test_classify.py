@@ -1,30 +1,28 @@
 """The outcome ladder (adapters/harness/classify.py) and contract.json, replayed on fixtures taken from real runs (tests/contract/fixtures)."""
-import hermetic  # noqa: F401  (a home of its own for every test)
 import argparse
 import json
+import shutil
+import sys
 import tempfile
 import unittest
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
-from test_route import route, ROOT, T
-from delegate.domain.policy.worker import denial, denial_item
-from delegate.adapters.harness.opencode import OpenCodeHarness
-from delegate.app.supervisor import RunHooks
-from fakes.fake_run import replay as replay_run
-from delegate.app import env
-from delegate.app import answer
-from delegate.app import launch
-from delegate.adapters.harness import classify
-from delegate.contracts import stops
-import sys
-from delegate.domain.lanes import profiles
-from delegate.cli import verbs
-from delegate.app import decide as dec
-import shutil
-from delegate.adapters import agent_runs
-from delegate.adapters import codex_account
 
+import hermetic  # noqa: F401  (a home of its own for every test)
+from fakes.fake_run import replay as replay_run
+from test_route import ROOT, T, route
+
+from delegate.adapters import agent_runs, codex_account
+from delegate.adapters.harness import classify
+from delegate.adapters.harness.opencode import OpenCodeHarness
+from delegate.app import answer, env, launch
+from delegate.app import decide as dec
+from delegate.app.supervisor import RunHooks
+from delegate.cli import verbs
+from delegate.contracts import stops
+from delegate.domain.lanes import profiles
+from delegate.domain.policy.worker import denial, denial_item
 
 FIXTURES = sorted((ROOT / "tests" / "contract" / "fixtures").glob("*.json"))
 CONTRACT = json.loads((ROOT / "skills" / "delegate" / "contract.json").read_text(encoding="utf-8"))
@@ -146,7 +144,7 @@ class Stop(unittest.TestCase):
         self.assertEqual(len(f["rows"]), 53)
         for row in f["rows"]:
             self.assertEqual(stop_tuple(self.answer(replay(row, f), "OPENAI_SUBSCRIPTION")), ("bad_request", "caller", "needs_owner", "none"), row["id"])
-        self.assertIsNone((env.load_state().out or None))            # not one of them marks the lane
+        self.assertIsNone(env.load_state().out or None)            # not one of them marks the lane
 
     def test_golden_the_grok_batch_is_a_lane_out_with_no_time_and_marks_the_lane_once_for_all(self):
         f = load(ROOT / "tests" / "contract" / "fixtures" / "grok_spending_limit_24oct.json")
@@ -163,7 +161,7 @@ class Stop(unittest.TestCase):
         tuples = [stop_tuple(self.answer(o, "OPENAI_SUBSCRIPTION")) if (o := replay(row, f)) else None for row in f["rows"]]
         self.assertEqual(tuples.count(("bad_request", "caller", "needs_owner", "none")), 53)
         self.assertEqual(tuples.count(None), 268 - 53)
-        self.assertIsNone((env.load_state().out or None))
+        self.assertIsNone(env.load_state().out or None)
 
     def test_credit_exhausted_marks_the_lane_with_no_retry_time(self):
         row = load(ROOT / "tests" / "contract" / "fixtures" / "grok_spending_limit_24oct.json")["rows"][0]
@@ -186,7 +184,7 @@ class Stop(unittest.TestCase):
             launch.settler().apply(res, classify.Outcome(reason, "signal 15" if reason == "killed" else "ENOTFOUND", "exit"), {"lane": "OPENAI_SUBSCRIPTION"}, T, "cli", SimpleNamespace(timeout=30), 1, "")
             r = answer.result(res.pop("outcome"), **res)
             self.assertEqual((r["stop"]["reason"], r["stop"]["resumable"], r["stop"]["partial"], r["stop"]["ref"]), (reason, True, True, "thread-1"))
-        self.assertIsNone((env.load_state().out or None))
+        self.assertIsNone(env.load_state().out or None)
 
     def test_an_unknown_reason_still_gets_a_row_of_closed_facts(self):
         s = stops.stop_facts("some_new_reason")

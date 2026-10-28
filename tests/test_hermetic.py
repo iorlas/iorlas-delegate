@@ -1,8 +1,9 @@
 """The suite never reads the machine it runs on: a test's home, config dir and temp dir are its own, and the real agent folders are shut."""
-import hermetic          # noqa: F401
 import os
 import unittest
 from pathlib import Path
+
+import hermetic
 
 
 class Hermetic(unittest.TestCase):

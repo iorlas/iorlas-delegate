@@ -1,22 +1,20 @@
 """status --cheap: zero process spawns, last snapshot plus cached logins with age_s; next reads the login cache instead of spawning."""
-import hermetic  # noqa: F401  (a home of its own for every test)
 import contextlib
 import io
 import json
 import os
+import shutil
 import subprocess
 import tempfile
 import unittest
 from unittest import mock
 
-from delegate.adapters import procs
+import hermetic  # noqa: F401  (a home of its own for every test)
 import routing_support as support
-from test_route import route, T
-from delegate.app import env
-from delegate.app import usage
-from delegate.app import status
-from delegate.app import harnesses
-import shutil
+from test_route import route
+
+from delegate.adapters import procs
+from delegate.app import env, harnesses, status, usage
 
 
 def boom(*a, **k):

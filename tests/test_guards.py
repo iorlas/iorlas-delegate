@@ -1,5 +1,4 @@
 """The secret guard and git ownership. Run: python -m unittest discover -s tests"""
-import hermetic  # noqa: F401  (a home of its own for every test)
 import json
 import os
 import subprocess
@@ -7,13 +6,16 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
-from test_route import route, ROOT, _call
+
+import hermetic  # noqa: F401  (a home of its own for every test)
+from test_route import ROOT, _call, route
+
+from delegate.adapters import git
+from delegate.app import launch
+from delegate.domain.policy import worker
 from delegate.domain.policy.matchers import heredoc_only_hit, secret_hit
 from delegate.domain.policy.shell import git_write, read_only_problem
 from delegate.domain.policy.worker import is_policy_denial
-from delegate.app import launch
-from delegate.domain.policy import worker
-from delegate.adapters import git
 
 
 class SecretGuard(unittest.TestCase):

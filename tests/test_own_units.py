@@ -1,13 +1,12 @@
 """delegate-own, unit side: the process-lister guard, the typed contract, the answer's `worker` field. No process is started."""
-import hermetic          # noqa: F401
 import json
 import unittest
-from pathlib import Path
 
-from test_route import route, ROOT, CFG
+import hermetic  # noqa: F401
+from test_route import ROOT
 
-from delegate.adapters import procs    # noqa: E402  (route put skills/delegate and src/ on sys.path)
-from delegate.contracts import wire    # noqa: E402
+from delegate.adapters import procs
+from delegate.contracts import wire
 
 
 class OsProc(unittest.TestCase):

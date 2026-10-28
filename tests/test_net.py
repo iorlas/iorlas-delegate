@@ -1,13 +1,11 @@
 """Network facts (delegate-4n7, delegate-0sf, delegate-dlz): the probe, the words of a dropped connection, network never benching a pair,
 roles{} in status --json --cheap, and the adapter registry."""
-import hermetic  # noqa: F401  (a home of its own for every test)
 import contextlib
 import io
 import json
 import os
 import socket
 import subprocess
-import sys
 import tempfile
 import threading
 import time
@@ -15,26 +13,22 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
+import hermetic  # noqa: F401  (a home of its own for every test)
 import routing_support as support
+from test_route import CFG, T, lanes, route
+
 from delegate.contracts.history import RunRow
 from delegate.contracts.routing import BreakerPolicy
 from delegate.domain.health.ledger import HealthLedger, failure_fields
-from test_route import route, CFG, T, lanes
 
 LANES = Path(__file__).resolve().parent.parent / "src" / "delegate" / "adapters"
 from delegate.adapters import netprobe, procs
+from delegate.adapters.harness import classify
+from delegate.app import env, harnesses, launch, net
 from delegate.app import roles as role_view
-from delegate.adapters.harness import classify
-from delegate.contracts import stops
-from delegate.app import env
-from delegate.app import cockpit
-from delegate.app import launch
-from delegate.app import net
-from delegate.adapters.harness import classify
+from delegate.app.settle import Settler
 from delegate.contracts import stops
 from delegate.domain.lanes import profiles
-from delegate.app import harnesses
-from delegate.app.settle import Settler
 
 
 @contextlib.contextmanager

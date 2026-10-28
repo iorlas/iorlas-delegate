@@ -1,9 +1,10 @@
 """domain/policy: the verdict on a worker's tool call, and the typed refusal record (D3)."""
-import hermetic  # noqa: F401  (a home of its own for every test)
 import unittest
 
+import hermetic  # noqa: F401  (a home of its own for every test)
+
 from delegate.contracts import events as ev
-from delegate.domain.policy.matchers import heredoc_only_hit, secret_hit
+from delegate.domain.policy.matchers import heredoc_only_hit
 from delegate.domain.policy.shell import git_write, read_only_problem
 from delegate.domain.policy.worker import denial, denial_item, is_policy_denial, judge
 

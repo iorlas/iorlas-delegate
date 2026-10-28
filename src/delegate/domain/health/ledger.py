@@ -13,8 +13,7 @@ Never counted: bad_request (the caller's fault), network, killed, timeout, secre
 """
 from dataclasses import dataclass
 
-from delegate.contracts.history import (CanaryRow, Failure, HealthState, HistoryRow, LaneFact, PairFact, ReleaseRow,
-                                        RunRow, Streak)
+from delegate.contracts.history import CanaryRow, Failure, HealthState, HistoryRow, LaneFact, PairFact, ReleaseRow, RunRow, Streak
 from delegate.contracts.routing import BreakerPolicy
 from delegate.domain.health.matchers import fingerprint
 

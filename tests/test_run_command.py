@@ -1,25 +1,24 @@
 """`route.py run`: leases and slots, who runs unattended, history and status, limits and resume."""
-import hermetic  # noqa: F401  (a home of its own for every test)
+import dataclasses
 import json
 import os
 import sys
 import time
-from unittest import mock
 import unittest
 from pathlib import Path
-from test_route import route, at, why
+from unittest import mock
+
+import hermetic  # noqa: F401  (a home of its own for every test)
 import routing_support as support
-import stream_proc
-from stream_proc import alive, proc_start
-from delegate.adapters import procs
+from run_support import RunBase
+from stream_proc import proc_start
+from test_route import at, route, why
+
 from delegate.adapters.harness import opencode_sandbox as box
-from delegate.app import env
-from delegate.app import status
+from delegate.app import env, status
+from delegate.contracts.state import UsageCache
 from delegate.domain.lanes import leases
 from delegate.domain.lanes.lane import Lane
-from delegate.contracts.state import UsageCache
-import dataclasses
-from run_support import RunBase
 
 
 class RunCommand(RunBase):

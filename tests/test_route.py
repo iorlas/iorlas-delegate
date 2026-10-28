@@ -1,5 +1,4 @@
 """Deterministic tests for the delegate router. Run: python -m unittest discover -s tests"""
-import hermetic  # noqa: F401  (a home of its own for every test)
 import copy
 import datetime as dt
 import importlib.util
@@ -13,20 +12,21 @@ import time
 import unittest
 from pathlib import Path
 
+import hermetic  # noqa: F401  (a home of its own for every test)
+
 ROOT = Path(__file__).resolve().parent.parent
 spec = importlib.util.spec_from_file_location("route", ROOT / "skills" / "delegate" / "route.py")
 route = importlib.util.module_from_spec(spec)
 sys.modules["route"] = route
 spec.loader.exec_module(route)
-import routing_support as support  # noqa: E402
-from delegate.app import env
-from delegate.app import usage
+import routing_support as support
+
 from delegate.app import decide as dec
-from delegate.app import net
-from delegate.domain.time import spec
-from delegate.domain.lanes.lane import Lane
+from delegate.app import env, net, usage
 from delegate.contracts.stores import locked
 from delegate.domain.health import ledger as health_ledger
+from delegate.domain.lanes.lane import Lane
+from delegate.domain.time import spec
 
 net.REAL_NET_PROBE = net.net_probe
 net.net_probe = lambda hosts=None: {"up": True, "ip_up": True, "why": "ok", "ms": 1, "hosts": {}, "at": time.time()}     # tests open no socket; tests/test_net.py swaps it per case
@@ -217,7 +217,7 @@ class Helpers(unittest.TestCase):
             "extraUsage": {"enabled": True}}, "context": {"percentUsed": 25}}
         u = usage.normalize_usage(real)
         self.assertEqual((u["five_hour"]["used"], u["weekly"]["used"], u["fable"]["used"]), (1.0, 3.0, 1.0))
-        self.assertAlmostEqual(u["weekly"]["resets_at"], dt.datetime(2026, 10, 25, 13, 59, 59, 908000, tzinfo=dt.timezone.utc).timestamp(), places=2)
+        self.assertAlmostEqual(u["weekly"]["resets_at"], dt.datetime(2026, 10, 25, 13, 59, 59, 908000, tzinfo=dt.UTC).timestamp(), places=2)
         self.assertEqual(usage.normalize_usage(real["plan"]), u)
 
     def test_next_weekly(self):
@@ -255,7 +255,6 @@ class BaseTable(unittest.TestCase):
     """SKILL.md carries a fixed role table for installs without Python. It must equal what routing.json gives for Claude sub-agents."""
 
     def test_skill_table_matches_routing_json(self):
-        import re
         skill = (Path(__file__).resolve().parent.parent / "skills" / "delegate" / "SKILL.md").read_text(encoding="utf-8")
         block = re.search(r"<!-- base-table -->(.*?)<!-- /base-table -->", skill, re.S).group(1)
         table = {}
@@ -274,11 +273,9 @@ class BaseTable(unittest.TestCase):
 
 class StateLock(unittest.TestCase):
     def test_a_lock_that_stays_held_raises_instead_of_running_unlocked(self):
-        with tempfile.TemporaryDirectory() as d:
-            with locked(Path(d) / "x", timeout=5):
-                with self.assertRaises(TimeoutError):
-                    with locked(Path(d) / "x", timeout=0.2):
-                        pass
+        with tempfile.TemporaryDirectory() as d, locked(Path(d) / "x", timeout=5), self.assertRaises(TimeoutError):
+            with locked(Path(d) / "x", timeout=0.2):
+                pass
 
     def test_parallel_processes_lose_no_update(self):
         code = ("import sys; sys.path.insert(0, %r); from delegate.app import env\n"

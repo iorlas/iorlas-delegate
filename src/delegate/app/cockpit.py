@@ -5,11 +5,12 @@ from delegate.app import env, harnesses, usage
 from delegate.app.decide import busy_jitter
 from delegate.app.fleet import mark_busy
 from delegate.contracts.routing import CallArgs
-from delegate.domain.lanes.profiles import LOGIN_CMD
 from delegate.domain.holds.book import HoldBook
 from delegate.domain.lanes.leases import LeaseBook
+from delegate.domain.lanes.profiles import LOGIN_CMD
 from delegate.domain.routing.router import Router
 from delegate.domain.time.spec import fmt_in, local, when
+
 
 def needs_input(lanes):
     need = []
@@ -65,7 +66,7 @@ def off_reason(name, cfg, login):
         return "declined: remove it from the profile in config.json to bring it back"
     if login[0] is False:
         return f"not configured: logged out, run `{LOGIN_CMD[name]}`"
-    return f"not configured: `route.py doctor` says what it needs" + (f" ({login[1]})" if login[0] is None and login[1] else "")
+    return "not configured: `route.py doctor` says what it needs" + (f" ({login[1]})" if login[0] is None and login[1] else "")
 
 
 def classify_out(lane, rec):

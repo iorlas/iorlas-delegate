@@ -161,7 +161,7 @@ AGENT_KIND = {"codex": "codex", "claude_p": "claude-p", "opencode": "opencode"}
 def login_text(kind, lane):
     """(the hint stored with a lane that is logged out, the text of the answer with {why})."""
     if kind == "codex":
-        return "logged out: run `codex login`", f"codex is not logged in: {{why}} (route.py doctor)"
+        return "logged out: run `codex login`", "codex is not logged in: {why} (route.py doctor)"
     if kind == "claude_p":
         return "logged out: run `claude auth login`", "claude is not logged in: {why} (claude auth login)"
     hint = ("free OpenCode access refused; no paid credentials will be used" if lane == "DEEPSEEK_FREE" else "run `opencode auth login` and choose Z.AI Coding Plan; enter your Coding Plan key in your own terminal"

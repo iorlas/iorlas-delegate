@@ -1,16 +1,15 @@
 """Codex quota read (delegate-av1) and Claude-last routing (delegate-m86), with responses recorded from `codex app-server` on 2026-10-26."""
-import hermetic  # noqa: F401  (a home of its own for every test)
 import copy
 import os
 import tempfile
 import unittest
+
+import hermetic  # noqa: F401  (a home of its own for every test)
 import routing_support as support
+from test_route import CFG, T, lanes
+
+from delegate.app import cockpit, env, usage
 from delegate.contracts.state import UsageCache
-from test_route import route, CFG, lanes, decide, T
-from delegate.app import onboard
-from delegate.app import env
-from delegate.app import usage
-from delegate.app import cockpit
 from delegate.domain.lanes.lane import Lane
 
 # `account/rateLimits/read` as recorded: Pro Lite, one weekly window sent as `primary`, no `secondary`, no other bucket, no credits.

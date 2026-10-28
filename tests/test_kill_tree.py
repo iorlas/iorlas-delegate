@@ -1,9 +1,8 @@
 """Tree kill: a worker stopped by timeout, reap or the app-server path leaves no descendant, whatever session it sits in."""
-import hermetic  # noqa: F401  (a home of its own for every test)
 import contextlib
-import json
 import os
 import re
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -12,18 +11,17 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
-from test_route import route, ROOT
+import hermetic  # noqa: F401  (a home of its own for every test)
 from stream_proc import alive, proc_start
-from delegate.adapters import procs
+from test_route import ROOT
+
+from delegate.adapters import codex_account, procs
 from delegate.adapters.harness.base import LaunchSpec
 from delegate.adapters.harness.codex import CodexHarness
+from delegate.app import lease, usage
 from delegate.app.publish import LiveSink
 from delegate.app.supervisor import RunHooks, Supervisor
 from delegate.contracts.state import Lease
-from delegate.app import usage
-from delegate.app import lease
-import shutil
-from delegate.adapters import codex_account
 
 # A fake of the Codex CLI: a node-shim analogue that starts a native child in a session of its own; the child ignores SIGTERM.
 CHILD = "import signal,time; signal.signal(signal.SIGTERM, signal.SIG_IGN); time.sleep(300)"

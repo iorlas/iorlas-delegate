@@ -1,10 +1,9 @@
-import hermetic  # noqa: F401  (a home of its own for every test)
 import copy
 import unittest
-from types import SimpleNamespace
-from unittest.mock import patch
+
+import hermetic  # noqa: F401  (a home of its own for every test)
 import routing_support as support
-from test_route import route, CFG, lanes, T, argparse_ns
+from test_route import CFG, T, lanes
 
 
 class CodexPolicy(unittest.TestCase):

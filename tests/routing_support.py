@@ -11,16 +11,14 @@ from unittest import mock
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
 from delegate.app import cockpit, decide, env
+from delegate.app import decide as dec
 from delegate.app.fleet import Fleet
-from delegate.domain.holds.book import new_hold
-
 from delegate.contracts import codec
 from delegate.contracts.routing import CallArgs, Run
 from delegate.contracts.state import Hold, Lease, OutState, StateDoc
-from delegate.domain.holds.book import HoldBook
+from delegate.domain.holds.book import HoldBook, new_hold
 from delegate.domain.routing.router import Router
 from delegate.domain.routing.tiers import TierPlan
-from delegate.app import decide as dec
 
 
 def doc_of(st):
@@ -86,7 +84,7 @@ def state_json():
     return codec.to_json(env.load_state())
 
 
-__all__ = ["add_hold", "fleet_patches", "decide", "put_out", "put_lease", "lease", "put_hold", "holds_of", "clear_out", "state_json", "Hold", "copy"]
+__all__ = ["Hold", "add_hold", "clear_out", "copy", "decide", "fleet_patches", "holds_of", "lease", "put_hold", "put_lease", "put_out", "state_json"]
 
 
 def add_hold(lane, until, reason, roles=None, set_by="owner", t=None):

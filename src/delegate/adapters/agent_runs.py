@@ -7,7 +7,6 @@ Call sites, and what a rewrite must keep: docs/dev/integrations.md.
 
 import json
 import time
-from pathlib import Path
 
 from app_dirs import config_dir
 from atomic_io import atomic_write_json

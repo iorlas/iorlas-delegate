@@ -135,7 +135,7 @@ def drift_warnings(states: StateStore, lanes: dict[str, Lane], doc: StateDoc, t:
     out = [f"{n} is enabled but not ready, so it is skipped (route.py doctor)"
            for n in bad if t - doc.warned_at.get(n, 0) > WARN_EVERY_S]
     if out:
-        states.update(lambda s: s.warned_at.update({n: t for n in bad}))
+        states.update(lambda s: s.warned_at.update(dict.fromkeys(bad, t)))
     return out
 
 

@@ -1,25 +1,24 @@
 """Free lane must fail closed and keep the actual author family."""
-import hermetic  # noqa: F401  (a home of its own for every test)
 import copy
 import json
-import subprocess
-import unittest
+import sys
 import tempfile
+import unittest
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
-from test_route import route, CFG, lanes, decide
-from delegate.adapters.harness.opencode import OpenCodeHarness
-from delegate.app.supervisor import RunHooks
+
+import hermetic  # noqa: F401  (a home of its own for every test)
 from fakes.fake_run import replay
-from delegate.app import env
-from delegate.app import usage
-from delegate.app import launch
-from delegate.app import decide as dec
-from delegate.domain.lanes.lane import Lane
-import sys
+from test_route import CFG, decide, lanes
+
 from delegate.adapters import agent_runs
+from delegate.adapters.harness.opencode import OpenCodeHarness
+from delegate.app import decide as dec
+from delegate.app import env, launch, usage
 from delegate.app.settle import Settler
+from delegate.app.supervisor import RunHooks
+from delegate.domain.lanes.lane import Lane
 
 
 class DeepSeekTests(unittest.TestCase):

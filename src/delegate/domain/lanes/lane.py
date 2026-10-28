@@ -5,12 +5,12 @@ lane that is only waiting for a slot is a COPY (`with_busy`).
 """
 from dataclasses import dataclass, field, replace
 
+from timefmt import fmt_span
+
 from delegate.contracts.routing import Settings
 from delegate.contracts.state import Hold
 from delegate.domain.health.ledger import PairView
 from delegate.domain.holds.book import hold_text
-from timefmt import fmt_span
-
 from delegate.domain.time.spec import local
 
 

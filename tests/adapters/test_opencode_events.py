@@ -1,8 +1,6 @@
 """OpenCodeHarness: golden `opencode run --format json --print-logs` streams (stdout events and stderr log lines) -> HarnessEvents + Evidence +
 Summary, the provisional rows a permission line starts, its argv and sandboxed environment, the free-model check and its login probe.
 No real ZAI call is made here: the goldens are recorded shapes (87-live-view-design.md), not a live check."""
-import hermetic  # noqa: F401  (a home of its own for every test)
-import dataclasses
 import json
 import subprocess
 import sys
@@ -11,13 +9,14 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
+import hermetic  # noqa: F401  (a home of its own for every test)
+
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE.parent.parent / "src"))
-from delegate.adapters.harness import opencode_sandbox as box      # noqa: E402
-from delegate.adapters.harness.base import LaunchInputs           # noqa: E402
-from delegate.adapters.harness.opencode import OpenCodeHarness, Profile      # noqa: E402
-from delegate.app.publish import LiveSink                          # noqa: E402
-from delegate.contracts import events as ev                       # noqa: E402
+from delegate.adapters.harness import opencode_sandbox as box  # noqa: E402
+from delegate.adapters.harness.base import LaunchInputs  # noqa: E402
+from delegate.adapters.harness.opencode import OpenCodeHarness, Profile  # noqa: E402
+from delegate.app.publish import LiveSink  # noqa: E402
 
 GOLD = HERE / "golden"
 

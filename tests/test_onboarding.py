@@ -1,19 +1,15 @@
 """Onboarding, onboarding wizard and its child environment. Run: python -m unittest discover -s tests"""
-import hermetic  # noqa: F401  (a home of its own for every test)
 import os
-import sys
+import shutil
 import tempfile
 import unittest
 from pathlib import Path
-from test_route import route, T, argparse_ns
-from delegate.adapters.harness import opencode_sandbox as box
-from delegate.app import env
-from delegate.app import usage
-from delegate.app import cockpit
+
+import hermetic  # noqa: F401  (a home of its own for every test)
+from test_route import T, argparse_ns, route
+
+from delegate.app import cockpit, doctor, env, fleet, usage
 from delegate.app import decide as dec
-from delegate.app import fleet
-import shutil
-from delegate.app import doctor
 
 
 class Onboarding(unittest.TestCase):

@@ -1,17 +1,18 @@
 """`route.py run` on the OpenCode lanes: watchdog, sandboxed shell, Grok answers and cost."""
-import hermetic  # noqa: F401  (a home of its own for every test)
 import json
 import os
 import sys
 import time
-from unittest import mock
 import unittest
 from pathlib import Path
-from test_route import why
-from delegate.adapters.harness import opencode_sandbox as box
-from delegate.app import env
-from delegate.app import watch
+from unittest import mock
+
+import hermetic  # noqa: F401  (a home of its own for every test)
 from run_support import RunBase
+from test_route import why
+
+from delegate.adapters.harness import opencode_sandbox as box
+from delegate.app import env, watch
 
 
 class RunOpenCode(RunBase):

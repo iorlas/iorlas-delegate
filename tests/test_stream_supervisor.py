@@ -1,6 +1,5 @@
 """delegate-np7: one supervisor for Codex, Claude Code and opencode. Fixture replays: a fake CLI prints a recorded stream and never exits (or stalls);
 no real model is called. Grace and stall are cut to ~1 s through the supervisor constants."""
-import hermetic  # noqa: F401  (a home of its own for every test)
 import argparse
 import json
 import os
@@ -11,17 +10,16 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
+import hermetic  # noqa: F401  (a home of its own for every test)
+
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "skills" / "delegate"))
-import route                                  # noqa: E402
-from delegate.adapters.harness import claude   # noqa: E402
-from delegate.adapters.harness.opencode import OpenCodeHarness   # noqa: E402
-from delegate.app.supervisor import RunHooks   # noqa: E402
-from delegate.app import watch                # noqa: E402
-from delegate.app import env
-from delegate.app import launch
 import shutil
-from delegate.adapters import agent_runs
-from delegate.adapters import codex_account
+
+from delegate.adapters import agent_runs, codex_account
+from delegate.adapters.harness import claude
+from delegate.adapters.harness.opencode import OpenCodeHarness
+from delegate.app import env, launch, watch
+from delegate.app.supervisor import RunHooks
 
 T = 1_000_000.0
 

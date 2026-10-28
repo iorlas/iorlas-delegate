@@ -77,7 +77,7 @@ def merge(a, b):
 
 
 def iso(ts):
-    return dt.datetime.fromtimestamp(ts, dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    return dt.datetime.fromtimestamp(ts, dt.UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
 def fields(acct, ref, ended_at):

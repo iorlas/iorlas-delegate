@@ -1,27 +1,25 @@
 """Owner holds: record, back_at, stale asks. Run: python -m unittest discover -s tests"""
-import hermetic  # noqa: F401  (a home of its own for every test)
 import copy
 import json
 import sys
 import tempfile
 import time
-from unittest import mock
 import unittest
 from pathlib import Path
-from test_route import route, CFG, T, argparse_ns, lanes
-from delegate.app.supervisor import RunHooks
+from unittest import mock
+
+import hermetic  # noqa: F401  (a home of its own for every test)
 import routing_support as support
-from delegate.app import env
-from delegate.app import answer
-from delegate.app import launch
+from test_route import CFG, T, argparse_ns, lanes, route
+
+from delegate.app import answer, env, fleet, launch, status
 from delegate.app import decide as dec
-from delegate.app import status
-from delegate.app import fleet
-from delegate.contracts import stops
-from delegate.domain.lanes.lane import Lane
-from delegate.domain.holds.book import HoldBook
-from delegate.contracts.state import RefRecord
+from delegate.app.supervisor import RunHooks
 from delegate.cli import verbs
+from delegate.contracts import stops
+from delegate.contracts.state import RefRecord
+from delegate.domain.holds.book import HoldBook
+from delegate.domain.lanes.lane import Lane
 
 
 class Holds(unittest.TestCase):

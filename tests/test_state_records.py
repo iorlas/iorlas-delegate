@@ -1,5 +1,4 @@
 """Breaker, reset times, token budget, config location, agent-runs. Run: python -m unittest discover -s tests"""
-import hermetic  # noqa: F401  (a home of its own for every test)
 import datetime as dt
 import json
 import os
@@ -7,30 +6,28 @@ import re
 import sys
 import tempfile
 import time
-from unittest import mock
 import unittest
 from pathlib import Path
-from test_route import route, CFG, ROOT, T, argparse_ns, at, lanes, why
-from delegate.app.publish import LiveSink
-from delegate.app.supervisor import RunHooks, Supervisor
+from unittest import mock
+
+import hermetic  # noqa: F401  (a home of its own for every test)
 import routing_support as support
-from delegate.app.fleet import apply_health
-from delegate.contracts import codec, stores
 import stream_proc
-from delegate.adapters import procs
-from delegate.adapters.harness import reset_parse
+from test_route import CFG, T, argparse_ns, lanes, route
+
+from delegate.adapters import agent_runs
+from delegate.adapters.harness import classify, reset_parse
 from delegate.adapters.harness.base import LaunchSpec
 from delegate.adapters.harness.codex import CodexHarness
-from delegate.app import env
-from delegate.app import usage
-from delegate.app import launch
 from delegate.app import decide as dec
-from delegate.adapters.harness import classify
-from delegate.domain.lanes.lane import Lane
-from delegate.app import watch
+from delegate.app import env, launch, usage, watch
+from delegate.app.fleet import apply_health
+from delegate.app.publish import LiveSink
+from delegate.app.supervisor import RunHooks, Supervisor
+from delegate.contracts import codec, stores
 from delegate.contracts import history as hist
 from delegate.domain.health import ledger as health_ledger
-from delegate.adapters import agent_runs
+from delegate.domain.lanes.lane import Lane
 
 
 class Breaker(unittest.TestCase):
@@ -115,7 +112,7 @@ class ResetTimes(unittest.TestCase):
             time.tzset()
 
     def at(self, text, t=None):
-        t = t or dt.datetime(2026, 10, 25, 0, 0, tzinfo=dt.timezone.utc).timestamp()
+        t = t or dt.datetime(2026, 10, 25, 0, 0, tzinfo=dt.UTC).timestamp()
         return reset_parse.parse_reset(text, t), t
 
     @unittest.skipUnless(hasattr(time, "tzset"), "needs time.tzset")
@@ -126,15 +123,15 @@ class ResetTimes(unittest.TestCase):
 
     def test_a_stated_zone_is_kept(self):
         (at, zone), _ = self.at("resets at 2026-10-25T08:19:00Z")
-        self.assertEqual((dt.datetime.fromtimestamp(at, dt.timezone.utc).strftime("%H:%M"), zone), ("08:19", "UTC"))
+        self.assertEqual((dt.datetime.fromtimestamp(at, dt.UTC).strftime("%H:%M"), zone), ("08:19", "UTC"))
         (at, zone), _ = self.at("will reset at 2026-10-25 14:49:00 +08:00")
-        self.assertEqual((dt.datetime.fromtimestamp(at, dt.timezone.utc).strftime("%H:%M"), zone), ("06:49", "+08:00"))
+        self.assertEqual((dt.datetime.fromtimestamp(at, dt.UTC).strftime("%H:%M"), zone), ("06:49", "+08:00"))
 
     def test_retry_after_seconds_and_http_date(self):
         (at, _), t = self.at("429 Too Many Requests, Retry-After: 120")
         self.assertEqual(at, t + 120)
-        (at, _), t = self.at("HTTP 429 retry-after: Sun, 25 Oct 2026 12:00:00 GMT", dt.datetime(2026, 10, 25, 10, 0, tzinfo=dt.timezone.utc).timestamp())
-        self.assertEqual(dt.datetime.fromtimestamp(at, dt.timezone.utc).strftime("%H:%M"), "12:00")
+        (at, _), t = self.at("HTTP 429 retry-after: Sun, 25 Oct 2026 12:00:00 GMT", dt.datetime(2026, 10, 25, 10, 0, tzinfo=dt.UTC).timestamp())
+        self.assertEqual(dt.datetime.fromtimestamp(at, dt.UTC).strftime("%H:%M"), "12:00")
 
     def test_in_n_hours_and_try_again_at(self):
         (at, _), t = self.at("You can try again in 5 hours.")
@@ -164,7 +161,7 @@ class ResetTimes(unittest.TestCase):
                                time.time(), "codex", argparse_ns("worker", timeout=0))
             rec = env.load_state().out["L1"]
             self.assertEqual((rec.source, rec.zone), ("vendor", "UTC"))
-            self.assertEqual(rec.until, dt.datetime(2026, 10, 30, 14, 49, tzinfo=dt.timezone.utc).timestamp())
+            self.assertEqual(rec.until, dt.datetime(2026, 10, 30, 14, 49, tzinfo=dt.UTC).timestamp())
             for want_n in (0, 1, 2):          # three guesses in a row climb the ladder
                 launch.settler().apply({}, classify.Outcome("rate_limited", "slow down", "event"), {"lane": "L2"}, 1_800_000_000.0, "codex", argparse_ns("worker", timeout=0))
                 rec = env.load_state().out["L2"]
@@ -180,7 +177,6 @@ class TokenBudget(unittest.TestCase):
     def test_skill_md(self):
         text = (self.ROOT / "SKILL.md").read_text(encoding="utf-8")
         self.assertLessEqual(len(text), 1900)      # raised from 1800 on 2026-10-19: the run_in_background line
-        import re
         desc = re.search(r"^description: (.*)$", text, re.M).group(1)
         self.assertLessEqual(len(desc), 170)
 

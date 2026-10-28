@@ -1,5 +1,4 @@
 """Shared fixture of the `route.py run` tests: fake `codex` and `claude` on PATH, a temp repo, a config dir of its own. Not a test module."""
-import hermetic  # noqa: F401  (a home of its own for every test)
 import json
 import os
 import sys
@@ -7,14 +6,14 @@ import tempfile
 import time
 import unittest
 from pathlib import Path
-from test_route import route
+
+import hermetic  # noqa: F401  (a home of its own for every test)
 import routing_support as support
-from delegate.app import env
-from delegate.app import usage
+from test_route import route
+
+from delegate.app import env, usage
 from delegate.contracts import history as hist
 from delegate.domain.health import ledger as health_ledger
-
-
 
 
 class RunBase(unittest.TestCase):

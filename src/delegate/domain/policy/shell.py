@@ -20,7 +20,7 @@ FIND_RUNS = {"-exec", "-execdir", "-ok", "-okdir", "-delete", "-fprint", "-fprin
 def git_args(t: list[str]) -> list[str]:
     """Words after `git` and its -C/--no-pager/--git-dir options; the first is the subcommand."""
     args = t[1:]
-    while args and args[0] in ("-C", "--no-pager") or args and args[0].startswith("--git-dir"):
+    while (args and args[0] in ("-C", "--no-pager")) or (args and args[0].startswith("--git-dir")):
         args = args[2:] if args[0] == "-C" else args[1:]
     return args
 
@@ -34,9 +34,9 @@ def git_write(cmd: str) -> str | None:
         args = git_args(t)
         sub, rest = (args[0] if args else ""), args[1:]
         if sub in GIT_CHANGING \
-                or sub == "stash" and not (rest and rest[0] in ("list", "show")) \
-                or sub == "worktree" and not (rest and rest[0] == "list") \
-                or sub in ("branch", "tag") and (rest and not rest[0].startswith("-") or any(x.startswith("-") and not x.startswith(GIT_LISTING) for x in rest)):
+                or (sub == "stash" and not (rest and rest[0] in ("list", "show"))) \
+                or (sub == "worktree" and not (rest and rest[0] == "list")) \
+                or (sub in ("branch", "tag") and ((rest and not rest[0].startswith("-")) or any(x.startswith("-") and not x.startswith(GIT_LISTING) for x in rest))):
             return " ".join(t[:3])
     return None
 

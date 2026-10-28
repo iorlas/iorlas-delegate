@@ -49,7 +49,7 @@ def without_excluded(text: str) -> str | None:
         path_excl = prev in EXCL_PATH_OPTS and prev2 in ("-not", "!")
         inline = EXCLUDE_WORD_RE.match(x)
         if not (glob_excl or path_excl or inline or x in EXCL_OPTS or EXCLUDE_PATHSPEC_RE.match(x) or x in ("-not", "!")
-                or x in EXCL_PATH_OPTS and prev in ("-not", "!")):
+                or (x in EXCL_PATH_OPTS and prev in ("-not", "!"))):
             out.append(x)
         prev2, prev = prev, x
     return " ".join(out)

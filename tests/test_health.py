@@ -1,14 +1,14 @@
 """Idle watchdog (R15: delegate-go0). The health fold, breaker and incident replays live in tests/domain/test_health.py."""
-import hermetic  # noqa: F401  (a home of its own for every test)
 import sys
 import unittest
 from pathlib import Path
 
+import hermetic  # noqa: F401  (a home of its own for every test)
+
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "src"))
 sys.path.insert(0, str(ROOT / "skills" / "delegate"))
-from delegate.app import watch      # noqa: E402
-from delegate.adapters import procs
+from delegate.app import watch  # noqa: E402
 
 
 class Clock:

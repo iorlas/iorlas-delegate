@@ -1,9 +1,10 @@
 """src/delegate layers (88 section 3), the cheap part: contracts import nothing of ours but contracts; adapters never import app; no `re` in
 contracts or app; no import inside a function; no module past 400 lines of code. No rules gate exists in this repo yet."""
-import hermetic  # noqa: F401  (a home of its own for every test)
 import ast
 import unittest
 from pathlib import Path
+
+import hermetic  # noqa: F401  (a home of its own for every test)
 
 SRC = Path(__file__).resolve().parent.parent / "src" / "delegate"
 FORBIDDEN = {"contracts": ("adapters", "app", "domain", "cli"), "adapters": ("app", "domain", "cli"), "domain": ("adapters", "app", "cli"), "app": ("cli",)}

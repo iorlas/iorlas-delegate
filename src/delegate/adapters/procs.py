@@ -9,7 +9,6 @@ POSIX only.
 import os
 import subprocess
 import time
-from collections.abc import Callable
 
 import stream_proc
 from stream_proc import alive, proc_start

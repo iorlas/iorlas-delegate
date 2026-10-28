@@ -7,8 +7,8 @@ from dataclasses import field
 from pathlib import Path
 from typing import Any, Protocol
 
-from delegate.contracts.codec import mutable, record
 from delegate.contracts import events as ev
+from delegate.contracts.codec import mutable, record
 from delegate.contracts.events import HarnessEvent
 
 

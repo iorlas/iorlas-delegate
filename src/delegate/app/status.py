@@ -14,6 +14,7 @@ from delegate.domain.holds.book import HoldBook
 from delegate.domain.lanes.leases import LeaseBook, suspect
 from delegate.domain.routing.router import Router
 
+
 def status_payload(cfg, lanes, ck, st, t):
     return {"v": 1, "ts": t,
             "lanes": {n: {"family": l.family, "kind": l.kind, "out": l.out, "out_until": l.out_until, "reason": l.out_reason if l.out else None, "five": l.five, "week": l.week,

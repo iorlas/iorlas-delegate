@@ -1,5 +1,4 @@
 """A real pre-0.45 config.json (tests/fixtures/config_pre_0_45.json, retired keys and all) must still drive `route.py run`. Run: python -m unittest discover -s tests"""
-import hermetic  # noqa: F401  (a home of its own for every test)
 import json
 import os
 import subprocess
@@ -7,8 +6,10 @@ import sys
 import unittest
 from pathlib import Path
 
+import hermetic  # noqa: F401  (a home of its own for every test)
 import run_support as T
 from test_route import route
+
 from delegate.app import env
 from delegate.contracts.routing import RETIRED_SETTINGS, split_retired
 

@@ -1,6 +1,5 @@
 """DELEGATE_LIVE_FILE: the live event file for a dashboard. Fixture streams per harness replayed through the real launchers (a fake CLI prints them
 and never exits); assert the kinds in order and the cmd / cmd_end id pairs. Env unset: no file."""
-import hermetic  # noqa: F401  (a home of its own for every test)
 import json
 import os
 import sys
@@ -8,11 +7,14 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
+import hermetic  # noqa: F401  (a home of its own for every test)
+
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "skills" / "delegate"))
-import test_stream_supervisor as tss           # noqa: E402
-from delegate.adapters.harness.codex import CodexHarness   # noqa: E402
-from delegate.app.publish import LiveSink, end_status      # noqa: E402
+import test_stream_supervisor as tss
+
+from delegate.adapters.harness.codex import CodexHarness
+from delegate.app.publish import LiveSink, end_status
 
 j = tss.j
 LONG = "x" * 3000

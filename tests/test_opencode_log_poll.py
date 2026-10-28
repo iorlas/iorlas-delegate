@@ -1,13 +1,13 @@
 """The supervisor's log watcher: a limit phrase in a log line that quotes the worker's own command must not mark the lane out; a real limit line must."""
-import hermetic  # noqa: F401  (a home of its own for every test)
 import tempfile
 import unittest
 from pathlib import Path
 
-from test_route import route
+import hermetic  # noqa: F401  (a home of its own for every test)
+
+from delegate.adapters.harness import classify
 from delegate.adapters.harness.opencode import OpenCodeHarness
 from delegate.app.supervisor import LogWatcher
-from delegate.adapters.harness import classify
 
 ECHO = ['INFO  2026-10-26T21:32:01 +3ms service=permission evaluated permission=bash pattern="cat <<EOF\\ntry again later\\nEOF" action=allow',
         'INFO  2026-10-26T21:32:02 +1ms service=permission evaluated permission=bash pattern="echo rate limit hit" action=allow']

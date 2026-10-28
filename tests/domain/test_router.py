@@ -1,10 +1,11 @@
 """The router is pure and replays the characterization goldens (golden/decisions.json, taken from route.py before D2 moved it)."""
-import hermetic  # noqa: F401  (a home of its own for every test)
 import json
 import socket
 import sys
 import unittest
 from pathlib import Path
+
+import hermetic  # noqa: F401  (a home of its own for every test)
 
 ROOT = Path(__file__).resolve().parent.parent.parent
 sys.path.insert(0, str(ROOT / "src"))

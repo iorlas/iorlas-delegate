@@ -1,24 +1,23 @@
-import hermetic  # noqa: F401  (a home of its own for every test)
 import copy
 import json
 import os
+import sys
 import tempfile
 import unittest
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
+
+import hermetic  # noqa: F401  (a home of its own for every test)
 import routing_support as support
-from test_route import route, CFG, lanes, T
-from delegate.adapters.harness.opencode import OpenCodeHarness
-from delegate.app.supervisor import RunHooks
 from fakes.fake_run import replay
-from delegate.app import onboard
-from delegate.app import env
-from delegate.app import launch
-from delegate.domain.lanes.lane import Lane
-from delegate.app import watch
-import sys
+from test_route import CFG, T, lanes
+
 from delegate.adapters import agent_runs
+from delegate.adapters.harness.opencode import OpenCodeHarness
+from delegate.app import env, launch, onboard, watch
+from delegate.app.supervisor import RunHooks
+from delegate.domain.lanes.lane import Lane
 
 
 class ZaiTests(unittest.TestCase):

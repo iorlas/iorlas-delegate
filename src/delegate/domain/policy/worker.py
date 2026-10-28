@@ -59,4 +59,4 @@ def denial_item(d: ev.Denied) -> dict[str, Any]:
 def is_policy_denial(tool_name: str | None, tool_input: dict[str, Any] | None, read_only: bool = False) -> bool:
     """A git write the coordinator forbids, or a write on a read-only step, is delegate's policy, not a decision for the owner (a secret path stays one)."""
     cmd = str((tool_input or {}).get("command") or "").strip()
-    return tool_name == "Bash" and not secret_hit(cmd) and bool(git_write(cmd) or read_only and read_only_problem(cmd))
+    return tool_name == "Bash" and not secret_hit(cmd) and bool(git_write(cmd) or (read_only and read_only_problem(cmd)))
