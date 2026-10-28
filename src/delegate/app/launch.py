@@ -3,7 +3,6 @@ Settler applies the outcome (`launch_worker`). Also the rules every worker's pro
 import contextlib
 import dataclasses
 import json
-import os
 import shlex
 import shutil
 import sys
@@ -40,15 +39,10 @@ def settler():
     return settle.Settler(env.states(), net.net_up, env.now, decide.busy_jitter)
 
 
-def engine_only() -> tuple[str, ...]:
-    """The recipes the brief says only the engine runs (DELEGATE_ENGINE_ONLY, comma-separated); a write step's guard blocks them."""
-    return tuple(x.strip() for x in os.environ.get("DELEGATE_ENGINE_ONLY", "").split(",") if x.strip())
-
-
-def guard_settings(read_only: bool | None):
+def guard_settings(read_only: bool | None, engine_only: tuple[str, ...] = ()):
     """--settings for claude -p: delegate's PreToolUse hook (route.py guard), read-only for steps that may not write."""
     argv = [sys.executable, str(env.SKILL_DIR / "route.py"), "guard"] + (["--read-only"] if read_only else [])
-    argv += [f"--engine-only={x}" for x in engine_only()] if not read_only else []
+    argv += [f"--engine-only={x}" for x in engine_only] if not read_only else []
     cmd = shlex.join(argv)
     return {"hooks": {"PreToolUse": [{"matcher": "*", "hooks": [{"type": "command", "command": cmd}]}]}}
 
@@ -99,13 +93,13 @@ def secret_in(e: Any):
     return e.text if secret_hit(e.text) else None
 
 
-def denied_items(hx: Harness, read_only: bool | None):
+def denied_items(hx: Harness, read_only: bool | None, engine_only: tuple[str, ...] = ()):
     """The `denied` items of a run, from the denials its harness reported. A git write the coordinator forbids, or a write on a read-only step, is
     delegate's policy, not the owner's call, and Claude's own record of it is dropped."""
     out = []
     for x in hx.evidence.denials:
         cmd = (x.input or {}).get("command")
-        if hx.kind == "claude" and policy.is_policy_denial(x.tool, x.input, bool(read_only), engine_only()):
+        if hx.kind == "claude" and policy.is_policy_denial(x.tool, x.input, bool(read_only), engine_only):
             continue
         kind = x.kind if x.kind != "policy" else "secret" if hx.kind == "opencode" and x.tool == "Bash" and secret_hit(cmd) else "policy"
         out.append(policy.denial_item(policy.denial(kind, x.tool, x.input)))
@@ -138,7 +132,8 @@ def prepare_claude(d: dict, brief: str, a: env.Args, rid: str, t: float, cfg: di
     hx = ClaudeHarness()
     spec = hx.launch_spec(LaunchInputs(
         exe=exe, cwd=h["cwd"], model=h["model"], effort=d["effort"], prompt=brief, env=env.child_env(), schema=a.schema, resume=a.resume, session=rid,
-        system=PREAMBLE + repo_instruction_text(h["cwd"]), settings=json.dumps(guard_settings(h.get("read_only"))), write=bool(h["write"])))
+        system=PREAMBLE + repo_instruction_text(h["cwd"]), settings=json.dumps(guard_settings(h.get("read_only"), tuple(getattr(a, "engine_only", None) or ()))),
+        write=bool(h["write"])))
     return Prep(hx, spec, {})
 
 
@@ -236,7 +231,7 @@ def launch_worker(d: dict, brief: str, a: env.Args, rid: str, t: float, cfg: dic
     with contextlib.suppress(Exception):        # one history row per inter-event gap over watch.LONG_GAP_S (role "gap"): the health fold ignores it
         sup.dog.flush(env.history_add, d["lane"], d["model"], out.watch.why is None)
     sm, w = out.summary, out.watch
-    res: dict[str, Any] = dict(sm.res, stderr=out.err, denied=denied_items(hx, h.get("read_only")))
+    res: dict[str, Any] = dict(sm.res, stderr=out.err, denied=denied_items(hx, h.get("read_only"), tuple(getattr(a, "engine_only", None) or ())))
     if h["kind"] == "codex":
         codex_usage(res, x)
     if out.stream_tail:

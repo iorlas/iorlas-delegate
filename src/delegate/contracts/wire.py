@@ -57,6 +57,7 @@ class RunRequest:
     title: str = ""
     call_id: str | None = None
     live_file: str | None = None     # DELEGATE_LIVE_FILE
+    engine_only: list[str] = field(default_factory=list)     # recipes only the engine runs: a write step's guard blocks `just RECIPE`; --engine-only once per item
 
     def to_argv(self, route: str) -> list[str]:
         out = [sys.executable, route, "run", self.role, "--brief", self.brief_file, "--cwd", self.cwd]
@@ -65,6 +66,8 @@ class RunRequest:
         for flag, v in opt:
             if v not in (None, ""):
                 out += [flag, str(v)]
+        for recipe in self.engine_only:
+            out += ["--engine-only", recipe]
         return out + (["--unattended"] if self.unattended else [])
 
     def env(self) -> dict[str, str]:

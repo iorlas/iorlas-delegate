@@ -5,7 +5,7 @@ description: Delegate a sub-task to another model or subscription, only when the
 
 `DELEGATE_DEPTH` set = you are a worker: do not delegate.
 Use Bash `run_in_background`.
-`python3 ${CLAUDE_SKILL_DIR}/route.py run ROLE [--cwd D] [--authored-by openai|claude|xai|deepseek] [--premium] [--allow-degraded] [--claude-usage JSON] < brief`
+`python3 ${CLAUDE_SKILL_DIR}/route.py run ROLE [--cwd D] [--authored-by openai|claude|xai|deepseek] [--premium] [--allow-degraded] [--claude-usage JSON] [--engine-only RECIPE]... < brief`  (engine-only: write guard blocks `just RECIPE`)
 Roles: planner (plan) · worker (implement) · reviewer (`--authored-by`: family that wrote it) · light (read).
 
 | answer | do |

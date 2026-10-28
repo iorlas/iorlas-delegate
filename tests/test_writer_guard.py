@@ -1,12 +1,17 @@
 """delegate-81g: a write step may not kill processes it did not start nor run the checks the brief leaves to the engine."""
 import io
 import json
+import os
 import sys
 import unittest
+from unittest import mock
 
 import hermetic  # noqa: F401  (a home of its own for every test)
 from test_route import route
 
+from delegate.app import launch
+from delegate.cli import parser
+from delegate.contracts import wire
 from delegate.domain.policy.worker import judge
 
 KILLS = ('pkill -f "Unity.*client"', "kill 4242 4243", "killall Unity", "cd /s && pkill -9 -f Unity; echo done", "kill -9 $(pgrep Unity)",
@@ -23,6 +28,30 @@ def guard(command: str, *flags: str) -> tuple[int, str]:
         return code, sys.stderr.getvalue()
     finally:
         sys.stdin, sys.stderr = real
+
+
+class EngineOnlyRequestTest(unittest.TestCase):
+    """The recipe list is a typed request field (--engine-only once per item), never an environment variable."""
+
+    def flags(self, **kw):
+        argv = wire.RunRequest(role="writer", brief_file="b", cwd="/w", **kw).to_argv("route.py")
+        ns = parser.build().parse_args(argv[2:])
+        cmd = json.loads(json.dumps(launch.guard_settings(False, tuple(ns.engine_only))))["hooks"]["PreToolUse"][0]["hooks"][0]["command"]
+        return argv, cmd
+
+    def test_flag_per_item_reaches_the_guard(self):
+        argv, cmd = self.flags(engine_only=["unity-tests", "e2e"])
+        self.assertEqual([argv[i + 1] for i, x in enumerate(argv) if x == "--engine-only"], ["unity-tests", "e2e"])
+        self.assertIn("--engine-only=unity-tests", cmd)
+        self.assertEqual(guard("just unity-tests", "--engine-only=unity-tests")[0], 2)
+        self.assertEqual(guard("just test-fast", "--engine-only=unity-tests")[0], 0)
+
+    def test_flag_absent_blocks_nothing_and_old_env_var_is_ignored(self):
+        with mock.patch.dict(os.environ, {"DELEGATE_ENGINE_ONLY": "unity-tests"}):
+            argv, cmd = self.flags()
+        self.assertNotIn("--engine-only", argv)
+        self.assertNotIn("engine-only", cmd)
+        self.assertEqual(guard("just unity-tests")[0], 0)
 
 
 class WriterGuardTest(unittest.TestCase):

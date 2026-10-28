@@ -63,6 +63,7 @@ def build():
     ru.add_argument("--premium", nargs="?", const="claude", metavar="FAMILY"); ru.add_argument("--allow-degraded", action="store_true")
     ru.add_argument("--claude-usage"); ru.add_argument("--cwd"); ru.add_argument("--brief"); ru.add_argument("--timeout", type=int, help="seconds; none by default"); ru.add_argument("--idle", type=int, help="seconds without worker output before it is hung; default per CLI"); ru.add_argument("--unattended", action="store_true")
     ru.add_argument("--schema"); ru.add_argument("--resume"); ru.add_argument("--cap", type=float); ru.add_argument("--parent"); ru.add_argument("--task"); ru.add_argument("--title")
+    ru.add_argument("--engine-only", action="append", default=[], help="a recipe only the engine runs; a write step's guard blocks it; repeatable")
     ru.add_argument("--call-id", help="the caller's id for this call: echoed in the answer and written to history.jsonl, the key that joins the caller's record to ours")
     ho = sub.add_parser("hold", help="stop a lane for some roles until a time; --until is mandatory"); ho.add_argument("lane"); ho.add_argument("--until"); ho.add_argument("--roles")
     ho.add_argument("--reason", default=""); ho.add_argument("--set-by", default="owner")

@@ -27,7 +27,7 @@ state and in Claude Code's own transcripts.
 
 ## 2. `route.py run` is a contract; everything else is not
 
-task-loop's engine calls `route.py run ROLE --unattended --brief FILE --cwd DIR [--schema F] [--resume REF] [--cap USD] [--timeout S] [--parent SESSION] [--task ID] [--title T]`
+task-loop's engine calls `route.py run ROLE --unattended --brief FILE --cwd DIR [--schema F] [--resume REF] [--cap USD] [--timeout S] [--parent SESSION] [--task ID] [--title T] [--engine-only RECIPE]...`
 as a script, with no Claude session behind it. The contract is `skills/delegate/contract.json` (reasons, facts, flags, answer schema); the consumer is iorlas-task-loop.
 
 - Handshake: `route.py contract --json` prints one line `{contract: 3, reasons{reason: {scope, permanence, retry, health, wording}}, run_args[]}`; a caller
