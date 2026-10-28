@@ -98,6 +98,7 @@ class RunStops(RunBase):
         p.send_signal(signal.SIGTERM)
         p.wait(timeout=15)
         self.assertIn(f"delegate: worker pid={wp[0]} pgid={wp[0]}", p.stderr.read().decode())
+        p.stdout.close(); p.stderr.close()
         time.sleep(0.3)
         with self.assertRaises(OSError):
             os.kill(pid, 0)

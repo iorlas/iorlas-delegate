@@ -243,7 +243,7 @@ class RunCommand(RunBase):
             self.assertEqual(why(r), "duplicate_task")
             self.assertIsNone(worker.poll())
         finally:
-            worker.kill()
+            worker.kill(); worker.wait()
 
     def test_a_reused_pid_is_not_killed(self):
         import subprocess as sp
@@ -255,7 +255,7 @@ class RunCommand(RunBase):
             self.assertEqual(r["stop"], None)
             self.assertIsNone(other.poll())
         finally:
-            other.kill()
+            other.kill(); other.wait()
 
     def test_a_resume_on_a_lane_with_all_slots_taken_waits_for_a_slot(self):
         self.run_it()

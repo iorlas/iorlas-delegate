@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import contextlib
+import os
+import select
 import subprocess
 import threading
 import time
@@ -14,8 +16,8 @@ from stream_proc.hold import popen_held
 from stream_proc.tree import stop_tree
 
 if TYPE_CHECKING:
-    import os
     from collections.abc import Callable, Mapping, Sequence
+    from typing import IO
 
 Kind = Literal["wall", "idle", "stopped"]
 
@@ -40,13 +42,43 @@ class Result:
     survivors: tuple[int, ...] = ()
 
 
-def _pump(stream: object, cb: Callable[[str], None] | None, touch: Callable[[], None]) -> None:
-    """Read lines until EOF (a torn last line included) so a full pipe never blocks; a failing callback never stops it."""
-    for raw in stream:  # type: ignore[attr-defined]
+def _emit(cb: Callable[[str], None] | None, raw: bytes) -> None:
+    if cb is not None:
+        with contextlib.suppress(Exception):
+            cb(raw.decode("utf-8", "replace"))
+
+
+def _pump(
+    stream: IO[bytes] | None,
+    cb: Callable[[str], None] | None,
+    touch: Callable[[], None],
+    quit_: threading.Event,
+) -> None:
+    """Read lines until EOF (a torn last line included) so a full pipe never blocks; a failing callback never stops it.
+
+    Polls the descriptor so ``quit_`` ends the reader even when a grandchild keeps the pipe open: the caller
+    can then close the pipe without a reader inside it.
+    """
+    if stream is None:
+        return
+    fd = stream.fileno()
+    buf = b""
+    while not quit_.is_set():
+        if not select.select([fd], [], [], 0.05)[0]:
+            continue
+        try:
+            chunk = os.read(fd, 65536)
+        except OSError:
+            break
+        if not chunk:
+            break
         touch()
-        if cb is not None:
-            with contextlib.suppress(Exception):
-                cb(raw.decode("utf-8", "replace"))
+        buf += chunk
+        *lines, buf = buf.split(b"\n")
+        for line in lines:
+            _emit(cb, line + b"\n")
+    if buf:
+        _emit(cb, buf)
 
 
 def _wait(
@@ -107,24 +139,42 @@ def run(
         start_new_session=True,
     )
     readers: list[threading.Thread] = []
+    quit_ = threading.Event()
     kind: Kind | None = None
     survivors: tuple[int, ...] = ()
     try:
-        hold.replay()
-        for stream, cb in ((p.stdout, on_stdout), (p.stderr, on_stderr)):
-            reader = threading.Thread(target=_pump, args=(stream, cb, lambda: last.__setitem__(0, time.monotonic())), daemon=True)
-            reader.start()
-            readers.append(reader)
-        start = proctable.proc_start(p.pid)
-        kind = _wait(p, t0=t0, last=last, timeout=timeout, idle=idle, stop=stop)
-        if kind is not None:
-            survivors = stop_tree(p, grace=grace, prove=prove)
-    except BaseException:
-        stop_tree(p, grace=grace, prove=prove)
-        raise
-    end = time.monotonic() + (drain if kind is None else 2.0)
-    for reader in readers:
-        reader.join(max(0.0, end - time.monotonic()))
+        try:
+            hold.replay()
+            for stream, cb in ((p.stdout, on_stdout), (p.stderr, on_stderr)):
+                touch = lambda: last.__setitem__(0, time.monotonic())  # noqa: E731
+                reader = threading.Thread(target=_pump, args=(stream, cb, touch, quit_), daemon=True)
+                reader.start()
+                readers.append(reader)
+            start = proctable.proc_start(p.pid)
+            kind = _wait(p, t0=t0, last=last, timeout=timeout, idle=idle, stop=stop)
+            if kind is not None:
+                survivors = stop_tree(p, grace=grace, prove=prove)
+        except BaseException:
+            stop_tree(p, grace=grace, prove=prove)
+            raise
+        end = time.monotonic() + (drain if kind is None else 2.0)
+        for reader in readers:
+            reader.join(max(0.0, end - time.monotonic()))
+    finally:
+        _release(p, readers, quit_)
     code = p.returncode
     sig = -code if code is not None and code < 0 else None
     return Result(None if sig else code, sig, kind, p.pid, p.pid, start, time.monotonic() - t0, survivors)
+
+
+def _release(p: subprocess.Popen[bytes], readers: list[threading.Thread], quit_: threading.Event) -> None:
+    """End every reader, then close the child's pipes: on every exit path nothing of the child stays open."""
+    quit_.set()
+    for reader in readers:
+        reader.join(2.0)
+    if any(reader.is_alive() for reader in readers):
+        return  # a callback is stuck: closing a pipe under its reader is worse than the warning
+    for stream in (p.stdout, p.stderr, p.stdin):
+        if stream is not None:
+            with contextlib.suppress(OSError):
+                stream.close()
