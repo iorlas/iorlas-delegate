@@ -24,7 +24,7 @@ class XdgWritable(unittest.TestCase):
                                                   write=True))
                 xdg = {k: v for k, v in spec.env.items() if k.startswith("XDG_")}
                 self.assertTrue(xdg)
-                self.assertEqual(len(xdg), 3 if profile.own_data else 1)
+                self.assertEqual(len(xdg), 4 if profile.own_data else 2)
                 assert h.shell is not None
                 script = h.shell.read_text()
                 for k, v in xdg.items():

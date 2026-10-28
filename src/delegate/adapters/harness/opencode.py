@@ -116,9 +116,12 @@ class OpenCodeHarness(Quiet):
             env["XDG_DATA_HOME"], env["XDG_CACHE_HOME"] = str(self.root / "opencode-free-data"), str(self.root / "opencode-free-cache")
             launcher_xdg += ["XDG_DATA_HOME", "XDG_CACHE_HOME"]
         roots = [Path(env[k]) for k in launcher_xdg]       # every XDG dir this launcher points commands at
-        for r in roots:
+        cache = Path(env["XDG_CACHE_HOME"]) if self.profile.own_data else self.root / "opencode-cache"
+        env.update(box.cache_env(cache))                     # uv, mise and XDG state: under the writable cache, never ~/.local
+        caches = [Path(env[k]) for k in box.cache_env(cache)]
+        for r in (*roots, *caches):                          # created here, before any sandboxed command: a command cannot create them
             r.mkdir(parents=True, exist_ok=True)
-        self.write_shell(i.cwd, i.write, self.shell, roots)
+        self.write_shell(i.cwd, i.write, self.shell, roots, caches)
         config: dict[str, Any] = {"permission": box.permissions(i.write)}
         if self.profile.providers:
             for key in SESSION_VARS:

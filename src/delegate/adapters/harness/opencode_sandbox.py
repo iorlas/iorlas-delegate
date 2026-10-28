@@ -30,6 +30,13 @@ def permissions(write: bool) -> dict:
     return {"*": "allow", "read": reads, "webfetch": "deny", "websearch": "deny", "external_directory": outside, "task": "deny", **({} if write else {"edit": "deny"})}
 
 
+def cache_env(cache: Path) -> dict[str, str]:
+    """The cache and state dirs a worker's tools (uv, mise, just, anything on XDG) write, all under one writable `cache` root: nothing is left to
+    default to ~/.local/state or ~/.cache. The launcher creates each before the sandbox starts."""
+    return {"XDG_STATE_HOME": str(cache / "state"), "UV_CACHE_DIR": str(cache / "uv"), "MISE_CACHE_DIR": str(cache / "mise"),
+            "MISE_STATE_DIR": str(cache / "mise-state")}
+
+
 def network_refusal(out: str) -> bool:
     """True when a command's output shows it was refused the network (the shell's sandbox blocks it): that is not an owner decision."""
     return any(x in out for x in NETWORK_REFUSALS)
@@ -39,16 +46,18 @@ def _quote(x: object) -> str:
     return json.dumps(os.path.realpath(str(x)))
 
 
-def write_shell(cwd: str, write: bool, path: Path, roots: Sequence[Path] = ()) -> None:
+def write_shell(cwd: str, write: bool, path: Path, roots: Sequence[Path] = (), caches: Sequence[Path] = ()) -> None:
     """The $SHELL OpenCode runs commands with: each one under sandbox-exec. `roots` are the XDG dirs the launcher points commands at (their tools
-    cache and keep state there), writable like temp."""
+    cache and keep state there), writable like temp. `caches` are the tool cache dirs (they may sit under a SECRETS folder such as
+    ~/.claude/plugins/data): read and write is allowed there after the secrets rule, and nowhere wider."""
     home = Path.home()
     secrets = " ".join(f"(subpath {_quote(home / x)})" for x in SECRETS)
     scratch = Path(cwd) / ".task"        # the task-loop engine's git-ignored scratch folder: a reviewer's test run writes its temp files there
-    writable = [cwd if write else scratch] + ["/private/tmp", "/private/var/folders", home / "Library" / "Caches", home / ".cache", *roots]
+    writable = [cwd if write else scratch] + ["/private/tmp", "/private/var/folders", home / "Library" / "Caches", home / ".cache", *roots, *caches]
     keep = " ".join(f"(require-not (subpath {_quote(x)}))" for x in writable)
+    back = "".join(f"(allow file-read* file-write* (subpath {_quote(x)}))" for x in caches)
     profile = ('(version 1)(allow default)(deny network-outbound (remote ip))'
-               f'(deny file-read* file-write* {secrets} (regex #"/\\.env$") (regex #"/\\.env\\.[^/]*$"))'
+               f'(deny file-read* file-write* {secrets} (regex #"/\\.env$") (regex #"/\\.env\\.[^/]*$")){back}'
                '(allow file-read* (regex #"/\\.env\\.(example|sample|template|dist)$"))'
                f'(deny file-write* (require-all {keep} (require-not (regex #"^/dev/"))))'
                + ("" if write else f"(deny file-write* (require-all (subpath {_quote(cwd)}) (require-not (subpath {_quote(scratch)}))))"))
