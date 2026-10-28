@@ -3,6 +3,7 @@
 Unset, nothing is written. The first line of the file is the WorkerStarted of the first worker; each worker's `start` event follows it.
 A write error warns once and stops the feed; a file past LIVE_FILE_MAX stops growing (only `end` still goes out). Nothing here raises into the call.
 """
+import contextlib
 import json
 import os
 import sys
@@ -10,6 +11,8 @@ import threading
 import time
 from collections.abc import Callable
 from typing import Any
+
+from jsonl_log import append_line, open_append
 
 from delegate.contracts import events as ev
 from delegate.contracts import live
@@ -34,7 +37,7 @@ class LiveSink:
     def __init__(self, harness: str, path: str | None = None, wall: Callable[[], float] = time.time, run_id: str = "") -> None:
         path = os.environ.get(ENV) if path is None else path
         self.harness, self.wall, self.path, self.run_id = harness, wall, path or None, run_id
-        self.fh: Any = None
+        self.fd: int | None = None
         self.lock = threading.Lock()
         self.broken = self.capped = False
         self.t0 = wall()
@@ -51,15 +54,14 @@ class LiveSink:
             return
         try:
             with self.lock:
-                if self.fh is None:
+                if self.fd is None:
                     os.makedirs(os.path.dirname(os.path.abspath(self.path)), exist_ok=True)
-                    self.fh = open(self.path, "a", encoding="utf-8")
-                line = json.dumps(to_json(rec), ensure_ascii=False) + "\n"
-                if not final and self.fh.tell() + len(line.encode("utf-8")) > LIVE_FILE_MAX:
+                    self.fd = open_append(self.path)
+                line = (json.dumps(to_json(rec), ensure_ascii=False) + "\n").encode("utf-8")
+                if not final and os.fstat(self.fd).st_size + len(line) > LIVE_FILE_MAX:
                     self.capped = True
                     return
-                self.fh.write(line)
-                self.fh.flush()
+                append_line(self.fd, line)
         except Exception as e:        # a dashboard feed must never break the call
             self.broken = True
             print(f"delegate: live event file {self.path} stopped: {e}", file=sys.stderr)
@@ -103,12 +105,10 @@ class LiveSink:
             return
         self.write(live.LiveEnd(t=self.wall(), status=status, secs=round(self.wall() - self.t0, 1), cost_usd=_opt(cost_usd)), final=True)
         with self.lock:
-            if self.fh:
-                try:
-                    self.fh.close()
-                except OSError:
-                    pass
-                self.fh = None
+            if self.fd is not None:
+                with contextlib.suppress(OSError):
+                    os.close(self.fd)
+                self.fd = None
 
     # -- paired events ---------------------------------------------------------------------------------------------------------------------
     def begin(self, ident: Any, shell: bool, text: str, cwd: str | None = None, prov: bool = False) -> None:

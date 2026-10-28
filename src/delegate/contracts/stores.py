@@ -12,6 +12,7 @@ from collections.abc import Callable, Iterator
 from pathlib import Path
 
 from atomic_io import atomic_write_text
+from jsonl_log import append_line, open_append
 from process_lock import LockHeldError, ProcessLock
 
 from delegate.contracts import codec
@@ -34,6 +35,15 @@ def locked(path: Path | str, timeout: float = 10.0) -> Iterator[None]:
         yield
     finally:
         lock.release()
+
+
+def append_json(path: Path, value: object) -> None:
+    """One JSON line appended with a single O_APPEND write (jsonl_log), so writers in other processes never interleave."""
+    fd = open_append(path)
+    try:
+        append_line(fd, (json.dumps(value) + "\n").encode("utf-8"))
+    finally:
+        os.close(fd)
 
 
 def private(path: Path | str) -> None:
@@ -96,13 +106,12 @@ class HistoryStore:
         with contextlib.suppress(Exception), locked(self.path):
             if self.path.exists() and self.path.stat().st_size > HISTORY_MAX:
                 self._rotate(time.time() - HISTORY_DAYS * 86400)
-            with open(self.path, "a", encoding="utf-8") as f:
-                f.write(json.dumps(codec.to_json(row)) + "\n")
+            append_json(self.path, codec.to_json(row))
             private(self.path)
 
     def _rotate(self, cut: float) -> None:
         keep = [r for r in self._read(0.0) if r[0].ts >= cut]
-        self.path.write_text("".join(ln for _, ln in keep), encoding="utf-8")
+        atomic_write_text(self.path, "".join(ln for _, ln in keep), fsync=False)      # shelf lacks: jsonl_log compacts by size and file count, not by row age
 
     def _read(self, since: float) -> list[tuple[HistoryRow, str]]:
         out = []
@@ -152,8 +161,7 @@ class LedgerStore:
         return out
 
     def add(self, cost: float, model: str, t: float) -> None:
-        with locked(self.path), open(self.path, "a", encoding="utf-8") as f:
-            f.write(json.dumps(codec.to_json(LedgerRow(ts=t, model=model, cost=cost))) + "\n")
+        append_json(self.path, codec.to_json(LedgerRow(ts=t, model=model, cost=cost)))      # one O_APPEND write per line: no lock needed
         private(self.path)
 
 
