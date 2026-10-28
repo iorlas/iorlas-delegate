@@ -17,7 +17,7 @@ EXCL_PATH_OPTS = {"-path", "-ipath", "-name", "-iname", "-wholename", "-iwholena
 HEREDOC_RE = re.compile(r"<<-?[ \t]*(['\"]?)(\w+)\1[^\n]*\n.*?(?:\n[ \t]*\2\b|\Z)", re.S)
 QUIET_REDIRECT_RE = re.compile(r"\d?>&\d|&?\d?>\s*/dev/null")
 WRITES_RE = re.compile(r"`|\$\(|[<>]\(|>")
-SEGMENT_RE = re.compile(r"\|\||&&|;|\||\n")
+LOOP_HEADS = {"for", "while", "until"}
 SHELL_C_RE = re.compile(r"-[a-z]*c[a-z]*")
 EXCLUDE_WORD_RE = re.compile(r"--exclude(?:-dir|-from)?=|(?:--i?glob=|-g)!")
 EXCLUDE_PATHSPEC_RE = re.compile(r":(?:!|\(exclude\))")
@@ -70,14 +70,57 @@ def heredoc_only_hit(cmd: str | None) -> bool:
     return bool(secret_hit(cmd) and not secret_hit(HEREDOC_RE.sub(lambda m: m.group().split("\n", 1)[0] + "\n", cmd)))
 
 
+def split_unquoted(text: str) -> list[str]:
+    """`text` cut at | || && ; and newlines that are not inside quotes or escaped: a separator in a quoted word stays in the word."""
+    out: list[str] = []
+    cur: list[str] = []
+    quote = ""
+    i = 0
+    while i < len(text):
+        c = text[i]
+        if quote:
+            if c == "\\" and quote == '"' and i + 1 < len(text):
+                cur.append(c)
+                i += 1
+                c = text[i]
+            elif c == quote:
+                quote = ""
+        elif c == "\\" and i + 1 < len(text):
+            cur.append(c)
+            i += 1
+            c = text[i]
+        elif c in "'\"":
+            quote = c
+        elif c in "|;&\n" and (c != "&" or text[i + 1:i + 2] == "&"):
+            out.append("".join(cur))
+            cur = []
+            i += 2 if text[i + 1:i + 2] == c and c in "|&" else 1
+            continue
+        cur.append(c)
+        i += 1
+    out.append("".join(cur))
+    return out
+
+
+def loop_words(t: list[str]) -> list[str]:
+    """The command part of one line of a for/while/until loop (header word, `do` and a lone `done` removed); a for header is no command."""
+    if t[0] == "for" or t == ["done"]:
+        return []
+    if t[0] in LOOP_HEADS or t[0] == "do":
+        return t[1:]
+    return t
+
+
 def pieces(cmd: str) -> list[list[str]] | None:
-    """The command lines in `cmd` (split on | || && ; and newlines), each as words; None when one cannot be parsed."""
+    """The command lines in `cmd` (split on unquoted | || && ; and newlines; `for/while ... do ... done` reduced to its commands), each as
+    words; None when one cannot be parsed."""
     out = []
-    for seg in SEGMENT_RE.split(QUIET_REDIRECT_RE.sub(" ", unwrap(cmd))):
+    for seg in split_unquoted(QUIET_REDIRECT_RE.sub(" ", unwrap(cmd))):
         try:
             t = shlex.split(seg)
         except ValueError:
             return None
+        t = loop_words(t) if t else t
         if t:
             out.append(t)
     return out
