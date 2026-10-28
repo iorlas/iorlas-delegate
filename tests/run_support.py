@@ -82,7 +82,7 @@ cat > /dev/null
 if [ "$FAKE_MODE" = logout ]; then echo "Failed to authenticate: OAuth session expired and could not be refreshed" >&2; exit 1; fi
 if [ "$FAKE_MODE" = bghang ]; then
   echo '{"type":"result","result":"answered","session_id":"sess-2","is_error":false}'
-  set -m; sleep 61 & echo $! > "$FAKE_PIDFILE"; wait; exit 0
+  set -m 2>/dev/null; sleep 61 & echo $! > "$FAKE_PIDFILE"; wait; exit 0
 fi
 if [ "$FAKE_MODE" = ae6v ]; then
   printf '{"type":"assistant","message":{"usage":{"input_tokens":1}}}\n{"type":"result","result":"all done","session_id":"sess-7","is_error":false,"num_turns":2}'
