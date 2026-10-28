@@ -1,9 +1,10 @@
 """roles{} for status --json (delegate-0sf, A2.7): per role, may a worker start now (`usable`) and can its vendors be reached (`net`).
 
-Pure: the caller passes `decide` (route.decide), the lanes, and the cached network probe. No process, no socket. A full `status` computes the
+Pure: the caller passes a domain `Router`, the lanes, and the cached network probe. No process, no socket. A full `status` computes the
 rows; `status --cheap` replays them from the snapshot and refreshes the parts that move without a spawn: `net` (the probe cache), live holds.
 """
 from delegate.adapters import netprobe
+from delegate.contracts.routing import CallArgs, Run
 from . import profiles
 
 
@@ -28,33 +29,29 @@ def role_hosts(role):
     return list(dict.fromkeys(h for f in families(role) for h in profiles.hosts_for_family(f)))
 
 
-def roles_view(cfg, lanes, st, t, decide, cached_net=None):
+def roles_view(cfg, lanes, router, doc, t, cached_net=None):
     """-> {role: {usable, lane, model, why, until, hosts, net}}. `usable` is what `next ROLE` would answer with no flags, in the unattended view
-    (credit lanes are never picked unattended). `until` = when a stopped role is expected back (the soonest lane return), else None."""
+    (credit lanes are never picked unattended). `until` = when a stopped role is expected back (the soonest lane return), else None.
+    `router` is a domain Router; nothing is mutated."""
     live = {n: l for n, l in lanes.items() if l.kind != "credit"}
-    held_before = {n: l.held for n, l in lanes.items()}
     out = {}
-    try:
-        for name, role in cfg["roles"].items():
-            hosts = role_hosts(role)
-            row = {"usable": None, "lane": None, "model": None, "why": None, "until": None, "hosts": hosts, "net": netprobe.view(cached_net, hosts, t)}
-            try:
-                d = decide(name, cfg, live, st, t, {"authored_by": None, "failed": [], "premium": None, "allow_degraded": False, "unattended": True})
-            except Exception as e:      # one odd role must not take the status down
-                row["why"] = f"{type(e).__name__}: {e}"
-                out[name] = row
-                continue
-            if d["action"] == "run":
-                row.update(usable=True, lane=d["lane"], model=d["model"])
-            else:
-                backs = [l.out_until for l in live.values() if l.out and l.out_until and l.out_until > t]
-                backs += [b["until"] for l in live.values() for b in l.benched.values() if b.get("until") and b["until"] > t]
-                backs += [l.held["until"] for l in live.values() if l.held and l.held.get("until") and l.held["until"] > t]
-                row.update(usable=False, why=d.get("say") or d.get("error"), until=min(backs) if backs else None)
+    for name, role in cfg["roles"].items():
+        hosts = role_hosts(role)
+        row = {"usable": None, "lane": None, "model": None, "why": None, "until": None, "hosts": hosts, "net": netprobe.view(cached_net, hosts, t)}
+        try:
+            d = router.decide(name, CallArgs(unattended=True), live)
+        except Exception as e:      # one odd role must not take the status down
+            row["why"] = f"{type(e).__name__}: {e}"
             out[name] = row
-    finally:
-        for n, l in lanes.items():
-            l.held = held_before[n]
+            continue
+        if isinstance(d, Run):
+            row.update(usable=True, lane=d.lane, model=d.model)
+        else:
+            backs = [l.out_until for l in live.values() if l.out and l.out_until and l.out_until > t]
+            backs += [b.until for l in live.values() for b in l.benched.values() if b.until and b.until > t]
+            backs += [h.until for l in live.values() if (h := router.holds.covering(l.name, name, t)) and h.until > t]
+            row.update(usable=False, why=getattr(d, "say", None) or getattr(d, "error", None), until=min(backs) if backs else None)
+        out[name] = row
     return out
 
 

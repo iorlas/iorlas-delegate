@@ -98,7 +98,7 @@ class Fields(unittest.TestCase):
         f = usage.fields(usage.codex(short(CALL1)), "thr-1", 1_000_000_000)
         self.assertEqual((f["last_activity_at"], f["warm_until"], f["ttl_s"], f["ttl_source"]), ("2001-09-09T01:46:40Z", "2001-09-09T02:46:40Z", 3600, "observed"))
         self.assertEqual(usage.fields(None, None, 0)["warm_until"], None)
-        self.assertNotIn("warm_until", Path(route.__file__).read_text().split("def decide", 1)[1].split("\ndef ", 1)[0])       # no routing policy reads it
+        self.assertNotIn("warm_until", "".join(p.read_text() for p in (Path(route.__file__).parents[2] / "src/delegate/domain/routing").glob("*.py")))       # no routing policy reads it
 
     def test_merge_adds_counts_and_keeps_unknown_cost_unknown(self):
         a, b = usage.codex(short(CALL1)), usage.codex(short(CALL1))

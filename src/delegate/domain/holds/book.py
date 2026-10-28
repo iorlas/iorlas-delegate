@@ -41,6 +41,11 @@ class HoldBook:
                 return h
         return None
 
+    @staticmethod
+    def refusal(h: Hold, say: str | None = None) -> dict:
+        """The answer fields for a refused call under a hold: the lane is out for this role until the hold ends, never `retry_after = now + 1`."""
+        return {"outcome": "held", "retry_after": h.until, "say": say or f"{h.lane} is on hold, {hold_text(h)}"}
+
     def rows(self, t: float) -> list[dict]:
         """Every hold in force, with who set it and when it ends: for status --json and `holds`."""
         live = [h for h in self.holds.values() if h.until > t]

@@ -19,6 +19,7 @@ spec = importlib.util.spec_from_file_location("route", ROOT / "skills" / "delega
 route = importlib.util.module_from_spec(spec)
 sys.modules["route"] = route
 spec.loader.exec_module(route)
+<<<<<<< HEAD
 from delegate.adapters import procs  # noqa: E402  (route put src/ on sys.path)
 from delegate.adapters.harness import opencode_sandbox as box, reset_parse  # noqa: E402
 from delegate.adapters.harness.base import LaunchSpec  # noqa: E402
@@ -28,6 +29,12 @@ from delegate.domain.policy.matchers import heredoc_only_hit, secret_hit  # noqa
 from delegate.domain.policy.shell import git_write, read_only_problem  # noqa: E402
 from delegate.domain.policy.worker import is_policy_denial  # noqa: E402
 from delegate.app.supervisor import RunHooks, Supervisor  # noqa: E402
+=======
+from delegate.adapters.harness import reset_parse  # noqa: E402  (route put src/ on sys.path)
+import routing_support as support  # noqa: E402
+from delegate.app.fleet import apply_health  # noqa: E402
+from delegate.contracts import codec, stores  # noqa: E402
+>>>>>>> 454cb35 (D2: route.py on the typed Router/Fleet/HoldBook; lanes/health.py removed; tests ported to the typed API)
 
 route.REAL_NET_PROBE = route.net_probe
 route.net_probe = lambda hosts=None: {"up": True, "ip_up": True, "why": "ok", "ms": 1, "hosts": {}, "at": time.time()}     # tests open no socket; tests/test_net.py swaps it per case
@@ -62,7 +69,7 @@ def lanes(openai=None, sub=None, credit=None):
 def decide(role, ls, st=None, **args):
     a = {"authored_by": None, "failed": [], "premium": None, "allow_degraded": False}
     a.update(args)
-    return route.decide(role, copy.deepcopy(CFG), ls, st or {}, T, a)
+    return support.decide(role, copy.deepcopy(CFG), ls, st or {}, T, a)
 
 
 def health_mod():
@@ -268,17 +275,17 @@ class Cli(unittest.TestCase):
             try:
                 route.main(["report", "--lane", "OPENAI_SUBSCRIPTION", "--event", "out", "--until", str(T + 3600)])
                 st = route.load_state()
-                self.assertIn("OPENAI_SUBSCRIPTION", st["out"])
+                self.assertIn("OPENAI_SUBSCRIPTION", st.out)
                 cfg = route.load_routing()
                 real = dict(route.READERS)
                 route.READERS.update({k: (lambda lane, S, st_, t, *a: None) for k in real})
                 try:
-                    ls = route.gather(cfg, st, T, check_config=False)
+                    ls = route.fleet_builder(cfg).build(st, T, check_config=False).lanes
                 finally:
                     route.READERS.update(real)
                 self.assertTrue(ls["OPENAI_SUBSCRIPTION"].out)
                 route.main(["report", "--lane", "OPENAI_SUBSCRIPTION", "--event", "ok"])
-                self.assertNotIn("OPENAI_SUBSCRIPTION", route.load_state().get("out", {}))
+                self.assertNotIn("OPENAI_SUBSCRIPTION", route.load_state().out)
             finally:
                 for k in ("XDG_CONFIG_HOME", "APPDATA", "DELEGATE_NOW", "DELEGATE_CONFIG_DIR"):
                     os.environ.pop(k, None)
@@ -338,7 +345,7 @@ class Onboarding(unittest.TestCase):
         real = dict(route.READERS)
         route.READERS.update({k: (lambda lane, S, st_, t, *a: None) for k in real})
         try:
-            return route.gather(self.cfg, st or {}, T)
+            return route.fleet_builder(self.cfg).build(route.load_state(), T).lanes
         finally:
             route.READERS.update(real)
 
@@ -352,7 +359,7 @@ class Onboarding(unittest.TestCase):
         ls = self._gather()
         self.assertEqual(list(ls), ["CLAUDE_SUBSCRIPTION"])
         self.assertEqual(route.profile_lanes(), {})
-        self.assertEqual(route.drift_warnings(ls, {}, T), [])
+        self.assertEqual(route.drift_warnings(route.states(), ls, route.load_state(), T), [])
 
     def test_ready_lane_is_enabled_once_and_remembered(self):
         self._make_codex_ready()
@@ -368,10 +375,8 @@ class Onboarding(unittest.TestCase):
         route.set_profile_lane("OPENAI_SUBSCRIPTION", "enabled")          # nothing on this fake machine
         ls = self._gather()
         self.assertTrue(ls["OPENAI_SUBSCRIPTION"].out)
-        st = {}
-        self.assertEqual(len(route.drift_warnings(ls, st, T)), 1)
-        route.update_state(lambda s: s.update(st))
-        self.assertEqual(route.drift_warnings(ls, route.load_state(), T + 60), [])
+        self.assertEqual(len(route.drift_warnings(route.states(), ls, route.load_state(), T)), 1)
+        self.assertEqual(route.drift_warnings(route.states(), ls, route.load_state(), T + 60), [])
 
     def test_usage_is_requested_only_on_desktop(self):
         ls = self._gather()
@@ -532,13 +537,13 @@ class StateLock(unittest.TestCase):
 
     def test_parallel_processes_lose_no_update(self):
         code = ("import sys; sys.path.insert(0, %r); import route\n"
-                "for _ in range(25): route.update_state(lambda s: s.__setitem__('n', s.get('n', 0) + 1))" % str(Path(route.__file__).parent))
+                "for _ in range(25): route.update_state(lambda s: s.warned_at.__setitem__('n', s.warned_at.get('n', 0) + 1))" % str(Path(route.__file__).parent))
         with tempfile.TemporaryDirectory() as d:
             env = dict(os.environ, DELEGATE_CONFIG_DIR=d)
             ps = [subprocess.Popen([sys.executable, "-c", code], env=env, stderr=subprocess.PIPE) for _ in range(8)]
             self.maxDiff = None
             self.assertEqual([p.communicate()[1].decode()[-1500:] for p in ps], [""] * 8)
-            self.assertEqual(json.loads(Path(d, "state.json").read_text())["n"], 200)
+            self.assertEqual(json.loads(Path(d, "state.json").read_text())["warned_at"]["n"], 200)
 
 
 class OnboardChildEnv(unittest.TestCase):
@@ -790,7 +795,7 @@ printf '{"type":"result","result":"claude says hi","session_id":"sess-1","total_
         self.assertNotIn("ANTHROPIC_API_KEY", Path(os.environ["FAKE_ENV"]).read_text())
 
     def test_unattended_runs_when_no_usage_reading_exists(self):
-        route.update_state(lambda s: s.setdefault("out", {}).__setitem__("OPENAI_SUBSCRIPTION", {"until": route.now() + 3600, "why": "t"}))
+        support.put_out("OPENAI_SUBSCRIPTION", route.now() + 3600)
         Path(self.tmp.name, ".claude", "state", "max-limits.json").unlink()      # an unattended factory: no status line, no get_usage
         code, r = self.run_it()
         self.assertEqual((code, r["stop"], r["lane"]), (0, None, "CLAUDE_SUBSCRIPTION"))     # no limit by default
@@ -800,7 +805,7 @@ printf '{"type":"result","result":"claude says hi","session_id":"sess-1","total_
         self.assertEqual((code, r["stop"]), (0, None))
 
     def test_unattended_keeps_the_orchestrator_reserve(self):
-        route.update_state(lambda s: s.setdefault("out", {}).__setitem__("OPENAI_SUBSCRIPTION", {"until": route.now() + 3600, "why": "t"}))
+        support.put_out("OPENAI_SUBSCRIPTION", route.now() + 3600)
         f = Path(self.tmp.name) / ".claude" / "state" / "max-limits.json"
         d = json.loads(f.read_text())
         d["rate_limits"]["seven_day"]["used_percentage"] = 93                # above the 90% weekly reserve
@@ -814,18 +819,17 @@ printf '{"type":"result","result":"claude says hi","session_id":"sess-1","total_
 
     def test_unattended_never_picks_the_credit_lane_even_with_a_key(self):
         os.environ["CLAUDE_CREDIT_WORKER_KEY"] = "sk-ant-x"
-        route.update_state(lambda s: s.setdefault("out", {}).__setitem__("OPENAI_SUBSCRIPTION", {"until": route.now() + 3600, "why": "t"}))
+        support.put_out("OPENAI_SUBSCRIPTION", route.now() + 3600)
         _, r = self.run_it()
         self.assertEqual(r["lane"], "CLAUDE_SUBSCRIPTION")
 
     def test_unattended_never_answers_agent_ask_user_or_needs_input(self):
-        route.update_state(lambda s: s.setdefault("out", {}).update(
-            {n: {"until": route.now() + 3600, "why": "t"} for n in ("OPENAI_SUBSCRIPTION", "CLAUDE_SUBSCRIPTION")}))
+        [support.put_out(n, route.now() + 3600) for n in ("OPENAI_SUBSCRIPTION", "CLAUDE_SUBSCRIPTION")]
         code, r = self.run_it(role="planner")
         self.assertEqual((code, why(r)), (0, "no_lane"))
         self.assertNotIn("ask_user", r)
         self.assertNotIn("needs_input", r)
-        route.update_state(lambda s: s.pop("out"))
+        support.clear_out()
         self.codex_out()
         _, r = self.run_it(role="planner")                                 # no Agent tool here: the subscription runs claude -p (Sonnet; Opus never plans in the loop)
         self.assertIsNone(r.get("agent_model"))
@@ -836,15 +840,13 @@ printf '{"type":"result","result":"claude says hi","session_id":"sess-1","total_
         _, r = self.run_it(role="planner", unattended=False)
         self.assertEqual((r["stop"], r["lane"], r["agent_model"]), (None, "CLAUDE_SUBSCRIPTION", "sonnet"))
         self.assertIn("coordinator", r["brief_prefix"])
-        route.update_state(lambda s: s.setdefault("out", {}).update(
-            {n: {"until": route.now() + 3600, "why": "t"} for n in ("OPENAI_SUBSCRIPTION", "CLAUDE_SUBSCRIPTION")}))
+        [support.put_out(n, route.now() + 3600) for n in ("OPENAI_SUBSCRIPTION", "CLAUDE_SUBSCRIPTION")]
         _, r = self.run_it(role="planner", unattended=False)
         self.assertEqual(why(r), "no_lane")
         self.assertIn("ask_user", r)
 
     def lease(self, rid, lane, task="", expires=None):
-        route.update_state(lambda s: s.setdefault("leases", {}).__setitem__(rid, {"lane": lane, "role": "worker", "pid": 1, "start": route.now(), "task": task,
-                                                                               "expires": expires if expires is not None else route.now() + 600}))
+        support.put_lease(rid, lane=lane, role="worker", start=route.now(), task=task, expires=expires if expires is not None else route.now() + 600)
 
     def test_a_busy_first_choice_waits_unless_told_not_to(self):
         for i in range(4):
@@ -887,7 +889,7 @@ printf '{"type":"result","result":"claude says hi","session_id":"sess-1","total_
         d = json.loads(f.read_text())
         d["rate_limits"]["five_hour"]["used_percentage"] = 85
         f.write_text(json.dumps(d))
-        route.update_state(lambda s: s.setdefault("out", {}).__setitem__("OPENAI_SUBSCRIPTION", {"until": route.now() + 3600, "why": "t"}))
+        support.put_out("OPENAI_SUBSCRIPTION", route.now() + 3600)
         self.lease("c0", "CLAUDE_SUBSCRIPTION")
         _, r = self.run_it()
         self.assertEqual(why(r), "no_lane")          # one slot, taken: the first choice is out, so nothing waits for a slot
@@ -899,13 +901,13 @@ printf '{"type":"result","result":"claude says hi","session_id":"sess-1","total_
         self.assertIn("T-1", r["say"])
         _, r = self.run_it("--task", "T-2")
         self.assertEqual(r["stop"], None)
-        route.update_state(lambda s: s["leases"].pop("r0"))
+        route.update_state(lambda s: s.leases.pop("r0"))
         _, r = self.run_it("--task", "T-1")             # a resume after the first run ended is fine
         self.assertEqual(r["stop"], None)
 
     def test_the_lease_is_released_and_a_history_line_is_written(self):
         _, r = self.run_it("--task", "T-9")
-        self.assertEqual(route.load_state().get("leases"), {})
+        self.assertEqual(route.load_state().leases, {})
         line = json.loads(route.history_path().read_text().splitlines()[-1])
         self.assertEqual((line["run_id"], line["task"], line["lane"], line["done"]), (r["run_id"], "T-9", "OPENAI_SUBSCRIPTION", True))
         self.assertEqual(line["tokens"], {"in": 100, "cached": 40, "out": 7})
@@ -934,7 +936,7 @@ printf '{"type":"result","result":"claude says hi","session_id":"sess-1","total_
         self.assertEqual(r["warnings"], ["answer_done_process_alive"])
         self.assertIsNone(r["stop"])
         self.assertEqual(json.loads(route.history_path().read_text().splitlines()[-1])["warnings"], ["answer_done_process_alive"])
-        self.assertNotIn("OPENAI_SUBSCRIPTION", route.load_state().get("out", {}))
+        self.assertNotIn("OPENAI_SUBSCRIPTION", route.load_state().out)
         time.sleep(0.3)
         with self.assertRaises(OSError):
             os.kill(int(Path(os.environ["FAKE_PIDFILE"]).read_text()), 0)
@@ -990,7 +992,7 @@ printf '{"type":"result","result":"claude says hi","session_id":"sess-1","total_
                 self.fail(p.stdout.read().decode() + p.stderr.read().decode())
             time.sleep(0.1)
         pid = int(Path(os.environ["FAKE_PIDFILE"]).read_text())
-        wp = [v.get("worker_pid") for v in (route.load_state().get("leases") or {}).values()]
+        wp = [v.worker_pid for v in route.load_state().leases.values()]
         self.assertTrue(wp and wp[0], "the lease names the worker before it does any work")
         p.send_signal(signal.SIGTERM)
         p.wait(timeout=15)
@@ -998,14 +1000,14 @@ printf '{"type":"result","result":"claude says hi","session_id":"sess-1","total_
         time.sleep(0.3)
         with self.assertRaises(OSError):
             os.kill(pid, 0)
-        self.assertEqual(route.load_state().get("leases"), {})
+        self.assertEqual(route.load_state().leases, {})
 
 
     def config(self, **kw):
         route.update_config(lambda c: c.update(kw))
 
     def codex_out(self):
-        route.update_state(lambda s: s.setdefault("out", {}).__setitem__("OPENAI_SUBSCRIPTION", {"until": route.now() + 3600, "why": "t"}))
+        support.put_out("OPENAI_SUBSCRIPTION", route.now() + 3600)
 
     FAKE_OPENCODE = """#!/bin/sh
 [ "$1" = export ] && { echo '{"info":{"id":"'"$2"'"},"messages":[]}'; exit 0; }
@@ -1051,7 +1053,7 @@ echo '{"type":"step_finish","sessionID":"ses_1","part":{"type":"step-finish","co
         _, r = self.run_it(timeout=0)
         self.assertLess(time.time() - t0, 20)
         self.assertEqual((why(r), r["stop"]["permanence"], r["lane"]), ("rate_limited", "transient", "GROK_SUBSCRIPTION"))
-        out = route.load_state()["out"]["GROK_SUBSCRIPTION"]
+        out = route.load_state().out["GROK_SUBSCRIPTION"]
         self.assertIn("Free usage limit reached", out["why"])
         self.assertGreater(out["until"], time.time())
         self.assertLessEqual(out["until"], (time.time() // 86400 + 1) * 86400 + 1)
@@ -1065,7 +1067,7 @@ echo '{"type":"step_finish","sessionID":"ses_1","part":{"type":"step-finish","co
             _, r = self.run_it(timeout=0)
         self.assertLess(time.time() - t0, 20)
         self.assertEqual((why(r), r["stop"]["permanence"]), ("hung", "transient"))
-        self.assertEqual(route.load_state()["out"]["GROK_SUBSCRIPTION"]["reason"], "hung")
+        self.assertEqual(route.load_state().out["GROK_SUBSCRIPTION"].reason, "hung")
         self.assert_child_gone(pid)
 
     @unittest.skipIf(sys.platform != "darwin", "the Grok lane runs commands under sandbox-exec: macOS only")
@@ -1078,7 +1080,7 @@ echo '{"type":"step_finish","sessionID":"ses_1","part":{"type":"step-finish","co
         with mock.patch.dict(route.watch.LIMITS["opencode"], first_event_s=20):
             _, r = self.run_it(timeout=0)
         self.assertEqual((r["stop"], r["text"]), (None, "grok did it"))
-        self.assertNotIn("GROK_SUBSCRIPTION", route.load_state().get("out", {}))
+        self.assertNotIn("GROK_SUBSCRIPTION", route.load_state().out)
 
     @unittest.skipIf(sys.platform != "darwin", "the Grok lane runs commands under sandbox-exec: macOS only")
     def test_grok_is_the_worker_after_codex_in_a_sandboxed_shell_without_user_config(self):
@@ -1153,8 +1155,8 @@ echo '{"type":"step_finish","sessionID":"ses_1","part":{"type":"step-finish","co
         self.codex_out()
         _, r = self.run_it(mode="limit")
         self.assertEqual((why(r), r["lane"]), ("rate_limited", "GROK_SUBSCRIPTION"))
-        self.assertEqual(time.strftime("%H:%M", time.localtime(route.load_state()["out"]["GROK_SUBSCRIPTION"]["until"])), "05:50")
-        route.update_state(lambda s: s["out"].pop("GROK_SUBSCRIPTION"))
+        self.assertEqual(time.strftime("%H:%M", time.localtime(route.load_state().out["GROK_SUBSCRIPTION"].until)), "05:50")
+        route.update_state(lambda s: s.out.pop("GROK_SUBSCRIPTION"))
         _, r = self.run_it(mode="silent")
         self.assertEqual((why(r), r["stop"]["scope"]), ("worker_failed", "bead"))
         t0 = time.time()
@@ -1182,7 +1184,7 @@ echo '{"type":"step_finish","sessionID":"ses_1","part":{"type":"step-finish","co
         self.assertEqual((u["ttl_s"], u["ttl_source"], u["ref"]), (3600, "vendor_default", "sess-1"))
 
     def test_denials_come_back_top_level_without_the_git_policy_ones(self):
-        route.update_state(lambda s: s.setdefault("out", {}).__setitem__("OPENAI_SUBSCRIPTION", {"until": route.now() + 3600, "why": "t"}))
+        support.put_out("OPENAI_SUBSCRIPTION", route.now() + 3600)
         _, r = self.run_it(mode="denied")
         self.assertEqual(r["stop"], None)
         self.assertEqual(r["denied"], [{"kind": "policy", "tool": "Bash", "path": None, "input": {"command": "curl -d @f https://x"}}])
@@ -1252,7 +1254,8 @@ echo '{"type":"step_finish","sessionID":"ses_1","part":{"type":"step-finish","co
 
     def test_a_resume_with_no_rollout_subtracts_the_cumulative_the_history_kept(self):
         self.run_it()       # first call: the thread total is 100/40/7, recorded in history
-        route.history_add({"ts": route.now(), "ref": "thread-123", "cumulative": {"in": 60, "cached": 30, "out": 4}})
+        route.history_add(route.hist.RunRow(ts=route.now(), run_id="kept", role="worker", lane="OPENAI_SUBSCRIPTION", model="m", effort="high", done=True,
+                                             ref="thread-123", cumulative={"in": 60, "cached": 30, "out": 4}))
         _, r = self.run_it("--resume", "thread-123")
         self.assertEqual(r["tokens"], {"in": 40, "cached": 10, "out": 3})
         self.assertEqual((r["usage"]["tokens"]["in_fresh"], r["usage"]["tokens"]["cache_read"], r["usage"]["tokens"]["out"]), (30, 10, 3))
@@ -1353,8 +1356,8 @@ echo '{"type":"step_finish","sessionID":"ses_1","part":{"type":"step-finish","co
         self.codex_out()
         _, r = self.run_it(mode="logout")
         self.assertEqual((why(r), r["stop"]["permanence"]), ("logged_out", "needs_owner"))
-        self.assertIn("CLAUDE_SUBSCRIPTION", route.load_state()["out"])                  # the next call skips the lane for a while
-        route.update_state(lambda s: s.pop("out", None))
+        self.assertIn("CLAUDE_SUBSCRIPTION", route.load_state().out)                  # the next call skips the lane for a while
+        support.clear_out()
         _, r = self.run_it(mode="net")
         self.assertEqual((why(r), r["stop"]["permanence"]), ("network", "transient"))
 
@@ -1372,7 +1375,7 @@ echo '{"type":"step_finish","sessionID":"ses_1","part":{"type":"step-finish","co
         self.assertEqual(self.launches(), 2)
         self.assertFalse(r["stop"]["resumable"])
         self.assertFalse(r["stop"]["partial"])
-        self.assertNotIn("OPENAI_SUBSCRIPTION", route.load_state().get("out", {}))      # the network is not the lane's fault
+        self.assertNotIn("OPENAI_SUBSCRIPTION", route.load_state().out)      # the network is not the lane's fault
 
     def test_a_drop_with_the_net_still_down_is_not_relaunched_in_the_call(self):
         with mock.patch.object(route, "net_probe", lambda hosts=None: {"up": False, "ip_up": False, "why": "offline", "ms": 1, "hosts": {}, "at": time.time()}):
@@ -1383,7 +1386,7 @@ echo '{"type":"step_finish","sessionID":"ses_1","part":{"type":"step-finish","co
     def test_a_dropped_stream_keeps_the_ref_in_the_answer_the_stop_and_the_refs_table(self):
         _, r = self.run_it(mode="late_error")
         self.assertEqual((r["ref"], r["stop"]["ref"]), ("thread-123", "thread-123"))
-        self.assertIn("thread-123", route.load_state()["refs"])         # a later --resume finds the lane that made it
+        self.assertIn("thread-123", route.load_state().refs)         # a later --resume finds the lane that made it
         row = json.loads(Path(route.history_path()).read_text().splitlines()[-1])
         self.assertEqual((row["outcome"], row["ref"]), ("network", "thread-123"))
 
@@ -1396,10 +1399,10 @@ echo '{"type":"step_finish","sessionID":"ses_1","part":{"type":"step-finish","co
         for _ in range(5):
             _, r = self.run_it(mode="late_error", unattended=True)
             self.assertEqual(why(r), "network")
-        rows = health_mod().read_rows(route.history_path())
-        st = health_mod().fold(rows)
-        self.assertTrue(health_mod().view(st, "OPENAI_SUBSCRIPTION", r["model"], time.time())["usable"])
-        self.assertEqual(st["pairs"], {})
+        led = route.health_ledger.HealthLedger(route.typed_routing(CFG).settings.breaker)
+        st = led.fold(route.history_store().rows())
+        self.assertTrue(led.view(st, "OPENAI_SUBSCRIPTION", r["model"], time.time()).usable)
+        self.assertEqual(st.pairs, {})
         _, r = self.run_it()
         self.assertEqual(r["stop"], None)
 
@@ -1409,7 +1412,7 @@ echo '{"type":"step_finish","sessionID":"ses_1","part":{"type":"step-finish","co
         self.assertEqual((r["stop"], r["text"]), (None, "the final answer"))
         self.assertEqual(r["warnings"], ["net_after_answer"])
         self.assertIsNone(r["stop"])
-        self.assertNotIn("OPENAI_SUBSCRIPTION", route.load_state().get("out", {}))
+        self.assertNotIn("OPENAI_SUBSCRIPTION", route.load_state().out)
 
     def test_the_final_answer_then_a_drop_is_done_with_a_warning_claude(self):
         self.codex_out()
@@ -1513,17 +1516,17 @@ echo '{"type":"step_finish","sessionID":"ses_1","part":{"type":"step-finish","co
         self.assertIsNone(route.schema_problem(r, schema))
         for mode, reason in (("bad_request", "bad_request"), ("limit", "rate_limited"), ("logout", "logged_out"), ("early_error", "vendor_blip"), ("net", "network"),
                              ("late_error", "network"), ("secret", "secrets")):
-            route.update_state(lambda st: st.pop("out", None))
+            support.clear_out()
             _, r = self.run_it(mode=mode)
             self.assertEqual(r["stop"]["reason"], reason, mode)
             self.assertIsNone(route.schema_problem(r, schema), mode)
             self.assertEqual(json.loads(route.history_path().read_text().splitlines()[-1])["outcome"], reason)
-        route.update_state(lambda st: st.pop("out", None))
+        support.clear_out()
 
     def test_a_request_fault_leaves_the_lane_in_state_json_alone(self):
-        before = route.load_state().get("out")
+        before = route.load_state().out
         self.run_it(mode="bad_request")
-        self.assertEqual(route.load_state().get("out"), before)
+        self.assertEqual(route.load_state().out, before)
 
     def test_handshake_declares_contract_3_and_the_reason_table(self):
         import io
@@ -1580,9 +1583,8 @@ echo '{"type":"step_finish","sessionID":"ses_1","part":{"type":"step-finish","co
 
     def failed_rows(self, n, ago, outcome="worker_failed", lane="OPENAI_SUBSCRIPTION", model="gpt-6.1-sol", say="boom"):
         t = route.now() - ago
-        from lanes import health
-        return [dict(ts=t + i, run_id=f"f{i}", task=f"t{i}", role="worker", lane=lane, model=model, status="failed", reason=outcome, **health.row_fields(outcome, "event", say))
-                for i in range(n)]
+        return [route.hist.RunRow(ts=t + i, run_id=f"f{i}", task=f"t{i}", role="worker", lane=lane, model=model, effort="high", done=False,
+                                  **route.health_ledger.failure_fields(outcome, "event", say)) for i in range(n)]
 
     def test_codex_that_goes_quiet_is_stopped_through_the_tree_kill_and_the_lane_is_not_marked_out(self):
         with mock.patch.dict(route.watch.LIMITS["codex"], silence_s=1), mock.patch.object(procs, "stop_tree", wraps=procs.stop_tree) as st:
@@ -1592,7 +1594,7 @@ echo '{"type":"step_finish","sessionID":"ses_1","part":{"type":"step-finish","co
         self.assertEqual((why(r), r["stop"]["permanence"]), ("hung", "transient"))
         self.assertIn("silent for 1s", r["say"])
         self.assertTrue(st.called)                                    # every kill goes through stop_tree
-        self.assertNotIn("OPENAI_SUBSCRIPTION", route.load_state().get("out", {}))      # went quiet mid-run: the pair is suspect, not the lane
+        self.assertNotIn("OPENAI_SUBSCRIPTION", route.load_state().out)      # went quiet mid-run: the pair is suspect, not the lane
         pid = int(Path(os.environ["FAKE_PIDFILE"]).read_text())
         time.sleep(0.3)
         with self.assertRaises(OSError):
@@ -1600,14 +1602,20 @@ echo '{"type":"step_finish","sessionID":"ses_1","part":{"type":"step-finish","co
         last = json.loads(route.history_path().read_text().splitlines()[-1])
         self.assertEqual((last["outcome"], last["v"], last["model"], len(last["fingerprint"])), ("hung", 1, "gpt-6.1-sol", 12))
 
+<<<<<<< HEAD
     def test_a_gap_over_1800s_is_written_to_history_through_the_watchdog_and_the_fold_ignores_it(self):
         from delegate.app import watch
         from lanes import health
+=======
+    def test_a_gap_over_1800s_is_written_to_history_through_worker_watch_and_the_fold_ignores_it(self):
+        import functools
+>>>>>>> 454cb35 (D2: route.py on the typed Router/Fleet/HoldBook; lanes/health.py removed; tests ported to the typed API)
         t = [0.0]
         d = {"lane": "OPENAI_SUBSCRIPTION", "model": "gpt-6.1-sol"}
         dog = watch.Watchdog(120, 3600, clock=lambda: t[0])
         for at in (5, 1805, 4005):       # gaps of 1800 s (not logged) and 2200 s (logged)
             t[0] = at
+<<<<<<< HEAD
             dog.touch()
         self.assertFalse(dog.poll())
         dog.flush(route.history_add, d["lane"], d["model"], True)
@@ -1616,6 +1624,15 @@ echo '{"type":"step_finish","sessionID":"ses_1","part":{"type":"step-finish","co
                          [("gap", "OPENAI_SUBSCRIPTION", "gpt-6.1-sol", 2200.0, True, None)])
         self.assertEqual(health.fold(rows)["pairs"], {})
         dog.flush(None, d["lane"], d["model"], True)       # never raises
+=======
+            tick()
+        self.assertFalse(poll())
+        route.log_gaps(w, d)
+        rows = route.history_store().rows()
+        self.assertEqual([(type(r).__name__, r.lane, r.model, r.gap_s, r.finished) for r in rows], [("GapRow", "OPENAI_SUBSCRIPTION", "gpt-6.1-sol", 2200.0, True)])
+        self.assertEqual(route.health_ledger.HealthLedger(route.typed_routing(CFG).settings.breaker).fold(rows).pairs, {})
+        route.log_gaps({"wd": None}, d)       # never raises
+>>>>>>> 454cb35 (D2: route.py on the typed Router/Fleet/HoldBook; lanes/health.py removed; tests ported to the typed API)
 
     def test_any_stream_line_counts_as_activity_even_on_stderr(self):
         with mock.patch.dict(route.watch.LIMITS["codex"], silence_s=1):      # the fake prints to stderr every 0.4 s for 3 s
@@ -1636,20 +1653,20 @@ echo '{"type":"step_finish","sessionID":"ses_1","part":{"type":"step-finish","co
         self.assertEqual(len(calls), 2)
         self.assertEqual(Path(os.environ["FAKE_ARGS"] + ".brief").read_text().strip().splitlines()[-1], "the brief")
         rows = [json.loads(x) for x in route.history_path().read_text().splitlines()]
-        self.assertEqual([x["role"] for x in rows[-2:]], ["canary", "worker"])
+        self.assertEqual([x["kind"] for x in rows[-2:]], ["canary", "run"])
         _, r = self.run_it()                           # the canary passed: the ladder is reset, the next call has none
         self.assertEqual(len(self.args_seen().strip().splitlines()), 3)
 
     def test_a_failed_canary_is_the_answer_and_starts_the_next_rung(self):
-        from lanes import health
         self.hist(self.failed_rows(3, 1500))
         _, r = self.run_it(mode="early_error")
         self.assertEqual(why(r), "vendor_blip")
         self.assertTrue(r["say"].startswith("canary failed: "), r["say"])
         self.assertEqual(len(self.args_seen().strip().splitlines()), 1)         # the real brief was never sent
-        v = health.view(health.fold(health.read_rows(route.history_path())), "OPENAI_SUBSCRIPTION", "gpt-6.1-sol", route.now() + 1)
-        self.assertEqual((v["state"], v["rung"]), ("broken", 2))
-        self.assertAlmostEqual(v["until"] - route.now(), 30 * 60, delta=5)
+        led = route.health_ledger.HealthLedger(route.typed_routing(CFG).settings.breaker)
+        v = led.view(led.fold(route.history_store().rows()), "OPENAI_SUBSCRIPTION", "gpt-6.1-sol", route.now() + 1)
+        self.assertEqual((v.state, v.rung), ("broken", 2))
+        self.assertAlmostEqual(v.until - route.now(), 30 * 60, delta=5)
 
     def test_bad_request_never_benches_the_pair(self):
         for _ in range(4):
@@ -1677,14 +1694,15 @@ echo '{"type":"step_finish","sessionID":"ses_1","part":{"type":"step-finish","co
 
     def test_a_suspect_lease_does_not_count_against_the_lane_cap(self):
         now = route.now()
-        quiet = {"lane": "OPENAI_SUBSCRIPTION", "role": "worker", "pid": 1, "start": now - 3000, "expires": now + 100, "silence_s": 2400, "last_event": now - 2500}
-        live = dict(quiet, last_event=now - 10)
+        quiet = support.lease(lane="OPENAI_SUBSCRIPTION", role="worker", start=now - 3000, expires=now + 100, silence_s=2400, last_event=now - 2500)
+        live = route.replace(quiet, last_event=now - 10)
         self.assertTrue(route.suspect(quiet, now))
         self.assertFalse(route.suspect(live, now))
-        self.assertFalse(route.suspect({"lane": "x", "start": now - 99999, "expires": now + 1}, now))     # an old lease without a limit is not guessed at
-        st = {"leases": {"a": quiet, "b": live}}
-        self.assertEqual(route.lease_counts(st, now, "OPENAI_SUBSCRIPTION"), {"live": 2, "suspect": 1})
-        self.assertEqual([r["suspect"] for r in route.running_rows({"leases": {"a": dict(quiet, start=now - 3000)}}, now)], [True])
+        self.assertFalse(route.suspect(support.lease(lane="x", start=now - 99999, expires=now + 1), now))     # an old lease without a limit is not guessed at
+        st = support.doc_of({})
+        st.leases = {"a": quiet, "b": live}
+        self.assertEqual(route.LeaseBook(st.leases).counts("OPENAI_SUBSCRIPTION", now), {"live": 2, "suspect": 1})
+        self.assertEqual([r["suspect"] for r in route.running_rows(st, now)], [True, False])
 
     def test_workers_of_a_lane_marked_out_by_someone_else_are_stopped_within_the_poll_interval(self):
         from delegate.app.supervisor import LaneGoneWatcher
@@ -1718,10 +1736,15 @@ echo '{"type":"step_finish","sessionID":"ses_1","part":{"type":"step-finish","co
         dead = sp.Popen(["true"]); dead.wait()
         orphan = sp.Popen(["sleep", "300"], start_new_session=True)
         try:
+<<<<<<< HEAD
             start = procs.start_token(orphan.pid)
             route.update_state(lambda st: st.setdefault("leases", {}).__setitem__("old-run", {
                 "lane": "OPENAI_SUBSCRIPTION", "role": "worker", "pid": dead.pid, "pid_start": "Mon Jan  1 00:00:00 2001", "start": route.now() - 300,
                 "expires": route.now() + 60, "task": "T-7", "worker_pid": orphan.pid, "worker_start": start}))
+=======
+            start = route.proc_start(orphan.pid)
+            support.put_lease("old-run", lane="OPENAI_SUBSCRIPTION", role="worker", pid=dead.pid, pid_start="Mon Jan  1 00:00:00 2001", start=route.now() - 300,                 expires=route.now() + 60, task="T-7", worker_pid=orphan.pid, worker_start=start)
+>>>>>>> 454cb35 (D2: route.py on the typed Router/Fleet/HoldBook; lanes/health.py removed; tests ported to the typed API)
             _, r = self.run_it("--task", "T-7")
             self.assertEqual(r["stop"], None)                      # ran after the orphan was stopped
             self.assertIsNotNone(orphan.poll())
@@ -1734,9 +1757,13 @@ echo '{"type":"step_finish","sessionID":"ses_1","part":{"type":"step-finish","co
         import subprocess as sp
         worker = sp.Popen(["sleep", "300"], start_new_session=True)
         try:
+<<<<<<< HEAD
             route.update_state(lambda st: st.setdefault("leases", {}).__setitem__("old-run", {
                 "lane": "OPENAI_SUBSCRIPTION", "role": "worker", "pid": os.getpid(), "pid_start": procs.start_token(os.getpid()), "start": route.now() - 300,
                 "expires": route.now() - 1, "task": "T-9", "worker_pid": worker.pid, "worker_start": procs.start_token(worker.pid)}))
+=======
+            support.put_lease("old-run", lane="OPENAI_SUBSCRIPTION", role="worker", pid=os.getpid(), pid_start=route.proc_start(os.getpid()), start=route.now() - 300,                 expires=route.now() - 1, task="T-9", worker_pid=worker.pid, worker_start=route.proc_start(worker.pid))
+>>>>>>> 454cb35 (D2: route.py on the typed Router/Fleet/HoldBook; lanes/health.py removed; tests ported to the typed API)
             _, r = self.run_it("--task", "T-9")
             self.assertEqual(why(r), "duplicate_task")
             self.assertIsNone(worker.poll())
@@ -1748,9 +1775,7 @@ echo '{"type":"step_finish","sessionID":"ses_1","part":{"type":"step-finish","co
         dead = sp.Popen(["true"]); dead.wait()
         other = sp.Popen(["sleep", "300"], start_new_session=True)
         try:
-            route.update_state(lambda st: st.setdefault("leases", {}).__setitem__("old-run", {
-                "lane": "OPENAI_SUBSCRIPTION", "role": "worker", "pid": dead.pid, "pid_start": "x", "start": route.now() - 300, "expires": route.now() - 1,
-                "task": "T-8", "worker_pid": other.pid, "worker_start": "Mon Jan  1 00:00:00 2001"}))
+            support.put_lease("old-run", lane="OPENAI_SUBSCRIPTION", role="worker", pid=dead.pid, pid_start="x", start=route.now() - 300, expires=route.now() - 1,                 task="T-8", worker_pid=other.pid, worker_start="Mon Jan  1 00:00:00 2001")
             _, r = self.run_it("--task", "T-8")
             self.assertEqual(r["stop"], None)
             self.assertIsNone(other.poll())
@@ -1765,7 +1790,7 @@ echo '{"type":"step_finish","sessionID":"ses_1","part":{"type":"step-finish","co
         self.assertEqual((why(r), r["stop"]["permanence"], r["lane"]), ("busy", "transient", "OPENAI_SUBSCRIPTION"))
         self.assertTrue(time.time() + 50 < at(r) < time.time() + 130)
         last = json.loads(route.history_path().read_text().splitlines()[-1])           # refusals are in history too
-        self.assertEqual((last["outcome"], last["resume"], last["run_id"]), ("busy", True, None))
+        self.assertEqual((last["outcome"], last["resume"], last["kind"]), ("busy", True, "refusal"))
 
     def test_a_limit_refusal_lasts_until_the_known_reset(self):
         soon = route.now() + 500
@@ -1775,7 +1800,7 @@ echo '{"type":"step_finish","sessionID":"ses_1","part":{"type":"step-finish","co
                 lane.five, lane.five_reset, lane.week, lane.week_reset = 50, soon, 10, soon + 99999
         route.READERS["codex_app_server"] = reading
         self.run_it(mode="limit")
-        self.assertAlmostEqual(route.load_state()["out"]["OPENAI_SUBSCRIPTION"]["until"], soon, delta=1)
+        self.assertAlmostEqual(route.load_state().out["OPENAI_SUBSCRIPTION"].until, soon, delta=1)
         when, source, _ = reset_parse.limit_until("You've hit your usage limit. ... or try again at 5:50 AM.", route.now(), {})
         self.assertEqual(time.strftime("%H:%M", time.localtime(when)), "05:50")
         self.assertTrue(route.now() < when <= route.now() + 86400)
@@ -1786,26 +1811,26 @@ echo '{"type":"step_finish","sessionID":"ses_1","part":{"type":"step-finish","co
     def test_a_plan_with_only_a_weekly_window_reads_it_as_the_week(self):
         res = {"ordinaryUsageAllowed": True, "rateLimits": {"primary": {"usedPercent": 40, "windowDurationMins": 10080, "resetsAt": route.now() + 3 * 86400},
                                                             "secondary": None, "rateLimitReachedType": None}}
-        route.update_state(lambda s: s.__setitem__("codex_limits", {"at": route.now(), "res": res}))
+        route.update_state(lambda s: setattr(s, "codex_limits", route.UsageCache(at=route.now(), data=res)))
         lane = route.Lane("OPENAI_SUBSCRIPTION", "openai", "subscription")
-        self.real["codex_app_server"](lane, route.load_routing()["settings"], route.load_state(), route.now())
+        self.real["codex_app_server"](lane, route.settings_of(route.load_routing()), route.load_state(), route.now())
         self.assertEqual((lane.five, lane.week), (None, 40.0))
         self.assertIsNotNone(lane.pace)
 
     def test_a_reading_with_room_after_the_refusal_clears_the_out(self):
-        route.update_state(lambda s: s.setdefault("out", {}).__setitem__("OPENAI_SUBSCRIPTION", {"until": route.now() + 5 * 86400, "why": "limit refusal: x", "at": route.now() - 60}))
+        support.put_out("OPENAI_SUBSCRIPTION", route.now() + 5 * 86400, "limit refusal: x", at=route.now() - 60)
 
         def reading(lane, S, st, t, *a):
             lane.five, lane.week, lane.read_at = 0, 0, t
         route.READERS["codex_app_server"] = reading
         _, r = self.run_it()
         self.assertEqual((r["stop"], r["lane"]), (None, "OPENAI_SUBSCRIPTION"))
-        self.assertNotIn("OPENAI_SUBSCRIPTION", route.load_state().get("out", {}))
+        self.assertNotIn("OPENAI_SUBSCRIPTION", route.load_state().out)
 
     def test_the_model_saying_rate_limit_is_not_a_limit_refusal(self):
         route.READERS["codex_app_server"] = lambda lane, S, st, t, *a: None
         _, r = self.run_it(mode="saylimit")
-        self.assertNotIn("OPENAI_SUBSCRIPTION", route.load_state().get("out", {}))
+        self.assertNotIn("OPENAI_SUBSCRIPTION", route.load_state().out)
         self.assertNotEqual(why(r), "rate_limited")
 
     def test_resume_continues_on_the_same_lane_and_never_switches(self):
@@ -1815,7 +1840,7 @@ echo '{"type":"step_finish","sessionID":"ses_1","part":{"type":"step-finish","co
         self.assertEqual((r["stop"], r["lane"]), (None, "OPENAI_SUBSCRIPTION"))
         self.assertIn("exec resume", self.args_seen())
         self.assertIn('sandbox_mode="workspace-write"', self.args_seen())
-        route.update_state(lambda s: s.setdefault("out", {}).__setitem__("OPENAI_SUBSCRIPTION", {"until": route.now() + 3600, "why": "t"}))
+        support.put_out("OPENAI_SUBSCRIPTION", route.now() + 3600)
         n = len(self.args_seen().splitlines())
         _, r = self.run_it("--resume", "thread-123")
         self.assertEqual((why(r), r["lane"], r["stop"]["permanence"]), ("rate_limited", "OPENAI_SUBSCRIPTION", "transient"))
@@ -1847,87 +1872,91 @@ class Holds(unittest.TestCase):
 
     def test_a_hold_without_until_is_refused(self):
         with self.assertRaises(ValueError):
-            route.add_hold("OPENAI_SUBSCRIPTION", None, "pause")
+            support.add_hold("OPENAI_SUBSCRIPTION", None, "pause")
         code, out = self.main("hold", "OPENAI_SUBSCRIPTION", "--reason", "pause")
         self.assertEqual((code, out["ok"]), (1, False))
         self.assertIn("--until", out["error"])
-        self.assertEqual(route.load_state().get("holds"), None)
+        self.assertEqual(route.load_state().holds, {})
         for bad in ("yesterday", "1000"):
             self.assertEqual(self.main("hold", "OPENAI_SUBSCRIPTION", "--until", bad)[0], 1)
         self.assertEqual(self.main("hold", "NOPE", "--until", "+2h")[0], 1)
-        self.assertEqual(route.load_state().get("holds"), None)
+        self.assertEqual(route.load_state().holds, {})
         code, out = self.main("hold", "OPENAI_SUBSCRIPTION", "--until", str(int(time.time()) + 3600), "--reason", "epoch as the command line gives it")
         self.assertEqual((code, out["ok"]), (0, True))
         self.assertEqual(self.main("hold", "OPENAI_SUBSCRIPTION", "--until", "2099-01-01T00:00:00+00:00")[0], 0)
-        self.assertEqual(len(route.load_state()["holds"]), 2)
+        self.assertEqual(len(route.load_state().holds), 2)
 
     def test_a_refusal_says_why_there_is_no_transcript_and_what_held_the_lane(self):
-        route.add_hold("OPENAI_SUBSCRIPTION", "+1h", "x")
+        support.add_hold("OPENAI_SUBSCRIPTION", "+1h", "x")
         a = argparse_ns("worker", call_id="c#9", task=None, parent=None, title=None, brief=None, timeout=5, unattended=True, schema=None, resume="old")
-        st = {"refs": {"old": {"lane": "OPENAI_SUBSCRIPTION", "model": "gpt-6.1-sol", "mode": "write", "effort": "medium"}}}
         import io
-        with mock.patch.object(route, "gather", return_value=lanes()), mock.patch.object(route, "publish_lanes"), mock.patch.object(route, "mark_busy"), \
-                mock.patch.object(route, "interactive", return_value=False), mock.patch("sys.stdout", io.StringIO()) as out:
-            route.update_state(lambda s: s.setdefault("refs", {}).update(st["refs"]))
+        with support.fleet_patches(lanes()), mock.patch.object(route, "interactive", return_value=False), mock.patch("sys.stdout", io.StringIO()) as out:
+            route.update_state(lambda s: s.refs.__setitem__("old", route.RefRecord(lane="OPENAI_SUBSCRIPTION", model="gpt-6.1-sol", mode="write", effort="medium")))
             route.run_once(a, copy.deepcopy(CFG))
         r = json.loads(out.getvalue())
         self.assertEqual((r["transcript_status"], r["call_id"], r["stop"]["reason"]), ("not_launched", "c#9", "held"))
         self.assertIsNone(route.schema_problem(r, route.classify.CONTRACT["answer_schema"]))
 
     def test_a_hold_stops_its_roles_until_it_ends_and_the_trace_says_who(self):
-        h = route.add_hold("OPENAI_SUBSCRIPTION", "+2h", "weekly budget", ["worker", "hard"], t=T)
-        self.assertEqual((h["set_by"], h["until"], h["roles"]), ("owner", T + 7200, ["hard", "worker"]))
+        h = support.add_hold("OPENAI_SUBSCRIPTION", "+2h", "weekly budget", ["worker", "hard"], t=T)
+        self.assertEqual((h.set_by, h.until, h.roles), ("owner", T + 7200, ["hard", "worker"]))
         st = route.load_state()
-        d = route.decide("worker", copy.deepcopy(CFG), lanes(), st, T, {"authored_by": None, "failed": [], "premium": None, "allow_degraded": False})
+        d = support.decide("worker", copy.deepcopy(CFG), lanes(), st, T, {"authored_by": None, "failed": [], "premium": None, "allow_degraded": False})
         self.assertNotEqual(d["lane"], "OPENAI_SUBSCRIPTION")
         self.assertTrue(any(x.startswith("OPENAI_SUBSCRIPTION: rejected, held: owner until") and "weekly budget" in x for x in d["trace"]), d["trace"])
-        p = route.decide("planner", copy.deepcopy(CFG), lanes(), st, T, {"authored_by": None, "failed": [], "premium": None, "allow_degraded": False})
+        p = support.decide("planner", copy.deepcopy(CFG), lanes(), st, T, {"authored_by": None, "failed": [], "premium": None, "allow_degraded": False})
         self.assertEqual(p["lane"], "OPENAI_SUBSCRIPTION")        # the hold names roles
-        later = route.decide("worker", copy.deepcopy(CFG), lanes(), st, T + 7201, {"authored_by": None, "failed": [], "premium": None, "allow_degraded": False})
+        later = support.decide("worker", copy.deepcopy(CFG), lanes(), st, T + 7201, {"authored_by": None, "failed": [], "premium": None, "allow_degraded": False})
         self.assertEqual(later["lane"], "OPENAI_SUBSCRIPTION")      # and ends by itself
 
     def test_a_hold_with_no_roles_stops_the_lane_for_every_role(self):
-        route.add_hold("OPENAI_SUBSCRIPTION", "+1h", "", t=T)
+        support.add_hold("OPENAI_SUBSCRIPTION", "+1h", "", t=T)
         for role in ("planner", "worker", "reviewer"):
-            d = route.decide(role, copy.deepcopy(CFG), lanes(), route.load_state(), T, {"authored_by": None, "failed": [], "premium": None, "allow_degraded": False})
+            d = support.decide(role, copy.deepcopy(CFG), lanes(), route.load_state(), T, {"authored_by": None, "failed": [], "premium": None, "allow_degraded": False})
             self.assertNotEqual(d.get("lane"), "OPENAI_SUBSCRIPTION", role)
 
     def test_refusals_under_a_hold_wait_for_its_end_never_one_second(self):
-        h = route.add_hold("OPENAI_SUBSCRIPTION", "+3h", "pause", ["worker"], t=T)
+        h = support.add_hold("OPENAI_SUBSCRIPTION", "+3h", "pause", ["worker"], t=T)
         a = argparse_ns("worker", resume="old")
-        st = {"refs": {"old": {"lane": "OPENAI_SUBSCRIPTION", "model": "gpt-6.1-sol", "mode": "write", "effort": "medium"}}, "holds": {h["id"]: h}}
-        with mock.patch.object(route, "load_state", return_value=st), mock.patch.object(route, "gather", return_value=lanes()), mock.patch.object(route, "publish_lanes"), mock.patch.object(route, "mark_busy"), \
-                mock.patch.object(route, "now", return_value=T):
+        st = support.doc_of({})
+        st.holds[h.id] = h
+        st.refs["old"] = route.RefRecord(lane="OPENAI_SUBSCRIPTION", model="gpt-6.1-sol", mode="write", effort="medium")
+        with mock.patch.object(route, "load_state", return_value=st), support.fleet_patches(lanes()), mock.patch.object(route, "now", return_value=T):
             d, _, _, _ = route.decision(a, copy.deepcopy(CFG))
-        self.assertEqual((d["action"], d["retry_after"], d["outcome"]), ("stop", h["until"], "held"))
+        self.assertEqual((d["action"], d["retry_after"], d["outcome"]), ("stop", h.until, "held"))
         self.assertIn("owner", d["say"])
+<<<<<<< HEAD
         res = route.launch_worker({"role": "worker", "lane": "OPENAI_SUBSCRIPTION", "how": {"kind": "codex", "sandbox": "workspace-write"}}, "b", argparse_ns("worker"), "rid", T, CFG, {}, RunHooks())
         self.assertEqual((res["retry_after"], res["outcome"]), (h["until"], "held"))
+=======
+        res = route.launch_codex({"role": "worker", "lane": "OPENAI_SUBSCRIPTION", "how": {"sandbox": "workspace-write"}}, "b", argparse_ns("worker"), "rid", T, {})
+        self.assertEqual((res["retry_after"], res["outcome"]), (h.until, "held"))
+>>>>>>> 454cb35 (D2: route.py on the typed Router/Fleet/HoldBook; lanes/health.py removed; tests ported to the typed API)
 
     def test_release_and_status_show_the_holder_and_expiry(self):
-        h = route.add_hold("OPENAI_SUBSCRIPTION", "+2d", "budget", ["worker"], "alice")
-        with mock.patch.object(route, "gather", return_value=lanes()), mock.patch.object(route, "publish_lanes"):
+        h = support.add_hold("OPENAI_SUBSCRIPTION", "+2d", "budget", ["worker"], "alice")
+        with support.fleet_patches(lanes()):
             _, st = self.main("status", "--json")
         row = st["holds"][0]
-        self.assertEqual((row["id"], row["set_by"], row["roles"], row["reason"]), (h["id"], "alice", ["worker"], "budget"))
+        self.assertEqual((row["id"], row["set_by"], row["roles"], row["reason"]), (h.id, "alice", ["worker"], "budget"))
         self.assertGreater(row["until"], time.time())
-        self.assertEqual(self.main("release", h["id"])[0], 0)
+        self.assertEqual(self.main("release", h.id)[0], 0)
         self.assertEqual(self.main("holds")[1]["holds"], [])
         self.assertEqual(self.main("release", "nothing")[0], 1)
 
 
 class BackAt(unittest.TestCase):
     def test_a_lane_over_its_ceiling_is_back_at_that_windows_reset(self):
-        S = route.load_routing()["settings"]
+        S = route.settings_of(route.load_routing())
         l = route.Lane("OPENAI_SUBSCRIPTION", "openai", "subscription")
         l.five, l.five_reset, l.week, l.week_reset = 99, 1000.0, 10, 9000.0
-        self.assertEqual(route.back_at(l, S), 1000.0)
+        self.assertEqual(l.back_at(S), 1000.0)
         l.five, l.week = 10, 99
-        self.assertEqual(route.back_at(l, S), 9000.0)
+        self.assertEqual(l.back_at(S), 9000.0)
         l.week = 10
-        self.assertIsNone(route.back_at(l, S))
+        self.assertIsNone(l.back_at(S))
         l.out, l.out_until = True, 500.0
-        self.assertEqual(route.back_at(l, S), 500.0)
+        self.assertEqual(l.back_at(S), 500.0)
 
 
 class ConfigLocation(unittest.TestCase):
@@ -2071,7 +2100,7 @@ class AgentRuns(unittest.TestCase):
                 self.assertNotIn("ended", rec)
                 lane = route.Lane("OPENAI_SUBSCRIPTION", "openai", "subscription")
                 lane.five, lane.five_reset = 41, 99
-                route.publish_lanes({"OPENAI_SUBSCRIPTION": lane}, {}, 5.0)
+                route.publish_lanes({"OPENAI_SUBSCRIPTION": lane}, support.doc_of({}), 5.0)
                 lr = json.loads((ar.root() / "lanes" / "delegate.json").read_text())
                 self.assertEqual(lr["lanes"][0]["usage"], [{"window": "5h", "used_pct": 41, "resets_at": 99}])
                 self.assertEqual(lr["at"], 5.0)
@@ -2149,15 +2178,15 @@ class ResetTimes(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d, mock.patch.object(route, "config_dir", return_value=Path(d)):
             res = route.settle({}, route.classify.Outcome("rate_limited", "will reset at 2026-10-30 14:49:00 UTC", "event"), {"lane": "L1", "limit_reset": None},
                                time.time(), "codex", argparse_ns("worker", timeout=0))
-            rec = route.load_state()["out"]["L1"]
-            self.assertEqual((rec["source"], rec["zone"]), ("vendor", "UTC"))
-            self.assertEqual(rec["until"], dt.datetime(2026, 10, 30, 14, 49, tzinfo=dt.timezone.utc).timestamp())
+            rec = route.load_state().out["L1"]
+            self.assertEqual((rec.source, rec.zone), ("vendor", "UTC"))
+            self.assertEqual(rec.until, dt.datetime(2026, 10, 30, 14, 49, tzinfo=dt.timezone.utc).timestamp())
             for want_n in (0, 1, 2):          # three guesses in a row climb the ladder
                 route.settle({}, route.classify.Outcome("rate_limited", "slow down", "event"), {"lane": "L2"}, 1_800_000_000.0, "codex", argparse_ns("worker", timeout=0))
-                rec = route.load_state()["out"]["L2"]
-                self.assertEqual((rec["source"], rec["guess_n"], round((rec["until"] - 1_800_000_000.0) / 60)), ("guess", want_n, (15, 30, 60)[want_n]))
+                rec = route.load_state().out["L2"]
+                self.assertEqual((rec.source, rec.guess_n, round((rec.until - 1_800_000_000.0) / 60)), ("guess", want_n, (15, 30, 60)[want_n]))
             route.main(["report", "--lane", "OPENAI_SUBSCRIPTION", "--event", "out", "--until", str(int(time.time()) + 600)])
-            self.assertEqual(route.load_state()["out"]["OPENAI_SUBSCRIPTION"]["source"], "manual")
+            self.assertEqual(route.load_state().out["OPENAI_SUBSCRIPTION"].source, "manual")
 
 
 class StaleHolds(unittest.TestCase):
@@ -2177,22 +2206,23 @@ class StaleHolds(unittest.TestCase):
 
     def test_one_ask_for_a_stale_hold_never_a_second_and_nothing_is_printed(self):
         import io
-        h = route.add_hold("OPENAI_SUBSCRIPTION", "+2d", "weekly spent")
+        h = support.add_hold("OPENAI_SUBSCRIPTION", "+2d", "weekly spent")
         real, sys.stdout = sys.stdout, io.StringIO()
         try:
-            asks, st = route.settle_holds(self.lanes(80), route.load_state(), route.now())
+            asks, st = route.settle_holds(route.states(), self.lanes(80), route.load_state(), route.now())
             self.assertEqual(asks, [])                                       # the lane is still full: the hold is doing its job
-            asks, st = route.settle_holds(self.lanes(0), route.load_state(), route.now())
-            asks2, st2 = route.settle_holds(self.lanes(0), route.load_state(), route.now() + 600)
+            asks, st = route.settle_holds(route.states(), self.lanes(0), route.load_state(), route.now())
+            asks2, st2 = route.settle_holds(route.states(), self.lanes(0), route.load_state(), route.now() + 600)
             printed = sys.stdout.getvalue()
         finally:
             sys.stdout = real
         self.assertEqual(printed, "")
-        self.assertEqual([(a["kind"], a["id"], a["lane"]) for a in asks], [("hold_stale", h["id"], "OPENAI_SUBSCRIPTION")])
+        asks, asks2 = [a.as_dict() for a in asks], [a.as_dict() for a in asks2]
+        self.assertEqual([(a["kind"], a["id"], a["lane"]) for a in asks], [("hold_stale", h.id, "OPENAI_SUBSCRIPTION")])
         self.assertEqual(asks2, asks)                                        # the same ask (same id, same raised_at), not a new one
-        self.assertEqual(st2["holds"][h["id"]]["stale_at"], asks[0]["raised_at"])
-        self.assertIn("route.py release " + h["id"], asks[0]["answer"])
-        self.assertTrue(route.hold_rows({"settings": {}}, st2, route.now())[0]["stale"])
+        self.assertEqual(st2.holds[h.id].stale_at, asks[0]["raised_at"])
+        self.assertIn("route.py release " + h.id, asks[0]["answer"])
+        self.assertTrue(route.HoldBook(st2.holds).rows(route.now())[0]["stale"])
 
     def test_status_carries_asks(self):
         payload = route.status_payload(CFG, self.lanes(50), [], route.load_state(), route.now())
@@ -2204,34 +2234,35 @@ class Breaker(unittest.TestCase):
     """delegate-rdt / -y3f: the pair breaker is wired into the decision for every lane, and DeepSeek/ZAI/Grok run under the watchdog."""
 
     def lanes_with(self, hist_rows):
-        from lanes import health
         lanes_ = lanes()
         grok = route.Lane("GROK_SUBSCRIPTION", "xai", "subscription")
         lanes_[grok.name] = grok
-        st = health.fold(hist_rows)
+        led = route.health_ledger.HealthLedger(route.settings_of(CFG).breaker)
+        st = led.fold(hist_rows)
         for l in lanes_.values():
-            route.apply_health(l, CFG, st, T + 1)
+            apply_health(l, route.typed_routing(CFG).models, led, st, T + 1)
         return lanes_
 
     def rows(self, lane, model, n=3, outcome="worker_failed"):
-        from lanes import health
-        return [dict(ts=T + i, run_id=f"r{i}", task=f"t{i}", lane=lane, model=model, status="failed", **health.row_fields(outcome, "event", "boom")) for i in range(n)]
+        return [route.hist.RunRow(ts=T + i, run_id=f"r{i}", task=f"t{i}", role="worker", lane=lane, model=model, effort="high", done=False,
+                                  **route.health_ledger.failure_fields(outcome, "event", "boom")) for i in range(n)]
 
     def test_a_benched_pair_falls_through_to_the_next_step_and_only_that_pair(self):
         ls = self.lanes_with(self.rows("OPENAI_SUBSCRIPTION", "gpt-6.1-sol"))
         self.assertIn("gpt-6.1-sol", ls["OPENAI_SUBSCRIPTION"].benched)
-        d = route.decide("worker", CFG, ls, {}, T + 1, {"authored_by": None, "failed": [], "premium": None, "allow_degraded": False})
+        d = support.decide("worker", CFG, ls, {}, T + 1, {"authored_by": None, "failed": [], "premium": None, "allow_degraded": False})
         self.assertNotEqual(d["model"], "gpt-6.1-sol")
-        ok, why = route.usable(ls["OPENAI_SUBSCRIPTION"], CFG["settings"], True, "gpt-6.1-sol")
+        S = route.settings_of(CFG)
+        ok, why = ls["OPENAI_SUBSCRIPTION"].usable(S, True, "gpt-6.1-sol")
         self.assertFalse(ok)
         self.assertIn("benched", why)
-        self.assertTrue(route.usable(ls["OPENAI_SUBSCRIPTION"], CFG["settings"], True, "gpt-6-luna")[0])
-        self.assertTrue(route.usable(ls["OPENAI_SUBSCRIPTION"], CFG["settings"], True)[0])
+        self.assertTrue(ls["OPENAI_SUBSCRIPTION"].usable(S, True, "gpt-6-luna")[0])
+        self.assertTrue(ls["OPENAI_SUBSCRIPTION"].usable(S, True)[0])
 
     def test_all_pairs_benched_stops_with_the_bench_ends_listed(self):
         ls = self.lanes_with(self.rows("OPENAI_SUBSCRIPTION", "gpt-6.1-sol") + self.rows("CLAUDE_SUBSCRIPTION", "sonnet-5.5") + self.rows("CLAUDE_SUBSCRIPTION", "opus-5.5")
                              + self.rows("CLAUDE_CREDIT", "sonnet-5.5") + self.rows("GROK_SUBSCRIPTION", "grok-4.7"))
-        d = route.decide("worker", CFG, ls, {}, T + 1, {"authored_by": None, "failed": [], "premium": None, "allow_degraded": False})
+        d = support.decide("worker", CFG, ls, {}, T + 1, {"authored_by": None, "failed": [], "premium": None, "allow_degraded": False})
         self.assertEqual(d["action"], "stop")
         self.assertIn("OPENAI_SUBSCRIPTION/gpt-6.1-sol", d["resets"])
 
@@ -2247,17 +2278,18 @@ class Breaker(unittest.TestCase):
             for model in models:
                 with self.subTest(lane=name, model=model):
                     lane = route.Lane(name, fam, "subscription")
-                    from lanes import health
-                    route.apply_health(lane, CFG, health.fold(self.rows(name, model, outcome="vendor_blip")), T + 1)
-                    self.assertFalse(route.usable(lane, CFG["settings"], True, model)[0])
+                    led = route.health_ledger.HealthLedger(route.settings_of(CFG).breaker)
+                    apply_health(lane, route.typed_routing(CFG).models, led, led.fold(self.rows(name, model, outcome="vendor_blip")), T + 1)
+                    self.assertFalse(lane.usable(route.settings_of(CFG), True, model)[0])
         import inspect
         self.assertIn("Supervisor(", inspect.getsource(route.launch_worker))         # all three harnesses run under the one supervisor, so under its watchdog
 
     def test_history_rotation_survives_a_corrupt_line(self):
-        with tempfile.TemporaryDirectory() as d, mock.patch.object(route, "config_dir", return_value=Path(d)), mock.patch.object(route, "HISTORY_MAX", 100):
+        canary = lambda ts, rid: json.dumps(codec.to_json(route.hist.CanaryRow(ts=ts, run_id=rid, lane="L", model="m")))
+        with tempfile.TemporaryDirectory() as d, mock.patch.object(route, "config_dir", return_value=Path(d)), mock.patch.object(stores, "HISTORY_MAX", 100):
             p = route.history_path()
-            p.write_text("{broken\n" + json.dumps({"ts": 1.0, "run_id": "old"}) + "\n" + json.dumps({"ts": time.time(), "run_id": "keep"}) + "\n" * 1 + "x" * 200 + "\n", encoding="utf-8")
-            route.history_add({"ts": time.time(), "run_id": "new"})
+            p.write_text("{broken\n" + canary(1.0, "old") + "\n" + canary(time.time(), "keep") + "\n" * 1 + "x" * 200 + "\n", encoding="utf-8")
+            route.history_add(route.hist.CanaryRow(ts=time.time(), run_id="new", lane="L", model="m"))
             ids = [json.loads(x)["run_id"] for x in p.read_text().splitlines()]
             self.assertEqual(ids, ["keep", "new"])
 

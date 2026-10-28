@@ -3,6 +3,7 @@ import copy
 import unittest
 from types import SimpleNamespace
 from unittest.mock import patch
+import routing_support as support
 from test_route import route, CFG, lanes, T, argparse_ns
 
 
@@ -18,9 +19,9 @@ class CodexPolicy(unittest.TestCase):
         self.assertTrue(steps)
         self.assertEqual({s['effort'] for s in steps},{'medium'})
         ls={'OPENAI_SUBSCRIPTION':lanes()['OPENAI_SUBSCRIPTION']}
-        d=route.decide('reviewer',self.cfg,ls,{},T,self.args)
+        d=support.decide('reviewer',self.cfg,ls,{},T,self.args)
         self.assertEqual(d['effort'],'medium')
         self.assertIn('model_reasoning_effort=medium',d['how']['cli'])
-        p=route.decide('planner',self.cfg,ls,{},T,self.args)
+        p=support.decide('planner',self.cfg,ls,{},T,self.args)
         self.assertEqual(p['effort'],'high')
         self.assertIn('model_reasoning_effort=high',p['how']['cli'])

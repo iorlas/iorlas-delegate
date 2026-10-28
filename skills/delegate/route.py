@@ -28,6 +28,7 @@ import contextlib
 import copy
 import dataclasses
 import datetime as dt
+from dataclasses import replace
 import json
 import os
 import random
@@ -53,7 +54,7 @@ HERE = Path(__file__).resolve().parent
 if str(HERE) not in sys.path:
     sys.path.insert(0, str(HERE))
 sys.path.insert(0, str(HERE.parents[1] / "src"))     # delegate.*: the typed records and the harness classes ship in the plugin dir, next to skills/
-from lanes import classify, health                  # the one outcome ladder (delegate-e05); the health fold and breaker (rdt, a9x)
+from lanes import classify                  # the one outcome ladder (delegate-e05)
 from delegate.adapters import netprobe, procs
 from lanes import profiles, usage as accounting                # network facts (4n7); the lane adapter registry (dlz)
 from lanes import cockpit as role_view              # roles{} for status (0sf)
@@ -64,14 +65,26 @@ from delegate.adapters.harness.opencode import OpenCodeHarness, Profile
 from delegate.adapters.harness import opencode_sandbox
 from delegate.adapters.harness.codex import CodexHarness
 from delegate.app import watch
-from delegate.app.publish import LiveSink
+from delegate.app.publish import LiveSink, end_status
 from delegate.app.supervisor import LogWatcher, RunHooks, Supervisor
+from delegate.app.fleet import AuthCache, FleetBuilder, drift_warnings, mark_busy, settle_holds
 from delegate.contracts import codec, wire
 from delegate.contracts import events as harness_events
+from delegate.contracts import history as hist
+from delegate.contracts.routing import CallArgs, Error, LaneOut, Routing, Run, Stop
+from delegate.contracts.state import Lease, OutState, RefRecord, UsageCache
+from delegate.contracts.stores import CheckpointStore, ConfigStore, HistoryStore, LedgerStore, StateStore, locked, private
+from delegate.domain.cost.cycle import credit_cycle
+from delegate.domain.cost.ledger import CostLedger
+from delegate.domain.health import ledger as health_ledger
+from delegate.domain.holds.book import HoldBook, new_hold
+from delegate.domain.lanes.lane import Lane, apply_burn, window
+from delegate.domain.lanes.leases import LEASE_RENEW, LEASE_TTL, LeaseBook, suspect
 from delegate.domain.policy import worker as policy
 from delegate.domain.policy.matchers import heredoc_only_hit, secret_hit
 from delegate.domain.policy.worker import APPLY_PATCH_HINT, EDIT_RULE, GIT_RULES, SECRET_RULE
-WEEK_MIN = 7 * 24 * 60
+from delegate.domain.routing.router import Router, callable_lanes
+from delegate.domain.time.spec import WEEK_MIN, fmt_dur, fmt_in, local, next_weekly, parse_until, to_epoch, when
 
 
 # ----------------------------------------------------------------------------- time, paths, config
@@ -105,11 +118,6 @@ def config_dir():
     return p
 
 
-def private(path):
-    with contextlib.suppress(OSError):
-        os.chmod(path, 0o600)
-
-
 def deep_merge(a, b):
     out = copy.deepcopy(a)
     for k, v in (b or {}).items():
@@ -118,186 +126,89 @@ def deep_merge(a, b):
 
 
 def load_routing():
+    """routing.json with the owner's overrides (config.json, minus its `profile`) merged into `settings`, validated into contracts.routing.Routing."""
     with open(HERE / "routing.json", encoding="utf-8") as f:
         cfg = json.load(f)
-    user = config_dir() / "config.json"
-    if user.exists():
-        with open(user, encoding="utf-8") as f:
-            cfg["settings"] = deep_merge(cfg["settings"], json.load(f))
+    cfg["settings"] = deep_merge(cfg["settings"], config_store().overrides())
+    typed_routing(cfg)
     return cfg
 
 
-def fmt_dur(secs):
-    s = int(secs)
-    if s <= 0:
-        return "now"
-    d, r = divmod(s, 86400)
-    h, r = divmod(r, 3600)
-    m = r // 60
-    return f"{d}d{h}h" if d else (f"{h}h{m:02d}m" if h else f"{m}m")
-
-
-def local(epoch):
-    return dt.datetime.fromtimestamp(epoch).strftime("%a %d %b %H:%M")
-
-
-def to_epoch(v):
-    """epoch seconds, epoch ms, or ISO string -> epoch seconds; None if unparsable."""
-    if v is None or v == "":
-        return None
-    if isinstance(v, (int, float)):
-        return v / 1000.0 if v > 1e11 else float(v)
+def typed_routing(cfg):
     try:
-        return dt.datetime.fromisoformat(str(v).replace("Z", "+00:00")).timestamp()
-    except ValueError:
-        return None
+        return codec.from_json(Routing, cfg)
+    except codec.CodecError as e:
+        sys.exit(f"route.py: routing.json / config.json is not a valid routing table: {e}")
 
 
-def next_weekly(spec, t):
-    """'Sun 17:00' (local time) -> epoch of the next such moment, or None."""
-    try:
-        day, hm = spec.split()
-        hh, mm = (int(x) for x in hm.split(":"))
-        target = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"].index(day[:3].lower())
-    except (ValueError, AttributeError):
-        return None
-    base = dt.datetime.fromtimestamp(t)
-    cand = base.replace(hour=hh, minute=mm, second=0, microsecond=0) + dt.timedelta(days=(target - base.weekday()) % 7)
-    if cand.timestamp() <= t:
-        cand += dt.timedelta(days=7)
-    return cand.timestamp()
+# ----------------------------------------------------------------------------- the files under the config dir (each behind its store)
+
+def states():
+    return StateStore(config_dir() / "state.json")
 
 
-def credit_cycle(day, t):
-    """(start_epoch, next_reset_epoch) of the credit cycle containing t; reset on `day` of the month, local midnight."""
-    day = max(1, min(int(day or 1), 28))
-    base = dt.datetime.fromtimestamp(t)
-    this = base.replace(day=day, hour=0, minute=0, second=0, microsecond=0)
-    if this.timestamp() > t:
-        prev = (this.replace(day=1) - dt.timedelta(days=1)).replace(day=day)
-        return prev.timestamp(), this.timestamp()
-    nxt = ((this.replace(day=1) + dt.timedelta(days=32)).replace(day=1)).replace(day=day)
-    return this.timestamp(), nxt.timestamp()
+def config_store():
+    return ConfigStore(config_dir() / "config.json")
 
 
-# ----------------------------------------------------------------------------- state (atomic, locked)
-
-@contextlib.contextmanager
-def locked(path, timeout=10.0):
-    lock = str(path) + ".lock"
-    end = time.time() + timeout
-    fd = None
-    while fd is None:
-        try:
-            fd = os.open(lock, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
-        except (FileExistsError, PermissionError):      # Windows answers PermissionError while the previous holder's lock file is being deleted
-            try:
-                if time.time() - os.path.getmtime(lock) > 30:
-                    os.remove(lock)
-                    continue
-            except OSError:
-                pass
-            if time.time() > end:
-                raise TimeoutError(f"{path} is locked by another route.py for more than {timeout:.0f}s")
-            time.sleep(0.05)
-    try:
-        yield
-    finally:
-        os.close(fd)
-        with contextlib.suppress(OSError):
-            os.remove(lock)
+def history_path():
+    return config_dir() / "history.jsonl"
 
 
-def state_path():
-    return config_dir() / "state.json"
+def history_store():
+    return HistoryStore(history_path())
+
+
+def ledger_store():
+    return LedgerStore(config_dir() / "ledger.jsonl")
 
 
 def load_state():
-    try:
-        with open(state_path(), encoding="utf-8") as f:
-            return json.load(f)
-    except (OSError, ValueError):
-        return {}
-
-
-def save_state(st):
-    p = state_path()
-    tmp = p.with_suffix(f".tmp{os.getpid()}")
-    with open(tmp, "w", encoding="utf-8") as f:
-        json.dump(st, f)
-    for i in range(50):         # Windows refuses to replace a file another process has open for reading
-        try:
-            os.replace(tmp, p)
-            break
-        except PermissionError:
-            if i == 49:
-                raise
-            time.sleep(0.02)
-    private(p)
+    return states().load()
 
 
 def update_state(fn):
-    with locked(state_path()):
-        st = load_state()
-        fn(st)
-        save_state(st)
-        return st
-
-
-def config_path():
-    return config_dir() / "config.json"
+    return states().update(fn)
 
 
 def read_config():
-    try:
-        with open(config_path(), encoding="utf-8") as f:
-            d = json.load(f)
-        return d if isinstance(d, dict) else {}
-    except (OSError, ValueError):
-        return {}
+    return config_store().read()
 
 
 def update_config(fn):
-    """Locked read-modify-write of config.json: callers never save a stale snapshot."""
-    p = config_path()
-    with locked(p):
-        cur = read_config()
-        fn(cur)
-        tmp = p.with_suffix(f".tmp{os.getpid()}")
-        with open(tmp, "w", encoding="utf-8") as f:
-            json.dump(cur, f, indent=2)
-            f.write("\n")
-        os.replace(tmp, p)
-        private(p)
-        return cur
+    return config_store().update(fn)
 
 
 def profile_lanes():
-    """{lane: "enabled"|"declined"} written by init, set-key and first use. A missing lane = not decided."""
-    return dict((read_config().get("profile") or {}).get("lanes") or {})
+    return dict(config_store().profile().lanes)
 
 
 def set_profile_lane(name, value):
-    """value None removes the entry (back to auto-detect)."""
-    def put(c):
-        lanes = c.setdefault("profile", {}).setdefault("lanes", {})
-        if value is None:
-            lanes.pop(name, None)
-        else:
-            lanes[name] = value
-    update_config(put)
+    config_store().set_lane(name, value)
 
 
 def acked():
-    return set((read_config().get("profile") or {}).get("ack") or [])
+    return set(config_store().profile().ack)
 
 
 def set_ack(ident):
-    def put(c):
-        lst = c.setdefault("profile", {}).setdefault("ack", [])
-        if ident not in lst:
-            lst.append(ident)
-    update_config(put)
+    config_store().set_ack(ident)
+
+
+def history_add(row):
+    history_store().add(row)
+
+
+def ledger_add(cost, model, now_t):
+    ledger_store().add(cost, model, now_t)
+
+
+def ledger_spend(since_epoch):
+    return CostLedger(ledger_store().rows()).spend(since_epoch)
+
+
+def ledger_last_ts():
+    return CostLedger(ledger_store().rows()).last_ts()
 
 
 def harness():
@@ -320,142 +231,7 @@ def interactive():
     return not UNATTENDED
 
 
-OFFERS = []     # lanes seen for the first time and not usable; reported once, then forgotten
-
-
-def offered():
-    return set((read_config().get("profile") or {}).get("offered") or [])
-
-
-def mark_offered(names):
-    def put(c):
-        lst = c.setdefault("profile", {}).setdefault("offered", [])
-        lst.extend(n for n in names if n not in lst)
-    update_config(put)
-
-
-def lane_mode(name, cfg_lane, ready):
-    """-> "on" | "off" | "drift". Shared lanes are always on. Otherwise the profile decides;
-    a lane never decided is turned on once if the machine has it ready, else left out silently."""
-    if cfg_lane.get("shared_with_orchestrator"):
-        return "on"
-    v = profile_lanes().get(name)
-    if v == "declined":
-        return "off"
-    if v == "enabled":
-        return "on" if ready else "drift"
-    if ready:
-        set_profile_lane(name, "enabled")
-        return "on"
-    if name not in offered() and name not in OFFERS:
-        OFFERS.append(name)
-    return "off"
-
-
-def ledger_path():
-    return config_dir() / "ledger.jsonl"
-
-
-def ledger_spend(since_epoch):
-    total = 0.0
-    try:
-        with open(ledger_path(), encoding="utf-8") as f:
-            for line in f:
-                try:
-                    e = json.loads(line)
-                    if float(e["ts"]) >= since_epoch:
-                        total += float(e["cost"])
-                except (ValueError, KeyError):
-                    continue
-    except OSError:
-        pass
-    return total
-
-
-def ledger_last_ts():
-    try:
-        with open(ledger_path(), encoding="utf-8") as f:
-            return json.loads(f.read().splitlines()[-1])["ts"]
-    except (OSError, ValueError, KeyError, IndexError, TypeError):
-        return None
-
-
-def ledger_add(cost, model, now_t):
-    with locked(ledger_path()):
-        with open(ledger_path(), "a", encoding="utf-8") as f:
-            f.write(json.dumps({"ts": now_t, "model": model, "cost": cost}) + "\n")
-        private(ledger_path())
-
-
 # ----------------------------------------------------------------------------- lane state
-
-class Lane:
-    """What the router knows about one lane right now. Plain data, so tests can build it directly."""
-
-    def __init__(self, name, family, kind, shared=False):
-        self.name, self.family, self.kind, self.shared = name, family, kind, shared
-        self.out = False
-        self.out_until = None
-        self.out_reason = None    # why it is out, for scripts: limit, logged_out, busy, error
-        self.read_at = None       # when the usage reading was taken (Codex only)
-        self.busy = False         # out only because its slots are taken (mark_busy): it frees up by itself in minutes
-        self.five = None          # percent of the 5-hour window used, None = unknown
-        self.week = None          # percent of the weekly window used
-        self.week_reset = None    # epoch
-        self.five_reset = None
-        self.pace = None          # weekly pace in points: elapsed share minus used share
-        self.burn = False         # weekly window about to reset with allowance left
-        self.reset_in_days = None  # credit lanes
-        self.spend = 0.0
-        self.cap = None
-        self.notes = []
-        self.windows = []         # every window the vendor exposes, for the cockpit: {name, used, resets_at, span, source, at}
-        self.spend_blocked = False  # the vendor says a spend or credit limit stopped it (not a usage window)
-        self.warn = []            # cockpit warnings: a reading the owner should double-check (shown as `!` lines)
-        self.held = None          # the owner's hold record covering the role being decided (decide sets it); usable() then refuses
-        self.benched = {}         # model -> health view of a pair the breaker benched (lanes/health.py); usable(model=) then refuses
-        self.canary = {}          # model -> True when the pair's bench ended and its next launch is the one canary before full traffic
-        self.hview = {}           # model -> health view of every known pair, for status --json
-
-    @property
-    def usage_known(self):
-        return self.five is not None or self.week is not None
-
-    def brief(self, t):
-        bits = []
-        if self.five is not None:
-            bits.append(f"5h {self.five:.0f}%" + (f" (resets {fmt_dur(self.five_reset - t)})" if self.five_reset and self.five_reset > t else ""))
-        if self.week is not None:
-            bits.append(f"week {self.week:.0f}%" + (f" (resets {fmt_dur(self.week_reset - t)}, {local(self.week_reset)})" if self.week_reset and self.week_reset > t else "") + (f" pace {self.pace:+.0f}" if self.pace is not None else ""))
-        if self.kind == "credit":
-            bits.append(f"cycle ${self.spend:.2f} of ${self.cap:.0f} cap by this tool" + (f", resets in {self.reset_in_days:.1f}d" if self.reset_in_days is not None else ""))
-        if self.out:
-            bits.append("OUT" + (f" until {local(self.out_until)}" if self.out_until else ""))
-        elif self.burn:
-            bits.append("BURN (about to be lost: spend it)")
-        if not self.usage_known and self.kind == "subscription":
-            bits.append("usage unknown")
-        return "; ".join(bits + self.notes)
-
-
-def window(used, resets_at, span_min, t):
-    """-> (used_percent, minutes_to_reset, pace). A window whose reset passed counts as 0% used."""
-    if used is None:
-        return None, None, None
-    if resets_at is not None and resets_at <= t:
-        return 0.0, 0.0, None
-    if resets_at is None:
-        return float(used), None, None
-    mins = (resets_at - t) / 60.0
-    elapsed = max(0.0, min(100.0, 100.0 * (1 - mins / span_min)))
-    return float(used), mins, elapsed - float(used)
-
-
-def apply_burn(lane, S, week_mins):
-    b = S["burn"]
-    lane.burn = (lane.week is not None and week_mins is not None and 0 < week_mins <= b["minutes"]
-                 and 100 - lane.week >= b["min_left_percent"] and (lane.five is None or lane.five < 60))
-
 
 # ----------------------------------------------------------------------------- readers (the script gathers what it can)
 
@@ -535,18 +311,18 @@ def codex_buckets(res):
     return [(k, b.get("limitName") or k, b) for k, b in out.items() if isinstance(b, dict)]
 
 
-def read_codex(lane, S, st, t):
-    cached = st.get("codex_limits")
-    if cached and t - cached.get("at", 0) <= 60 and not os.environ.get("DELEGATE_NOCACHE"):
-        res, err = cached["res"], None
+def read_codex(lane, S, st, t, ai_usage=None):
+    cached = st.codex_limits
+    if cached and t - cached.at <= 60 and not os.environ.get("DELEGATE_NOCACHE"):
+        res, err = cached.data, None
     else:
         res, err = fetch_codex_limits()
         if res is not None:
-            update_state(lambda s_: s_.__setitem__("codex_limits", {"at": t, "res": res}))
+            update_state(lambda s_: setattr(s_, "codex_limits", UsageCache(at=t, data=res)))
     if res is None:
         lane.notes.append(err)
         return
-    lane.read_at = cached["at"] if cached and res is cached["res"] else t
+    lane.read_at = cached.at if cached and res is cached.data else t
     rl = res.get("rateLimits") or {}
     ws = []          # (bucket label, window): every window of every bucket, by length not by slot (Pro Lite sends its only, weekly, window as primary)
     for bid, label, b in codex_buckets(res):
@@ -588,11 +364,20 @@ def normalize_usage(raw):
     return out or None
 
 
+AUTH_TTL = 300          # a login check answers for this long: it spawns a CLI, cheap but not free
+AUTH_TIMEOUT = 10
+AUTH_FILE_TTL = 600     # what a non-cheap status, doctor, a login probe and a successful run left, as read by `next` and `status --cheap`
+
+
+def auth_cache():
+    return AuthCache(states(), not os.environ.get("DELEGATE_NOCACHE"))
+
+
 def claude_logged_out():
     """True only when `claude auth status` answers loggedIn false; no CLI or an unreadable answer is not a logout (an Agent-tool host may have no CLI)."""
-    c = cached_auth("CLAUDE_SUBSCRIPTION", now())
+    c = auth_cache().fresh("CLAUDE_SUBSCRIPTION", now(), AUTH_FILE_TTL)
     if c:
-        return c["ok"] is False
+        return c.ok is False
     exe = shutil.which("claude")
     if not exe:
         return False
@@ -602,25 +387,25 @@ def claude_logged_out():
     except (OSError, subprocess.TimeoutExpired, ValueError, AttributeError):
         return False
     if isinstance(v, bool):
-        write_auth("CLAUDE_SUBSCRIPTION", v, "claude auth status", now())
+        auth_cache().remember("CLAUDE_SUBSCRIPTION", v, "claude auth status", now())
     return v is False
 
 
 def read_claude_subscription(lane, S, st, t, ai_usage=None):
-    stale = S["usage_stale_minutes"] * 60
+    stale = S.usage_stale_minutes * 60
     usage = None
     src = None      # (where the numbers came from, when they were taken)
     if ai_usage:
         usage = normalize_usage(ai_usage)
         if usage:
-            update_state(lambda s: s.__setitem__("claude_usage", {"at": t, "data": usage}))
+            update_state(lambda s: setattr(s, "claude_usage", UsageCache(at=t, data=usage)))
             src = ("manual mark (get_usage passed in)", t)
     if usage is None:
-        saved = st.get("claude_usage")
-        if saved and t - saved.get("at", 0) <= stale:
-            usage = saved["data"]
-            src = ("manual mark (get_usage passed in)", saved["at"])
-            lane.notes.append(f"usage from {fmt_dur(t - saved['at'])} ago")
+        saved = st.claude_usage
+        if saved and t - saved.at <= stale:
+            usage = saved.data
+            src = ("manual mark (get_usage passed in)", saved.at)
+            lane.notes.append(f"usage from {fmt_dur(t - saved.at)} ago")
     if usage is None:
         f = Path.home() / ".claude" / "state" / "max-limits.json"
         try:
@@ -638,7 +423,7 @@ def read_claude_subscription(lane, S, st, t, ai_usage=None):
     if claude_logged_out():
         lane.out, lane.out_reason = True, "logged_out"
         lane.notes.append("claude is logged out: run `claude auth login`")
-    weekly_spec = S.get("claude_weekly_reset", "")
+    weekly_spec = S.claude_weekly_reset
     if usage:
         f5, wk = usage.get("five_hour") or {}, usage.get("weekly") or {}
         lane.five_reset, lane.week_reset = f5.get("resets_at"), wk.get("resets_at")
@@ -660,423 +445,52 @@ def read_claude_subscription(lane, S, st, t, ai_usage=None):
             lane.notes.append(f"weekly reset {local(nxt)} (config); use unknown")
 
 
-def read_claude_credit(lane, S, st, t):
-    c = S["credit"]
-    start, nxt = credit_cycle(c["reset_day"], t)
-    lane.cap = float(c["monthly_cap"])
+def read_claude_credit(lane, S, st, t, ai_usage=None):
+    c = S.credit
+    start, nxt = credit_cycle(c.reset_day, t)
+    lane.cap = float(c.monthly_cap)
     lane.spend = ledger_spend(start)
     lane.reset_in_days = (nxt - t) / 86400.0
     lane.week_reset = nxt
     add_window(lane, 100.0 * lane.spend / lane.cap if lane.cap else None, nxt, 43200, "estimated from history (this tool's ledger)", ledger_last_ts())
-    out = (st.get("out") or {}).get(lane.name)
-    if out and out.get("until", 0) > t:
-        lane.out, lane.out_until, lane.out_reason = True, out["until"], out.get("reason", "error")
-        lane.notes.append(out.get("why", "reported out"))
+    out = st.out.get(lane.name)
+    if out and out.until > t:
+        lane.out, lane.out_until, lane.out_reason = True, out.until, out.reason
+        lane.notes.append(out.why)
     elif lane.spend >= lane.cap:
         lane.out, lane.out_until, lane.out_reason = True, nxt, "limit"
         lane.notes.append("own cycle cap reached")
 
 
 READERS = {"codex_app_server": read_codex, "claude_subscription": read_claude_subscription, "claude_credit": read_claude_credit,
-           "none": lambda lane, S, st, t: None}      # no usage reading (Grok): only refusals mark it out
-
-
-def gather(cfg, st, t, ai_usage=None, check_config=True):
-    S = cfg["settings"]
-    lanes = {}
-    conf = {}
-    hstate = health_state(cfg, t)
-    if check_config:
-        import onboard
-        conf = onboard.configured_lanes(sys.modules[__name__], cfg)
-    for name, c in cfg["lanes"].items():
-        if name == "DEEPSEEK_FREE" and S.get("deepseek_free_enabled") is not True:
-            continue
-        if name == "ZAI_CODING_SUBSCRIPTION" and S.get("zai_coding_enabled") is not True:
-            continue
-        mode = lane_mode(name, c, conf.get(name, True)) if check_config else "on"
-        if mode == "off":
-            continue
-        lane = Lane(name, c["family"], c["kind"], c.get("shared_with_orchestrator", False))
-        reader = READERS[c["reader"]]
-        if c["reader"] == "claude_subscription":
-            reader(lane, S, st, t, ai_usage)
-        else:
-            reader(lane, S, st, t)
-        o = (st.get("out") or {}).get(name)
-        if o and o.get("reason", "limit") == "limit" and lane.read_at and lane.read_at > o.get("at", 0) and not lane.out \
-                and (lane.five or 0) < 95 and (lane.week or 0) < 95:       # a reading after the refusal shows room: the out was wrong or is over
-            update_state(lambda s_: s_.get("out", {}).pop(name, None))
-            o = None
-        if o and o.get("until", 0) > t and not lane.out:      # an out reported by the model or by a launcher
-            lane.out, lane.out_until, lane.out_reason = True, o["until"], o.get("reason", "error")
-            lane.notes.append(o.get("why", "reported out"))
-        if mode == "drift":
-            lane.out, lane.out_until, lane.out_reason = True, None, "logged_out"
-            lane.notes.insert(0, "enabled but not ready (login or key gone?)")
-        apply_health(lane, cfg, hstate, t)
-        lanes[name] = lane
-    return lanes
-
-
-def health_state(cfg, t):
-    """-> the health fold (lanes/health.py) over history.jsonl, continued from a cached checkpoint. The checkpoint is a cache: no file, a corrupt
-    one, or another breaker policy means a fold of the whole history."""
-    pol = health.policy(cfg["settings"])
-    cp = config_dir() / "health-checkpoint.json"
-    base = health.load(cp, pol)
-    rows = health.read_rows(history_path(), base["ts"] if base else 0.0)
-    state = health.fold(rows, base, pol)
-    if rows:
-        health.save(cp, state, pol)
-    return state
-
-
-def apply_health(lane, cfg, hstate, t):
-    """Put the breaker's view of each (lane, model) pair on the lane: `benched` (refused), `canary` (the next launch is the probe), `hview` (status)."""
-    pol = health.policy(cfg["settings"])
-    for model, m in cfg["models"].items():
-        if m.get("family") != lane.family:
-            continue
-        v = health.view(hstate, lane.name, model, t, pol)
-        lane.hview[model] = v
-        if v["state"] == "broken":
-            lane.benched[model] = v
-        elif v["canary"]:
-            lane.canary[model] = True
-
-
-# ----------------------------------------------------------------------------- the decision functions (pure)
-
-def limits_for(lane, S, relaxed):
-    """-> (weekly %, five-hour %, name): where the router stops using the lane. The strict pass uses the gate (a shared lane keeps the orchestrator's reserve), the relaxed pass the ceiling."""
-    c = S["relaxed_ceiling"]
-    if lane.shared:
-        r = S["orchestrator_reserve"]
-        wk, fv = (c["orchestrator_weekly"], c["orchestrator_five_hour"]) if relaxed else (r["weekly"], r["five_hour"])
-        return wk, fv, "hard ceiling" if relaxed else "orchestrator reserve"
-    g = S["worker_lane_gate"]
-    wk, fv = (c["weekly"], c["five_hour"]) if relaxed else (g["weekly"], g["five_hour"])
-    return wk, fv, "hard ceiling" if relaxed else "lane gate"
-
-
-def usable(lane, S, relaxed, model=None):
-    """-> (bool, reason). With `model`, a pair the breaker benched is refused too."""
-    if lane.held:
-        return False, hold_text(lane.held)
-    if model and model in lane.benched:
-        b = lane.benched[model]
-        return False, f"{model} benched ({b['kind']}, {b['source']}) until {local(b['until'])}"
-    if lane.out:
-        return False, f"out until {local(lane.out_until)}" if lane.out_until else "out"
-    wk, fv, why = limits_for(lane, S, relaxed)
-    if lane.week is not None and lane.week >= wk:
-        return False, f"weekly {lane.week:.0f}% >= {wk} ({why})"
-    if lane.five is not None and lane.five >= fv:
-        return False, f"5h {lane.five:.0f}% >= {fv} ({why})"
-    return True, "ok"
-
-
-def back_at(lane, S):
-    """When an unusable lane is expected back: its out-until, else the reset of the window it is over; None when usable or unknown."""
-    ok, why = usable(lane, S, True)
-    if ok:
-        return None
-    if lane.held:
-        return lane.held.get("until")
-    if lane.out:
-        return lane.out_until
-    return lane.week_reset if why.startswith("weekly") else lane.five_reset if why.startswith("5h") else None
-
-
-def pick_lane(family, lanes, S, st, t, relaxed, trace, model=None):
-    """Lane of `family` to use now for `model`, or None. Appends the reasoning to `trace`."""
-    mine = [l for l in lanes.values() if l.family == family]
-    ok = []
-    for l in mine:
-        good, why = usable(l, S, relaxed, model)
-        trace.append(f"{l.name}: {'usable' if good else 'rejected, ' + why}")
-        if good:
-            ok.append(l)
-    if not ok:
-        return None
-    sub = next((l for l in ok if l.kind == "subscription"), None)
-    credit = next((l for l in ok if l.kind == "credit"), None)
-    if not (sub and credit):
-        return ok[0]
-    if not relaxed and not sub.usage_known:
-        trace.append(f"{sub.name}: usage unknown, so {credit.name} first")
-        return credit
-    c = S["credit"]
-    # use-it-or-lose-it
-    if sub.burn:
-        trace.append(f"{sub.name}: BURN")
-        return sub
-    if credit.reset_in_days is not None and credit.reset_in_days <= c["use_before_reset_days"] and credit.spend < c["under_cap_fraction"] * credit.cap:
-        trace.append(f"{credit.name}: resets in {credit.reset_in_days:.1f}d with the allowance unspent")
-        return credit
-    # strained / recovered, with a minimum dwell so the choice does not flap
-    prev = (st.get("prev") or {}).get(family)
-    sticky = prev and prev.get("lane") in (sub.name, credit.name) and t - prev.get("since", 0) < S["min_dwell_minutes"] * 60
-    if sticky:
-        trace.append(f"dwell: keep {prev['lane']} for {S['min_dwell_minutes']} min")
-        return sub if prev["lane"] == sub.name else credit
-    if (sub.five is not None and sub.five >= S["strain"]["five_hour"]) or (sub.pace is not None and sub.pace <= S["strain"]["weekly_pace"]):
-        trace.append(f"{sub.name}: strained")
-        return credit
-    if (sub.five is None or sub.five < S["recover"]["five_hour"]) and (sub.pace is None or sub.pace > S["recover"]["weekly_pace"]):
-        return sub
-    return sub if (not prev or prev.get("lane") == sub.name) else credit
-
-
-LATE_FLAGS = ("degraded", "same_family")
+           "none": lambda lane, S, st, t, ai_usage=None: None}      # no usage reading (Grok): only refusals mark it out
 
 
 # ----------------------------------------------------------------------------- owner holds (delegate-dns)
 
-def real_hold(lane, role, st, t):
-    """-> the owner's hold record that stops `role` on `lane` at time t, else None. A record is {id, lane, roles, set_by, set_at, until, reason}."""
-    for h in (st.get("holds") or {}).values():
-        if h.get("lane") == lane and (not h.get("roles") or role in h["roles"]) and h.get("until", 0) > t:
-            return h
-    return None
-
-
-def hold_text(h):
-    return f"held: {h.get('set_by') or 'owner'} " + (f"until {local(h['until'])}" if h.get("until") else "with no expiry") + (f" ({h['reason']})" if h.get("reason") else "")
-
-
-def refusal_fields(h, say=None):
-    """The answer fields for a refused call under a hold: the lane is out for this role until the hold ends, never `retry_after = now + 1`."""
-    return {"outcome": "held", "retry_after": h.get("until"), "say": say or f"{h['lane']} is on hold, {hold_text(h)}"}
-
-
-HOLD_STALE_BELOW = 5.0      # a hold whose lane now shows less than this % used (the weekly window, else the 5 h) has outlived its reason: one ask
-
-
-def add_hold(lane, until, reason, roles=None, set_by="owner", t=None):
-    """Record an owner hold. `until` is mandatory and must be in the future: a hold with no end is refused."""
-    t = now() if t is None else t
-    end = parse_until(until, t)
-    if end is None:
-        raise ValueError("a hold needs --until (an epoch, an ISO time, or +2h / +3d): a hold with no end is refused")
-    if end <= t:
-        raise ValueError(f"--until {until} is in the past")
-    if lane not in load_routing()["lanes"]:
-        raise ValueError(f"unknown lane {lane}; lanes: {', '.join(load_routing()['lanes'])}")
-    rec = {"id": uuid.uuid4().hex[:8], "lane": lane, "roles": sorted(roles or []), "set_by": set_by, "set_at": t, "until": end, "reason": reason or ""}
-    update_state(lambda s: s.setdefault("holds", {}).__setitem__(rec["id"], rec))
-    return rec
-
-
-def parse_until(v, t):
-    m = re.fullmatch(r"\+(\d+)([mhd])", str(v or "").strip())
-    if m:
-        return t + int(m.group(1)) * {"m": 60, "h": 3600, "d": 86400}[m.group(2)]
-    with contextlib.suppress(TypeError, ValueError):
-        v = float(v)      # the command line hands over a string
-    return to_epoch(v)
-
-
-def hold_usage(lane):
-    """-> percent used of the lane's weekly window (else its 5 h one), None when unknown."""
-    return None if lane is None else lane.week if lane.week is not None else lane.five
-
-
-def settle_holds(lanes, st, t):
-    """A hold still in force whose lane shows less than HOLD_STALE_BELOW % used is stale: it gets ONE ask, stamped on the record (`stale_at`) so no
-    later call raises it again; nothing is printed or pushed, the ask is a field of `status --json` (`asks`). -> (asks, state after)."""
-    stamp = [k for k, h in (st.get("holds") or {}).items() if h.get("until", 0) > t and not h.get("stale_at")
-             and (u := hold_usage(lanes.get(h.get("lane")))) is not None and u < HOLD_STALE_BELOW]
-    if stamp:
-        def apply(s_):
-            for k in stamp:
-                h_ = (s_.get("holds") or {}).get(k)
-                if h_ and not h_.get("stale_at"):
-                    h_["stale_at"] = t
-        st = update_state(apply)
-    asks = []
-    for h in (st.get("holds") or {}).values():
-        used = hold_usage(lanes.get(h.get("lane")))
-        if h.get("stale_at") and h.get("until", 0) > t and used is not None and used < HOLD_STALE_BELOW:
-            asks.append({"kind": "hold_stale", "id": h["id"], "lane": h["lane"], "raised_at": h["stale_at"], "used_pct": used,
-                         "say": f"hold {h['id']} on {h['lane']} (until {local(h['until'])}{', ' + h['reason'] if h.get('reason') else ''}) is still in force but the lane shows {used:.0f}% used",
-                         "answer": f"route.py release {h['id']} to end it, or leave it until it expires"})
-    return asks, st
-
-
-def hold_rows(cfg, st, t):
-    """Every hold now in force, with who set it and when it ends: for status --json and `holds`."""
-    rows = [dict(h, ends_in_s=int(h["until"] - t), stale=bool(h.get("stale_at"))) for h in (st.get("holds") or {}).values() if h.get("until", 0) > t]
-    return sorted(rows, key=lambda h: (h.get("until") or 1e18))
-
-
 def cmd_hold(a, cfg):
     try:
-        rec = add_hold(a.lane, a.until, a.reason, [x for x in (a.roles or "").split(",") if x], a.set_by)
+        if a.lane not in cfg["lanes"]:
+            raise ValueError(f"unknown lane {a.lane}; lanes: {', '.join(cfg['lanes'])}")
+        rec = new_hold(uuid.uuid4().hex[:8], a.lane, a.until, a.reason, [x for x in (a.roles or "").split(",") if x], a.set_by, now())
     except ValueError as e:
         print(json.dumps({"ok": False, "error": str(e)}))
         return 1
-    print(json.dumps({"ok": True, "hold": rec}))
+    update_state(lambda s: s.holds.__setitem__(rec.id, rec))
+    print(json.dumps({"ok": True, "hold": codec.to_json(rec)}))
     return 0
 
 
 def cmd_release(a, cfg):
     gone = []
-
-    def drop(st):
-        for k, h in list((st.get("holds") or {}).items()):
-            if a.target in (k, h.get("lane")):
-                gone.append(st["holds"].pop(k))
-    update_state(drop)
-    print(json.dumps({"ok": bool(gone), "released": gone}))
+    update_state(lambda s: gone.extend(HoldBook(s.holds).release(a.target)))
+    print(json.dumps({"ok": bool(gone), "released": [codec.to_json(h) for h in gone]}))
     return 0 if gone else 1
 
 
 def cmd_holds(a, cfg):
-    print(json.dumps({"holds": hold_rows(cfg, load_state(), now())}))
+    print(json.dumps({"holds": HoldBook(load_state().holds).rows(now())}))
     return 0
-
-
-def loop_barred(step, role, cfg):
-    """Why the loop never runs this step, else None: its model is explicit-call-only (models[m].loop false, Opus), or the role bars its family (reviewer: xai)."""
-    m = cfg["models"].get(step.get("model")) or {}
-    if m.get("loop") is False:
-        return f"{step.get('model')} is never routed in the loop (explicit user call only)"
-    fam = m.get("family") or step.get("on")
-    if fam in (role.get("exclude_families") or []):
-        return f"{fam} is excluded from this role"
-    return None
-
-
-def build_tiers(role, cfg, args, role_name=None):
-    """-> list of tiers; each tier is a list of steps tried strict then relaxed before the next tier."""
-    steps = list(role.get("steps") or [])
-    if "by_author" in role:
-        w = args.get("authored_by") or "unknown"
-        if w not in role["by_author"]:
-            return None
-        steps = list(role["by_author"][w])
-    if cfg["settings"].get("deepseek_free_enabled") is not True:
-        steps = [s for s in steps if s.get("on") != "deepseek"]
-    if cfg["settings"].get("zai_coding_enabled") is not True:
-        steps = [s for s in steps if s.get("on") != "zai"]
-    prem = args.get("premium")
-    if prem:
-        step = (cfg.get("premium") or {}).get(prem)
-        if not step:
-            return None
-        steps = [dict(step)] + steps
-    if role_name is None:
-        role_name = next((name for name, value in cfg["roles"].items() if value == role), None)
-    steps = [s for s in steps if not loop_barred(s, role, cfg)]
-    if role.get("order") == "cost":         # cheapest configured model first inside a tier (stable: ties keep the listed order)
-        steps.sort(key=lambda s: (cfg["models"].get(s.get("model")) or {}).get("cost", 1000))
-    steps = [dict(s, idx=i) for i, s in enumerate(steps)]
-    if role["advance"] == "on_failure":
-        failed = args.get("failed") or []
-        start = (max(failed) + 1) if failed else 0
-        steps = steps[start:]
-    # Order of tiers (each tried strict, then relaxed): a requested premium step, then every non-Claude step, then every Claude step;
-    # within each, unflagged steps before LATE_FLAGS ones. Claude lanes come last for every role (bead delegate-m86).
-    first = [s for s in steps if s.get("flag") == "user_requested_premium"]
-    rest = [s for s in steps if s not in first]
-    tiers = [first]
-    for claude in (False, True):
-        part = [s for s in rest if (s.get("on") == "claude") == claude]
-        tiers += [[s for s in part if s.get("flag") not in LATE_FLAGS], [s for s in part if s.get("flag") in LATE_FLAGS]]
-    tiers = [x for x in tiers if x]
-    if args.get("allow_degraded") and role.get("degraded_needs_consent"):
-        tiers.append([dict(s, flag="degraded_with_consent", idx=len(steps) + i) for i, s in enumerate(role["degraded_needs_consent"]) if not loop_barred(s, role, cfg)])
-    return tiers
-
-
-def family_state(fam, lanes, S):
-    """Why no lane of `fam` is usable, in a few words: 'xai out until Sat 24 Oct 18:00', 'claude logged out', 'claude over its limit', 'claude not set up'."""
-    mine = [l for l in lanes.values() if l.family == fam]
-    if not mine:
-        return f"{fam} not set up"
-    l = mine[0]
-    if l.out:
-        if l.out_reason == "logged_out":
-            return f"{fam} logged out"
-        return f"{fam} out" + (f" until {local(l.out_until)}" if l.out_until else "")
-    return f"{fam} over its limit"
-
-
-def review_warning(flag, step, author, lanes, S, cfg):
-    """One line for a same_family or degraded step; None for any other step."""
-    if flag not in LATE_FLAGS:
-        return None
-    fam = step["on"]
-    others = [f for f in dict.fromkeys(c["family"] for c in cfg["lanes"].values()) if f != fam]
-    down_fams = [f for f in others if not any(usable(l, S, True)[0] for l in lanes.values() if l.family == f)]
-    down = "; ".join(family_state(f, lanes, S) for f in down_fams)
-    if flag == "same_family":
-        spare = [f for f in others if f not in down_fams]
-        return (f"reviewing {author or 'unknown'}'s work with {fam}: " + (f"{', '.join(spare)} is kept as the last resort" if spare else "no other family is up")
-                + (f" ({down})" if down else ""))
-    return f"degraded: {step['model']} {step['effort']} on {fam} because the better options are down" + (f" ({down})" if down else "")
-
-
-def decide(role_name, cfg, lanes, st, t, args):
-    """Pure: no I/O. Returns the decision dict."""
-    S = cfg["settings"]
-    role = cfg["roles"].get(role_name)
-    if role is None:
-        return {"action": "error", "error": f"unknown role {role_name}; roles: {', '.join(cfg['roles'])}"}
-    tiers = build_tiers(role, cfg, args, role_name)
-    if tiers is None:
-        if args.get("premium") and not (cfg.get("premium") or {}).get(args["premium"]):
-            return {"action": "error", "error": f"no premium model configured for family {args['premium']}; premium: {[k for k, v in (cfg.get('premium') or {}).items() if v and k != 'about']}"}
-        return {"action": "error", "error": f"--authored-by must be {' or '.join(k for k in role['by_author'] if k != 'unknown')} (or omitted)"}
-    trace = []
-    for l in lanes.values():
-        l.held = real_hold(l.name, role_name, st, t)
-    steps_ = [x for tier in tiers for x in tier]
-    first = next((x for x in steps_ if any(l.family == x["on"] for l in lanes.values())), steps_[0] if steps_ else None)      # the role's first choice among lanes that are set up
-    mine = [l for l in lanes.values() if first and l.family == first["on"]]
-
-    def free_ok(l):         # usable if its slots were free
-        o, l.out = l.out, False
-        try:
-            return usable(l, S, True)[0]
-        finally:
-            l.out = o
-    busy = [l for l in mine if l.busy and free_ok(l)]
-    if busy and args.get("wait_busy") and not any(usable(l, S, True)[0] for l in mine):
-        until = min(l.out_until for l in busy)      # the first choice is only waiting for a slot: a minute beats a round on the next rung
-        return {"action": "stop", "reason": "busy", "lane": busy[0].name, "retry_after": until,
-                "say": f"{busy[0].name} (the role's first choice) has no free slot: {busy[0].notes[0]}", "trace": trace}
-    why_not_first = "busy" if busy else "out" if any(l.out for l in mine) else "ceiling"
-    first_lane = next((l.name for l in mine if l.kind == "subscription"), mine[0].name if mine else None)
-    for tier in tiers:
-        for relaxed in (False, True):
-            for step in tier:
-                lane = pick_lane(step["on"], lanes, S, st, t, relaxed, trace, step["model"])
-                if lane is None:
-                    continue
-                fb = step is not first
-                warn = review_warning(step.get("flag"), step, args.get("authored_by"), lanes, S, cfg)
-                return {"action": "run", "role": role_name, "pass": "relaxed" if relaxed else "strict",
-                        "rung": step.get("idx"), "fallback": fb, "fallback_reason": why_not_first if fb else None, "first_lane": first_lane if fb else None,
-                        "lane": lane.name, "model": step["model"], "effort": step["effort"], "mode": step.get("mode", "read_only"),
-                        "cap": step.get("cap"), "flag": step.get("flag"),
-                        "how": how(lane, step, cfg, args.get("cwd"), args.get("unattended", False)), "trace": trace,
-                        **({"warning": warn} if warn else {})}
-    resets = {l.name: local(l.out_until) for l in lanes.values() if l.out and l.out_until}
-    resets.update({f"{l.name}/{m}": local(b["until"]) for l in lanes.values() for m, b in l.benched.items()})
-    stop = {"action": "stop", "role": role_name, "say": role["stop"], "resets": resets, "trace": trace}
-    barred = sorted({why for x in [*(role.get("steps") or []), *(sx for v in (role.get("by_author") or {}).values() for sx in v)] if (why := loop_barred(x, role, cfg))})
-    if barred and not tiers:
-        stop["reason"] = "loop_excluded"
-        stop["say"] = f"{role['stop']} Nothing is left to route: " + "; ".join(barred) + "."
-    consent = [s for s in role.get("degraded_needs_consent") or [] if not loop_barred(s, role, cfg)]
-    if consent and not args.get("allow_degraded"):
-        stop["ask_user"] = {"question": "No adequate model is available. Run a degraded option?",
-                            "options": [f"{s['model']} {s['effort']}" for s in consent if not loop_barred(s, role, cfg)],
-                            "then": f"route.py next {role_name} --allow-degraded"}
-    return stop
 
 
 # Every codex run and resume gets these, so neither the user's config nor a repo file widens or narrows them. The sandbox has no network and
@@ -1171,11 +585,7 @@ def needs_input(lanes):
 def finished_runs(n):
     """The last n finished runs, newest last: the dashboard's view of history.jsonl (the file itself stays private)."""
     keys = ("run_id", "ts", "role", "task", "lane", "model", "done", "outcome", "secs", "cost", "tokens", "denials")
-    try:
-        lines = history_path().read_text(encoding="utf-8").splitlines()[-n:]
-        return [{k: json.loads(ln).get(k) for k in keys} for ln in lines if ln]
-    except (OSError, ValueError):
-        return []
+    return [{k: getattr(r, k) for k in keys} for r in history_store().runs(n)]
 
 
 # ----------------------------------------------------------------------------- the cockpit: every lane, one row each
@@ -1188,62 +598,10 @@ LABELS = {"CLAUDE_SUBSCRIPTION": "Claude subscription", "CLAUDE_CREDIT": "Claude
 LOGIN_CMD = {"OPENAI_SUBSCRIPTION": "codex login", "CLAUDE_SUBSCRIPTION": "claude auth login", "CLAUDE_CREDIT": "route.py set-key",
              "GROK_SUBSCRIPTION": "opencode auth login", "ZAI_CODING_SUBSCRIPTION": "opencode auth login, choose Z.AI Coding Plan",
              "DEEPSEEK_FREE": "route.py doctor --lane DEEPSEEK_FREE"}
-AUTH_TTL = 300          # a login check answers for this long: it spawns a CLI, cheap but not free
-AUTH_TIMEOUT = 10
-AUTH_FILE_TTL = 600     # auth-cache.json: written by a non-cheap status, doctor, a login probe and a successful run; read by next and status --cheap
-
-
-def auth_cache_path():
-    return config_dir() / "auth-cache.json"
-
-
-def read_auth_cache():
-    """-> {lane: {at, ok, why}}; empty when the file is missing or unreadable."""
-    try:
-        d = json.loads(auth_cache_path().read_text(encoding="utf-8"))
-        return d if isinstance(d, dict) else {}
-    except (OSError, ValueError, SystemExit):
-        return {}
-
-
-def write_auth(name, ok, why, t):
-    """Remember a login answer for AUTH_FILE_TTL. Never fails the caller."""
-    if ok is None:
-        return
-    with contextlib.suppress(Exception):
-        p = auth_cache_path()
-        with locked(p):
-            d = read_auth_cache()
-            d[name] = {"at": t, "ok": bool(ok), "why": str(why)[:120]}
-            tmp = p.with_suffix(f".tmp{os.getpid()}")
-            tmp.write_text(json.dumps(d), encoding="utf-8")
-            os.replace(tmp, p)
-            private(p)
-
-
-def cached_auth(name, t):
-    """-> the fresh {at, ok, why} entry for a lane, or None (stale, missing, or DELEGATE_NOCACHE set)."""
-    c = read_auth_cache().get(name)
-    if isinstance(c, dict) and 0 <= t - c.get("at", 0) <= AUTH_FILE_TTL and "ok" in c and not os.environ.get("DELEGATE_NOCACHE"):
-        return c
-    return None
 SLOW_WINDOW = 2 * 3600  # a hang or timeout this recent, with no good run on the lane since, keeps it marked slow
 SLOW_KINDS = ("hung", "timeout")
 
 
-def fmt_in(secs):
-    """'2h 10m', '6d 21h', '45m'."""
-    s = int(secs)
-    if s < 60:
-        return "<1m"
-    d, r = divmod(s, 86400)
-    h, r = divmod(r, 3600)
-    m = r // 60
-    return f"{d}d {h}h" if d else f"{h}h {m:02d}m" if h else f"{m}m"
-
-
-def when(epoch, t):
-    return f"{local(epoch)} (in {fmt_in(epoch - t)})"
 
 
 def probe_login(name):
@@ -1261,13 +619,11 @@ def probe_login(name):
 
 def login_state(name, st, t):
     """-> (ok, why, checked_at): probe_login cached a few minutes in state, so a status call costs one process per lane at most."""
-    c = (st.get("auth") or {}).get(name)
-    if c and t - c.get("at", 0) <= AUTH_TTL and not os.environ.get("DELEGATE_NOCACHE"):
-        return c["ok"], c["why"], c["at"]
+    c = auth_cache().fresh(name, t, AUTH_TTL, st)
+    if c:
+        return c.ok, c.why, c.at
     ok, why = probe_login(name)
-    if ok is not None:
-        update_state(lambda s_: s_.setdefault("auth", {}).__setitem__(name, {"at": t, "ok": ok, "why": why}))
-        write_auth(name, ok, why, t)
+    auth_cache().remember(name, ok, why, t)
     return ok, why, t
 
 
@@ -1295,7 +651,7 @@ def off_reason(name, cfg, login):
 def classify_out(lane, rec):
     """Why a lane that is out is out -> logged_out | spend | slow | resting. rec is its state.json entry (older ones have no typed reason)."""
     r = lane.out_reason
-    text = " ".join([(rec or {}).get("why", "")] + lane.notes)
+    text = " ".join([rec.why if rec else ""] + lane.notes)
     if r == "logged_out" or (r in (None, "error") and classify.LOGIN_RE.search(text)):
         return "logged_out"
     if lane.spend_blocked or classify.SPEND_RE.search(text) or (r == "limit" and lane.kind == "credit"):
@@ -1324,7 +680,7 @@ def window_rows(lane, S, t):
                      "age_s": None if w["at"] is None else max(0, int(t - w["at"]))})
         if used is None or lane.kind == "credit":
             continue
-        (gwk, gfv, gname), (cwk, cfv, _) = limits_for(lane, S, False), limits_for(lane, S, True)
+        (gwk, gfv, gname), (cwk, cfv, _) = lane.limits(S, False), lane.limits(S, True)
         gate, ceil = (gwk, cwk) if w["span"] > 1440 else (gfv, cfv)
         if used >= gate:
             low.append({"window": w["name"], "used_pct": round(used, 1), "limit": ceil if used >= ceil else gate,
@@ -1334,7 +690,7 @@ def window_rows(lane, S, t):
 
 def lane_view(name, cfg, lane, st, t, history=(), running=0, login=(None, "", None), off_why=None):
     """One lane's cockpit row. Pure given its inputs: lane is what gather built (None = disabled or not configured), history the recent finished runs."""
-    S, c = cfg["settings"], cfg["lanes"][name]
+    S, c = settings_of(cfg), cfg["lanes"][name]
     v = {"id": name, "label": c.get("label") or LABELS.get(name, name), "family": c["family"], "kind": c["kind"], "model": lane_model(cfg, name),
          "state": "off", "emoji": EMOJI["off"], "reason": off_why or "disabled or not configured", "detail": None,
          "unlock": {"locked": False, "known": False, "at": None, "in_s": None, "text": None, "why": "not in use"},
@@ -1343,12 +699,12 @@ def lane_view(name, cfg, lane, st, t, history=(), running=0, login=(None, "", No
     if lane is None:
         return v
     v["windows"], v["low_tokens"] = window_rows(lane, S, t)
-    rec = (st.get("out") or {}).get(name)
+    rec = st.out.get(name)
     relogin = f"waits for you to log in (`{LOGIN_CMD[name]}`); re-checked every {AUTH_TTL // 60} min"
     until, why, locked = None, "not locked", False
     if lane.out:
         kind = classify_out(lane, rec)
-        text = (rec or {}).get("why") or (lane.notes[0] if lane.notes else "")
+        text = (rec.why if rec else "") or (lane.notes[0] if lane.notes else "")
         v["detail"] = text[:160] or None
         until, locked = lane.out_until, True
         if kind == "logged_out" or login[0] is False:
@@ -1365,9 +721,9 @@ def lane_view(name, cfg, lane, st, t, history=(), running=0, login=(None, "", No
     elif login[0] is False:
         v["state"], locked, why = "logged_out", True, relogin
         note = f"logged out: run `{LOGIN_CMD[name]}`"
-    elif not usable(lane, S, True)[0]:               # over the hard ceiling with nothing recorded: resting until that window resets
+    elif not lane.usable(S, True)[0]:               # over the hard ceiling with nothing recorded: resting until that window resets
         v["state"], locked = "resting", True
-        until, note, why = back_at(lane, S), usable(lane, S, True)[1], "no reset time for the window it is over"
+        until, note, why = lane.back_at(S), lane.usable(S, True)[1], "no reset time for the window it is over"
     else:
         last = next((h for h in reversed(history) if h.get("lane") == name), None)
         slow = last if last and last.get("outcome") in SLOW_KINDS and t - (last.get("ts") or 0) <= SLOW_WINDOW else None
@@ -1393,26 +749,31 @@ def lane_view(name, cfg, lane, st, t, history=(), running=0, login=(None, "", No
 
 def claude_why(cfg, lanes):
     """Why no non-Claude worker lane was usable when a Claude lane got the pick: 'OPENAI_SUBSCRIPTION out until ..; ZAI_CODING_SUBSCRIPTION not set up'."""
-    S = cfg["settings"]
+    S = settings_of(cfg)
     fams = {s["on"] for s in cfg["roles"]["worker"]["steps"] if s["on"] != "claude"}
     parts = []
     for name, c in cfg["lanes"].items():
         if c["family"] not in fams:
             continue
         l = lanes.get(name)
-        parts.append(f"{name} " + ("not set up" if l is None else usable(l, S, True)[1]))
+        parts.append(f"{name} " + ("not set up" if l is None else l.usable(S, True)[1]))
     return "; ".join(parts) or "no other lane exists"
+
+
+def busy_jitter():
+    return random.randint(60, 120)
+
+
+def settings_of(cfg):
+    return typed_routing(cfg).settings
 
 
 def next_worker(cfg, lanes, st, t):
     """The lane `next worker` would pick now: decide() on a copy, nothing written."""
-    cur = copy.deepcopy(lanes)
-    mark_busy(cur, st, cfg["settings"], t)
+    routing = typed_routing(cfg)
+    cur = mark_busy(lanes, st, routing.settings, t, busy_jitter)
     unattended = not interactive()
-    if unattended:
-        cur = {n: l for n, l in cur.items() if l.kind != "credit"}
-    d = decide("worker", cfg, cur, st, t, {"authored_by": None, "failed": [], "premium": None, "allow_degraded": False,
-                                           "unattended": unattended, "cwd": None, "wait_busy": unattended})
+    d = Router(routing, HoldBook(st.holds), st.prev, t).route("worker", CallArgs(unattended=unattended), cur).as_dict()
     if d["action"] == "run":
         r = {"action": "run", "lane": d["lane"], "model": d["model"], "effort": d["effort"], "pass": d["pass"], "fallback": d["fallback"], "why": None}
         if cfg["lanes"][d["lane"]]["family"] == "claude":
@@ -1426,13 +787,13 @@ def cockpit(cfg, lanes, st, t):
     import onboard
     R = sys.modules[__name__]
     hist = finished_runs(60)
-    live = live_leases(st, t)
+    book = LeaseBook(st.leases)
     rows = []
     for name, c in cfg["lanes"].items():
         lane = lanes.get(name)
         login = login_state(name, st, t)
         off = off_reason(name, cfg, login) if lane is None else None
-        rows.append(lane_view(name, cfg, lane, st, t, hist, sum(1 for x in live.values() if x["lane"] == name), login, off))
+        rows.append(lane_view(name, cfg, lane, st, t, hist, book.counts(name, t)["live"], login, off))
     return {"v": 1, "at": t, "legend": {EMOJI[k]: LEGEND[k] for k in EMOJI}, "next_worker": next_worker(cfg, lanes, st, t), "lanes": rows}
 
 
@@ -1476,7 +837,7 @@ def status_payload(cfg, lanes, ck, st, t):
                           "pace": l.pace, "burn": l.burn, "spend": l.spend, "cap": l.cap, "notes": l.notes} for n, l in lanes.items()},
             "cockpit": ck,
             "running": running_rows(st, t),
-            "needs_input": needs_input(lanes), "holds": hold_rows(cfg, st, t), "asks": settle_holds(lanes, st, t)[0],
+            "needs_input": needs_input(lanes), "holds": HoldBook(st.holds).rows(t), "asks": [x.as_dict() for x in settle_holds(states(), lanes, st, t)[0]],
             "health": health_rows(cfg, lanes, st, t), **roles_payload(cfg, lanes, st, t)}
 
 
@@ -1487,7 +848,9 @@ def net_cache_path():
 def roles_payload(cfg, lanes, st, t):
     """roles{} (usable and net per role) and network{} for status --json; the probe is read from its cache, never run here."""
     cached = netprobe.load(str(net_cache_path()))
-    return {"roles": role_view.roles_view(cfg, lanes, st, t, decide, cached), "network": network_view(cached, t)}
+    routing = typed_routing(cfg)
+    router = Router(routing, HoldBook(st.holds), st.prev, t)
+    return {"roles": role_view.roles_view(cfg, lanes, router, st, t, cached), "network": network_view(cached, t)}
 
 
 def network_view(cached, t):
@@ -1517,17 +880,18 @@ def cmd_net(a):
 
 def health_rows(cfg, lanes, st, t):
     """One row per (lane, model): state (up|busy|exhausted|logged_out|held|broken), until, source, evidence, leases{live,suspect}, last_failures[3]."""
-    rows, pol = [], health.policy(cfg["settings"])
+    rows, pol = [], settings_of(cfg).breaker
     for name, l in lanes.items():
-        cnt = lease_counts(st, t, name)
-        rec = (st.get("out") or {}).get(name) or {}
+        cnt = LeaseBook(st.leases).counts(name, t)
+        rec = st.out.get(name)
         ats = [w.get("at") for w in l.windows if w.get("at")]
-        stale = health.stale_usage(max(ats) if ats else l.read_at, t, pol)
+        stale = health_ledger.stale_usage(max(ats) if ats else l.read_at, t, pol)
         for model, v in l.hview.items():
-            if v["state"] == "up" and l.out and not l.busy:         # the lane's own out record (state.json) is the other half of "exhausted"
-                v = dict(v, state="logged_out" if l.out_reason == "logged_out" else "exhausted", until=l.out_until, source=rec.get("source"), kind=l.out_reason,
-                         evidence=(rec.get("why") or "")[:240])
-            state = health.combine(v, l.held, l.busy)
+            if v.state == "up" and l.out and not l.busy:         # the lane's own out record (state.json) is the other half of "exhausted"
+                v = replace(v, state="logged_out" if l.out_reason == "logged_out" else "exhausted", until=l.out_until, source=rec.source if rec else None,
+                            kind=l.out_reason, evidence=(rec.why if rec else "")[:240])
+            state = health_ledger.combine(v, False, l.busy)
+            v = v.as_dict()
             rows.append({"lane": name, "model": model, "state": state, "until": v["until"], "source": v["source"], "kind": v["kind"], "evidence": v["evidence"],
                          "canary": v["canary"], "rung": v["rung"], "leases": cnt, "last_failures": v["last_failures"],
                          "needs_login": state == "logged_out" and l.family == "claude",
@@ -1536,9 +900,9 @@ def health_rows(cfg, lanes, st, t):
 
 
 def running_rows(st, t):
-    return [{"run_id": k, "lane": v["lane"], "role": v["role"], "task": v.get("task", ""), "started": v["start"], "age_s": int(t - v["start"]),
-             "pid": v.get("pid"), "worker_pid": v.get("worker_pid"), "suspect": suspect(v, t)}
-            for k, v in sorted(live_leases(st, t).items(), key=lambda kv: kv[1]["start"])]
+    return [{"run_id": k, "lane": v.lane, "role": v.role, "task": v.task, "started": v.start, "age_s": int(t - v.start),
+             "pid": v.pid, "worker_pid": v.worker_pid, "suspect": suspect(v, t)}
+            for k, v in sorted(LeaseBook(st.leases).live(t).items(), key=lambda kv: kv[1].start)]
 
 
 def write_snapshot(payload):
@@ -1561,8 +925,8 @@ def cmd_status_cheap(a, cfg):
         snap = d if isinstance(d, dict) else {}
     at = snap.get("ts")
     out = {k: v for k, v in snap.items() if k not in ("ts", "running")}
-    out.update(v=1, cheap=True, ts=t, age_s=int(t - at) if isinstance(at, (int, float)) else None, running=running_rows(st, t), holds=hold_rows(cfg, st, t),
-               auth={n: {"ok": c.get("ok"), "why": c.get("why"), "age_s": int(t - c.get("at", 0))} for n, c in read_auth_cache().items() if isinstance(c, dict)})
+    out.update(v=1, cheap=True, ts=t, age_s=int(t - at) if isinstance(at, (int, float)) else None, running=running_rows(st, t), holds=HoldBook(st.holds).rows(t),
+               auth=auth_cache().rows(st, t))
     out.setdefault("lanes", {})
     cached = netprobe.load(str(net_cache_path()))       # a file, not a socket: cheap opens no connection
     out.update(roles=role_view.refresh(snap.get("roles"), out["holds"], cached, t), network=network_view(cached, t))
@@ -1575,7 +939,7 @@ def cmd_status(a, cfg):
         return cmd_status_cheap(a, cfg)
     t = now()
     st = load_state()
-    lanes = gather(cfg, st, t, parse_json_arg(a.claude_usage))
+    lanes = fleet_builder(cfg).build(st, t, parse_json_arg(a.claude_usage)).lanes
     publish_lanes(lanes, st, t)
     ck = cockpit(cfg, lanes, st, t)
     payload = status_payload(cfg, lanes, ck, st, t)
@@ -1589,128 +953,66 @@ def cmd_status(a, cfg):
     return 0
 
 
-def drift_warnings(lanes, st, t):
-    """A lane the profile enabled but the machine no longer supports: say so once a day."""
-    warned = st.get("warned_at") or {}
-    bad = [n for n, l in lanes.items() if l.notes and l.notes[0].startswith("enabled but not ready")]
-    out = [f"{n} is enabled but not ready, so it is skipped (route.py doctor; or route.py doctor --decline {n})" for n in bad if t - warned.get(n, 0) > 86400]
-    if out:
-        update_state(lambda s_: s_.setdefault("warned_at", {}).update({n: t for n in bad}))
-    return out
-
-
-LEASE_TTL, LEASE_RENEW = 120, 30      # a running run holds a lease; renewed while it lives, it expires by itself if route.py is killed
-
-
-def live_leases(st, t):
-    return {k: v for k, v in (st.get("leases") or {}).items() if v.get("expires", 0) > t}
-
-
-def suspect(v, t):
-    """A lease whose worker printed nothing for longer than its CLI's silence limit: it is probably hung, and does not count against the lane's cap
-    (the 22 false `busy` of 25 Oct). Its worker is stopped by its own watchdog; this only stops it blocking the lane meanwhile."""
-    s_ = v.get("silence_s")
-    return bool(s_) and t - max(v.get("last_event") or 0, v.get("start") or 0) > s_
-
-
-def lease_counts(st, t, lane):
-    """-> {live, suspect}: the running leases on `lane` (suspect ones are also in live)."""
-    mine = [v for v in live_leases(st, t).values() if v.get("lane") == lane]
-    return {"live": len(mine), "suspect": sum(1 for v in mine if suspect(v, t))}
-
-
 def orphan(v):
     """True when the lease's route.py process is gone (pid plus start time: an expired lease alone may be a laptop waking up) but its worker
     is still running: a SIGKILL on route.py leaves the worker, which is its own process group, editing the tree."""
-    gone = procs.start_token(v.get("pid")) != v.get("pid_start")
-    return gone and bool(v.get("worker_start")) and procs.start_token(v.get("worker_pid")) == v.get("worker_start")
+    gone = procs.start_token(v.pid) != v.pid_start
+    return gone and bool(v.worker_start) and procs.start_token(v.worker_pid) == v.worker_start
 
 
 def reap(v):
     """Stop an orphaned worker's whole tree: SIGTERM, a short grace, SIGKILL (stop_tree). -> True when the worker is gone."""
-    pg = int(v["worker_pid"])
-    procs.stop_tree(pg, grace=3, done=lambda: procs.start_token(pg) != v.get("worker_start"))
-    return procs.start_token(pg) != v.get("worker_start")
+    pg = int(v.worker_pid)
+    procs.stop_tree(pg, grace=3, done=lambda: procs.start_token(pg) != v.worker_start)
+    return procs.start_token(pg) != v.worker_start
 
 
-def slots(lane, S):
-    """How many runs may be in flight on a lane: max_parallel (null = unlimited), one when the lane is strained."""
-    n = S.get("max_parallel")
-    if n is None:
-        return None
-    if lane.five is not None and lane.five >= S["strain"]["five_hour"]:
-        return 1
-    return int(n)
+def fleet_builder(cfg):
+    import onboard
+    R = sys.modules[__name__]
+    return FleetBuilder(typed_routing(cfg), states(), history_store(), CheckpointStore(config_dir() / "health-checkpoint.json"), config_store(),
+                        READERS, lambda: onboard.configured_lanes(R, cfg))
 
 
-def mark_busy(lanes, st, S, t):
-    """A lane with all its slots taken is skipped like a refused lane; the jitter keeps retrying engines from arriving together."""
-    live = live_leases(st, t)
-    for l in lanes.values():
-        cap, running = slots(l, S), sum(1 for v in live.values() if v["lane"] == l.name and not suspect(v, t))
-        if cap is not None and running >= cap and not l.out:
-            l.out, l.out_until, l.busy, l.out_reason = True, t + random.randint(60, 120), True, "busy"
-            l.notes.insert(0, f"busy: {running} running, {cap} allowed")
+def call_args(a, unattended):
+    return CallArgs(authored_by=a.authored_by, failed=tuple(int(x) for x in a.failed.split(",") if x != "") if a.failed else (), premium=a.premium,
+                    allow_degraded=a.allow_degraded, unattended=unattended, resume=getattr(a, "resume", None), cap=getattr(a, "cap", None))
 
 
 def decision(a, cfg):
-    """next and run share this: gather, decide, remember the lane choice. -> (d, lanes, warnings, t)"""
+    """next and run share this: build the fleet, route, remember the lane choice. -> (d, lanes, warnings, t); d is the JSON answer of `next`."""
     t = now()
     st = load_state()
+    routing = typed_routing(cfg)
     unattended = not interactive()
-    del OFFERS[:]
-    lanes = gather(cfg, st, t, parse_json_arg(a.claude_usage))
-    new_offers = list(OFFERS)
-    warnings = drift_warnings(lanes, st, t)
-    _, st = settle_holds(lanes, st, t)
-    publish_lanes(lanes, st, t)
-    S = cfg["settings"]
-    mark_busy(lanes, st, S, t)
-    if unattended:        # no one to pay the API credit knowingly: credit lanes are never picked unattended
-        lanes = {n: l for n, l in lanes.items() if l.kind != "credit"}
-    ref = getattr(a, "resume", None)
-    if ref:             # continue on the lane that made the ref; never switch lanes silently
-        rec = (st.get("refs") or {}).get(ref)
-        lane = lanes.get(rec["lane"]) if rec else None
-        if not rec:
-            return {"action": "error", "error": f"unknown --resume ref {ref}"}, lanes, warnings, t
-        hold = real_hold(rec["lane"], a.role, st, t)
-        if hold:
-            return {"action": "stop", "lane": rec["lane"], "retry_after": hold.get("until"), "outcome": "held",
-                    "say": f"{rec['lane']} is on hold, {hold_text(hold)}."
-                    + " Continue with a fresh writer on another lane; existing file changes remain in the working directory."}, lanes, warnings, t
-        if lane is None or not usable(lane, S, True, rec["model"])[0]:
-            why = usable(lane, S, True, rec["model"])[1] if lane else "not usable by this caller"
-            if lane is not None and lane.busy:       # its slots are taken: wait for one, the thread stays on its lane
-                return {"action": "stop", "reason": "busy", "lane": rec["lane"], "retry_after": lane.out_until,
-                        "say": f"{rec['lane']} has no free slot to continue {ref}: {lane.notes[0]}"}, lanes, warnings, t
-            return {"action": "stop", "lane": rec["lane"], "retry_after": back_at(lane, S) if lane else None,
-                    "outcome": "held" if lane and lane.held else lane.benched[rec["model"]]["kind"] if lane and rec["model"] in lane.benched
-                    else {"logged_out": "logged_out", "hung": "hung", "credit": "credit_exhausted"}.get(lane.out_reason, "rate_limited") if lane else "rate_limited",
-                    "say": f"{rec['lane']} cannot continue {ref} now: {why}"}, lanes, warnings, t
-        step = {"model": rec["model"], "effort": rec["effort"], "mode": rec["mode"], "cap": a.cap or rec.get("cap")}
-        return {"action": "run", "role": a.role, "pass": "resume", "rung": rec.get("rung"), "fallback": rec.get("fallback"),
-                "fallback_reason": rec.get("fallback_reason"), "first_lane": rec.get("first_lane"), "lane": lane.name, "model": rec["model"], "effort": rec["effort"],
-                "mode": rec["mode"], "cap": step["cap"], "how": how(lane, step, cfg, a.cwd, unattended)}, lanes, warnings, t
-    args = {"authored_by": a.authored_by, "failed": [int(x) for x in a.failed.split(",") if x != ""] if a.failed else [],
-            "premium": a.premium, "allow_degraded": a.allow_degraded and not unattended, "cwd": a.cwd, "unattended": unattended, "wait_busy": unattended}
-    d = decide(a.role, cfg, lanes, st, t, args)
-    if d["action"] == "run":
-        fam = cfg["lanes"][d["lane"]]["family"]
-        if getattr(a, "cap", None):
-            d["cap"] = d["how"]["cap"] = a.cap if d["how"]["kind"] == "claude_p" else d["how"].get("cap")
+    fleet = fleet_builder(cfg).build(st, t, parse_json_arg(a.claude_usage))
+    warnings = drift_warnings(states(), fleet.lanes, st, t)
+    _, st = settle_holds(states(), fleet.lanes, st, t)
+    publish_lanes(fleet.lanes, st, t)
+    lanes = callable_lanes(mark_busy(fleet.lanes, st, routing.settings, t, busy_jitter), unattended)
+    args = call_args(a, unattended)
+    router = Router(routing, HoldBook(st.holds), st.prev, t)
+    pick = router.route(a.role, args, lanes, st.refs.get(args.resume or ""))
+    d = pick.as_dict()
+    if isinstance(pick, Run):
+        step = {"model": pick.model, "effort": pick.effort, "mode": pick.mode}
+        if pick.cap is not None or pick.pass_ == "resume":
+            step["cap"] = pick.cap
+        d["how"] = how(lanes[pick.lane], step, cfg, a.cwd, unattended)
+        if pick.pass_ != "resume":
+            fam = lanes[pick.lane].family
+            if args.cap:
+                d["cap"] = d["how"]["cap"] = args.cap if d["how"]["kind"] == "claude_p" else d["how"].get("cap")
 
-        def mark(s):
-            prev = s.setdefault("prev", {}).get(fam)
-            if not prev or prev.get("lane") != d["lane"]:
-                s["prev"][fam] = {"lane": d["lane"], "since": t}
-        if sum(1 for l in lanes.values() if l.family == fam) > 1:
-            update_state(mark)
-    if unattended and d.get("action") == "stop":
-        d.pop("ask_user", None)
-    if new_offers:
-        mark_offered(new_offers)
-        d["notice"] = "not set up: " + ", ".join(new_offers) + " (doctor --lane NAME to set up, doctor --decline NAME to hide)"
+            def mark(s):
+                new = router.dwell.note(fam, pick.lane, t)
+                if new:
+                    s.prev[fam] = new
+            if sum(1 for lane in lanes.values() if lane.family == fam) > 1:
+                update_state(mark)
+    if fleet.offers:
+        config_store().mark_offered(fleet.offers)
+        d["notice"] = "not set up: " + ", ".join(fleet.offers) + " (doctor --lane NAME to set up, doctor --decline NAME to hide)"
     return d, lanes, warnings, t
 
 
@@ -1734,15 +1036,14 @@ def cmd_report(a, cfg):
     if a.lane not in cfg["lanes"]:
         sys.exit(f"route.py: unknown lane {a.lane}; lanes: {', '.join(cfg['lanes'])}")
     if a.event == "ok":
-        update_state(lambda s: (s.setdefault("out", {}).pop(a.lane, None)))
-        history_add({"ts": now(), "run_id": "manual", "release": True, "lane": a.lane, "model": None, "role": "report"})      # the fold forgets the lane's limits
+        update_state(lambda s: s.out.pop(a.lane, None))
+        history_add(hist.ReleaseRow(ts=now(), lane=a.lane))      # the fold forgets the lane's limits
         print(f"{a.lane}: marked available")
         return 0
     until = to_epoch(a.until)
     if until is None:
         st = load_state()
-        lanes = gather(cfg, st, t, check_config=False)     # a lane the profile leaves out can still be reported out
-        lane = lanes[a.lane]
+        lane = fleet_builder(cfg).build(st, t, check_config=False).lanes[a.lane]     # a lane the profile leaves out can still be reported out
         until = lane.out_until or (lane.week_reset if lane.week_reset and lane.week_reset > t and lane.kind == "credit" else None) or t + 3600
     mark_out(a.lane, until, "reported out", t, "limit", "manual" if a.until else "guess")
     print(f"{a.lane}: out until {local(until)}")
@@ -1845,8 +1146,8 @@ def publish_lanes(lanes, st, t):
     if agent_runs is None:
         return
     try:
-        outs = st.get("out") or {}
-        agent_runs.lanes([(n, l.out_until if l.out else None, (outs.get(n) or {}).get("why") if l.out else None,
+        outs = st.out
+        agent_runs.lanes([(n, l.out_until if l.out else None, outs[n].why if l.out and n in outs else None,
                            [("5h", l.five, l.five_reset), ("week", l.week, l.week_reset)]) for n, l in lanes.items()], t)
     except Exception:
         pass
@@ -1924,8 +1225,8 @@ def codex_reset_now(t):
 def mark_out(lane, until, why, t, reason="limit", source="guess", zone=None, guess_n=0):
     """Record a lane out. source: vendor (the vendor stated the end) | guess | manual (the owner said); zone: the zone the vendor's time was in;
     `set` = wall clock now (workers already running read it: a lane marked out after they started stops them)."""
-    update_state(lambda s: s.setdefault("out", {}).__setitem__(lane, {"until": until, "why": why, "at": t, "set": time.time(), "reason": reason,
-                                                                    "source": source, "zone": zone, "guess_n": guess_n}))
+    update_state(lambda s: s.out.__setitem__(lane, OutState(until=until, why=why, at=t, set=time.time(), reason=reason, source=source, zone=zone,
+                                                           guess_n=guess_n)))
 
 
 def codex_child_tokens(thread, since):
@@ -2013,8 +1314,8 @@ def settle(res, o, d, t, who, a, rc=None, tail="", reset=None, credit_until=None
             until = now() + random.randint(60, 120)
             res.update(retry_after=until, say=f"{who} {words} and was stopped (its whole process tree); retry")
     elif r == "rate_limited":
-        prev = (load_state().get("out") or {}).get(lane) or {}
-        n = prev.get("guess_n", -1) + 1 if prev.get("source") == "guess" and t - prev.get("at", 0) < 6 * 3600 else 0
+        prev = load_state().out.get(lane)
+        n = prev.guess_n + 1 if prev and prev.source == "guess" and t - prev.at < 6 * 3600 else 0
         until, source, zone = reset_parse.limit_until(why, t, d, reset, n)
         mark_out(lane, until, ("limit (opencode log): " if o.source == "ours" else "limit refusal: ") + why[:120].replace("\n", " "), t, "limit", source, zone, n if source == "guess" else 0)
         res.update(retry_after=until, say=f"{lane} hit a limit" + (f" ({why[:120]}); worker stopped, lane" if o.source == "ours" else ";") + f" out until {local(until)}")
@@ -2029,7 +1330,7 @@ def settle(res, o, d, t, who, a, rc=None, tail="", reset=None, credit_until=None
     elif r == "bad_request":
         res.update(fix="the vendor rejected the request itself (schema, flags or arguments): fix the caller, not the lane", say=f"{who} rejected the request: {why[:300]}")
     elif r == "network" and answered:         # the final answer was captured before the connection dropped (ae6v): the work is done, say so
-        update_state(lambda s: s.setdefault("out", {}).pop(lane, None))
+        update_state(lambda s: s.out.pop(lane, None))
         res.update(outcome=None, data=parse_data(res.get("text") or "", a.schema), warnings=["net_after_answer"], detail="")
     elif r == "network":      # not a lane fault: nothing is marked out, the pair is not counted, and the caller decides when to resume (`resumable`, `ref`)
         res.update(retry_after=soon(), resumable=bool(res.get("ref") and res.get("started")), partial=bool(res.get("partial")),
@@ -2119,9 +1420,9 @@ def denied_items(hx, read_only):
 
 def prepare_codex(d, brief, a, rid, t, cfg):
     h = d["how"]
-    hold = real_hold(d.get("lane") or "OPENAI_SUBSCRIPTION", d.get("role", getattr(a, "role", None)), load_state(), t)
+    hold = HoldBook(load_state().holds).covering(d.get("lane") or "OPENAI_SUBSCRIPTION", d.get("role", getattr(a, "role", None)), t)
     if hold:
-        return refusal_fields(hold, "no worker was launched")
+        return HoldBook.refusal(hold, "no worker was launched")
     exe = shutil.which("codex")
     if not exe:
         return {"outcome": "setup", "say": "codex CLI not found on PATH (route.py doctor --lane OPENAI_SUBSCRIPTION)"}
@@ -2130,7 +1431,7 @@ def prepare_codex(d, brief, a, rid, t, cfg):
         exe=exe, cwd=h["cwd"], model=h["model"], effort=d["effort"], sandbox=h["sandbox"], out_file=str(config_dir() / f"codex-last-{rid[:8]}.txt"), env=child_env(),
         cli=h["cli"], access=CODEX_ACCESS, isolation=h["isolation"], schema=a.schema, resume=a.resume,
         prompt=" ".join((SECRET_RULE, GIT_RULES, EDIT_RULE, NO_SUBAGENTS_RULE, ESCALATE_RULE, DENIED_RULE)) + "\n\n" + brief))
-    before = (codex_thread_total(a.resume) or history_cumulative(a.resume)) if a.resume else None
+    before = (codex_thread_total(a.resume) or history_store().last_cumulative(a.resume)) if a.resume else None
     return Prep(hx, spec, {"before": before, "started": time.time()})       # wall clock, not now(): it is compared with file times
 
 
@@ -2263,7 +1564,7 @@ def launch_worker(d, brief, a, rid, t, cfg, meta, hooks):
         settle(res, o, d, t, hx.kind, a, sm.rc, sm.tail, reset=(lambda: codex_reset_now(t)) if hx.kind == "codex" else None,
                credit_until=x.get("credit_until"), login=login_text(h["kind"], d["lane"]))
     else:
-        update_state(lambda s: s.setdefault("out", {}).pop(d["lane"], None))
+        update_state(lambda s: s.out.pop(d["lane"], None))
         res.update(data=sm.data if sm.data is not None else parse_data(sm.text, a.schema))
         if sm.warnings:
             res["warnings"] = sm.warnings
@@ -2320,41 +1621,12 @@ def emit(r):
     return 0        # exit 0 whenever the object was printed; non-zero only if route.py itself crashed
 
 
-HISTORY_MAX, HISTORY_DAYS = 1_000_000, 14
-
-
-def history_path():
-    return config_dir() / "history.jsonl"
-
-
-def history_add(rec):
-    """One line per finished run, kept for calibration. Never holds the brief; never fails a run."""
-    with contextlib.suppress(Exception):
-        with locked(history_path()):
-            p = history_path()
-            if p.exists() and p.stat().st_size > HISTORY_MAX:       # rotate: keep the last HISTORY_DAYS days
-                cut = time.time() - HISTORY_DAYS * 86400
-                keep_ = [ln for ln in p.read_text(encoding="utf-8", errors="replace").splitlines() if ln and (health.row_ts(ln) or 0) >= cut]       # a corrupt line is dropped, never fatal
-                p.write_text("\n".join(keep_) + ("\n" if keep_ else ""), encoding="utf-8")
-            with open(p, "a", encoding="utf-8") as f:
-                f.write(json.dumps(rec) + "\n")
-            private(p)
-
-
-def history_cumulative(ref):
-    """The thread total the newest history row for `ref` recorded: where the rollout file is gone, a resume still knows what came before."""
-    with contextlib.suppress(Exception):
-        rows = [json.loads(ln) for ln in history_path().read_text(encoding="utf-8", errors="replace").splitlines()[-2000:] if ref in ln]
-        return accounting.last_cumulative(rows, ref)
-    return None
-
-
 def lane_use(cfg, name, t):
     """(five_hour %, weekly %) of a lane now; None where unknown."""
     c = cfg["lanes"][name]
     lane = Lane(name, c["family"], c["kind"], c.get("shared_with_orchestrator", False))
     with contextlib.suppress(Exception):
-        READERS[c["reader"]](lane, cfg["settings"], load_state(), t)
+        READERS[c["reader"]](lane, settings_of(cfg), load_state(), t)
     return lane.five, lane.week
 
 
@@ -2367,8 +1639,8 @@ def cmd_contract(a, cfg):
 def refuse(a, outcome, say, retry_after, extra, **who):
     """An answer given without launching a worker; history keeps it too, so refusals are countable."""
     call_id = getattr(a, "call_id", None)
-    history_add({"ts": now(), "run_id": None, "call_id": call_id, **health.row_fields(outcome, "", say, retry_after), "role": a.role, "task": getattr(a, "task", None) or "",
-                 "lane": who.get("lane"), "model": who.get("model"), "resume": bool(getattr(a, "resume", None))})
+    history_add(hist.RefusalRow(ts=now(), call_id=call_id, **health_ledger.failure_fields(outcome, "", say, retry_after), role=a.role, task=getattr(a, "task", None) or "",
+                                lane=who.get("lane"), model=who.get("model"), resume=bool(getattr(a, "resume", None))))
     return emit(result(outcome, say=say, retry_after=retry_after, call_id=call_id, transcript_status="not_launched", **who, **extra))
 
 
@@ -2388,7 +1660,7 @@ def canary(launch, d, rid, a):
     the ladder), else the failed result, which is the answer to the caller: the run's own history row then starts the next rung."""
     res = launch(CANARY_BRIEF, argparse.Namespace(**dict(vars(a), resume=None, schema=None, timeout=CANARY_TIMEOUT_S)))
     if res.get("outcome") is None:
-        history_add({"ts": now(), "run_id": str(uuid.uuid4()), "role": "canary", "lane": d["lane"], "model": d["model"], "done": True, "secs": None, "v": health.V})
+        history_add(hist.CanaryRow(ts=now(), run_id=str(uuid.uuid4()), lane=d["lane"], model=d["model"]))
         return None
     if res["outcome"] == "timeout":      # a probe that did not answer in time is hung: `timeout` is never counted, `hung` is
         res.update(outcome="hung", retry_after=now() + 60, say=f"canary: {d['lane']}/{d['model']} did not answer within {CANARY_TIMEOUT_S}s")
@@ -2413,7 +1685,8 @@ def run_once(a, cfg):
     if d["action"] == "stop":
         if d.get("outcome"):        # --resume on a lane that is out, benched or held
             return refuse(a, d["outcome"], d["say"], d.get("retry_after"), extra, lane=d["lane"])
-        retry = min([x for x in [back_at(l, cfg["settings"]) for l in lanes.values()] + [b["until"] for l in lanes.values() for b in l.benched.values()] if x] or [None])
+        holds, S = HoldBook(load_state().holds), settings_of(cfg)
+        retry = min([x for x in [l.back_at(S, holds.covering(l.name, a.role, t)) for l in lanes.values()] + [b.until for l in lanes.values() for b in l.benched.values()] if x] or [None])
         if not unattended and d.get("ask_user"):
             extra.update(ask_user=d["ask_user"], ask_kind="decision")
         if d.get("reason") == "busy":
@@ -2436,37 +1709,37 @@ def run_once(a, cfg):
         return emit(result("caller", **who, call_id=getattr(a, "call_id", None), say="empty brief: pass it on stdin or with --brief FILE", **extra))
     cwd = h["cwd"]
     rid = str(uuid.uuid4())
-    S, lane = cfg["settings"], lanes[d["lane"]]
+    S, lane = settings_of(cfg), lanes[d["lane"]]
     # A limit refusal mid-run lasts until the time its message names, else the soonest window reset (else an hour).
     resets = [(lane.week or 0, lane.week_reset), (lane.five or 0, lane.five_reset)]
     d["limit_reset"] = min((r for _, r in resets if r and r > t), default=None)     # a guess: the soonest reset (too early costs one refused call, too late days)
-    cap, taken = slots(lane, S), {}
+    cap, taken = lane.slots(S), {}
     canary_due = bool(lane.canary.get(d["model"])) and h["kind"] in profiles.REGISTRY
     silence_s = IDLE_S or watch.LIMITS[watch.CLI_OF_KIND[h["kind"]]]["silence_s"]
 
     def claim(st):      # the authoritative count: inside the lock, never from the snapshot decision() read
-        live = live_leases(st, now())
-        for k, v in (st.get("leases") or {}).items():
+        live = LeaseBook(st.leases).live(now())
+        for k, v in list(st.leases.items()):
             if orphan(v):
                 gone = reap(v)
-                history_add({"ts": now(), "run_id": k, "role": v.get("role"), "task": v.get("task", ""), "lane": v.get("lane"), "reaped": gone, "worker_pid": v.get("worker_pid")})
+                history_add(hist.ReapRow(ts=now(), run_id=k, role=v.role, task=v.task, lane=v.lane, reaped=gone, worker_pid=v.worker_pid))
                 if gone:
                     live.pop(k, None)
                 else:           # still running: its lease stays, so the same task or a full lane waits
-                    live[k] = dict(v, expires=now() + LEASE_TTL)
-            elif k not in live and v.get("pid_start") and procs.start_token(v.get("pid")) == v["pid_start"]:
+                    live[k] = replace(v, expires=now() + LEASE_TTL)
+            elif k not in live and v.pid_start and procs.start_token(v.pid) == v.pid_start:
                 live[k] = v     # expired only because route.py could not renew it (the laptop slept): it is still running
-        st["leases"] = live
-        if a.task and any(v.get("task") == a.task for v in live.values()):
+        st.leases = live
+        if a.task and any(v.task == a.task for v in live.values()):
             taken["no"] = ("duplicate_task", f"task {a.task} already has a running worker")
-        elif canary_due and any(v.get("canary") == d["model"] and v["lane"] == d["lane"] for v in live.values()):
+        elif canary_due and any(v.canary == d["model"] and v.lane == d["lane"] for v in live.values()):
             taken["no"] = ("busy", f"{d['lane']}/{d['model']} has its canary running; wait for it")
-        elif cap is not None and sum(1 for v in live.values() if v["lane"] == d["lane"] and not suspect(v, now())) >= cap:
+        elif cap is not None and sum(1 for v in live.values() if v.lane == d["lane"] and not suspect(v, now())) >= cap:
             taken["no"] = ("busy", f"{d['lane']} has all {cap} slots taken")
         else:
             taken["peers"] = sorted(live)
-            live[rid] = {"lane": d["lane"], "role": a.role, "pid": os.getpid(), "pid_start": me_start, "start": now(), "expires": now() + LEASE_TTL, "task": a.task or "",
-                         "silence_s": silence_s, **({"canary": d["model"]} if canary_due else {})}
+            live[rid] = Lease(lane=d["lane"], role=a.role, pid=os.getpid(), pid_start=me_start, start=now(), expires=now() + LEASE_TTL, task=a.task or "",
+                              silence_s=silence_s, canary=d["model"] if canary_due else None)
     me_start = procs.start_token(os.getpid())
     launched = {}
     update_state(claim)
@@ -2476,8 +1749,8 @@ def run_once(a, cfg):
 
     def keep_lease():
         def renew(st):
-            if rid in (st.get("leases") or {}):
-                st["leases"][rid]["expires"] = now() + LEASE_TTL
+            if rid in st.leases:
+                st.leases[rid].expires = now() + LEASE_TTL
         while not beat.wait(LEASE_RENEW):
             with contextlib.suppress(Exception):
                 update_state(renew)
@@ -2492,28 +1765,27 @@ def run_once(a, cfg):
         launched.update(pid=w.pid, pgid=w.pgid, start=w.start)
 
         def note(st):
-            if rid in (st.get("leases") or {}):
-                st["leases"][rid].update(worker_pid=w.pid, worker_start=w.start)
+            if rid in st.leases:
+                st.leases[rid].worker_pid, st.leases[rid].worker_start = w.pid, w.start
         update_state(note)
     hooks.started = worker_started
 
     def stamp_beat(wall):
         """The worker printed something: stamp the lease (at most every 30 s)."""
         def stamp(st):
-            if rid in (st.get("leases") or {}):
-                st["leases"][rid]["last_event"] = wall
+            if rid in st.leases:
+                st.leases[rid].last_event = wall
         update_state(stamp)
     hooks.beat = stamp_beat
-    ref_rec = {"lane": d["lane"], "model": d["model"], "effort": d["effort"], "mode": d["mode"], "cap": d.get("cap"),
-               "rung": d.get("rung"), "fallback": d.get("fallback"), "fallback_reason": d.get("fallback_reason"), "first_lane": d.get("first_lane")}
+    ref_rec = RefRecord(lane=d["lane"], model=d["model"], effort=d["effort"], mode=d["mode"], cap=d.get("cap"),
+                        rung=d.get("rung"), fallback=d.get("fallback"), fallback_reason=d.get("fallback_reason"), first_lane=d.get("first_lane"))
 
     def keep_ref(ref):
         """Remember the ref for `--resume` whatever the outcome."""
         def keep(s):
-            refs = s.setdefault("refs", {})
-            refs[ref] = ref_rec
-            for k in list(refs)[:-200]:
-                refs.pop(k)
+            s.refs[ref] = ref_rec
+            for k in list(s.refs)[:-200]:
+                s.refs.pop(k)
         update_state(keep)
 
     def ref_seen(ref):
@@ -2522,8 +1794,8 @@ def run_once(a, cfg):
         print(f"delegate: ref={ref} run_id={rid}", file=sys.stderr, flush=True)
 
         def stamp(st):
-            if rid in (st.get("leases") or {}):
-                st["leases"][rid]["ref"] = ref
+            if rid in st.leases:
+                st.leases[rid].ref = ref
         update_state(stamp)
     hooks.ref = ref_seen
     meta = {"parent_session": a.parent or "", "title": a.title or brief.strip().splitlines()[0][:120]}
@@ -2566,8 +1838,8 @@ def run_once(a, cfg):
         beat.set()
 
         def release(st):
-            ends["peers"] = [k for k in live_leases(st, now()) if k != rid]
-            (st.get("leases") or {}).pop(rid, None)
+            ends["peers"] = [k for k in LeaseBook(st.leases).live(now()) if k != rid]
+            st.leases.pop(rid, None)
         with contextlib.suppress(Exception):
             update_state(release)
     err = res.pop("stderr", "")
@@ -2575,7 +1847,7 @@ def run_once(a, cfg):
         print(err[-2000:], file=sys.stderr)
     done = res.get("outcome") is None
     if done and d["lane"] in ("CLAUDE_SUBSCRIPTION", "OPENAI_SUBSCRIPTION"):
-        write_auth(d["lane"], True, "a worker run succeeded", now())
+        auth_cache().remember(d["lane"], True, "a worker run succeeded", now())
     if agent_runs:
         agent_runs.run(rid, ended=now(), status="completed" if done else "failed", transcript=find_transcript(res.get("ref"), fam))
     if res.get("ref"):          # every outcome: a stop, a failure and a timeout can all be resumed
@@ -2587,11 +1859,12 @@ def run_once(a, cfg):
     detail = res.pop("detail", "")
     if detail:
         res["first_error"] = detail
-    history_add({"ts": now(), "run_id": rid, "call_id": getattr(a, "call_id", None), "ref": res.get("ref"), **health.row_fields(res.get("outcome"), "", detail or res.get("say"), res.get("retry_after")),
-                 "role": a.role, "task": a.task or "", "lane": d["lane"], "model": d["model"], "effort": d["effort"],
-                 "done": done, "warnings": res.get("warnings"), "stream_tail": res.pop("stream_tail", None), "denials": sum(1 for x in res.get("denied") or [] if x.get("kind") != "sandbox_limit"), "secs": secs, "cost": res.get("cost", 0), "tokens": res.get("tokens"), "cumulative": res.get("cumulative"),
-                 "five_before": lane.five, "week_before": lane.week, "five_after": five_after, "week_after": week_after,
-                 "overlap": sorted(set(taken["peers"]) | set(ends.get("peers", []))), "slots": cap, "transcript": transcript})
+    history_add(hist.RunRow(
+        ts=now(), run_id=rid, call_id=getattr(a, "call_id", None), ref=res.get("ref"), **health_ledger.failure_fields(res.get("outcome"), "", detail or res.get("say"), res.get("retry_after")),
+        role=a.role, task=a.task or "", lane=d["lane"], model=d["model"], effort=d["effort"], done=done, warnings=res.get("warnings"), stream_tail=res.pop("stream_tail", None),
+        denials=sum(1 for x in res.get("denied") or [] if x.get("kind") != "sandbox_limit"), secs=secs, cost=res.get("cost", 0), tokens=res.get("tokens"),
+        cumulative=res.get("cumulative"), five_before=lane.five, week_before=lane.week, five_after=five_after, week_after=week_after,
+        overlap=sorted(set(taken["peers"]) | set(ends.get("peers", []))), slots=cap, transcript=transcript))
     info = transcript_info(transcript, fam, t_from)
     ac = res.pop("acct", None)
     res.pop("cumulative", None)
@@ -2634,7 +1907,7 @@ def cmd_doctor(a, cfg):
     d = onboard.doctor(R, cfg, deep=a.deep, lane=a.lane)
     for c in d.get("checks") or []:
         if isinstance(c, dict) and c.get("id") == "claude_login" and c.get("ok") is True:       # only a positive answer: doctor cannot tell "logged out" from "no CLI" or "unreadable"
-            write_auth("CLAUDE_SUBSCRIPTION", c.get("ok"), "doctor", now())
+            auth_cache().remember("CLAUDE_SUBSCRIPTION", c.get("ok"), "doctor", now())
     if a.next:
         step = onboard.next_step(d)
         print(json.dumps(step if step and "optional_only" not in step else {"step": None, "say": "READY", "lanes": d["lanes"]}, indent=1))

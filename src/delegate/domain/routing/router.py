@@ -16,6 +16,11 @@ from delegate.domain.time.spec import local
 OUTCOME_OF_OUT = {"logged_out": "logged_out", "hung": "hung", "credit": "credit_exhausted"}
 
 
+def callable_lanes(lanes: dict[str, Lane], unattended: bool) -> dict[str, Lane]:
+    """No one pays API credit knowingly when the caller is an engine: credit lanes are never picked unattended."""
+    return {n: lane for n, lane in lanes.items() if lane.kind != "credit"} if unattended else lanes
+
+
 class Router:
     def __init__(self, routing: Routing, holds: HoldBook, prev: dict[str, Dwell], t: float) -> None:
         self.r = routing
@@ -29,9 +34,8 @@ class Router:
 
     def route(self, role: str, args: CallArgs, lanes: dict[str, Lane], rec: RefRecord | None = None) -> Decision:
         """The call's decision: `--resume` continues its thread on its lane; otherwise the role's chain. An unattended caller (an engine) has
-        no one to pay API credit knowingly, no one to ask, and waits for a busy first choice."""
-        if args.unattended:
-            lanes = {n: lane for n, lane in lanes.items() if lane.kind != "credit"}
+        no one to ask, and waits for a busy first choice."""
+        lanes = callable_lanes(lanes, args.unattended)
         if args.resume:
             return self.resume(role, args, rec, lanes)
         d = self.decide(role, replace(args, allow_degraded=args.allow_degraded and not args.unattended), lanes, wait_busy=args.unattended)

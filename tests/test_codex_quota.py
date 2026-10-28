@@ -4,6 +4,8 @@ import copy
 import os
 import tempfile
 import unittest
+import routing_support as support
+from delegate.contracts.state import UsageCache
 from test_route import route, CFG, lanes, decide, T
 import onboard
 
@@ -26,8 +28,8 @@ NOW = 1793000000          # 2026-10-26, before both resets
 
 def with_res(res, S=None, st=None, t=NOW):
     lane = route.Lane("OPENAI_SUBSCRIPTION", "openai", "subscription")
-    route.update_state(lambda s_: s_.__setitem__("codex_limits", {"at": t, "res": res}))
-    S = copy.deepcopy(S or CFG["settings"])
+    route.update_state(lambda s_: setattr(s_, "codex_limits", UsageCache(at=t, data=res)))
+    S = route.settings_of(CFG) if S is None else route.settings_of({**CFG, "settings": S})
     route.read_codex(lane, S, st if st is not None else route.load_state(), t)
     return lane
 
@@ -65,7 +67,7 @@ class CodexRead(Fresh):
                                                      "primary": {"usedPercent": 10, "windowDurationMins": 10080, "resetsAt": NOW + 86400}, "secondary": None}
         lane = with_res(res)
         cfg = copy.deepcopy(CFG)
-        v = route.lane_view("OPENAI_SUBSCRIPTION", cfg, lane, {}, NOW, (), 0, (True, "ok", NOW), None)
+        v = route.lane_view("OPENAI_SUBSCRIPTION", cfg, lane, support.doc_of({}), NOW, (), 0, (True, "ok", NOW), None)
         ck = {"at": NOW, "next_worker": {"action": "stop", "say": "x"}, "legend": {}, "lanes": [v]}
         text = "\n".join(route.cockpit_text(ck))
         self.assertIn("spark weekly", text)
@@ -94,7 +96,7 @@ class ClaudeLast(Fresh):
     def pick(self, role, ls, **args):
         a = {"authored_by": None, "failed": [], "premium": None, "allow_degraded": False}
         a.update(args)
-        return route.decide(role, self.cfg(), ls, {}, T, a)
+        return support.decide(role, self.cfg(), ls, {}, T, a)
 
     def test_all_lanes_up_a_non_claude_lane_is_picked_for_every_role(self):
         for role in CFG["roles"]:
@@ -106,7 +108,7 @@ class ClaudeLast(Fresh):
     def test_the_chain_never_puts_a_claude_step_before_a_non_claude_one(self):
         for role_name, role in CFG["roles"].items():
             for who in ([None] if role_name != "reviewer" else list(role["by_author"])):
-                tiers = route.build_tiers(role, self.cfg(), {"authored_by": who, "failed": []}, role_name)
+                tiers = support.build_tiers(role_name, self.cfg(), {"authored_by": who})
                 flat = [s["on"] == "claude" for t in tiers for s in t]
                 self.assertEqual(flat, sorted(flat), (role_name, who))
 
@@ -145,16 +147,16 @@ class ClaudeLast(Fresh):
         for n in ("OPENAI_SUBSCRIPTION", "GROK_SUBSCRIPTION", "DEEPSEEK_FREE"):
             ls[n].out, ls[n].out_until = True, T + 3600
         del ls["ZAI_CODING_SUBSCRIPTION"]
-        nw = route.next_worker(cfg, ls, {}, T)
+        nw = route.next_worker(cfg, ls, support.doc_of({}), T)
         self.assertTrue(nw["lane"].startswith("CLAUDE"))
         for part in ("OPENAI_SUBSCRIPTION out until", "GROK_SUBSCRIPTION out until", "DEEPSEEK_FREE out until", "ZAI_CODING_SUBSCRIPTION not set up"):
             self.assertIn(part, nw["why"])
-        v = route.lane_view("OPENAI_SUBSCRIPTION", cfg, None, {}, T)
+        v = route.lane_view("OPENAI_SUBSCRIPTION", cfg, None, support.doc_of({}), T)
         text = route.cockpit_text({"at": T, "next_worker": nw, "legend": {}, "lanes": [v]})[0]
         self.assertIn("(Claude because OPENAI_SUBSCRIPTION out until", text)
 
     def test_cockpit_next_line_has_no_reason_when_a_non_claude_lane_is_picked(self):
-        nw = route.next_worker(self.cfg(), self.everything(), {}, T)
+        nw = route.next_worker(self.cfg(), self.everything(), support.doc_of({}), T)
         self.assertEqual((nw["lane"], nw["why"]), ("DEEPSEEK_FREE", None))
 
 

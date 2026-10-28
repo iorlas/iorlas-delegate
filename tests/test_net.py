@@ -15,11 +15,15 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
+import routing_support as support
+from delegate.contracts.history import RunRow
+from delegate.contracts.routing import BreakerPolicy
+from delegate.domain.health.ledger import HealthLedger, failure_fields
 from test_route import route, CFG, T, lanes
 
 LANES = Path(__file__).resolve().parent.parent / "src" / "delegate" / "adapters"
 from delegate.adapters import netprobe, procs
-from lanes import classify, cockpit, health, profiles          # noqa: E402  (test_route put skills/delegate on sys.path)
+from lanes import classify, cockpit, profiles          # noqa: E402  (test_route put skills/delegate on sys.path)
 
 
 @contextlib.contextmanager
@@ -149,11 +153,12 @@ class RouteNet(unittest.TestCase):
 class NotTheLanesFault(unittest.TestCase):
     def test_network_never_counts_against_a_pair(self):
         self.assertFalse(classify.benches_pair("network"))
-        rows = [{"ts": 1000.0 + i, "run_id": f"r{i}", "task": f"t{i}", "lane": "OPENAI_SUBSCRIPTION", "model": "m",
-                 **health.row_fields("network", "", "error sending request", None)} for i in range(12)]
-        st = health.fold(rows)
-        v = health.view(st, "OPENAI_SUBSCRIPTION", "m", 1100.0)
-        self.assertEqual((v["state"], v["usable"], st["pairs"], st["lanes"]), ("up", True, {}, {}))
+        led = HealthLedger(BreakerPolicy())
+        rows = [RunRow(ts=1000.0 + i, run_id=f"r{i}", task=f"t{i}", role="worker", lane="OPENAI_SUBSCRIPTION", model="m", effort="high", done=False,
+                       **failure_fields("network", "", "error sending request", None)) for i in range(12)]
+        st = led.fold(rows)
+        v = led.view(st, "OPENAI_SUBSCRIPTION", "m", 1100.0)
+        self.assertEqual((v.state, v.usable, st.pairs, st.lanes), ("up", True, {}, {}))
 
     def test_a_failure_that_names_no_cause_becomes_network_only_when_the_net_is_down(self):
         d = {"lane": "OPENAI_SUBSCRIPTION"}
@@ -190,7 +195,7 @@ class Roles(unittest.TestCase):
     def test_roles_say_usable_and_net(self):
         ls = lanes()
         cached = {"up": True, "since": T - 50, "at": T - 5, "hosts": {"chatgpt.com": "ok", "api.anthropic.com": "tcp"}}
-        roles = cockpit.roles_view(CFG, ls, {}, T, route.decide, cached)
+        roles = cockpit.roles_view(CFG, ls, support.router(CFG, T), support.doc_of({}), T, cached)
         self.assertEqual(set(roles), set(CFG["roles"]))
         self.assertTrue(roles["planner"]["usable"])
         self.assertEqual(roles["planner"]["lane"], "OPENAI_SUBSCRIPTION")
@@ -200,15 +205,15 @@ class Roles(unittest.TestCase):
 
     def test_an_unusable_role_says_why_and_when(self):
         ls = lanes(openai={"out": True, "out_until": T + 600, "out_reason": "limit"}, sub={"out": True, "out_until": T + 900, "out_reason": "limit"})
-        roles = cockpit.roles_view(CFG, ls, {}, T, route.decide, None)
+        roles = cockpit.roles_view(CFG, ls, support.router(CFG, T), support.doc_of({}), T, None)
         self.assertIs(roles["planner"]["usable"], False)
         self.assertEqual(roles["planner"]["until"], T + 600)
         self.assertIsNone(roles["planner"]["net"]["up"])
 
     def test_deciding_roles_leaves_the_lanes_as_it_found_them(self):
         ls = lanes()
-        cockpit.roles_view(CFG, ls, {}, T, route.decide, None)
-        self.assertTrue(all(l.held is None for l in ls.values()))
+        cockpit.roles_view(CFG, ls, support.router(CFG, T), support.doc_of({}), T, None)
+        self.assertTrue(all(not l.busy and not l.out for l in ls.values()))
 
     def test_refresh_brings_net_and_holds_up_to_date_without_a_spawn(self):
         roles = {"worker": {"usable": True, "lane": "OPENAI_SUBSCRIPTION", "model": "m", "why": None, "until": None, "hosts": ["chatgpt.com"], "net": {"up": None}}}

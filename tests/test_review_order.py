@@ -1,6 +1,7 @@
 """Reviewer order (delegate-jx2, qjw, pnz): Codex first, then the other non-Claude families cheapest configured cost first (Grok never reviews), then the
 writer's own non-Claude family (same_family warning, never blocks), then Claude Sonnet last; Opus never runs in the loop. Claude-last holds for every other role too."""
 import hermetic  # noqa: F401  (a home of its own for every test)
+import routing_support as support
 import contextlib
 import copy
 import importlib.util
@@ -43,7 +44,7 @@ def lanes(*up):
 def review(writer, *up, role="reviewer", **kw):
     a = {"authored_by": writer, "failed": [], "premium": None, "allow_degraded": False}
     a.update(kw)
-    return route.decide(role, copy.deepcopy(CFG), lanes(*up), {}, T, a)
+    return support.decide(role, copy.deepcopy(CFG), lanes(*up), {}, T, a)
 
 
 ALL = tuple(NAMES)
@@ -155,13 +156,13 @@ class ReviewOrder(unittest.TestCase):
             for m, v in cost.items():
                 cfg["models"][m]["cost"] = v
             a = {"authored_by": "claude", "failed": [], "premium": None, "allow_degraded": False}
-            return route.decide("reviewer", cfg, lanes("zai", "deepseek", "claude"), {}, T, a)["model"]
+            return support.decide("reviewer", cfg, lanes("zai", "deepseek", "claude"), {}, T, a)["model"]
         self.assertEqual(first({"glm-5.3": 1, "deepseek-v4.1-flash-free": 2}), "glm-5.3")
         self.assertEqual(first({"glm-5.3": 5, "deepseek-v4.1-flash-free": 2}), "deepseek-v4.1-flash-free")
         cfg = copy.deepcopy(CFG)
         cfg["models"]["gpt-6.1-sol"]["cost"] = 99                           # Codex only goes first because it is configured cheapest
         a = {"authored_by": "claude", "failed": [], "premium": None, "allow_degraded": False}
-        self.assertEqual(route.decide("reviewer", cfg, lanes(*ALL), {}, T, a)["model"], "glm-5.3")
+        self.assertEqual(support.decide("reviewer", cfg, lanes(*ALL), {}, T, a)["model"], "glm-5.3")
 
     def test_opus_is_never_returned_for_any_loop_role(self):
         import itertools
@@ -191,7 +192,7 @@ class ReviewOrder(unittest.TestCase):
                 role["by_author"] = {k: [dict(opus)] for k in role["by_author"]}
             else:
                 role["steps"] = [dict(opus)]
-            d = route.decide(name, cfg, lanes(*ALL), {}, T, {"authored_by": None, "failed": [], "premium": None, "allow_degraded": True})
+            d = support.decide(name, cfg, lanes(*ALL), {}, T, {"authored_by": None, "failed": [], "premium": None, "allow_degraded": True})
             self.assertEqual((d["action"], d.get("reason")), ("stop", "loop_excluded"), name)
             self.assertIn("opus-5.5 is never routed in the loop", d["say"])
 

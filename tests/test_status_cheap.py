@@ -10,6 +10,7 @@ import unittest
 from unittest import mock
 
 from delegate.adapters import procs
+import routing_support as support
 from test_route import route, T
 
 
@@ -43,7 +44,7 @@ class Cheap(unittest.TestCase):
     def test_snapshot_and_cached_logins(self):
         now = route.now()
         route.write_snapshot({"v": 1, "ts": now - 90, "lanes": {"X": {}}, "cockpit": {"v": 1}, "running": [], "recent": [], "needs_input": []})
-        route.write_auth("CLAUDE_SUBSCRIPTION", False, "not logged in", now - 30)
+        route.auth_cache().remember("CLAUDE_SUBSCRIPTION", False, "not logged in", now - 30)
         rc, d = self.cheap()
         self.assertEqual(rc, 0)
         self.assertTrue(89 <= d["age_s"] <= 100)
@@ -53,7 +54,7 @@ class Cheap(unittest.TestCase):
 
     def test_running_comes_from_fresh_leases_without_ps(self):
         now = route.now()
-        route.update_state(lambda s: s.setdefault("leases", {}).__setitem__("r1", {"lane": "L", "role": "worker", "start": now - 5, "expires": now + 60, "pid": 1}))
+        route.update_state(lambda s: s.leases.__setitem__("r1", support.lease(lane="L", role="worker", start=now - 5, expires=now + 60)))
         rc, d = self.cheap()
         self.assertEqual([r["run_id"] for r in d["running"]], ["r1"])
 
@@ -89,17 +90,17 @@ class AuthCache(unittest.TestCase):
         return [c for c in calls if c[1:3] == ["auth", "status"]]
 
     def test_fresh_cache_means_no_auth_status_call(self):
-        route.write_auth("CLAUDE_SUBSCRIPTION", True, "x", route.now() - 60)
+        route.auth_cache().remember("CLAUDE_SUBSCRIPTION", True, "x", route.now() - 60)
         self.assertEqual(self.next_worker(), [])
 
     def test_stale_or_missing_cache_asks_once_and_fills_the_cache(self):
         self.assertEqual(len(self.next_worker()), 1)             # missing
         self.assertEqual(self.next_worker(), [])                 # now cached
-        route.write_auth("CLAUDE_SUBSCRIPTION", True, "x", route.now() - route.AUTH_FILE_TTL - 5)
+        route.auth_cache().remember("CLAUDE_SUBSCRIPTION", True, "x", route.now() - route.AUTH_FILE_TTL - 5)
         self.assertEqual(len(self.next_worker()), 1)             # stale
 
     def test_cached_logout_is_honoured(self):
-        route.write_auth("CLAUDE_SUBSCRIPTION", False, "x", route.now())
+        route.auth_cache().remember("CLAUDE_SUBSCRIPTION", False, "x", route.now())
         with mock.patch.object(procs, "run_capture", side_effect=AssertionError("spawned")):
             self.assertTrue(route.claude_logged_out())
 

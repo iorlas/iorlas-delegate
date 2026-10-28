@@ -114,7 +114,7 @@ class Stop(unittest.TestCase):
                 want_reason = row.get("expected_reason", f.get("expected_reason"))
                 if "evidence" not in row or not want_reason:
                     continue
-                before = route.load_state().get("out")
+                before = (route.load_state().out or None)
                 lane = f.get("lane", "OPENAI_SUBSCRIPTION")
                 o = replay(row, f)
                 r = self.answer(o, lane)
@@ -124,8 +124,8 @@ class Stop(unittest.TestCase):
                 self.assertEqual(stop_tuple(r), expected_tuple(f, row, want_reason), f"{path.name} {row['id']}")
                 self.assertIsNone(route.schema_problem(r, CONTRACT["answer_schema"]), f"{path.name} {row['id']}")
                 if r["stop"]["scope"] in ("bead", "caller", "machine"):
-                    self.assertEqual(route.load_state().get("out"), before, f"{path.name} {row['id']}: a {r['stop']['scope']}-scoped fault touched the lane's state")
-                route.update_state(lambda s: s.pop("out", None))
+                    self.assertEqual((route.load_state().out or None), before, f"{path.name} {row['id']}: a {r['stop']['scope']}-scoped fault touched the lane's state")
+                route.update_state(lambda s: s.out.clear())
                 n += 1
         self.assertGreater(n, 250)
 
@@ -134,7 +134,7 @@ class Stop(unittest.TestCase):
         self.assertEqual(len(f["rows"]), 53)
         for row in f["rows"]:
             self.assertEqual(stop_tuple(self.answer(replay(row, f), "OPENAI_SUBSCRIPTION")), ("bad_request", "caller", "needs_owner", "none"), row["id"])
-        self.assertIsNone(route.load_state().get("out"))            # not one of them marks the lane
+        self.assertIsNone((route.load_state().out or None))            # not one of them marks the lane
 
     def test_golden_the_grok_batch_is_a_lane_out_with_no_time_and_marks_the_lane_once_for_all(self):
         f = load(ROOT / "tests" / "contract" / "fixtures" / "grok_spending_limit_24oct.json")
@@ -143,7 +143,7 @@ class Stop(unittest.TestCase):
             r = self.answer(replay(row, f), "GROK_SUBSCRIPTION")
             self.assertEqual(stop_tuple(r), ("credit_exhausted", "lane", "needs_owner", "none"), row["id"])
             self.assertIsNone(r["stop"]["retry"]["at"])
-        self.assertIn("GROK_SUBSCRIPTION", route.load_state()["out"])
+        self.assertIn("GROK_SUBSCRIPTION", route.load_state().out)
 
     def test_golden_the_22_oct_night_has_53_bad_requests_and_every_other_row_is_done(self):
         f = load(ROOT / "tests" / "contract" / "fixtures" / "night_22oct.json")
@@ -151,15 +151,15 @@ class Stop(unittest.TestCase):
         tuples = [stop_tuple(self.answer(o, "OPENAI_SUBSCRIPTION")) if (o := replay(row, f)) else None for row in f["rows"]]
         self.assertEqual(tuples.count(("bad_request", "caller", "needs_owner", "none")), 53)
         self.assertEqual(tuples.count(None), 268 - 53)
-        self.assertIsNone(route.load_state().get("out"))
+        self.assertIsNone((route.load_state().out or None))
 
     def test_credit_exhausted_marks_the_lane_with_no_retry_time(self):
         row = load(ROOT / "tests" / "contract" / "fixtures" / "grok_spending_limit_24oct.json")["rows"][0]
         o = replay(row, None)
         r = self.answer(o, "GROK_SUBSCRIPTION")
-        out = route.load_state()["out"]["GROK_SUBSCRIPTION"]
-        self.assertGreater(out["until"], T)                  # hidden from the picker (gather needs a time) and probed again later
-        self.assertEqual((out["reason"], r["stop"]["scope"], r["stop"]["retry"]), ("credit", "lane", {"kind": "none", "at": None}))
+        out = route.load_state().out["GROK_SUBSCRIPTION"]
+        self.assertGreater(out.until, T)                  # hidden from the picker (gather needs a time) and probed again later
+        self.assertEqual((out.reason, r["stop"]["scope"], r["stop"]["retry"]), ("credit", "lane", {"kind": "none", "at": None}))
 
     def test_a_credit_cycle_that_names_its_end_is_a_predicted_retry(self):
         r = self.answer(classify.Outcome("credit_exhausted", "credit balance is too low", "event"), "CLAUDE_CREDIT", credit_until=T + 86400)
@@ -178,7 +178,7 @@ class Stop(unittest.TestCase):
             route.settle(res, classify.Outcome(reason, "signal 15" if reason == "killed" else "ENOTFOUND", "exit"), {"lane": "OPENAI_SUBSCRIPTION"}, T, "cli", SimpleNamespace(timeout=30), 1, "")
             r = route.result(res.pop("outcome"), **res)
             self.assertEqual((r["stop"]["reason"], r["stop"]["resumable"], r["stop"]["partial"], r["stop"]["ref"]), (reason, True, True, "thread-1"))
-        self.assertIsNone(route.load_state().get("out"))
+        self.assertIsNone((route.load_state().out or None))
 
     def test_an_unknown_reason_still_gets_a_row_of_closed_facts(self):
         s = classify.stop_facts("some_new_reason")
@@ -346,19 +346,19 @@ class Launchers(unittest.TestCase):
         row = load(ROOT / "tests" / "contract" / "fixtures" / "grok_spending_limit_24oct.json")["rows"][0]
         res = self.opencode([{"type": "error", "error": {"name": "APIError", "data": {"message": row["evidence"]["vendor_err"]}}}])
         self.assertEqual((res["outcome"], res.get("retry_after")), ("credit_exhausted", None))
-        self.assertIn("GROK_SUBSCRIPTION", route.load_state()["out"])
+        self.assertIn("GROK_SUBSCRIPTION", route.load_state().out)
 
     def test_a_bad_request_row_through_the_codex_launcher_leaves_the_lane_alone(self):
         for row in load(ROOT / "tests" / "contract" / "fixtures" / "bad_request_22oct.json")["rows"][:3]:
             res = self.run_cli("codex", [{"type": "turn.failed", "error": {"message": row["evidence"]["vendor_err"]}}], 1)
             self.assertEqual(res["outcome"], "bad_request")
-        self.assertEqual(route.load_state().get("out"), None)
+        self.assertEqual((route.load_state().out or None), None)
 
     def test_a_sigterm_with_no_error_is_killed_and_retried_not_failed(self):
         res = self.opencode([{"type": "step_finish", "part": {"tokens": {"input": 5}}}], rc=-15)
         self.assertEqual(res["outcome"], "killed")
         self.assertNotIn("retry_after", res)
-        self.assertEqual(route.load_state().get("out"), None)
+        self.assertEqual((route.load_state().out or None), None)
 
     def test_codex_stream_retries_do_not_fail_a_run_that_finished(self):
         res = self.run_cli("codex", [{"type": "error", "message": "Reconnecting... 2/5 (idle timeout waiting for websocket)"},
@@ -379,13 +379,13 @@ class Launchers(unittest.TestCase):
         self.assertEqual(res["outcome"], "worker_failed")
         res = self.opencode([{"type": "text", "part": {"text": words}}], rc=1)
         self.assertEqual(res["outcome"], "worker_failed")
-        self.assertEqual(route.load_state().get("out"), None)
+        self.assertEqual((route.load_state().out or None), None)
 
     def test_the_clis_own_error_still_does(self):
         res = self.run_cli("claude_p", [{"type": "result", "is_error": True, "result": "API Error: 429 rate limit exceeded", "num_turns": 1}], 1,
                            lane="CLAUDE_SUBSCRIPTION", cap=1, read_only=False)
         self.assertEqual(res["outcome"], "rate_limited")
-        self.assertIn("CLAUDE_SUBSCRIPTION", route.load_state()["out"])
+        self.assertIn("CLAUDE_SUBSCRIPTION", route.load_state().out)
 
     def test_additive_usage_facts_come_from_the_events(self):
         res = self.opencode([{"type": "step_finish", "part": {"tokens": {"input": 1000, "output": 5, "cache": {"read": 3000, "write": 0}}}},

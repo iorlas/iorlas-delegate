@@ -3,11 +3,13 @@ a usage reading per lane, the out board, the health fold and the leases. Side ef
 
 `mark_busy`, `settle_holds` and `drift_warnings` are the three things a call does to the fleet before the Router sees it.
 """
+import contextlib
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 
-from delegate.contracts.routing import LaneSpec, Routing, Settings
-from delegate.contracts.state import StateDoc
+from delegate.contracts.history import HealthState
+from delegate.contracts.routing import LaneSpec, ModelSpec, Routing, Settings
+from delegate.contracts.state import AuthEntry, StateDoc
 from delegate.contracts.stores import CheckpointStore, ConfigStore, HistoryStore, StateStore
 from delegate.domain.health.ledger import HealthLedger
 from delegate.domain.holds.book import HoldBook, StaleHold
@@ -48,7 +50,7 @@ class FleetBuilder:
             if mode == "drift":
                 lane.out, lane.out_until, lane.out_reason = True, None, "logged_out"
                 lane.notes.insert(0, DRIFT_NOTE + " (login or key gone?)")
-            self._apply_health(lane, health, t)
+            apply_health(lane, self.r.models, HealthLedger(s.breaker), health, t)
             fleet.lanes[name] = lane
         return fleet
 
@@ -79,7 +81,7 @@ class FleetBuilder:
             lane.out, lane.out_until, lane.out_reason = True, o.until, o.reason
             lane.notes.append(o.why)
 
-    def _health(self, t: float):
+    def _health(self, t: float) -> HealthState:
         """The health fold over history.jsonl, continued from a cached checkpoint (a cache: no file, a damaged one or another policy = a full fold)."""
         pol = self.r.settings.breaker
         base = self.checkpoints.load(pol)
@@ -89,21 +91,18 @@ class FleetBuilder:
             self.checkpoints.save(state, pol)
         return state
 
-    def _apply_health(self, lane: Lane, state, t: float) -> None:
-        """Put the breaker's view of each (lane, model) pair on the lane: `benched` (refused), `canary` (the next launch is the probe), `hview`."""
-        ledger = HealthLedger(self.r.settings.breaker)
-        for model, m in self.r.models.items():
-            if m.family != lane.family:
-                continue
-            v = ledger.view(state, lane.name, model, t)
-            lane.hview[model] = v
-            if v.state == "broken":
-                lane.benched[model] = v
-            elif v.canary:
-                lane.canary[model] = True
 
-    def ledger(self) -> HealthLedger:
-        return HealthLedger(self.r.settings.breaker)
+def apply_health(lane: Lane, models: Mapping[str, ModelSpec], ledger: HealthLedger, state: HealthState, t: float) -> None:
+    """Put the breaker's view of each (lane, model) pair on the lane: `benched` (refused), `canary` (the next launch is the probe), `hview`."""
+    for model, m in models.items():
+        if m.family != lane.family:
+            continue
+        v = ledger.view(state, lane.name, model, t)
+        lane.hview[model] = v
+        if v.state == "broken":
+            lane.benched[model] = v
+        elif v.canary:
+            lane.canary[model] = True
 
 
 def mark_busy(lanes: dict[str, Lane], doc: StateDoc, s: Settings, t: float, jitter: Callable[[], int]) -> dict[str, Lane]:
@@ -140,3 +139,23 @@ def drift_warnings(states: StateStore, lanes: dict[str, Lane], doc: StateDoc, t:
     return out
 
 
+
+
+class AuthCache:
+    """The one login cache (state.json `auth`): a login probe spawns a CLI, so its answer is kept. Readers pass the age they accept."""
+
+    def __init__(self, states: StateStore, use: bool = True) -> None:
+        self.states, self.use = states, use
+
+    def fresh(self, name: str, t: float, ttl: float, doc: StateDoc | None = None) -> AuthEntry | None:
+        e = (doc or self.states.load()).auth.get(name)
+        return e if self.use and e and 0 <= t - e.at <= ttl else None
+
+    def remember(self, name: str, ok: bool | None, why: str, t: float) -> None:
+        """Never fails the caller; an unknown answer (None) is not remembered."""
+        if ok is not None:
+            with contextlib.suppress(Exception):
+                self.states.update(lambda s: s.auth.__setitem__(name, AuthEntry(at=t, ok=bool(ok), why=str(why)[:120])))
+
+    def rows(self, doc: StateDoc, t: float) -> dict[str, dict]:
+        return {n: {"ok": e.ok, "why": e.why, "age_s": int(t - e.at)} for n, e in doc.auth.items()}

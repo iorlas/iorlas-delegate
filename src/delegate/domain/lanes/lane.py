@@ -116,3 +116,23 @@ class Lane:
         if not self.usage_known and self.kind == "subscription":
             bits.append("usage unknown")
         return "; ".join(bits + self.notes)
+
+
+def window(used: float | None, resets_at: float | None, span_min: float, t: float) -> tuple[float | None, float | None, float | None]:
+    """-> (used_percent, minutes_to_reset, pace). A window whose reset passed counts as 0% used."""
+    if used is None:
+        return None, None, None
+    if resets_at is not None and resets_at <= t:
+        return 0.0, 0.0, None
+    if resets_at is None:
+        return float(used), None, None
+    mins = (resets_at - t) / 60.0
+    elapsed = max(0.0, min(100.0, 100.0 * (1 - mins / span_min)))
+    return float(used), mins, elapsed - float(used)
+
+
+def apply_burn(lane: Lane, s: Settings, week_mins: float | None) -> None:
+    """The weekly window is about to reset with allowance left: spend it."""
+    b = s.burn
+    lane.burn = (lane.week is not None and week_mins is not None and 0 < week_mins <= b.minutes
+                 and 100 - lane.week >= b.min_left_percent and (lane.five is None or lane.five < 60))

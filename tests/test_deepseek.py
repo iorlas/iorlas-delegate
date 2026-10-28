@@ -40,8 +40,9 @@ class DeepSeekTests(unittest.TestCase):
 
     def test_disabled_is_skipped_even_with_enabled_profile(self):
         cfg = copy.deepcopy(CFG)
-        with patch.object(route, 'lane_mode', return_value='off'), patch.dict(route.READERS, {k: lambda *a: None for k in route.READERS}):
-            self.assertNotIn('DEEPSEEK_FREE', route.gather(cfg, {}, 1, check_config=False))
+        route.config_store().set_lane('DEEPSEEK_FREE', 'declined')
+        with patch.dict(route.READERS, {k: lambda *a: None for k in route.READERS}):
+            self.assertNotIn('DEEPSEEK_FREE', route.fleet_builder(cfg).build(route.load_state(), 1, check_config=False).lanes)
 
     def test_launch_isolates_credentials_and_refuses_unverified_model(self):
         d = {'lane': 'DEEPSEEK_FREE', 'model': 'deepseek-v4.1-flash-free', 'effort': 'low', 'role': 'worker',

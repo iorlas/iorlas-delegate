@@ -11,6 +11,7 @@ import unittest
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
+import routing_support as support
 from test_route import route, CFG, lanes, T
 import onboard
 
@@ -32,7 +33,7 @@ def lane(name, **over):
 
 
 def view(name, l, st=None, history=(), login=(True, "ok", T), cfg=None, off=None):
-    return route.lane_view(name, cfg or cfg_all(), l, st or {}, T, history, 0, login, off)
+    return route.lane_view(name, cfg or cfg_all(), l, support.doc_of(st or {}), T, history, 0, login, off)
 
 
 class Emoji(unittest.TestCase):
@@ -80,7 +81,7 @@ class Emoji(unittest.TestCase):
     def test_spending_limit_old_entry_without_a_reason(self):
         rec = {"until": T + 3 * HOUR, "why": "spending-limit: out of credits (personal-team-blocked); top up then report --event ok", "at": T - 60}
         l = lane("GROK_SUBSCRIPTION", out=True, out_until=rec["until"], out_reason="error", notes=[rec["why"]])
-        v = view("GROK_SUBSCRIPTION", l, {"out": {"GROK_SUBSCRIPTION": rec}})
+        v = view("GROK_SUBSCRIPTION", l, {"out": {"GROK_SUBSCRIPTION": {"until": rec["until"], "why": rec["why"], "at": rec["at"]}}})
         self.assertEqual((v["state"], v["emoji"]), ("spend", "💸"))
         self.assertTrue(v["unlock"]["known"])
 
@@ -164,12 +165,12 @@ class Readers(unittest.TestCase):
             route.ledger_add(30.0, "m", T - 3600)
             l = lane("CLAUDE_CREDIT")
             with patch.object(route, "now", return_value=T):
-                route.read_claude_credit(l, S, {}, T)
+                route.read_claude_credit(l, route.settings_of(CFG), support.doc_of({}), T)
             w = l.windows[0]
             self.assertEqual((w["name"], round(w["used"]), w["source"], w["at"]), ("monthly", 20, "estimated from history (this tool's ledger)", T - 3600))
             c = lane("CLAUDE_SUBSCRIPTION", shared=True)
             with patch.object(route, "claude_logged_out", return_value=False), patch.object(route, "update_state"):
-                route.read_claude_subscription(c, S, {}, T, {"plan": {"windows": [{"label": "5 hour", "percentUsed": 12, "resetsAt": T + HOUR}, {"label": "All weekly", "percentUsed": 40, "resetsAt": T + 86400}]}})
+                route.read_claude_subscription(c, route.settings_of(CFG), support.doc_of({}), T, {"plan": {"windows": [{"label": "5 hour", "percentUsed": 12, "resetsAt": T + HOUR}, {"label": "All weekly", "percentUsed": 40, "resetsAt": T + 86400}]}})
             self.assertEqual([(w["name"], w["used"], w["source"]) for w in c.windows], [("5-hour", 12.0, "manual mark (get_usage passed in)"), ("weekly", 40.0, "manual mark (get_usage passed in)")])
 
 
@@ -211,7 +212,7 @@ class Command(unittest.TestCase):
     def run_status(self, *argv, state=None, ready=None):
         cfg = cfg_all()
         with tempfile.TemporaryDirectory() as d, patch.dict(os.environ, {"DELEGATE_CONFIG_DIR": d, "CLAUDE_CODE_ENTRYPOINT": "cli"}):
-            (Path(d) / "state.json").write_text(json.dumps(state or {}))
+            (Path(d) / "state.json").write_text(json.dumps({"v": 1, **(state or {})}))
             ready = ready or {n: True for n in cfg["lanes"]}
             noread = {k: (lambda lane_, S, st_, t, *a: None) for k in route.READERS}
             logins = {"OPENAI_SUBSCRIPTION": (False, "Not logged in"), "GROK_SUBSCRIPTION": (True, "ok")}

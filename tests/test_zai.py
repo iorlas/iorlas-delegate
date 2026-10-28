@@ -7,6 +7,7 @@ import unittest
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
+import routing_support as support
 from test_route import route, CFG, lanes, T
 from delegate.adapters.harness.opencode import OpenCodeHarness
 from delegate.app.supervisor import RunHooks
@@ -18,7 +19,7 @@ class ZaiTests(unittest.TestCase):
     def choose(self, role, ls, **kwargs):
         cfg=copy.deepcopy(CFG)
         cfg['settings'].update(deepseek_free_enabled=True, zai_coding_enabled=True)
-        return route.decide(role,cfg,ls,{},T,dict(authored_by=None, failed=[], premium=None, allow_degraded=False, **kwargs))
+        return support.decide(role,cfg,ls,{},T,dict(authored_by=None, failed=[], premium=None, allow_degraded=False, **kwargs))
 
     def test_worker_priority_and_backoff(self):
         ls=lanes()
@@ -36,15 +37,15 @@ class ZaiTests(unittest.TestCase):
     def test_zai_author_gets_other_family(self):
         cfg=copy.deepcopy(CFG);cfg['settings'].update(deepseek_free_enabled=True,zai_coding_enabled=True)
         args=dict(authored_by='zai',failed=[],premium=None,allow_degraded=False)
-        d=route.decide('reviewer',cfg,lanes(),{},T,args)
+        d=support.decide('reviewer',cfg,lanes(),{},T,args)
         self.assertEqual(d['lane'],'OPENAI_SUBSCRIPTION')
         ls={'ZAI_CODING_SUBSCRIPTION':route.Lane('ZAI_CODING_SUBSCRIPTION','zai','subscription')}
-        d=route.decide('reviewer',cfg,ls,{},T,args)
+        d=support.decide('reviewer',cfg,ls,{},T,args)
         self.assertEqual(d['flag'],'same_family')
 
     def test_disabled_does_not_change_original_rungs(self):
         cfg=copy.deepcopy(CFG)
-        steps=route.build_tiers(cfg['roles']['worker'],cfg,{})[0]
+        steps=support.build_tiers('worker',cfg,{})[0]
         self.assertEqual(steps[0]['on'],'openai')
         self.assertEqual(steps[0]['idx'],0)
 
