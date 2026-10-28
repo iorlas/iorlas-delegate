@@ -1,0 +1,3771 @@
+[
+ {
+  "args": {
+   "allow_degraded": false,
+   "authored_by": null,
+   "cap": null,
+   "claude_usage": null,
+   "cwd": null,
+   "failed": "",
+   "premium": null,
+   "resume": null,
+   "role": "planner"
+  },
+  "expect": {
+   "action": "run",
+   "cap": null,
+   "effort": "high",
+   "fallback": false,
+   "fallback_reason": null,
+   "first_lane": null,
+   "flag": null,
+   "lane": "OPENAI_SUBSCRIPTION",
+   "mode": "read_only",
+   "model": "gpt-6.1-sol",
+   "pass": "strict",
+   "role": "planner",
+   "rung": 0,
+   "trace": [
+    "OPENAI_SUBSCRIPTION: usable"
+   ]
+  },
+  "lanes": [
+   {
+    "family": "openai",
+    "five": 10,
+    "kind": "subscription",
+    "name": "OPENAI_SUBSCRIPTION",
+    "pace": 0,
+    "shared": false,
+    "week": 5
+   },
+   {
+    "family": "claude",
+    "five": 30,
+    "kind": "subscription",
+    "name": "CLAUDE_SUBSCRIPTION",
+    "pace": 0,
+    "shared": true,
+    "week": 40
+   },
+   {
+    "cap": 150.0,
+    "family": "claude",
+    "kind": "credit",
+    "name": "CLAUDE_CREDIT",
+    "reset_in_days": 20.0,
+    "shared": false,
+    "spend": 0.0
+   }
+  ],
+  "name": "planner_healthy",
+  "settings": {},
+  "state": {},
+  "unattended": false
+ },
+ {
+  "args": {
+   "allow_degraded": false,
+   "authored_by": null,
+   "cap": null,
+   "claude_usage": null,
+   "cwd": null,
+   "failed": "",
+   "premium": null,
+   "resume": null,
+   "role": "planner"
+  },
+  "expect": {
+   "action": "run",
+   "cap": null,
+   "effort": "high",
+   "fallback": false,
+   "fallback_reason": null,
+   "first_lane": null,
+   "flag": null,
+   "lane": "OPENAI_SUBSCRIPTION",
+   "mode": "read_only",
+   "model": "gpt-6.1-sol",
+   "pass": "strict",
+   "role": "planner",
+   "rung": 0,
+   "trace": [
+    "OPENAI_SUBSCRIPTION: usable"
+   ]
+  },
+  "lanes": [
+   {
+    "family": "openai",
+    "five": 10,
+    "kind": "subscription",
+    "name": "OPENAI_SUBSCRIPTION",
+    "pace": 0,
+    "shared": false,
+    "week": 5
+   },
+   {
+    "family": "claude",
+    "five": 30,
+    "kind": "subscription",
+    "name": "CLAUDE_SUBSCRIPTION",
+    "pace": 0,
+    "shared": true,
+    "week": 40
+   },
+   {
+    "cap": 150.0,
+    "family": "claude",
+    "kind": "credit",
+    "name": "CLAUDE_CREDIT",
+    "reset_in_days": 20.0,
+    "shared": false,
+    "spend": 0.0
+   }
+  ],
+  "name": "planner_unattended",
+  "settings": {},
+  "state": {},
+  "unattended": true
+ },
+ {
+  "args": {
+   "allow_degraded": false,
+   "authored_by": null,
+   "cap": null,
+   "claude_usage": null,
+   "cwd": null,
+   "failed": "",
+   "premium": null,
+   "resume": null,
+   "role": "worker"
+  },
+  "expect": {
+   "action": "run",
+   "cap": null,
+   "effort": "medium",
+   "fallback": false,
+   "fallback_reason": null,
+   "first_lane": null,
+   "flag": null,
+   "lane": "OPENAI_SUBSCRIPTION",
+   "mode": "write",
+   "model": "gpt-6.1-sol",
+   "pass": "strict",
+   "role": "worker",
+   "rung": 0,
+   "trace": [
+    "OPENAI_SUBSCRIPTION: usable"
+   ]
+  },
+  "lanes": [
+   {
+    "family": "openai",
+    "five": 10,
+    "kind": "subscription",
+    "name": "OPENAI_SUBSCRIPTION",
+    "pace": 0,
+    "shared": false,
+    "week": 5
+   },
+   {
+    "family": "claude",
+    "five": 30,
+    "kind": "subscription",
+    "name": "CLAUDE_SUBSCRIPTION",
+    "pace": 0,
+    "shared": true,
+    "week": 40
+   },
+   {
+    "cap": 150.0,
+    "family": "claude",
+    "kind": "credit",
+    "name": "CLAUDE_CREDIT",
+    "reset_in_days": 20.0,
+    "shared": false,
+    "spend": 0.0
+   }
+  ],
+  "name": "worker_healthy",
+  "settings": {},
+  "state": {},
+  "unattended": false
+ },
+ {
+  "args": {
+   "allow_degraded": false,
+   "authored_by": null,
+   "cap": null,
+   "claude_usage": null,
+   "cwd": null,
+   "failed": "",
+   "premium": null,
+   "resume": null,
+   "role": "worker"
+  },
+  "expect": {
+   "action": "run",
+   "cap": null,
+   "effort": "medium",
+   "fallback": false,
+   "fallback_reason": null,
+   "first_lane": null,
+   "flag": null,
+   "lane": "OPENAI_SUBSCRIPTION",
+   "mode": "write",
+   "model": "gpt-6.1-sol",
+   "pass": "strict",
+   "role": "worker",
+   "rung": 0,
+   "trace": [
+    "OPENAI_SUBSCRIPTION: usable"
+   ]
+  },
+  "lanes": [
+   {
+    "family": "openai",
+    "five": 10,
+    "kind": "subscription",
+    "name": "OPENAI_SUBSCRIPTION",
+    "pace": 0,
+    "shared": false,
+    "week": 5
+   },
+   {
+    "family": "claude",
+    "five": 30,
+    "kind": "subscription",
+    "name": "CLAUDE_SUBSCRIPTION",
+    "pace": 0,
+    "shared": true,
+    "week": 40
+   },
+   {
+    "cap": 150.0,
+    "family": "claude",
+    "kind": "credit",
+    "name": "CLAUDE_CREDIT",
+    "reset_in_days": 20.0,
+    "shared": false,
+    "spend": 0.0
+   }
+  ],
+  "name": "worker_unattended",
+  "settings": {},
+  "state": {},
+  "unattended": true
+ },
+ {
+  "args": {
+   "allow_degraded": false,
+   "authored_by": null,
+   "cap": null,
+   "claude_usage": null,
+   "cwd": null,
+   "failed": "",
+   "premium": null,
+   "resume": null,
+   "role": "reviewer"
+  },
+  "expect": {
+   "action": "run",
+   "cap": null,
+   "effort": "medium",
+   "fallback": false,
+   "fallback_reason": null,
+   "first_lane": null,
+   "flag": null,
+   "lane": "OPENAI_SUBSCRIPTION",
+   "mode": "read_only",
+   "model": "gpt-6.1-sol",
+   "pass": "strict",
+   "role": "reviewer",
+   "rung": 0,
+   "trace": [
+    "OPENAI_SUBSCRIPTION: usable"
+   ]
+  },
+  "lanes": [
+   {
+    "family": "openai",
+    "five": 10,
+    "kind": "subscription",
+    "name": "OPENAI_SUBSCRIPTION",
+    "pace": 0,
+    "shared": false,
+    "week": 5
+   },
+   {
+    "family": "claude",
+    "five": 30,
+    "kind": "subscription",
+    "name": "CLAUDE_SUBSCRIPTION",
+    "pace": 0,
+    "shared": true,
+    "week": 40
+   },
+   {
+    "cap": 150.0,
+    "family": "claude",
+    "kind": "credit",
+    "name": "CLAUDE_CREDIT",
+    "reset_in_days": 20.0,
+    "shared": false,
+    "spend": 0.0
+   }
+  ],
+  "name": "reviewer_healthy",
+  "settings": {},
+  "state": {},
+  "unattended": false
+ },
+ {
+  "args": {
+   "allow_degraded": false,
+   "authored_by": null,
+   "cap": null,
+   "claude_usage": null,
+   "cwd": null,
+   "failed": "",
+   "premium": null,
+   "resume": null,
+   "role": "reviewer"
+  },
+  "expect": {
+   "action": "run",
+   "cap": null,
+   "effort": "medium",
+   "fallback": false,
+   "fallback_reason": null,
+   "first_lane": null,
+   "flag": null,
+   "lane": "OPENAI_SUBSCRIPTION",
+   "mode": "read_only",
+   "model": "gpt-6.1-sol",
+   "pass": "strict",
+   "role": "reviewer",
+   "rung": 0,
+   "trace": [
+    "OPENAI_SUBSCRIPTION: usable"
+   ]
+  },
+  "lanes": [
+   {
+    "family": "openai",
+    "five": 10,
+    "kind": "subscription",
+    "name": "OPENAI_SUBSCRIPTION",
+    "pace": 0,
+    "shared": false,
+    "week": 5
+   },
+   {
+    "family": "claude",
+    "five": 30,
+    "kind": "subscription",
+    "name": "CLAUDE_SUBSCRIPTION",
+    "pace": 0,
+    "shared": true,
+    "week": 40
+   },
+   {
+    "cap": 150.0,
+    "family": "claude",
+    "kind": "credit",
+    "name": "CLAUDE_CREDIT",
+    "reset_in_days": 20.0,
+    "shared": false,
+    "spend": 0.0
+   }
+  ],
+  "name": "reviewer_unattended",
+  "settings": {},
+  "state": {},
+  "unattended": true
+ },
+ {
+  "args": {
+   "allow_degraded": false,
+   "authored_by": null,
+   "cap": null,
+   "claude_usage": null,
+   "cwd": null,
+   "failed": "",
+   "premium": null,
+   "resume": null,
+   "role": "hard"
+  },
+  "expect": {
+   "action": "run",
+   "cap": null,
+   "effort": "high",
+   "fallback": false,
+   "fallback_reason": null,
+   "first_lane": null,
+   "flag": null,
+   "lane": "OPENAI_SUBSCRIPTION",
+   "mode": "write",
+   "model": "gpt-6.1-sol",
+   "pass": "strict",
+   "role": "hard",
+   "rung": 0,
+   "trace": [
+    "OPENAI_SUBSCRIPTION: usable"
+   ]
+  },
+  "lanes": [
+   {
+    "family": "openai",
+    "five": 10,
+    "kind": "subscription",
+    "name": "OPENAI_SUBSCRIPTION",
+    "pace": 0,
+    "shared": false,
+    "week": 5
+   },
+   {
+    "family": "claude",
+    "five": 30,
+    "kind": "subscription",
+    "name": "CLAUDE_SUBSCRIPTION",
+    "pace": 0,
+    "shared": true,
+    "week": 40
+   },
+   {
+    "cap": 150.0,
+    "family": "claude",
+    "kind": "credit",
+    "name": "CLAUDE_CREDIT",
+    "reset_in_days": 20.0,
+    "shared": false,
+    "spend": 0.0
+   }
+  ],
+  "name": "hard_healthy",
+  "settings": {},
+  "state": {},
+  "unattended": false
+ },
+ {
+  "args": {
+   "allow_degraded": false,
+   "authored_by": null,
+   "cap": null,
+   "claude_usage": null,
+   "cwd": null,
+   "failed": "",
+   "premium": null,
+   "resume": null,
+   "role": "hard"
+  },
+  "expect": {
+   "action": "run",
+   "cap": null,
+   "effort": "high",
+   "fallback": false,
+   "fallback_reason": null,
+   "first_lane": null,
+   "flag": null,
+   "lane": "OPENAI_SUBSCRIPTION",
+   "mode": "write",
+   "model": "gpt-6.1-sol",
+   "pass": "strict",
+   "role": "hard",
+   "rung": 0,
+   "trace": [
+    "OPENAI_SUBSCRIPTION: usable"
+   ]
+  },
+  "lanes": [
+   {
+    "family": "openai",
+    "five": 10,
+    "kind": "subscription",
+    "name": "OPENAI_SUBSCRIPTION",
+    "pace": 0,
+    "shared": false,
+    "week": 5
+   },
+   {
+    "family": "claude",
+    "five": 30,
+    "kind": "subscription",
+    "name": "CLAUDE_SUBSCRIPTION",
+    "pace": 0,
+    "shared": true,
+    "week": 40
+   },
+   {
+    "cap": 150.0,
+    "family": "claude",
+    "kind": "credit",
+    "name": "CLAUDE_CREDIT",
+    "reset_in_days": 20.0,
+    "shared": false,
+    "spend": 0.0
+   }
+  ],
+  "name": "hard_unattended",
+  "settings": {},
+  "state": {},
+  "unattended": true
+ },
+ {
+  "args": {
+   "allow_degraded": false,
+   "authored_by": null,
+   "cap": null,
+   "claude_usage": null,
+   "cwd": null,
+   "failed": "",
+   "premium": null,
+   "resume": null,
+   "role": "light"
+  },
+  "expect": {
+   "action": "run",
+   "cap": null,
+   "effort": "low",
+   "fallback": false,
+   "fallback_reason": null,
+   "first_lane": null,
+   "flag": null,
+   "lane": "OPENAI_SUBSCRIPTION",
+   "mode": "read_only",
+   "model": "gpt-6-luna",
+   "pass": "strict",
+   "role": "light",
+   "rung": 0,
+   "trace": [
+    "OPENAI_SUBSCRIPTION: usable"
+   ]
+  },
+  "lanes": [
+   {
+    "family": "openai",
+    "five": 10,
+    "kind": "subscription",
+    "name": "OPENAI_SUBSCRIPTION",
+    "pace": 0,
+    "shared": false,
+    "week": 5
+   },
+   {
+    "family": "claude",
+    "five": 30,
+    "kind": "subscription",
+    "name": "CLAUDE_SUBSCRIPTION",
+    "pace": 0,
+    "shared": true,
+    "week": 40
+   },
+   {
+    "cap": 150.0,
+    "family": "claude",
+    "kind": "credit",
+    "name": "CLAUDE_CREDIT",
+    "reset_in_days": 20.0,
+    "shared": false,
+    "spend": 0.0
+   }
+  ],
+  "name": "light_healthy",
+  "settings": {},
+  "state": {},
+  "unattended": false
+ },
+ {
+  "args": {
+   "allow_degraded": false,
+   "authored_by": null,
+   "cap": null,
+   "claude_usage": null,
+   "cwd": null,
+   "failed": "",
+   "premium": null,
+   "resume": null,
+   "role": "light"
+  },
+  "expect": {
+   "action": "run",
+   "cap": null,
+   "effort": "low",
+   "fallback": false,
+   "fallback_reason": null,
+   "first_lane": null,
+   "flag": null,
+   "lane": "OPENAI_SUBSCRIPTION",
+   "mode": "read_only",
+   "model": "gpt-6-luna",
+   "pass": "strict",
+   "role": "light",
+   "rung": 0,
+   "trace": [
+    "OPENAI_SUBSCRIPTION: usable"
+   ]
+  },
+  "lanes": [
+   {
+    "family": "openai",
+    "five": 10,
+    "kind": "subscription",
+    "name": "OPENAI_SUBSCRIPTION",
+    "pace": 0,
+    "shared": false,
+    "week": 5
+   },
+   {
+    "family": "claude",
+    "five": 30,
+    "kind": "subscription",
+    "name": "CLAUDE_SUBSCRIPTION",
+    "pace": 0,
+    "shared": true,
+    "week": 40
+   },
+   {
+    "cap": 150.0,
+    "family": "claude",
+    "kind": "credit",
+    "name": "CLAUDE_CREDIT",
+    "reset_in_days": 20.0,
+    "shared": false,
+    "spend": 0.0
+   }
+  ],
+  "name": "light_unattended",
+  "settings": {},
+  "state": {},
+  "unattended": true
+ },
+ {
+  "args": {
+   "allow_degraded": false,
+   "authored_by": null,
+   "cap": null,
+   "claude_usage": null,
+   "cwd": null,
+   "failed": "",
+   "premium": null,
+   "resume": null,
+   "role": "worker"
+  },
+  "expect": {
+   "action": "run",
+   "cap": null,
+   "effort": "medium",
+   "fallback": false,
+   "fallback_reason": null,
+   "first_lane": null,
+   "flag": null,
+   "lane": "OPENAI_SUBSCRIPTION",
+   "mode": "write",
+   "model": "gpt-6.1-sol",
+   "pass": "relaxed",
+   "role": "worker",
+   "rung": 0,
+   "trace": [
+    "OPENAI_SUBSCRIPTION: rejected, weekly 96% >= 95 (lane gate)",
+    "OPENAI_SUBSCRIPTION: usable"
+   ]
+  },
+  "lanes": [
+   {
+    "family": "openai",
+    "five": 10,
+    "kind": "subscription",
+    "name": "OPENAI_SUBSCRIPTION",
+    "pace": 0,
+    "shared": false,
+    "week": 96
+   },
+   {
+    "family": "claude",
+    "five": 30,
+    "kind": "subscription",
+    "name": "CLAUDE_SUBSCRIPTION",
+    "pace": 0,
+    "shared": true,
+    "week": 40
+   },
+   {
+    "cap": 150.0,
+    "family": "claude",
+    "kind": "credit",
+    "name": "CLAUDE_CREDIT",
+    "reset_in_days": 20.0,
+    "shared": false,
+    "spend": 0.0
+   }
+  ],
+  "name": "worker_codex_week_over_gate",
+  "settings": {},
+  "state": {},
+  "unattended": false
+ },
+ {
+  "args": {
+   "allow_degraded": false,
+   "authored_by": null,
+   "cap": null,
+   "claude_usage": null,
+   "cwd": null,
+   "failed": "",
+   "premium": null,
+   "resume": null,
+   "role": "worker"
+  },
+  "expect": {
+   "action": "run",
+   "cap": 2,
+   "effort": "medium",
+   "fallback": true,
+   "fallback_reason": "ceiling",
+   "first_lane": "OPENAI_SUBSCRIPTION",
+   "flag": null,
+   "lane": "CLAUDE_SUBSCRIPTION",
+   "mode": "write",
+   "model": "sonnet-5.5",
+   "pass": "strict",
+   "role": "worker",
+   "rung": 2,
+   "trace": [
+    "OPENAI_SUBSCRIPTION: rejected, weekly 99% >= 95 (lane gate)",
+    "OPENAI_SUBSCRIPTION: rejected, weekly 99% >= 98 (hard ceiling)",
+    "CLAUDE_SUBSCRIPTION: usable",
+    "CLAUDE_CREDIT: usable"
+   ]
+  },
+  "lanes": [
+   {
+    "family": "openai",
+    "five": 99,
+    "kind": "subscription",
+    "name": "OPENAI_SUBSCRIPTION",
+    "pace": 0,
+    "shared": false,
+    "week": 99
+   },
+   {
+    "family": "claude",
+    "five": 30,
+    "kind": "subscription",
+    "name": "CLAUDE_SUBSCRIPTION",
+    "pace": 0,
+    "shared": true,
+    "week": 40
+   },
+   {
+    "cap": 150.0,
+    "family": "claude",
+    "kind": "credit",
+    "name": "CLAUDE_CREDIT",
+    "reset_in_days": 20.0,
+    "shared": false,
+    "spend": 0.0
+   }
+  ],
+  "name": "worker_codex_over_ceiling",
+  "settings": {},
+  "state": {},
+  "unattended": false
+ },
+ {
+  "args": {
+   "allow_degraded": false,
+   "authored_by": null,
+   "cap": null,
+   "claude_usage": null,
+   "cwd": null,
+   "failed": "",
+   "premium": null,
+   "resume": null,
+   "role": "worker"
+  },
+  "expect": {
+   "action": "run",
+   "cap": 2,
+   "effort": "medium",
+   "fallback": true,
+   "fallback_reason": "out",
+   "first_lane": "OPENAI_SUBSCRIPTION",
+   "flag": null,
+   "lane": "CLAUDE_SUBSCRIPTION",
+   "mode": "write",
+   "model": "sonnet-5.5",
+   "pass": "strict",
+   "role": "worker",
+   "rung": 2,
+   "trace": [
+    "OPENAI_SUBSCRIPTION: rejected, out until Sun 09 Sep 03:46",
+    "OPENAI_SUBSCRIPTION: rejected, out until Sun 09 Sep 03:46",
+    "CLAUDE_SUBSCRIPTION: usable",
+    "CLAUDE_CREDIT: usable"
+   ]
+  },
+  "lanes": [
+   {
+    "family": "openai",
+    "five": 10,
+    "kind": "subscription",
+    "name": "OPENAI_SUBSCRIPTION",
+    "out": true,
+    "out_reason": "limit",
+    "out_until": 1000007200.0,
+    "pace": 0,
+    "shared": false,
+    "week": 5
+   },
+   {
+    "family": "claude",
+    "five": 30,
+    "kind": "subscription",
+    "name": "CLAUDE_SUBSCRIPTION",
+    "pace": 0,
+    "shared": true,
+    "week": 40
+   },
+   {
+    "cap": 150.0,
+    "family": "claude",
+    "kind": "credit",
+    "name": "CLAUDE_CREDIT",
+    "reset_in_days": 20.0,
+    "shared": false,
+    "spend": 0.0
+   }
+  ],
+  "name": "worker_codex_out",
+  "settings": {},
+  "state": {},
+  "unattended": false
+ },
+ {
+  "args": {
+   "allow_degraded": false,
+   "authored_by": null,
+   "cap": null,
+   "claude_usage": null,
+   "cwd": null,
+   "failed": "",
+   "premium": null,
+   "resume": null,
+   "role": "worker"
+  },
+  "expect": {
+   "action": "run",
+   "cap": 2,
+   "effort": "medium",
+   "fallback": true,
+   "fallback_reason": "out",
+   "first_lane": "OPENAI_SUBSCRIPTION",
+   "flag": null,
+   "lane": "CLAUDE_SUBSCRIPTION",
+   "mode": "write",
+   "model": "sonnet-5.5",
+   "pass": "strict",
+   "role": "worker",
+   "rung": 2,
+   "trace": [
+    "OPENAI_SUBSCRIPTION: rejected, out",
+    "OPENAI_SUBSCRIPTION: rejected, out",
+    "CLAUDE_SUBSCRIPTION: usable",
+    "CLAUDE_CREDIT: usable"
+   ]
+  },
+  "lanes": [
+   {
+    "family": "openai",
+    "five": 10,
+    "kind": "subscription",
+    "name": "OPENAI_SUBSCRIPTION",
+    "out": true,
+    "out_reason": "logged_out",
+    "pace": 0,
+    "shared": false,
+    "week": 5
+   },
+   {
+    "family": "claude",
+    "five": 30,
+    "kind": "subscription",
+    "name": "CLAUDE_SUBSCRIPTION",
+    "pace": 0,
+    "shared": true,
+    "week": 40
+   },
+   {
+    "cap": 150.0,
+    "family": "claude",
+    "kind": "credit",
+    "name": "CLAUDE_CREDIT",
+    "reset_in_days": 20.0,
+    "shared": false,
+    "spend": 0.0
+   }
+  ],
+  "name": "worker_codex_logged_out",
+  "settings": {},
+  "state": {},
+  "unattended": false
+ },
+ {
+  "args": {
+   "allow_degraded": false,
+   "authored_by": null,
+   "cap": null,
+   "claude_usage": null,
+   "cwd": null,
+   "failed": "",
+   "premium": null,
+   "resume": null,
+   "role": "worker"
+  },
+  "expect": {
+   "action": "stop",
+   "resets": {
+    "CLAUDE_CREDIT": "Sun 09 Sep 02:53",
+    "CLAUDE_SUBSCRIPTION": "Sun 09 Sep 04:16",
+    "OPENAI_SUBSCRIPTION": "Sun 09 Sep 03:10"
+   },
+   "role": "worker",
+   "say": "No worker lane is available. Hold the task; a few lines the orchestrator may write itself.",
+   "trace": [
+    "OPENAI_SUBSCRIPTION: rejected, out until Sun 09 Sep 03:10",
+    "OPENAI_SUBSCRIPTION: rejected, out until Sun 09 Sep 03:10",
+    "CLAUDE_SUBSCRIPTION: rejected, out until Sun 09 Sep 04:16",
+    "CLAUDE_CREDIT: rejected, out until Sun 09 Sep 02:53",
+    "CLAUDE_SUBSCRIPTION: rejected, out until Sun 09 Sep 04:16",
+    "CLAUDE_CREDIT: rejected, out until Sun 09 Sep 02:53"
+   ]
+  },
+  "lanes": [
+   {
+    "family": "openai",
+    "five": 10,
+    "kind": "subscription",
+    "name": "OPENAI_SUBSCRIPTION",
+    "out": true,
+    "out_reason": "limit",
+    "out_until": 1000005000.0,
+    "pace": 0,
+    "shared": false,
+    "week": 5
+   },
+   {
+    "family": "claude",
+    "five": 30,
+    "kind": "subscription",
+    "name": "CLAUDE_SUBSCRIPTION",
+    "out": true,
+    "out_reason": "limit",
+    "out_until": 1000009000.0,
+    "pace": 0,
+    "shared": true,
+    "week": 40
+   },
+   {
+    "cap": 150.0,
+    "family": "claude",
+    "kind": "credit",
+    "name": "CLAUDE_CREDIT",
+    "out": true,
+    "out_reason": "limit",
+    "out_until": 1000004000.0,
+    "reset_in_days": 20.0,
+    "shared": false,
+    "spend": 0.0
+   }
+  ],
+  "name": "worker_all_out",
+  "settings": {},
+  "state": {},
+  "unattended": false
+ },
+ {
+  "args": {
+   "allow_degraded": false,
+   "authored_by": null,
+   "cap": null,
+   "claude_usage": null,
+   "cwd": null,
+   "failed": "",
+   "premium": null,
+   "resume": null,
+   "role": "worker"
+  },
+  "expect": {
+   "action": "run",
+   "cap": 2,
+   "effort": "medium",
+   "fallback": true,
+   "fallback_reason": "out",
+   "first_lane": "OPENAI_SUBSCRIPTION",
+   "flag": null,
+   "lane": "CLAUDE_CREDIT",
+   "mode": "write",
+   "model": "sonnet-5.5",
+   "pass": "strict",
+   "role": "worker",
+   "rung": 2,
+   "trace": [
+    "OPENAI_SUBSCRIPTION: rejected, out until Sun 09 Sep 03:46",
+    "OPENAI_SUBSCRIPTION: rejected, out until Sun 09 Sep 03:46",
+    "CLAUDE_SUBSCRIPTION: rejected, 5h 85% >= 85 (orchestrator reserve)",
+    "CLAUDE_CREDIT: usable"
+   ]
+  },
+  "lanes": [
+   {
+    "family": "openai",
+    "five": 10,
+    "kind": "subscription",
+    "name": "OPENAI_SUBSCRIPTION",
+    "out": true,
+    "out_reason": "limit",
+    "out_until": 1000007200.0,
+    "pace": 0,
+    "shared": false,
+    "week": 5
+   },
+   {
+    "family": "claude",
+    "five": 85,
+    "kind": "subscription",
+    "name": "CLAUDE_SUBSCRIPTION",
+    "pace": 0,
+    "shared": true,
+    "week": 40
+   },
+   {
+    "cap": 150.0,
+    "family": "claude",
+    "kind": "credit",
+    "name": "CLAUDE_CREDIT",
+    "reset_in_days": 20.0,
+    "shared": false,
+    "spend": 0.0
+   }
+  ],
+  "name": "worker_sub_strained_credit",
+  "settings": {},
+  "state": {},
+  "unattended": false
+ },
+ {
+  "args": {
+   "allow_degraded": false,
+   "authored_by": null,
+   "cap": null,
+   "claude_usage": null,
+   "cwd": null,
+   "failed": "",
+   "premium": null,
+   "resume": null,
+   "role": "worker"
+  },
+  "expect": {
+   "action": "run",
+   "cap": 2,
+   "effort": "medium",
+   "fallback": true,
+   "fallback_reason": "out",
+   "first_lane": "OPENAI_SUBSCRIPTION",
+   "flag": null,
+   "lane": "CLAUDE_SUBSCRIPTION",
+   "mode": "write",
+   "model": "sonnet-5.5",
+   "pass": "strict",
+   "role": "worker",
+   "rung": 2,
+   "trace": [
+    "OPENAI_SUBSCRIPTION: rejected, out until Sun 09 Sep 03:46",
+    "OPENAI_SUBSCRIPTION: rejected, out until Sun 09 Sep 03:46",
+    "CLAUDE_SUBSCRIPTION: usable",
+    "CLAUDE_CREDIT: usable",
+    "CLAUDE_SUBSCRIPTION: BURN"
+   ]
+  },
+  "lanes": [
+   {
+    "family": "openai",
+    "five": 10,
+    "kind": "subscription",
+    "name": "OPENAI_SUBSCRIPTION",
+    "out": true,
+    "out_reason": "limit",
+    "out_until": 1000007200.0,
+    "pace": 0,
+    "shared": false,
+    "week": 5
+   },
+   {
+    "burn": true,
+    "family": "claude",
+    "five": 10,
+    "kind": "subscription",
+    "name": "CLAUDE_SUBSCRIPTION",
+    "pace": 0,
+    "shared": true,
+    "week": 40
+   },
+   {
+    "cap": 150.0,
+    "family": "claude",
+    "kind": "credit",
+    "name": "CLAUDE_CREDIT",
+    "reset_in_days": 20.0,
+    "shared": false,
+    "spend": 0.0
+   }
+  ],
+  "name": "worker_sub_burn",
+  "settings": {},
+  "state": {},
+  "unattended": false
+ },
+ {
+  "args": {
+   "allow_degraded": false,
+   "authored_by": null,
+   "cap": null,
+   "claude_usage": null,
+   "cwd": null,
+   "failed": "",
+   "premium": null,
+   "resume": null,
+   "role": "worker"
+  },
+  "expect": {
+   "action": "run",
+   "cap": 2,
+   "effort": "medium",
+   "fallback": true,
+   "fallback_reason": "out",
+   "first_lane": "OPENAI_SUBSCRIPTION",
+   "flag": null,
+   "lane": "CLAUDE_CREDIT",
+   "mode": "write",
+   "model": "sonnet-5.5",
+   "pass": "strict",
+   "role": "worker",
+   "rung": 2,
+   "trace": [
+    "OPENAI_SUBSCRIPTION: rejected, out until Sun 09 Sep 03:46",
+    "OPENAI_SUBSCRIPTION: rejected, out until Sun 09 Sep 03:46",
+    "CLAUDE_SUBSCRIPTION: usable",
+    "CLAUDE_CREDIT: usable",
+    "CLAUDE_CREDIT: resets in 2.0d with the allowance unspent"
+   ]
+  },
+  "lanes": [
+   {
+    "family": "openai",
+    "five": 10,
+    "kind": "subscription",
+    "name": "OPENAI_SUBSCRIPTION",
+    "out": true,
+    "out_reason": "limit",
+    "out_until": 1000007200.0,
+    "pace": 0,
+    "shared": false,
+    "week": 5
+   },
+   {
+    "family": "claude",
+    "five": 30,
+    "kind": "subscription",
+    "name": "CLAUDE_SUBSCRIPTION",
+    "pace": 0,
+    "shared": true,
+    "week": 40
+   },
+   {
+    "cap": 150.0,
+    "family": "claude",
+    "kind": "credit",
+    "name": "CLAUDE_CREDIT",
+    "reset_in_days": 2.0,
+    "shared": false,
+    "spend": 10.0
+   }
+  ],
+  "name": "worker_credit_resets_soon",
+  "settings": {},
+  "state": {},
+  "unattended": false
+ },
+ {
+  "args": {
+   "allow_degraded": false,
+   "authored_by": null,
+   "cap": null,
+   "claude_usage": null,
+   "cwd": null,
+   "failed": "",
+   "premium": null,
+   "resume": null,
+   "role": "worker"
+  },
+  "expect": {
+   "action": "run",
+   "cap": 2,
+   "effort": "medium",
+   "fallback": true,
+   "fallback_reason": "out",
+   "first_lane": "OPENAI_SUBSCRIPTION",
+   "flag": null,
+   "lane": "CLAUDE_CREDIT",
+   "mode": "write",
+   "model": "sonnet-5.5",
+   "pass": "strict",
+   "role": "worker",
+   "rung": 2,
+   "trace": [
+    "OPENAI_SUBSCRIPTION: rejected, out until Sun 09 Sep 03:46",
+    "OPENAI_SUBSCRIPTION: rejected, out until Sun 09 Sep 03:46",
+    "CLAUDE_SUBSCRIPTION: usable",
+    "CLAUDE_CREDIT: usable",
+    "CLAUDE_SUBSCRIPTION: usage unknown, so CLAUDE_CREDIT first"
+   ]
+  },
+  "lanes": [
+   {
+    "family": "openai",
+    "five": 10,
+    "kind": "subscription",
+    "name": "OPENAI_SUBSCRIPTION",
+    "out": true,
+    "out_reason": "limit",
+    "out_until": 1000007200.0,
+    "pace": 0,
+    "shared": false,
+    "week": 5
+   },
+   {
+    "family": "claude",
+    "five": null,
+    "kind": "subscription",
+    "name": "CLAUDE_SUBSCRIPTION",
+    "pace": null,
+    "shared": true,
+    "week": null
+   },
+   {
+    "cap": 150.0,
+    "family": "claude",
+    "kind": "credit",
+    "name": "CLAUDE_CREDIT",
+    "reset_in_days": 20.0,
+    "shared": false,
+    "spend": 0.0
+   }
+  ],
+  "name": "worker_sub_usage_unknown",
+  "settings": {},
+  "state": {},
+  "unattended": false
+ },
+ {
+  "args": {
+   "allow_degraded": false,
+   "authored_by": null,
+   "cap": null,
+   "claude_usage": null,
+   "cwd": null,
+   "failed": "",
+   "premium": null,
+   "resume": null,
+   "role": "worker"
+  },
+  "expect": {
+   "action": "run",
+   "cap": 2,
+   "effort": "medium",
+   "fallback": true,
+   "fallback_reason": "out",
+   "first_lane": "OPENAI_SUBSCRIPTION",
+   "flag": null,
+   "lane": "CLAUDE_CREDIT",
+   "mode": "write",
+   "model": "sonnet-5.5",
+   "pass": "strict",
+   "role": "worker",
+   "rung": 2,
+   "trace": [
+    "OPENAI_SUBSCRIPTION: rejected, out until Sun 09 Sep 03:46",
+    "OPENAI_SUBSCRIPTION: rejected, out until Sun 09 Sep 03:46",
+    "CLAUDE_SUBSCRIPTION: usable",
+    "CLAUDE_CREDIT: usable",
+    "dwell: keep CLAUDE_CREDIT for 30 min"
+   ]
+  },
+  "lanes": [
+   {
+    "family": "openai",
+    "five": 10,
+    "kind": "subscription",
+    "name": "OPENAI_SUBSCRIPTION",
+    "out": true,
+    "out_reason": "limit",
+    "out_until": 1000007200.0,
+    "pace": 0,
+    "shared": false,
+    "week": 5
+   },
+   {
+    "family": "claude",
+    "five": 30,
+    "kind": "subscription",
+    "name": "CLAUDE_SUBSCRIPTION",
+    "pace": 0,
+    "shared": true,
+    "week": 40
+   },
+   {
+    "cap": 150.0,
+    "family": "claude",
+    "kind": "credit",
+    "name": "CLAUDE_CREDIT",
+    "reset_in_days": 20.0,
+    "shared": false,
+    "spend": 0.0
+   }
+  ],
+  "name": "worker_dwell_keeps_credit",
+  "settings": {},
+  "state": {
+   "prev": {
+    "claude": {
+     "lane": "CLAUDE_CREDIT",
+     "since": 999999940.0
+    }
+   }
+  },
+  "unattended": false
+ },
+ {
+  "args": {
+   "allow_degraded": false,
+   "authored_by": null,
+   "cap": null,
+   "claude_usage": null,
+   "cwd": null,
+   "failed": "",
+   "premium": null,
+   "resume": null,
+   "role": "worker"
+  },
+  "expect": {
+   "action": "run",
+   "cap": 2,
+   "effort": "medium",
+   "fallback": true,
+   "fallback_reason": "out",
+   "first_lane": "OPENAI_SUBSCRIPTION",
+   "flag": null,
+   "lane": "CLAUDE_SUBSCRIPTION",
+   "mode": "write",
+   "model": "sonnet-5.5",
+   "pass": "strict",
+   "role": "worker",
+   "rung": 2,
+   "trace": [
+    "OPENAI_SUBSCRIPTION: rejected, out until Sun 09 Sep 03:46",
+    "OPENAI_SUBSCRIPTION: rejected, out until Sun 09 Sep 03:46",
+    "CLAUDE_SUBSCRIPTION: usable",
+    "CLAUDE_CREDIT: usable"
+   ]
+  },
+  "lanes": [
+   {
+    "family": "openai",
+    "five": 10,
+    "kind": "subscription",
+    "name": "OPENAI_SUBSCRIPTION",
+    "out": true,
+    "out_reason": "limit",
+    "out_until": 1000007200.0,
+    "pace": 0,
+    "shared": false,
+    "week": 5
+   },
+   {
+    "family": "claude",
+    "five": 30,
+    "kind": "subscription",
+    "name": "CLAUDE_SUBSCRIPTION",
+    "pace": 0,
+    "shared": true,
+    "week": 40
+   },
+   {
+    "cap": 150.0,
+    "family": "claude",
+    "kind": "credit",
+    "name": "CLAUDE_CREDIT",
+    "reset_in_days": 20.0,
+    "shared": false,
+    "spend": 0.0
+   }
+  ],
+  "name": "worker_dwell_expired",
+  "settings": {},
+  "state": {
+   "prev": {
+    "claude": {
+     "lane": "CLAUDE_CREDIT",
+     "since": 999992800.0
+    }
+   }
+  },
+  "unattended": false
+ },
+ {
+  "args": {
+   "allow_degraded": false,
+   "authored_by": null,
+   "cap": null,
+   "claude_usage": null,
+   "cwd": null,
+   "failed": "",
+   "premium": null,
+   "resume": null,
+   "role": "worker"
+  },
+  "expect": {
+   "action": "run",
+   "cap": 2,
+   "effort": "medium",
+   "fallback": true,
+   "fallback_reason": "ceiling",
+   "first_lane": "OPENAI_SUBSCRIPTION",
+   "flag": null,
+   "lane": "CLAUDE_SUBSCRIPTION",
+   "mode": "write",
+   "model": "sonnet-5.5",
+   "pass": "strict",
+   "role": "worker",
+   "rung": 2,
+   "trace": [
+    "OPENAI_SUBSCRIPTION: rejected, held: owner until Sun 09 Sep 02:46 (why)",
+    "OPENAI_SUBSCRIPTION: rejected, held: owner until Sun 09 Sep 02:46 (why)",
+    "CLAUDE_SUBSCRIPTION: usable",
+    "CLAUDE_CREDIT: usable"
+   ]
+  },
+  "lanes": [
+   {
+    "family": "openai",
+    "five": 10,
+    "kind": "subscription",
+    "name": "OPENAI_SUBSCRIPTION",
+    "pace": 0,
+    "shared": false,
+    "week": 5
+   },
+   {
+    "family": "claude",
+    "five": 30,
+    "kind": "subscription",
+    "name": "CLAUDE_SUBSCRIPTION",
+    "pace": 0,
+    "shared": true,
+    "week": 40
+   },
+   {
+    "cap": 150.0,
+    "family": "claude",
+    "kind": "credit",
+    "name": "CLAUDE_CREDIT",
+    "reset_in_days": 20.0,
+    "shared": false,
+    "spend": 0.0
+   }
+  ],
+  "name": "worker_hold_codex_all_roles",
+  "settings": {},
+  "state": {
+   "holds": {
+    "h1": {
+     "id": "h1",
+     "lane": "OPENAI_SUBSCRIPTION",
+     "reason": "why",
+     "roles": [],
+     "set_at": 999999990.0,
+     "set_by": "owner",
+     "until": 1000003600.0
+    }
+   }
+  },
+  "unattended": false
+ },
+ {
+  "args": {
+   "allow_degraded": false,
+   "authored_by": null,
+   "cap": null,
+   "claude_usage": null,
+   "cwd": null,
+   "failed": "",
+   "premium": null,
+   "resume": null,
+   "role": "worker"
+  },
+  "expect": {
+   "action": "run",
+   "cap": null,
+   "effort": "medium",
+   "fallback": false,
+   "fallback_reason": null,
+   "first_lane": null,
+   "flag": null,
+   "lane": "OPENAI_SUBSCRIPTION",
+   "mode": "write",
+   "model": "gpt-6.1-sol",
+   "pass": "strict",
+   "role": "worker",
+   "rung": 0,
+   "trace": [
+    "OPENAI_SUBSCRIPTION: usable"
+   ]
+  },
+  "lanes": [
+   {
+    "family": "openai",
+    "five": 10,
+    "kind": "subscription",
+    "name": "OPENAI_SUBSCRIPTION",
+    "pace": 0,
+    "shared": false,
+    "week": 5
+   },
+   {
+    "family": "claude",
+    "five": 30,
+    "kind": "subscription",
+    "name": "CLAUDE_SUBSCRIPTION",
+    "pace": 0,
+    "shared": true,
+    "week": 40
+   },
+   {
+    "cap": 150.0,
+    "family": "claude",
+    "kind": "credit",
+    "name": "CLAUDE_CREDIT",
+    "reset_in_days": 20.0,
+    "shared": false,
+    "spend": 0.0
+   }
+  ],
+  "name": "worker_hold_codex_other_role",
+  "settings": {},
+  "state": {
+   "holds": {
+    "h1": {
+     "id": "h1",
+     "lane": "OPENAI_SUBSCRIPTION",
+     "reason": "why",
+     "roles": [
+      "reviewer"
+     ],
+     "set_at": 999999990.0,
+     "set_by": "owner",
+     "until": 1000003600.0
+    }
+   }
+  },
+  "unattended": false
+ },
+ {
+  "args": {
+   "allow_degraded": false,
+   "authored_by": null,
+   "cap": null,
+   "claude_usage": null,
+   "cwd": null,
+   "failed": "",
+   "premium": null,
+   "resume": null,
+   "role": "worker"
+  },
+  "expect": {
+   "action": "run",
+   "cap": null,
+   "effort": "medium",
+   "fallback": false,
+   "fallback_reason": null,
+   "first_lane": null,
+   "flag": null,
+   "lane": "OPENAI_SUBSCRIPTION",
+   "mode": "write",
+   "model": "gpt-6.1-sol",
+   "pass": "strict",
+   "role": "worker",
+   "rung": 0,
+   "trace": [
+    "OPENAI_SUBSCRIPTION: usable"
+   ]
+  },
+  "lanes": [
+   {
+    "family": "openai",
+    "five": 10,
+    "kind": "subscription",
+    "name": "OPENAI_SUBSCRIPTION",
+    "pace": 0,
+    "shared": false,
+    "week": 5
+   },
+   {
+    "family": "claude",
+    "five": 30,
+    "kind": "subscription",
+    "name": "CLAUDE_SUBSCRIPTION",
+    "pace": 0,
+    "shared": true,
+    "week": 40
+   },
+   {
+    "cap": 150.0,
+    "family": "claude",
+    "kind": "credit",
+    "name": "CLAUDE_CREDIT",
+    "reset_in_days": 20.0,
+    "shared": false,
+    "spend": 0.0
+   }
+  ],
+  "name": "worker_hold_expired",
+  "settings": {},
+  "state": {
+   "holds": {
+    "h1": {
+     "id": "h1",
+     "lane": "OPENAI_SUBSCRIPTION",
+     "reason": "why",
+     "roles": [],
+     "set_at": 999999990.0,
+     "set_by": "owner",
+     "until": 999999995.0
+    }
+   }
+  },
+  "unattended": false
+ },
+ {
+  "args": {
+   "allow_degraded": false,
+   "authored_by": null,
+   "cap": null,
+   "claude_usage": null,
+   "cwd": null,
+   "failed": "",
+   "premium": null,
+   "resume": null,
+   "role": "worker"
+  },
+  "expect": {
+   "action": "run",
+   "cap": 2,
+   "effort": "medium",
+   "fallback": true,
+   "fallback_reason": "ceiling",
+   "first_lane": "OPENAI_SUBSCRIPTION",
+   "flag": null,
+   "lane": "CLAUDE_SUBSCRIPTION",
+   "mode": "write",
+   "model": "sonnet-5.5",
+   "pass": "strict",
+   "role": "worker",
+   "rung": 2,
+   "trace": [
+    "OPENAI_SUBSCRIPTION: rejected, gpt-6.1-sol benched (vendor_blip, breaker) until Sun 09 Sep 02:01",
+    "OPENAI_SUBSCRIPTION: rejected, gpt-6.1-sol benched (vendor_blip, breaker) until Sun 09 Sep 02:01",
+    "CLAUDE_SUBSCRIPTION: usable",
+    "CLAUDE_CREDIT: usable"
+   ]
+  },
+  "lanes": [
+   {
+    "benched": {
+     "gpt-6.1-sol": {
+      "kind": "vendor_blip",
+      "source": "breaker",
+      "until": 1000000900.0
+     }
+    },
+    "family": "openai",
+    "five": 10,
+    "kind": "subscription",
+    "name": "OPENAI_SUBSCRIPTION",
+    "pace": 0,
+    "shared": false,
+    "week": 5
+   },
+   {
+    "family": "claude",
+    "five": 30,
+    "kind": "subscription",
+    "name": "CLAUDE_SUBSCRIPTION",
+    "pace": 0,
+    "shared": true,
+    "week": 40
+   },
+   {
+    "cap": 150.0,
+    "family": "claude",
+    "kind": "credit",
+    "name": "CLAUDE_CREDIT",
+    "reset_in_days": 20.0,
+    "shared": false,
+    "spend": 0.0
+   }
+  ],
+  "name": "worker_benched_pair",
+  "settings": {},
+  "state": {},
+  "unattended": false
+ },
+ {
+  "args": {
+   "allow_degraded": false,
+   "authored_by": null,
+   "cap": null,
+   "claude_usage": null,
+   "cwd": null,
+   "failed": "",
+   "premium": null,
+   "resume": null,
+   "role": "worker"
+  },
+  "expect": {
+   "action": "run",
+   "cap": null,
+   "effort": "medium",
+   "fallback": false,
+   "fallback_reason": null,
+   "first_lane": null,
+   "flag": null,
+   "lane": "OPENAI_SUBSCRIPTION",
+   "mode": "write",
+   "model": "gpt-6.1-sol",
+   "pass": "strict",
+   "role": "worker",
+   "rung": 0,
+   "trace": [
+    "OPENAI_SUBSCRIPTION: usable"
+   ]
+  },
+  "lanes": [
+   {
+    "canary": {
+     "gpt-6.1-sol": true
+    },
+    "family": "openai",
+    "five": 10,
+    "kind": "subscription",
+    "name": "OPENAI_SUBSCRIPTION",
+    "pace": 0,
+    "shared": false,
+    "week": 5
+   },
+   {
+    "family": "claude",
+    "five": 30,
+    "kind": "subscription",
+    "name": "CLAUDE_SUBSCRIPTION",
+    "pace": 0,
+    "shared": true,
+    "week": 40
+   },
+   {
+    "cap": 150.0,
+    "family": "claude",
+    "kind": "credit",
+    "name": "CLAUDE_CREDIT",
+    "reset_in_days": 20.0,
+    "shared": false,
+    "spend": 0.0
+   }
+  ],
+  "name": "worker_canary_pair",
+  "settings": {},
+  "state": {},
+  "unattended": false
+ },
+ {
+  "args": {
+   "allow_degraded": false,
+   "authored_by": null,
+   "cap": null,
+   "claude_usage": null,
+   "cwd": null,
+   "failed": "",
+   "premium": null,
+   "resume": null,
+   "role": "worker"
+  },
+  "expect": {
+   "action": "stop",
+   "lane": "OPENAI_SUBSCRIPTION",
+   "reason": "busy",
+   "retry_after": 1000000090.0,
+   "say": "OPENAI_SUBSCRIPTION (the role's first choice) has no free slot: busy: 4 running, 4 allowed",
+   "trace": []
+  },
+  "lanes": [
+   {
+    "busy": true,
+    "family": "openai",
+    "five": 10,
+    "kind": "subscription",
+    "name": "OPENAI_SUBSCRIPTION",
+    "notes": [
+     "busy: 4 running, 4 allowed"
+    ],
+    "out": true,
+    "out_reason": "busy",
+    "out_until": 1000000090.0,
+    "pace": 0,
+    "shared": false,
+    "week": 5
+   },
+   {
+    "family": "claude",
+    "five": 30,
+    "kind": "subscription",
+    "name": "CLAUDE_SUBSCRIPTION",
+    "pace": 0,
+    "shared": true,
+    "week": 40
+   },
+   {
+    "cap": 150.0,
+    "family": "claude",
+    "kind": "credit",
+    "name": "CLAUDE_CREDIT",
+    "reset_in_days": 20.0,
+    "shared": false,
+    "spend": 0.0
+   }
+  ],
+  "name": "worker_busy_wait",
+  "settings": {},
+  "state": {},
+  "unattended": true
+ },
+ {
+  "args": {
+   "allow_degraded": false,
+   "authored_by": null,
+   "cap": null,
+   "claude_usage": null,
+   "cwd": null,
+   "failed": "",
+   "premium": null,
+   "resume": null,
+   "role": "worker"
+  },
+  "expect": {
+   "action": "run",
+   "cap": 2,
+   "effort": "medium",
+   "fallback": true,
+   "fallback_reason": "busy",
+   "first_lane": "OPENAI_SUBSCRIPTION",
+   "flag": null,
+   "lane": "CLAUDE_SUBSCRIPTION",
+   "mode": "write",
+   "model": "sonnet-5.5",
+   "pass": "strict",
+   "role": "worker",
+   "rung": 2,
+   "trace": [
+    "OPENAI_SUBSCRIPTION: rejected, out until Sun 09 Sep 01:48",
+    "OPENAI_SUBSCRIPTION: rejected, out until Sun 09 Sep 01:48",
+    "CLAUDE_SUBSCRIPTION: usable",
+    "CLAUDE_CREDIT: usable"
+   ]
+  },
+  "lanes": [
+   {
+    "busy": true,
+    "family": "openai",
+    "five": 10,
+    "kind": "subscription",
+    "name": "OPENAI_SUBSCRIPTION",
+    "notes": [
+     "busy: 4 running, 4 allowed"
+    ],
+    "out": true,
+    "out_reason": "busy",
+    "out_until": 1000000090.0,
+    "pace": 0,
+    "shared": false,
+    "week": 5
+   },
+   {
+    "family": "claude",
+    "five": 30,
+    "kind": "subscription",
+    "name": "CLAUDE_SUBSCRIPTION",
+    "pace": 0,
+    "shared": true,
+    "week": 40
+   },
+   {
+    "cap": 150.0,
+    "family": "claude",
+    "kind": "credit",
+    "name": "CLAUDE_CREDIT",
+    "reset_in_days": 20.0,
+    "shared": false,
+    "spend": 0.0
+   }
+  ],
+  "name": "worker_busy_attended",
+  "settings": {},
+  "state": {},
+  "unattended": false
+ },
+ {
+  "args": {
+   "allow_degraded": false,
+   "authored_by": null,
+   "cap": null,
+   "claude_usage": null,
+   "cwd": null,
+   "failed": "",
+   "premium": null,
+   "resume": null,
+   "role": "worker"
+  },
+  "expect": {
+   "action": "run",
+   "cap": 2,
+   "effort": "medium",
+   "fallback": true,
+   "fallback_reason": "busy",
+   "first_lane": "OPENAI_SUBSCRIPTION",
+   "flag": null,
+   "lane": "CLAUDE_SUBSCRIPTION",
+   "mode": "write",
+   "model": "sonnet-5.5",
+   "pass": "strict",
+   "role": "worker",
+   "rung": 2,
+   "trace": [
+    "OPENAI_SUBSCRIPTION: rejected, out until Sun 09 Sep 01:47",
+    "OPENAI_SUBSCRIPTION: rejected, out until Sun 09 Sep 01:47",
+    "CLAUDE_SUBSCRIPTION: usable",
+    "CLAUDE_CREDIT: usable"
+   ]
+  },
+  "lanes": [
+   {
+    "family": "openai",
+    "five": 10,
+    "kind": "subscription",
+    "name": "OPENAI_SUBSCRIPTION",
+    "pace": 0,
+    "shared": false,
+    "week": 5
+   },
+   {
+    "family": "claude",
+    "five": 30,
+    "kind": "subscription",
+    "name": "CLAUDE_SUBSCRIPTION",
+    "pace": 0,
+    "shared": true,
+    "week": 40
+   },
+   {
+    "cap": 150.0,
+    "family": "claude",
+    "kind": "credit",
+    "name": "CLAUDE_CREDIT",
+    "reset_in_days": 20.0,
+    "shared": false,
+    "spend": 0.0
+   }
+  ],
+  "name": "worker_slots_taken_by_leases",
+  "settings": {},
+  "state": {
+   "leases": {
+    "r0": {
+     "expires": 1000000060.0,
+     "lane": "OPENAI_SUBSCRIPTION",
+     "pid": 1,
+     "start": 999999995.0
+    },
+    "r1": {
+     "expires": 1000000060.0,
+     "lane": "OPENAI_SUBSCRIPTION",
+     "pid": 1,
+     "start": 999999995.0
+    },
+    "r2": {
+     "expires": 1000000060.0,
+     "lane": "OPENAI_SUBSCRIPTION",
+     "pid": 1,
+     "start": 999999995.0
+    },
+    "r3": {
+     "expires": 1000000060.0,
+     "lane": "OPENAI_SUBSCRIPTION",
+     "pid": 1,
+     "start": 999999995.0
+    }
+   }
+  },
+  "unattended": false
+ },
+ {
+  "args": {
+   "allow_degraded": false,
+   "authored_by": null,
+   "cap": null,
+   "claude_usage": null,
+   "cwd": null,
+   "failed": "0",
+   "premium": null,
+   "resume": null,
+   "role": "worker"
+  },
+  "expect": {
+   "action": "run",
+   "cap": null,
+   "effort": "medium",
+   "fallback": false,
+   "fallback_reason": null,
+   "first_lane": null,
+   "flag": null,
+   "lane": "OPENAI_SUBSCRIPTION",
+   "mode": "write",
+   "model": "gpt-6.1-sol",
+   "pass": "strict",
+   "role": "worker",
+   "rung": 0,
+   "trace": [
+    "OPENAI_SUBSCRIPTION: usable"
+   ]
+  },
+  "lanes": [
+   {
+    "family": "openai",
+    "five": 10,
+    "kind": "subscription",
+    "name": "OPENAI_SUBSCRIPTION",
+    "pace": 0,
+    "shared": false,
+    "week": 5
+   },
+   {
+    "family": "claude",
+    "five": 30,
+    "kind": "subscription",
+    "name": "CLAUDE_SUBSCRIPTION",
+    "pace": 0,
+    "shared": true,
+    "week": 40
+   },
+   {
+    "cap": 150.0,
+    "family": "claude",
+    "kind": "credit",
+    "name": "CLAUDE_CREDIT",
+    "reset_in_days": 20.0,
+    "shared": false,
+    "spend": 0.0
+   }
+  ],
+  "name": "worker_failed_0",
+  "settings": {},
+  "state": {},
+  "unattended": false
+ },
+ {
+  "args": {
+   "allow_degraded": false,
+   "authored_by": null,
+   "cap": null,
+   "claude_usage": null,
+   "cwd": null,
+   "failed": "0,1",
+   "premium": null,
+   "resume": null,
+   "role": "worker"
+  },
+  "expect": {
+   "action": "run",
+   "cap": null,
+   "effort": "medium",
+   "fallback": false,
+   "fallback_reason": null,
+   "first_lane": null,
+   "flag": null,
+   "lane": "OPENAI_SUBSCRIPTION",
+   "mode": "write",
+   "model": "gpt-6.1-sol",
+   "pass": "strict",
+   "role": "worker",
+   "rung": 0,
+   "trace": [
+    "OPENAI_SUBSCRIPTION: usable"
+   ]
+  },
+  "lanes": [
+   {
+    "family": "openai",
+    "five": 10,
+    "kind": "subscription",
+    "name": "OPENAI_SUBSCRIPTION",
+    "pace": 0,
+    "shared": false,
+    "week": 5
+   },
+   {
+    "family": "claude",
+    "five": 30,
+    "kind": "subscription",
+    "name": "CLAUDE_SUBSCRIPTION",
+    "pace": 0,
+    "shared": true,
+    "week": 40
+   },
+   {
+    "cap": 150.0,
+    "family": "claude",
+    "kind": "credit",
+    "name": "CLAUDE_CREDIT",
+    "reset_in_days": 20.0,
+    "shared": false,
+    "spend": 0.0
+   }
+  ],
+  "name": "worker_failed_0_1",
+  "settings": {},
+  "state": {},
+  "unattended": false
+ },
+ {
+  "args": {
+   "allow_degraded": false,
+   "authored_by": null,
+   "cap": null,
+   "claude_usage": null,
+   "cwd": null,
+   "failed": "",
+   "premium": "claude",
+   "resume": null,
+   "role": "worker"
+  },
+  "expect": {
+   "action": "run",
+   "cap": 6,
+   "effort": "medium",
+   "fallback": false,
+   "fallback_reason": null,
+   "first_lane": null,
+   "flag": "user_requested_premium",
+   "lane": "CLAUDE_SUBSCRIPTION",
+   "mode": "write",
+   "model": "fable-5.1",
+   "pass": "strict",
+   "role": "worker",
+   "rung": 0,
+   "trace": [
+    "CLAUDE_SUBSCRIPTION: usable",
+    "CLAUDE_CREDIT: usable"
+   ]
+  },
+  "lanes": [
+   {
+    "family": "openai",
+    "five": 10,
+    "kind": "subscription",
+    "name": "OPENAI_SUBSCRIPTION",
+    "pace": 0,
+    "shared": false,
+    "week": 5
+   },
+   {
+    "family": "claude",
+    "five": 30,
+    "kind": "subscription",
+    "name": "CLAUDE_SUBSCRIPTION",
+    "pace": 0,
+    "shared": true,
+    "week": 40
+   },
+   {
+    "cap": 150.0,
+    "family": "claude",
+    "kind": "credit",
+    "name": "CLAUDE_CREDIT",
+    "reset_in_days": 20.0,
+    "shared": false,
+    "spend": 0.0
+   }
+  ],
+  "name": "worker_premium_claude",
+  "settings": {},
+  "state": {},
+  "unattended": false
+ },
+ {
+  "args": {
+   "allow_degraded": false,
+   "authored_by": null,
+   "cap": null,
+   "claude_usage": null,
+   "cwd": null,
+   "failed": "",
+   "premium": "openai",
+   "resume": null,
+   "role": "worker"
+  },
+  "expect": {
+   "action": "error",
+   "error": "no premium model configured for family openai; premium: ['claude']"
+  },
+  "lanes": [
+   {
+    "family": "openai",
+    "five": 10,
+    "kind": "subscription",
+    "name": "OPENAI_SUBSCRIPTION",
+    "pace": 0,
+    "shared": false,
+    "week": 5
+   },
+   {
+    "family": "claude",
+    "five": 30,
+    "kind": "subscription",
+    "name": "CLAUDE_SUBSCRIPTION",
+    "pace": 0,
+    "shared": true,
+    "week": 40
+   },
+   {
+    "cap": 150.0,
+    "family": "claude",
+    "kind": "credit",
+    "name": "CLAUDE_CREDIT",
+    "reset_in_days": 20.0,
+    "shared": false,
+    "spend": 0.0
+   }
+  ],
+  "name": "worker_premium_openai_none",
+  "settings": {},
+  "state": {},
+  "unattended": false
+ },
+ {
+  "args": {
+   "allow_degraded": false,
+   "authored_by": null,
+   "cap": null,
+   "claude_usage": null,
+   "cwd": null,
+   "failed": "",
+   "premium": "nope",
+   "resume": null,
+   "role": "worker"
+  },
+  "expect": {
+   "action": "error",
+   "error": "no premium model configured for family nope; premium: ['claude']"
+  },
+  "lanes": [
+   {
+    "family": "openai",
+    "five": 10,
+    "kind": "subscription",
+    "name": "OPENAI_SUBSCRIPTION",
+    "pace": 0,
+    "shared": false,
+    "week": 5
+   },
+   {
+    "family": "claude",
+    "five": 30,
+    "kind": "subscription",
+    "name": "CLAUDE_SUBSCRIPTION",
+    "pace": 0,
+    "shared": true,
+    "week": 40
+   },
+   {
+    "cap": 150.0,
+    "family": "claude",
+    "kind": "credit",
+    "name": "CLAUDE_CREDIT",
+    "reset_in_days": 20.0,
+    "shared": false,
+    "spend": 0.0
+   }
+  ],
+  "name": "worker_unknown_premium",
+  "settings": {},
+  "state": {},
+  "unattended": false
+ },
+ {
+  "args": {
+   "allow_degraded": false,
+   "authored_by": null,
+   "cap": null,
+   "claude_usage": null,
+   "cwd": null,
+   "failed": "",
+   "premium": null,
+   "resume": null,
+   "role": "nosuch"
+  },
+  "expect": {
+   "action": "error",
+   "error": "unknown role nosuch; roles: planner, worker, reviewer, hard, light"
+  },
+  "lanes": [
+   {
+    "family": "openai",
+    "five": 10,
+    "kind": "subscription",
+    "name": "OPENAI_SUBSCRIPTION",
+    "pace": 0,
+    "shared": false,
+    "week": 5
+   },
+   {
+    "family": "claude",
+    "five": 30,
+    "kind": "subscription",
+    "name": "CLAUDE_SUBSCRIPTION",
+    "pace": 0,
+    "shared": true,
+    "week": 40
+   },
+   {
+    "cap": 150.0,
+    "family": "claude",
+    "kind": "credit",
+    "name": "CLAUDE_CREDIT",
+    "reset_in_days": 20.0,
+    "shared": false,
+    "spend": 0.0
+   }
+  ],
+  "name": "unknown_role",
+  "settings": {},
+  "state": {},
+  "unattended": false
+ },
+ {
+  "args": {
+   "allow_degraded": false,
+   "authored_by": "openai",
+   "cap": null,
+   "claude_usage": null,
+   "cwd": null,
+   "failed": "",
+   "premium": null,
+   "resume": null,
+   "role": "reviewer"
+  },
+  "expect": {
+   "action": "run",
+   "cap": null,
+   "effort": "medium",
+   "fallback": false,
+   "fallback_reason": null,
+   "first_lane": null,
+   "flag": "same_family",
+   "lane": "OPENAI_SUBSCRIPTION",
+   "mode": "read_only",
+   "model": "gpt-6.1-sol",
+   "pass": "strict",
+   "role": "reviewer",
+   "rung": 0,
+   "trace": [
+    "OPENAI_SUBSCRIPTION: usable"
+   ],
+   "warning": "reviewing openai's work with openai: claude is kept as the last resort (xai not set up; deepseek not set up; zai not set up)"
+  },
+  "lanes": [
+   {
+    "family": "openai",
+    "five": 10,
+    "kind": "subscription",
+    "name": "OPENAI_SUBSCRIPTION",
+    "pace": 0,
+    "shared": false,
+    "week": 5
+   },
+   {
+    "family": "claude",
+    "five": 30,
+    "kind": "subscription",
+    "name": "CLAUDE_SUBSCRIPTION",
+    "pace": 0,
+    "shared": true,
+    "week": 40
+   },
+   {
+    "cap": 150.0,
+    "family": "claude",
+    "kind": "credit",
+    "name": "CLAUDE_CREDIT",
+    "reset_in_days": 20.0,
+    "shared": false,
+    "spend": 0.0
+   }
+  ],
+  "name": "reviewer_by_openai",
+  "settings": {},
+  "state": {},
+  "unattended": false
+ },
+ {
+  "args": {
+   "allow_degraded": false,
+   "authored_by": "claude",
+   "cap": null,
+   "claude_usage": null,
+   "cwd": null,
+   "failed": "",
+   "premium": null,
+   "resume": null,
+   "role": "reviewer"
+  },
+  "expect": {
+   "action": "run",
+   "cap": null,
+   "effort": "medium",
+   "fallback": false,
+   "fallback_reason": null,
+   "first_lane": null,
+   "flag": null,
+   "lane": "OPENAI_SUBSCRIPTION",
+   "mode": "read_only",
+   "model": "gpt-6.1-sol",
+   "pass": "strict",
+   "role": "reviewer",
+   "rung": 0,
+   "trace": [
+    "OPENAI_SUBSCRIPTION: usable"
+   ]
+  },
+  "lanes": [
+   {
+    "family": "openai",
+    "five": 10,
+    "kind": "subscription",
+    "name": "OPENAI_SUBSCRIPTION",
+    "pace": 0,
+    "shared": false,
+    "week": 5
+   },
+   {
+    "family": "claude",
+    "five": 30,
+    "kind": "subscription",
+    "name": "CLAUDE_SUBSCRIPTION",
+    "pace": 0,
+    "shared": true,
+    "week": 40
+   },
+   {
+    "cap": 150.0,
+    "family": "claude",
+    "kind": "credit",
+    "name": "CLAUDE_CREDIT",
+    "reset_in_days": 20.0,
+    "shared": false,
+    "spend": 0.0
+   }
+  ],
+  "name": "reviewer_by_claude",
+  "settings": {},
+  "state": {},
+  "unattended": false
+ },
+ {
+  "args": {
+   "allow_degraded": false,
+   "authored_by": "xai",
+   "cap": null,
+   "claude_usage": null,
+   "cwd": null,
+   "failed": "",
+   "premium": null,
+   "resume": null,
+   "role": "reviewer"
+  },
+  "expect": {
+   "action": "run",
+   "cap": null,
+   "effort": "medium",
+   "fallback": false,
+   "fallback_reason": null,
+   "first_lane": null,
+   "flag": null,
+   "lane": "OPENAI_SUBSCRIPTION",
+   "mode": "read_only",
+   "model": "gpt-6.1-sol",
+   "pass": "strict",
+   "role": "reviewer",
+   "rung": 0,
+   "trace": [
+    "OPENAI_SUBSCRIPTION: usable"
+   ]
+  },
+  "lanes": [
+   {
+    "family": "openai",
+    "five": 10,
+    "kind": "subscription",
+    "name": "OPENAI_SUBSCRIPTION",
+    "pace": 0,
+    "shared": false,
+    "week": 5
+   },
+   {
+    "family": "claude",
+    "five": 30,
+    "kind": "subscription",
+    "name": "CLAUDE_SUBSCRIPTION",
+    "pace": 0,
+    "shared": true,
+    "week": 40
+   },
+   {
+    "cap": 150.0,
+    "family": "claude",
+    "kind": "credit",
+    "name": "CLAUDE_CREDIT",
+    "reset_in_days": 20.0,
+    "shared": false,
+    "spend": 0.0
+   },
+   {
+    "family": "xai",
+    "five": null,
+    "kind": "subscription",
+    "name": "GROK_SUBSCRIPTION",
+    "shared": false,
+    "week": null
+   }
+  ],
+  "name": "reviewer_by_xai",
+  "settings": {},
+  "state": {},
+  "unattended": false
+ },
+ {
+  "args": {
+   "allow_degraded": false,
+   "authored_by": "zzz",
+   "cap": null,
+   "claude_usage": null,
+   "cwd": null,
+   "failed": "",
+   "premium": null,
+   "resume": null,
+   "role": "reviewer"
+  },
+  "expect": {
+   "action": "error",
+   "error": "--authored-by must be openai or claude or xai or deepseek or zai (or omitted)"
+  },
+  "lanes": [
+   {
+    "family": "openai",
+    "five": 10,
+    "kind": "subscription",
+    "name": "OPENAI_SUBSCRIPTION",
+    "pace": 0,
+    "shared": false,
+    "week": 5
+   },
+   {
+    "family": "claude",
+    "five": 30,
+    "kind": "subscription",
+    "name": "CLAUDE_SUBSCRIPTION",
+    "pace": 0,
+    "shared": true,
+    "week": 40
+   },
+   {
+    "cap": 150.0,
+    "family": "claude",
+    "kind": "credit",
+    "name": "CLAUDE_CREDIT",
+    "reset_in_days": 20.0,
+    "shared": false,
+    "spend": 0.0
+   }
+  ],
+  "name": "reviewer_by_bad",
+  "settings": {},
+  "state": {},
+  "unattended": false
+ },
+ {
+  "args": {
+   "allow_degraded": false,
+   "authored_by": "openai",
+   "cap": null,
+   "claude_usage": null,
+   "cwd": null,
+   "failed": "",
+   "premium": null,
+   "resume": null,
+   "role": "reviewer"
+  },
+  "expect": {
+   "action": "run",
+   "cap": 2,
+   "effort": "medium",
+   "fallback": true,
+   "fallback_reason": "out",
+   "first_lane": "OPENAI_SUBSCRIPTION",
+   "flag": null,
+   "lane": "CLAUDE_SUBSCRIPTION",
+   "mode": "read_only",
+   "model": "sonnet-5.5",
+   "pass": "strict",
+   "role": "reviewer",
+   "rung": 1,
+   "trace": [
+    "OPENAI_SUBSCRIPTION: rejected, out until Sun 09 Sep 03:46",
+    "OPENAI_SUBSCRIPTION: rejected, out until Sun 09 Sep 03:46",
+    "CLAUDE_SUBSCRIPTION: usable",
+    "CLAUDE_CREDIT: usable"
+   ]
+  },
+  "lanes": [
+   {
+    "family": "openai",
+    "five": 10,
+    "kind": "subscription",
+    "name": "OPENAI_SUBSCRIPTION",
+    "out": true,
+    "out_reason": "limit",
+    "out_until": 1000007200.0,
+    "pace": 0,
+    "shared": false,
+    "week": 5
+   },
+   {
+    "family": "claude",
+    "five": 30,
+    "kind": "subscription",
+    "name": "CLAUDE_SUBSCRIPTION",
+    "pace": 0,
+    "shared": true,
+    "week": 40
+   },
+   {
+    "cap": 150.0,
+    "family": "claude",
+    "kind": "credit",
+    "name": "CLAUDE_CREDIT",
+    "reset_in_days": 20.0,
+    "shared": false,
+    "spend": 0.0
+   }
+  ],
+  "name": "reviewer_codex_out_same_family_warn",
+  "settings": {},
+  "state": {},
+  "unattended": false
+ },
+ {
+  "args": {
+   "allow_degraded": false,
+   "authored_by": null,
+   "cap": null,
+   "claude_usage": null,
+   "cwd": null,
+   "failed": "",
+   "premium": null,
+   "resume": null,
+   "role": "reviewer"
+  },
+  "expect": {
+   "action": "run",
+   "cap": 2,
+   "effort": "medium",
+   "fallback": true,
+   "fallback_reason": "out",
+   "first_lane": "OPENAI_SUBSCRIPTION",
+   "flag": null,
+   "lane": "CLAUDE_SUBSCRIPTION",
+   "mode": "read_only",
+   "model": "sonnet-5.5",
+   "pass": "strict",
+   "role": "reviewer",
+   "rung": 1,
+   "trace": [
+    "OPENAI_SUBSCRIPTION: rejected, out until Sun 09 Sep 03:46",
+    "OPENAI_SUBSCRIPTION: rejected, out until Sun 09 Sep 03:46",
+    "CLAUDE_SUBSCRIPTION: usable",
+    "CLAUDE_CREDIT: usable"
+   ]
+  },
+  "lanes": [
+   {
+    "family": "openai",
+    "five": 10,
+    "kind": "subscription",
+    "name": "OPENAI_SUBSCRIPTION",
+    "out": true,
+    "out_reason": "limit",
+    "out_until": 1000007200.0,
+    "pace": 0,
+    "shared": false,
+    "week": 5
+   },
+   {
+    "family": "claude",
+    "five": 30,
+    "kind": "subscription",
+    "name": "CLAUDE_SUBSCRIPTION",
+    "pace": 0,
+    "shared": true,
+    "week": 40
+   },
+   {
+    "cap": 150.0,
+    "family": "claude",
+    "kind": "credit",
+    "name": "CLAUDE_CREDIT",
+    "reset_in_days": 20.0,
+    "shared": false,
+    "spend": 0.0
+   }
+  ],
+  "name": "reviewer_only_claude",
+  "settings": {},
+  "state": {},
+  "unattended": false
+ },
+ {
+  "args": {
+   "allow_degraded": false,
+   "authored_by": null,
+   "cap": null,
+   "claude_usage": null,
+   "cwd": null,
+   "failed": "",
+   "premium": null,
+   "resume": null,
+   "role": "planner"
+  },
+  "expect": {
+   "action": "stop",
+   "ask_user": {
+    "options": [
+     "sonnet-5.5 low"
+    ],
+    "question": "No adequate model is available. Run a degraded option?",
+    "then": "route.py next planner --allow-degraded"
+   },
+   "resets": {
+    "CLAUDE_CREDIT": "Sun 09 Sep 02:53",
+    "CLAUDE_SUBSCRIPTION": "Sun 09 Sep 04:16",
+    "OPENAI_SUBSCRIPTION": "Sun 09 Sep 03:46"
+   },
+   "role": "planner",
+   "say": "No adequate reasoning model is available now.",
+   "trace": [
+    "OPENAI_SUBSCRIPTION: rejected, out until Sun 09 Sep 03:46",
+    "OPENAI_SUBSCRIPTION: rejected, out until Sun 09 Sep 03:46",
+    "CLAUDE_SUBSCRIPTION: rejected, out until Sun 09 Sep 04:16",
+    "CLAUDE_CREDIT: rejected, out until Sun 09 Sep 02:53",
+    "CLAUDE_SUBSCRIPTION: rejected, out until Sun 09 Sep 04:16",
+    "CLAUDE_CREDIT: rejected, out until Sun 09 Sep 02:53"
+   ]
+  },
+  "lanes": [
+   {
+    "family": "openai",
+    "five": 10,
+    "kind": "subscription",
+    "name": "OPENAI_SUBSCRIPTION",
+    "out": true,
+    "out_reason": "limit",
+    "out_until": 1000007200.0,
+    "pace": 0,
+    "shared": false,
+    "week": 5
+   },
+   {
+    "family": "claude",
+    "five": 30,
+    "kind": "subscription",
+    "name": "CLAUDE_SUBSCRIPTION",
+    "out": true,
+    "out_reason": "limit",
+    "out_until": 1000009000.0,
+    "pace": 0,
+    "shared": true,
+    "week": 40
+   },
+   {
+    "cap": 150.0,
+    "family": "claude",
+    "kind": "credit",
+    "name": "CLAUDE_CREDIT",
+    "out": true,
+    "out_reason": "limit",
+    "out_until": 1000004000.0,
+    "reset_in_days": 20.0,
+    "shared": false,
+    "spend": 0.0
+   }
+  ],
+  "name": "planner_degraded_ask",
+  "settings": {},
+  "state": {},
+  "unattended": false
+ },
+ {
+  "args": {
+   "allow_degraded": true,
+   "authored_by": null,
+   "cap": null,
+   "claude_usage": null,
+   "cwd": null,
+   "failed": "",
+   "premium": null,
+   "resume": null,
+   "role": "planner"
+  },
+  "expect": {
+   "action": "stop",
+   "resets": {
+    "CLAUDE_CREDIT": "Sun 09 Sep 02:53",
+    "CLAUDE_SUBSCRIPTION": "Sun 09 Sep 04:16",
+    "OPENAI_SUBSCRIPTION": "Sun 09 Sep 03:46"
+   },
+   "role": "planner",
+   "say": "No adequate reasoning model is available now.",
+   "trace": [
+    "OPENAI_SUBSCRIPTION: rejected, out until Sun 09 Sep 03:46",
+    "OPENAI_SUBSCRIPTION: rejected, out until Sun 09 Sep 03:46",
+    "CLAUDE_SUBSCRIPTION: rejected, out until Sun 09 Sep 04:16",
+    "CLAUDE_CREDIT: rejected, out until Sun 09 Sep 02:53",
+    "CLAUDE_SUBSCRIPTION: rejected, out until Sun 09 Sep 04:16",
+    "CLAUDE_CREDIT: rejected, out until Sun 09 Sep 02:53",
+    "CLAUDE_SUBSCRIPTION: rejected, out until Sun 09 Sep 04:16",
+    "CLAUDE_CREDIT: rejected, out until Sun 09 Sep 02:53",
+    "CLAUDE_SUBSCRIPTION: rejected, out until Sun 09 Sep 04:16",
+    "CLAUDE_CREDIT: rejected, out until Sun 09 Sep 02:53"
+   ]
+  },
+  "lanes": [
+   {
+    "family": "openai",
+    "five": 10,
+    "kind": "subscription",
+    "name": "OPENAI_SUBSCRIPTION",
+    "out": true,
+    "out_reason": "limit",
+    "out_until": 1000007200.0,
+    "pace": 0,
+    "shared": false,
+    "week": 5
+   },
+   {
+    "family": "claude",
+    "five": 30,
+    "kind": "subscription",
+    "name": "CLAUDE_SUBSCRIPTION",
+    "out": true,
+    "out_reason": "limit",
+    "out_until": 1000009000.0,
+    "pace": 0,
+    "shared": true,
+    "week": 40
+   },
+   {
+    "cap": 150.0,
+    "family": "claude",
+    "kind": "credit",
+    "name": "CLAUDE_CREDIT",
+    "out": true,
+    "out_reason": "limit",
+    "out_until": 1000004000.0,
+    "reset_in_days": 20.0,
+    "shared": false,
+    "spend": 0.0
+   }
+  ],
+  "name": "planner_degraded_consent",
+  "settings": {},
+  "state": {},
+  "unattended": false
+ },
+ {
+  "args": {
+   "allow_degraded": false,
+   "authored_by": null,
+   "cap": null,
+   "claude_usage": null,
+   "cwd": null,
+   "failed": "",
+   "premium": null,
+   "resume": null,
+   "role": "hard"
+  },
+  "expect": {
+   "action": "stop",
+   "resets": {
+    "CLAUDE_CREDIT": "Sun 09 Sep 02:53",
+    "OPENAI_SUBSCRIPTION": "Sun 09 Sep 03:46"
+   },
+   "role": "hard",
+   "say": "Every rung was tried or is unavailable. Report what was tried; if a rung needed more than a couple of tries the plan or the split is wrong. Fable only if the user says so.",
+   "trace": [
+    "OPENAI_SUBSCRIPTION: rejected, out until Sun 09 Sep 03:46",
+    "OPENAI_SUBSCRIPTION: rejected, out until Sun 09 Sep 03:46",
+    "CLAUDE_SUBSCRIPTION: rejected, out",
+    "CLAUDE_CREDIT: rejected, out until Sun 09 Sep 02:53",
+    "CLAUDE_SUBSCRIPTION: rejected, out",
+    "CLAUDE_CREDIT: rejected, out until Sun 09 Sep 02:53"
+   ]
+  },
+  "lanes": [
+   {
+    "family": "openai",
+    "five": 10,
+    "kind": "subscription",
+    "name": "OPENAI_SUBSCRIPTION",
+    "out": true,
+    "out_reason": "limit",
+    "out_until": 1000007200.0,
+    "pace": 0,
+    "shared": false,
+    "week": 5
+   },
+   {
+    "family": "claude",
+    "five": 30,
+    "kind": "subscription",
+    "name": "CLAUDE_SUBSCRIPTION",
+    "out": true,
+    "out_reason": "logged_out",
+    "pace": 0,
+    "shared": true,
+    "week": 40
+   },
+   {
+    "cap": 150.0,
+    "family": "claude",
+    "kind": "credit",
+    "name": "CLAUDE_CREDIT",
+    "out": true,
+    "out_reason": "limit",
+    "out_until": 1000004000.0,
+    "reset_in_days": 20.0,
+    "shared": false,
+    "spend": 0.0
+   }
+  ],
+  "name": "hard_all_claude_logged_out",
+  "settings": {},
+  "state": {},
+  "unattended": false
+ },
+ {
+  "args": {
+   "allow_degraded": false,
+   "authored_by": "openai",
+   "cap": null,
+   "claude_usage": null,
+   "cwd": null,
+   "failed": "",
+   "premium": null,
+   "resume": null,
+   "role": "reviewer"
+  },
+  "expect": {
+   "action": "run",
+   "cap": null,
+   "effort": "high",
+   "fallback": false,
+   "fallback_reason": null,
+   "first_lane": null,
+   "flag": null,
+   "lane": "ZAI_CODING_SUBSCRIPTION",
+   "mode": "read_only",
+   "model": "glm-5.3",
+   "pass": "strict",
+   "role": "reviewer",
+   "rung": 1,
+   "trace": [
+    "ZAI_CODING_SUBSCRIPTION: usable"
+   ]
+  },
+  "lanes": [
+   {
+    "family": "openai",
+    "five": 10,
+    "kind": "subscription",
+    "name": "OPENAI_SUBSCRIPTION",
+    "out": true,
+    "out_reason": "limit",
+    "out_until": 1000007200.0,
+    "pace": 0,
+    "shared": false,
+    "week": 5
+   },
+   {
+    "family": "claude",
+    "five": 30,
+    "kind": "subscription",
+    "name": "CLAUDE_SUBSCRIPTION",
+    "pace": 0,
+    "shared": true,
+    "week": 40
+   },
+   {
+    "cap": 150.0,
+    "family": "claude",
+    "kind": "credit",
+    "name": "CLAUDE_CREDIT",
+    "reset_in_days": 20.0,
+    "shared": false,
+    "spend": 0.0
+   },
+   {
+    "family": "deepseek",
+    "kind": "subscription",
+    "name": "DEEPSEEK_FREE",
+    "shared": false
+   },
+   {
+    "family": "zai",
+    "kind": "subscription",
+    "name": "ZAI_CODING_SUBSCRIPTION",
+    "shared": false
+   }
+  ],
+  "name": "worker_deepseek_enabled",
+  "settings": {
+   "deepseek_free_enabled": true,
+   "zai_coding_enabled": true
+  },
+  "state": {},
+  "unattended": false
+ },
+ {
+  "args": {
+   "allow_degraded": false,
+   "authored_by": null,
+   "cap": null,
+   "claude_usage": null,
+   "cwd": null,
+   "failed": "",
+   "premium": null,
+   "resume": null,
+   "role": "worker"
+  },
+  "expect": {
+   "action": "stop",
+   "resets": {
+    "CLAUDE_CREDIT": "Sun 09 Sep 02:53",
+    "OPENAI_SUBSCRIPTION": "Sun 09 Sep 03:46"
+   },
+   "role": "worker",
+   "say": "No worker lane is available. Hold the task; a few lines the orchestrator may write itself.",
+   "trace": [
+    "OPENAI_SUBSCRIPTION: rejected, out until Sun 09 Sep 03:46",
+    "OPENAI_SUBSCRIPTION: rejected, out until Sun 09 Sep 03:46",
+    "CLAUDE_SUBSCRIPTION: rejected, weekly 96% >= 90 (orchestrator reserve)",
+    "CLAUDE_CREDIT: rejected, out until Sun 09 Sep 02:53",
+    "CLAUDE_SUBSCRIPTION: rejected, weekly 96% >= 95 (hard ceiling)",
+    "CLAUDE_CREDIT: rejected, out until Sun 09 Sep 02:53"
+   ]
+  },
+  "lanes": [
+   {
+    "family": "openai",
+    "five": 10,
+    "kind": "subscription",
+    "name": "OPENAI_SUBSCRIPTION",
+    "out": true,
+    "out_reason": "limit",
+    "out_until": 1000007200.0,
+    "pace": 0,
+    "shared": false,
+    "week": 5
+   },
+   {
+    "family": "claude",
+    "five": 92,
+    "kind": "subscription",
+    "name": "CLAUDE_SUBSCRIPTION",
+    "pace": 0,
+    "shared": true,
+    "week": 96
+   },
+   {
+    "cap": 150.0,
+    "family": "claude",
+    "kind": "credit",
+    "name": "CLAUDE_CREDIT",
+    "out": true,
+    "out_reason": "limit",
+    "out_until": 1000004000.0,
+    "reset_in_days": 20.0,
+    "shared": false,
+    "spend": 0.0
+   }
+  ],
+  "name": "worker_sub_over_gate_relaxed_ok",
+  "settings": {},
+  "state": {},
+  "unattended": false
+ },
+ {
+  "args": {
+   "allow_degraded": false,
+   "authored_by": null,
+   "cap": null,
+   "claude_usage": null,
+   "cwd": null,
+   "failed": "",
+   "premium": null,
+   "resume": "nope",
+   "role": "worker"
+  },
+  "expect": {
+   "action": "error",
+   "error": "unknown --resume ref nope"
+  },
+  "lanes": [
+   {
+    "family": "openai",
+    "five": 10,
+    "kind": "subscription",
+    "name": "OPENAI_SUBSCRIPTION",
+    "pace": 0,
+    "shared": false,
+    "week": 5
+   },
+   {
+    "family": "claude",
+    "five": 30,
+    "kind": "subscription",
+    "name": "CLAUDE_SUBSCRIPTION",
+    "pace": 0,
+    "shared": true,
+    "week": 40
+   },
+   {
+    "cap": 150.0,
+    "family": "claude",
+    "kind": "credit",
+    "name": "CLAUDE_CREDIT",
+    "reset_in_days": 20.0,
+    "shared": false,
+    "spend": 0.0
+   }
+  ],
+  "name": "resume_unknown_ref",
+  "settings": {},
+  "state": {},
+  "unattended": false
+ },
+ {
+  "args": {
+   "allow_degraded": false,
+   "authored_by": null,
+   "cap": null,
+   "claude_usage": null,
+   "cwd": null,
+   "failed": "",
+   "premium": null,
+   "resume": "ref1",
+   "role": "worker"
+  },
+  "expect": {
+   "action": "run",
+   "cap": null,
+   "effort": "high",
+   "fallback": false,
+   "fallback_reason": null,
+   "first_lane": null,
+   "lane": "OPENAI_SUBSCRIPTION",
+   "mode": "write",
+   "model": "gpt-6.1-sol",
+   "pass": "resume",
+   "role": "worker",
+   "rung": 0
+  },
+  "lanes": [
+   {
+    "family": "openai",
+    "five": 10,
+    "kind": "subscription",
+    "name": "OPENAI_SUBSCRIPTION",
+    "pace": 0,
+    "shared": false,
+    "week": 5
+   },
+   {
+    "family": "claude",
+    "five": 30,
+    "kind": "subscription",
+    "name": "CLAUDE_SUBSCRIPTION",
+    "pace": 0,
+    "shared": true,
+    "week": 40
+   },
+   {
+    "cap": 150.0,
+    "family": "claude",
+    "kind": "credit",
+    "name": "CLAUDE_CREDIT",
+    "reset_in_days": 20.0,
+    "shared": false,
+    "spend": 0.0
+   }
+  ],
+  "name": "resume_ok",
+  "settings": {},
+  "state": {
+   "refs": {
+    "ref1": {
+     "cap": null,
+     "effort": "high",
+     "fallback": false,
+     "fallback_reason": null,
+     "first_lane": null,
+     "lane": "OPENAI_SUBSCRIPTION",
+     "mode": "write",
+     "model": "gpt-6.1-sol",
+     "rung": 0
+    }
+   }
+  },
+  "unattended": false
+ },
+ {
+  "args": {
+   "allow_degraded": false,
+   "authored_by": null,
+   "cap": 5,
+   "claude_usage": null,
+   "cwd": null,
+   "failed": "",
+   "premium": null,
+   "resume": "ref1",
+   "role": "worker"
+  },
+  "expect": {
+   "action": "run",
+   "cap": 5,
+   "effort": "high",
+   "fallback": true,
+   "fallback_reason": "out",
+   "first_lane": "OPENAI_SUBSCRIPTION",
+   "lane": "CLAUDE_CREDIT",
+   "mode": "write",
+   "model": "sonnet-5.5",
+   "pass": "resume",
+   "role": "worker",
+   "rung": 1
+  },
+  "lanes": [
+   {
+    "family": "openai",
+    "five": 10,
+    "kind": "subscription",
+    "name": "OPENAI_SUBSCRIPTION",
+    "pace": 0,
+    "shared": false,
+    "week": 5
+   },
+   {
+    "family": "claude",
+    "five": 30,
+    "kind": "subscription",
+    "name": "CLAUDE_SUBSCRIPTION",
+    "pace": 0,
+    "shared": true,
+    "week": 40
+   },
+   {
+    "cap": 150.0,
+    "family": "claude",
+    "kind": "credit",
+    "name": "CLAUDE_CREDIT",
+    "reset_in_days": 20.0,
+    "shared": false,
+    "spend": 0.0
+   }
+  ],
+  "name": "resume_cap_override",
+  "settings": {},
+  "state": {
+   "refs": {
+    "ref1": {
+     "cap": 2,
+     "effort": "high",
+     "fallback": true,
+     "fallback_reason": "out",
+     "first_lane": "OPENAI_SUBSCRIPTION",
+     "lane": "CLAUDE_CREDIT",
+     "mode": "write",
+     "model": "sonnet-5.5",
+     "rung": 1
+    }
+   }
+  },
+  "unattended": false
+ },
+ {
+  "args": {
+   "allow_degraded": false,
+   "authored_by": null,
+   "cap": null,
+   "claude_usage": null,
+   "cwd": null,
+   "failed": "",
+   "premium": null,
+   "resume": "ref1",
+   "role": "worker"
+  },
+  "expect": {
+   "action": "stop",
+   "lane": "OPENAI_SUBSCRIPTION",
+   "outcome": "held",
+   "retry_after": 1000003600.0,
+   "say": "OPENAI_SUBSCRIPTION is on hold, held: owner until Sun 09 Sep 02:46 (why). Continue with a fresh writer on another lane; existing file changes remain in the working directory."
+  },
+  "lanes": [
+   {
+    "family": "openai",
+    "five": 10,
+    "kind": "subscription",
+    "name": "OPENAI_SUBSCRIPTION",
+    "pace": 0,
+    "shared": false,
+    "week": 5
+   },
+   {
+    "family": "claude",
+    "five": 30,
+    "kind": "subscription",
+    "name": "CLAUDE_SUBSCRIPTION",
+    "pace": 0,
+    "shared": true,
+    "week": 40
+   },
+   {
+    "cap": 150.0,
+    "family": "claude",
+    "kind": "credit",
+    "name": "CLAUDE_CREDIT",
+    "reset_in_days": 20.0,
+    "shared": false,
+    "spend": 0.0
+   }
+  ],
+  "name": "resume_held",
+  "settings": {},
+  "state": {
+   "holds": {
+    "h1": {
+     "id": "h1",
+     "lane": "OPENAI_SUBSCRIPTION",
+     "reason": "why",
+     "roles": [],
+     "set_at": 999999990.0,
+     "set_by": "owner",
+     "until": 1000003600.0
+    }
+   },
+   "refs": {
+    "ref1": {
+     "cap": null,
+     "effort": "high",
+     "fallback": false,
+     "fallback_reason": null,
+     "first_lane": null,
+     "lane": "OPENAI_SUBSCRIPTION",
+     "mode": "write",
+     "model": "gpt-6.1-sol",
+     "rung": 0
+    }
+   }
+  },
+  "unattended": false
+ },
+ {
+  "args": {
+   "allow_degraded": false,
+   "authored_by": null,
+   "cap": null,
+   "claude_usage": null,
+   "cwd": null,
+   "failed": "",
+   "premium": null,
+   "resume": "ref1",
+   "role": "worker"
+  },
+  "expect": {
+   "action": "stop",
+   "lane": "OPENAI_SUBSCRIPTION",
+   "outcome": "rate_limited",
+   "retry_after": 1000007200.0,
+   "say": "OPENAI_SUBSCRIPTION cannot continue ref1 now: out until Sun 09 Sep 03:46"
+  },
+  "lanes": [
+   {
+    "family": "openai",
+    "five": 10,
+    "kind": "subscription",
+    "name": "OPENAI_SUBSCRIPTION",
+    "out": true,
+    "out_reason": "limit",
+    "out_until": 1000007200.0,
+    "pace": 0,
+    "shared": false,
+    "week": 5
+   },
+   {
+    "family": "claude",
+    "five": 30,
+    "kind": "subscription",
+    "name": "CLAUDE_SUBSCRIPTION",
+    "pace": 0,
+    "shared": true,
+    "week": 40
+   },
+   {
+    "cap": 150.0,
+    "family": "claude",
+    "kind": "credit",
+    "name": "CLAUDE_CREDIT",
+    "reset_in_days": 20.0,
+    "shared": false,
+    "spend": 0.0
+   }
+  ],
+  "name": "resume_lane_out",
+  "settings": {},
+  "state": {
+   "refs": {
+    "ref1": {
+     "cap": null,
+     "effort": "high",
+     "fallback": false,
+     "fallback_reason": null,
+     "first_lane": null,
+     "lane": "OPENAI_SUBSCRIPTION",
+     "mode": "write",
+     "model": "gpt-6.1-sol",
+     "rung": 0
+    }
+   }
+  },
+  "unattended": false
+ },
+ {
+  "args": {
+   "allow_degraded": false,
+   "authored_by": null,
+   "cap": null,
+   "claude_usage": null,
+   "cwd": null,
+   "failed": "",
+   "premium": null,
+   "resume": "ref1",
+   "role": "worker"
+  },
+  "expect": {
+   "action": "stop",
+   "lane": "OPENAI_SUBSCRIPTION",
+   "outcome": "logged_out",
+   "retry_after": null,
+   "say": "OPENAI_SUBSCRIPTION cannot continue ref1 now: out"
+  },
+  "lanes": [
+   {
+    "family": "openai",
+    "five": 10,
+    "kind": "subscription",
+    "name": "OPENAI_SUBSCRIPTION",
+    "out": true,
+    "out_reason": "logged_out",
+    "pace": 0,
+    "shared": false,
+    "week": 5
+   },
+   {
+    "family": "claude",
+    "five": 30,
+    "kind": "subscription",
+    "name": "CLAUDE_SUBSCRIPTION",
+    "pace": 0,
+    "shared": true,
+    "week": 40
+   },
+   {
+    "cap": 150.0,
+    "family": "claude",
+    "kind": "credit",
+    "name": "CLAUDE_CREDIT",
+    "reset_in_days": 20.0,
+    "shared": false,
+    "spend": 0.0
+   }
+  ],
+  "name": "resume_lane_logged_out",
+  "settings": {},
+  "state": {
+   "refs": {
+    "ref1": {
+     "cap": null,
+     "effort": "high",
+     "fallback": false,
+     "fallback_reason": null,
+     "first_lane": null,
+     "lane": "OPENAI_SUBSCRIPTION",
+     "mode": "write",
+     "model": "gpt-6.1-sol",
+     "rung": 0
+    }
+   }
+  },
+  "unattended": false
+ },
+ {
+  "args": {
+   "allow_degraded": false,
+   "authored_by": null,
+   "cap": null,
+   "claude_usage": null,
+   "cwd": null,
+   "failed": "",
+   "premium": null,
+   "resume": "ref1",
+   "role": "worker"
+  },
+  "expect": {
+   "action": "stop",
+   "lane": "OPENAI_SUBSCRIPTION",
+   "reason": "busy",
+   "retry_after": 1000000090.0,
+   "say": "OPENAI_SUBSCRIPTION has no free slot to continue ref1: busy: 4 running, 4 allowed"
+  },
+  "lanes": [
+   {
+    "busy": true,
+    "family": "openai",
+    "five": 10,
+    "kind": "subscription",
+    "name": "OPENAI_SUBSCRIPTION",
+    "notes": [
+     "busy: 4 running, 4 allowed"
+    ],
+    "out": true,
+    "out_reason": "busy",
+    "out_until": 1000000090.0,
+    "pace": 0,
+    "shared": false,
+    "week": 5
+   },
+   {
+    "family": "claude",
+    "five": 30,
+    "kind": "subscription",
+    "name": "CLAUDE_SUBSCRIPTION",
+    "pace": 0,
+    "shared": true,
+    "week": 40
+   },
+   {
+    "cap": 150.0,
+    "family": "claude",
+    "kind": "credit",
+    "name": "CLAUDE_CREDIT",
+    "reset_in_days": 20.0,
+    "shared": false,
+    "spend": 0.0
+   }
+  ],
+  "name": "resume_busy",
+  "settings": {},
+  "state": {
+   "refs": {
+    "ref1": {
+     "cap": null,
+     "effort": "high",
+     "fallback": false,
+     "fallback_reason": null,
+     "first_lane": null,
+     "lane": "OPENAI_SUBSCRIPTION",
+     "mode": "write",
+     "model": "gpt-6.1-sol",
+     "rung": 0
+    }
+   }
+  },
+  "unattended": false
+ },
+ {
+  "args": {
+   "allow_degraded": false,
+   "authored_by": null,
+   "cap": null,
+   "claude_usage": null,
+   "cwd": null,
+   "failed": "",
+   "premium": null,
+   "resume": "ref1",
+   "role": "worker"
+  },
+  "expect": {
+   "action": "stop",
+   "lane": "OPENAI_SUBSCRIPTION",
+   "outcome": "hung",
+   "retry_after": null,
+   "say": "OPENAI_SUBSCRIPTION cannot continue ref1 now: gpt-6.1-sol benched (hung, breaker) until Sun 09 Sep 02:01"
+  },
+  "lanes": [
+   {
+    "benched": {
+     "gpt-6.1-sol": {
+      "kind": "hung",
+      "source": "breaker",
+      "until": 1000000900.0
+     }
+    },
+    "family": "openai",
+    "five": 10,
+    "kind": "subscription",
+    "name": "OPENAI_SUBSCRIPTION",
+    "pace": 0,
+    "shared": false,
+    "week": 5
+   },
+   {
+    "family": "claude",
+    "five": 30,
+    "kind": "subscription",
+    "name": "CLAUDE_SUBSCRIPTION",
+    "pace": 0,
+    "shared": true,
+    "week": 40
+   },
+   {
+    "cap": 150.0,
+    "family": "claude",
+    "kind": "credit",
+    "name": "CLAUDE_CREDIT",
+    "reset_in_days": 20.0,
+    "shared": false,
+    "spend": 0.0
+   }
+  ],
+  "name": "resume_benched",
+  "settings": {},
+  "state": {
+   "refs": {
+    "ref1": {
+     "cap": null,
+     "effort": "high",
+     "fallback": false,
+     "fallback_reason": null,
+     "first_lane": null,
+     "lane": "OPENAI_SUBSCRIPTION",
+     "mode": "write",
+     "model": "gpt-6.1-sol",
+     "rung": 0
+    }
+   }
+  },
+  "unattended": false
+ },
+ {
+  "args": {
+   "allow_degraded": false,
+   "authored_by": null,
+   "cap": null,
+   "claude_usage": null,
+   "cwd": null,
+   "failed": "",
+   "premium": null,
+   "resume": "ref1",
+   "role": "worker"
+  },
+  "expect": {
+   "action": "stop",
+   "lane": "CLAUDE_CREDIT",
+   "outcome": "rate_limited",
+   "retry_after": null,
+   "say": "CLAUDE_CREDIT cannot continue ref1 now: not usable by this caller"
+  },
+  "lanes": [
+   {
+    "family": "openai",
+    "five": 10,
+    "kind": "subscription",
+    "name": "OPENAI_SUBSCRIPTION",
+    "pace": 0,
+    "shared": false,
+    "week": 5
+   },
+   {
+    "family": "claude",
+    "five": 30,
+    "kind": "subscription",
+    "name": "CLAUDE_SUBSCRIPTION",
+    "pace": 0,
+    "shared": true,
+    "week": 40
+   },
+   {
+    "cap": 150.0,
+    "family": "claude",
+    "kind": "credit",
+    "name": "CLAUDE_CREDIT",
+    "reset_in_days": 20.0,
+    "shared": false,
+    "spend": 0.0
+   }
+  ],
+  "name": "resume_credit_unattended",
+  "settings": {},
+  "state": {
+   "refs": {
+    "ref1": {
+     "cap": 2,
+     "effort": "high",
+     "fallback": true,
+     "fallback_reason": "out",
+     "first_lane": "OPENAI_SUBSCRIPTION",
+     "lane": "CLAUDE_CREDIT",
+     "mode": "write",
+     "model": "sonnet-5.5",
+     "rung": 1
+    }
+   }
+  },
+  "unattended": true
+ }
+]
