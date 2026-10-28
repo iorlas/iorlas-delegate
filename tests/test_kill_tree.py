@@ -18,6 +18,7 @@ from delegate.adapters.harness.base import LaunchSpec
 from delegate.adapters.harness.codex import CodexHarness
 from delegate.app.publish import LiveSink
 from delegate.app.supervisor import RunHooks, Supervisor
+from delegate.contracts.state import Lease
 
 # A fake of the Codex CLI: a node-shim analogue that starts a native child in a session of its own; the child ignores SIGTERM.
 CHILD = "import signal,time; signal.signal(signal.SIGTERM, signal.SIG_IGN); time.sleep(300)"
@@ -73,9 +74,9 @@ class RealTrees(unittest.TestCase):
         p = subprocess.Popen([sys.executable, "-c", SHIM, self.pidfile], start_new_session=True)
         self.addCleanup(lambda: (p.kill(), p.wait()))
         child = wait_for(self.pidfile)
-        v = {"worker_pid": p.pid, "worker_start": procs.start_token(p.pid)}
+        v = Lease(lane="L", pid=1, start=0.0, expires=0.0, worker_pid=p.pid, worker_start=procs.start_token(p.pid))
         cstart = procs.start_token(child)
-        self.assertTrue(v["worker_start"] and cstart)
+        self.assertTrue(v.worker_start and cstart)
         t0 = time.time()
         self.assertTrue(route.reap(v))
         self.assertTrue(gone(child, cstart), "the shim's native child survived reap")
