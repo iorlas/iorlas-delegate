@@ -33,12 +33,13 @@ Roles: `planner`, `worker`, `reviewer`, `hard`, `light`. Chains, models and thre
 ```
 skills/delegate/SKILL.md      dispatcher and the run loop (the only file read on a normal call)
 skills/delegate/modes/        init, codex, claude-credit, extend: read on demand
-skills/delegate/route.py      the router: run, next, status, report, capture-limits, doctor, set-key, config
-skills/delegate/onboard.py    readiness checks and setup steps
-skills/delegate/agent_runs.py publishes runs and lane limits as agent-runs v1 (a public contract)
+skills/delegate/route.py      the launcher: puts src/ on the path and calls delegate.cli.main (verbs: run, next, status, report, capture-limits, doctor, set-key, config, hold)
+src/delegate/                 contracts / domain / adapters / app / cli (layer rules in tests/test_layers.py)
+src/delegate/app/run.py       Run, the one entry of `run`; settle.py (Settler.apply), status.py, doctor.py, onboard.py
+src/delegate/adapters/agent_runs.py  publishes runs and lane limits as agent-runs v1 (a public contract)
 skills/delegate/routing.json  lanes, models, roles, thresholds
 commands/                     /iorlas-delegate:init, /iorlas-delegate:status (the lane cockpit)
-tests/                        python3 -m unittest discover -s tests   (CI: Ubuntu, macOS x Python 3.12)
+tests/                        python3 -m unittest discover -s tests   (CI: Ubuntu, macOS x Python 3.12; tests/test_rules.py holds the size caps)
 ```
 
 Git stays with the coordinator: workers never create branches or worktrees and never commit, merge or push; `run` compares HEAD and branch before and after and reports a change in `git_violation`.

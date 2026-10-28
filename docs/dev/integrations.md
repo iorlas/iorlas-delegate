@@ -11,13 +11,13 @@ command names and flags) is private and may change in any release.
 
 Spec, owned by the consumer side: https://github.com/iorlas/iorlas-task-loop/blob/main/docs/contracts/agent-runs-v1.md
 
-Delegate writes them from one file, `skills/delegate/agent_runs.py`, the only code that knows the format:
+Delegate writes them from one file, `src/delegate/adapters/agent_runs.py`, the only code that knows the format:
 
 | call site | what it publishes | why the dashboard needs it |
 |---|---|---|
-| `launch_worker` (route.py, one for every harness), before the worker starts: `agent_runs.run(id, kind="codex"\|"claude-p", lane, model, cwd, parent_session, title[, task], started, status="running")`; codex adds `thread` as soon as `thread.started` arrives, claude passes `session=ref` | a run record | ties the unattended worker to the session (and so the task) that launched it; `session`/`thread` find its live log |
-| `cmd_run`, after it: `agent_runs.run(id, ended, status, transcript)` | the same record, finished | shows done or failed and how long it ran |
-| `publish_lanes(lanes, st, t)` after `gather()` in `cmd_status` and `cmd_next` | `lanes/delegate.json` | the limits chips (5h and weekly use, a lane that is out and why); a reader ignores it once it is 6 hours old |
+| `launch_worker` (app/launch.py, one for every harness), before the worker starts: `agent_runs.run(id, kind="codex"\|"claude-p", lane, model, cwd, parent_session, title[, task], started, status="running")`; codex adds `thread` as soon as `thread.started` arrives, claude passes `session=ref` | a run record | ties the unattended worker to the session (and so the task) that launched it; `session`/`thread` find its live log |
+| `Run` (app/run.py), after it: `agent_runs.run(id, ended, status, transcript)` | the same record, finished | shows done or failed and how long it ran |
+| `publish_lanes(lanes, st, t)` (app/decide.py) after the fleet is built in `status` and in `decision` (`next`, `run`) | `lanes/delegate.json` | the limits chips (5h and weekly use, a lane that is out and why); a reader ignores it once it is 6 hours old |
 
 `claude -p` runs pass `--session-id <id>` (not `--no-session-persistence`) so that the worker's transcript exists at
 `~/.claude/projects/*/<id>.jsonl`. Without it the run record still shows, with no log behind it.
@@ -143,7 +143,7 @@ as a script, with no Claude session behind it. The contract is `skills/delegate/
   with the required fields, once at start and once at the end. Codex launched outside the codex plugin: set `kind`
   to `codex` and `thread` to its thread id.
 - Limits computed somewhere new: call `agent_runs.lanes(...)` with the new numbers, at least whenever `next` runs.
-- Deleting `agent_runs.py` is allowed, and nothing breaks: the dashboard then shows no delegate runs or limits.
+- Deleting `adapters/agent_runs.py` is allowed, and nothing breaks: the dashboard then shows no delegate runs or limits.
   Say so in the release notes.
 - A field's meaning changes, or a required field goes away: that is agent-runs v2. Change the spec in
   iorlas-task-loop first, make its reader accept both versions, then switch delegate.

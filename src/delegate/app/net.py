@@ -12,7 +12,7 @@ def network_view(cached, t):
 
 
 def net_probe(hosts=None):
-    """-> one probe (lanes/netprobe.py), stored in the net cache. Sockets only: no process, no vendor call, no quota."""
+    """-> one probe (adapters/netprobe.py), stored in the net cache. Sockets only: no process, no vendor call, no quota."""
     res = netprobe.probe(hosts)
     netprobe.record(str(env.net_cache_path()), res)
     return res

@@ -6,7 +6,7 @@ This file provides instructions and context for AI coding agents working on this
 
 Read `docs/dev/constitution.md` before changing anything: Denis's standing rules (no duplication, no backward compatibility, small, terse, script decides) and what we learned the hard way. Read `docs/dev/integrations.md` before changing how workers launch or limits are computed.
 
-Typed code lives in `src/delegate/` (contracts, adapters/harness, app), put on `sys.path` by `route.py`; the answer is `contracts/wire.py` `RunResult`, and `contract.json`'s `answer_schema` is generated from it: `python3 dev/gen_contract.py` (a test fails on drift).
+All code lives in `src/delegate/` (contracts / domain / adapters / app / cli; `route.py` is a launcher that puts it on `sys.path`; caps in `tests/test_rules.py`); the answer is `contracts/wire.py` `RunResult`, and `contract.json`'s `answer_schema` is generated from it: `python3 dev/gen_contract.py` (a test fails on drift).
 
 <!-- BEGIN BEADS INTEGRATION v:1 profile:minimal hash:1105d646 -->
 ## Beads Issue Tracker
@@ -79,7 +79,7 @@ README.md (Layout). The skill (`skills/delegate/SKILL.md`) is the only file read
 ## Before changing how workers launch, how limits are computed, or what state is kept
 
 Read `docs/dev/integrations.md`: other tools (the iorlas-task-loop dashboard) rely on the agent-runs v1 records
-`skills/delegate/agent_runs.py` writes, and on nothing else. It says what a rewrite must keep and what it may drop.
+`src/delegate/adapters/agent_runs.py` writes, and on nothing else. It says what a rewrite must keep and what it may drop.
 
 ## Conventions & Patterns
 
