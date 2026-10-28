@@ -3,6 +3,7 @@ Settler applies the outcome (`launch_worker`). Also the rules every worker's pro
 import contextlib
 import dataclasses
 import json
+import os
 import shlex
 import shutil
 import sys
@@ -39,9 +40,15 @@ def settler():
     return settle.Settler(env.states(), net.net_up, env.now, decide.busy_jitter)
 
 
+def engine_only() -> tuple[str, ...]:
+    """The recipes the brief says only the engine runs (DELEGATE_ENGINE_ONLY, comma-separated); a write step's guard blocks them."""
+    return tuple(x.strip() for x in os.environ.get("DELEGATE_ENGINE_ONLY", "").split(",") if x.strip())
+
+
 def guard_settings(read_only: bool | None):
     """--settings for claude -p: delegate's PreToolUse hook (route.py guard), read-only for steps that may not write."""
     argv = [sys.executable, str(env.SKILL_DIR / "route.py"), "guard"] + (["--read-only"] if read_only else [])
+    argv += [f"--engine-only={x}" for x in engine_only()] if not read_only else []
     cmd = shlex.join(argv)
     return {"hooks": {"PreToolUse": [{"matcher": "*", "hooks": [{"type": "command", "command": cmd}]}]}}
 
@@ -98,7 +105,7 @@ def denied_items(hx: Harness, read_only: bool | None):
     out = []
     for x in hx.evidence.denials:
         cmd = (x.input or {}).get("command")
-        if hx.kind == "claude" and policy.is_policy_denial(x.tool, x.input, bool(read_only)):
+        if hx.kind == "claude" and policy.is_policy_denial(x.tool, x.input, bool(read_only), engine_only()):
             continue
         kind = x.kind if x.kind != "policy" else "secret" if hx.kind == "opencode" and x.tool == "Bash" and secret_hit(cmd) else "policy"
         out.append(policy.denial_item(policy.denial(kind, x.tool, x.input)))

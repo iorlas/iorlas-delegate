@@ -78,7 +78,8 @@ def cmd_guard(a: env.Args, cfg: dict | None = None):
     more than read. The verdict is domain/policy's; this is the hook's stdin and exit code."""
     with contextlib.suppress(ValueError, AttributeError):
         j = json.load(sys.stdin)
-        v = policy.judge(j.get("tool_name"), j.get("tool_input") or {}, bool(getattr(a, "read_only", False)))
+        v = policy.judge(j.get("tool_name"), j.get("tool_input") or {}, bool(getattr(a, "read_only", False)),
+                         tuple(getattr(a, "engine_only", None) or ()))
         if v.blocked:
             print(v.reason, file=sys.stderr)
             return 2

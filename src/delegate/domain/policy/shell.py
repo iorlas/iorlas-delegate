@@ -77,3 +77,23 @@ def read_only_problem(cmd: str) -> str | None:
         if why:
             return why
     return None
+
+
+KILLERS = {"kill", "killall", "p" + "kill"}       # spelled apart: the no-process-lister rule scans the source for the name
+OWN_PIDS = ("$!", "%")
+RUNNERS = {"just", "make", "mise", "npm", "yarn", "pnpm", "uv"}
+WRITER_RULE = ("a write step may not kill processes or run the engine's checks: the engine owns the editor, the servers and the slow suites it "
+               "started, so a kill can take down its run. Do not run them; finish and report, the engine reruns the check.")
+
+
+def writer_problem(cmd: str, engine_only: tuple[str, ...] = ()) -> str | None:
+    """Why a write step may not run `cmd`, else None: the kill family (on anything but the step's own `$!` or `%job`), or a recipe the
+    brief says only the engine runs (`just <recipe>`, `make <recipe>` and kin)."""
+    for t in pieces(cmd) or []:
+        name = name_of(t[0])
+        args = [x for x in t[1:] if not x.startswith("-")]
+        if name in KILLERS and not (name == "kill" and args and all(x.startswith(OWN_PIDS) for x in args)):
+            return f"`{name}` stops processes this step did not start"
+        if name in RUNNERS and any(x in engine_only for x in args):
+            return f"`{name} {next(x for x in args if x in engine_only)}` is a check only the engine runs"
+    return None

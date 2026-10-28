@@ -4,7 +4,7 @@ from typing import Any
 
 from delegate.contracts import events as ev
 from delegate.domain.policy.matchers import heredoc_only_hit, secret_hit
-from delegate.domain.policy.shell import READ_ONLY_HELP, git_write, read_only_problem
+from delegate.domain.policy.shell import READ_ONLY_HELP, WRITER_RULE, git_write, read_only_problem, writer_problem
 
 EDIT_RULE = "Edit files with the patch/edit tool (apply_patch), never with shell heredocs or `python -c` file rewrites."
 APPLY_PATCH_HINT = "rewrite this edit with apply_patch (the secret name is only inside a heredoc body; heredoc and `python -c` rewrites are blocked)"
@@ -22,7 +22,7 @@ class Verdict:
     reason: str = ""
 
 
-def judge(tool_name: str | None, tool_input: dict[str, Any], read_only: bool) -> Verdict:
+def judge(tool_name: str | None, tool_input: dict[str, Any], read_only: bool, engine_only: tuple[str, ...] = ()) -> Verdict:
     """A tool call that names a secret path, changes git, or (on a read-only step) does more than read is blocked. Only the fields that name
     what is run or opened are checked, not file contents being written (a .gitignore listing .env is fine)."""
     hit = secret_hit(" ".join(str(tool_input.get(k) or "") for k in CHECKED_FIELDS))
@@ -36,6 +36,9 @@ def judge(tool_name: str | None, tool_input: dict[str, Any], read_only: bool) ->
     why = read_only and cmd and read_only_problem(cmd)
     if why:
         return Verdict(True, f"blocked by delegate: {why}; {READ_ONLY_HELP}")
+    why = not read_only and cmd and writer_problem(cmd, engine_only)
+    if why:
+        return Verdict(True, f"blocked by delegate: {why}; {WRITER_RULE}")
     return Verdict()
 
 
@@ -56,7 +59,7 @@ def denial_item(d: ev.Denied) -> dict[str, Any]:
     return {"kind": d.kind, "tool": d.tool, "path": denied_path(d), "input": d.input}
 
 
-def is_policy_denial(tool_name: str | None, tool_input: dict[str, Any] | None, read_only: bool = False) -> bool:
+def is_policy_denial(tool_name: str | None, tool_input: dict[str, Any] | None, read_only: bool = False, engine_only: tuple[str, ...] = ()) -> bool:
     """A git write the coordinator forbids, or a write on a read-only step, is delegate's policy, not a decision for the owner (a secret path stays one)."""
     cmd = str((tool_input or {}).get("command") or "").strip()
-    return tool_name == "Bash" and not secret_hit(cmd) and bool(git_write(cmd) or (read_only and read_only_problem(cmd)))
+    return tool_name == "Bash" and not secret_hit(cmd) and bool(git_write(cmd) or (read_only and read_only_problem(cmd)) or (not read_only and writer_problem(cmd, engine_only)))
