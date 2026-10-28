@@ -1,0 +1,18 @@
+{
+  "max_parallel": 3,
+  "claude_weekly_reset": "mon 09:00",
+  "deepseek_free_enabled": true,
+  "zai_coding_enabled": false,
+  "usage_stale_minutes": 20,
+  "min_dwell_minutes": 5,
+  "orchestrator_reserve": {"weekly": 25, "five_hour": 10},
+  "strain": {"five_hour": 85, "weekly_pace": 1.2},
+  "credit": {"monthly_cap": 50},
+  "codex_weekly_used_override": null,
+  "codex_resume_after_stall": true,
+  "profile": {
+    "lanes": {"CODEX_SUBSCRIPTION": "enabled", "CLAUDE_CREDIT": "declined", "DEEPSEEK_FREE": "enabled"},
+    "ack": ["volumes"],
+    "offered": ["ZAI_CODING"]
+  }
+}

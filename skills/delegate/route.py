@@ -71,7 +71,7 @@ from delegate.app.fleet import AuthCache, FleetBuilder, drift_warnings, mark_bus
 from delegate.contracts import codec, wire
 from delegate.contracts import events as harness_events
 from delegate.contracts import history as hist
-from delegate.contracts.routing import CallArgs, Error, LaneOut, Routing, Run, Stop
+from delegate.contracts.routing import CallArgs, Error, LaneOut, Routing, Run, Stop, split_retired
 from delegate.contracts.state import Lease, OutState, RefRecord, UsageCache
 from delegate.contracts.stores import CheckpointStore, ConfigStore, HistoryStore, LedgerStore, StateStore, locked, private
 from delegate.domain.cost.cycle import credit_cycle
@@ -125,20 +125,34 @@ def deep_merge(a, b):
     return out
 
 
+_RETIRED_WARNED = set()
+
+
 def load_routing():
-    """routing.json with the owner's overrides (config.json, minus its `profile`) merged into `settings`, validated into contracts.routing.Routing."""
+    """routing.json with the owner's overrides (config.json, minus its `profile`) merged into `settings`, validated into contracts.routing.Routing.
+    Retired settings keys are dropped with one stderr line each (stdout carries the answer); any other unknown key fails."""
     with open(HERE / "routing.json", encoding="utf-8") as f:
         cfg = json.load(f)
-    cfg["settings"] = deep_merge(cfg["settings"], config_store().overrides())
+    cfg["settings"], _ = split_retired(deep_merge(cfg["settings"], config_store().overrides()))
+    for k in retired_keys_present():
+        if k not in _RETIRED_WARNED:
+            _RETIRED_WARNED.add(k)
+            print(f"route.py: {config_store().path}: '{k}' is retired and ignored; it can be deleted from config.json", file=sys.stderr)
     typed_routing(cfg)
     return cfg
+
+
+def retired_keys_present():
+    """The retired settings keys config.json (the owner's file) still carries."""
+    return split_retired(config_store().overrides())[1]
 
 
 def typed_routing(cfg):
     try:
         return codec.from_json(Routing, cfg)
     except codec.CodecError as e:
-        sys.exit(f"route.py: routing.json / config.json is not a valid routing table: {e}")
+        sys.exit(f"route.py: routing.json / config.json is not a valid routing table: {e}. "
+                 f"Fix: delete the key from {config_store().path} (or rename it to a known settings key; see `route.py config show`)")
 
 
 # ----------------------------------------------------------------------------- the files under the config dir (each behind its store)

@@ -10,6 +10,16 @@ from delegate.contracts.codec import record
 
 V = 1
 
+# Settings keys an older config.json or routing.json may still carry. Loading drops them with one warning each; any other unknown key fails.
+RETIRED_SETTINGS = ("codex_weekly_used_override", "codex_resume_after_stall", "claude_resume_after_stall", "opencode_resume_after_stall",
+                    "codex_plan_review_only", "host_lanes", "contained_network", "cache_roots")
+
+
+def split_retired(settings: dict) -> tuple[dict, list[str]]:
+    """(settings without the retired keys, the retired keys that were there, in file order)."""
+    gone = [k for k in settings if k in RETIRED_SETTINGS]
+    return {k: v for k, v in settings.items() if k not in RETIRED_SETTINGS}, gone
+
 
 @record
 class Gate:

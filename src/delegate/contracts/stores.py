@@ -6,6 +6,7 @@ unreadable or of another shape reads as empty: a store never raises on read and 
 import contextlib
 import json
 import os
+import sys
 import time
 from collections.abc import Callable, Iterator
 from pathlib import Path
@@ -63,6 +64,9 @@ def read_json(path: Path) -> object | None:
         return None
 
 
+_STATE_WARNED: set[Path] = set()
+
+
 class StateStore:
     """`state.json` as a `StateDoc`. All writes go through `transaction()` / `update()`: one lock, read-modify-write."""
 
@@ -70,9 +74,13 @@ class StateStore:
         self.path = path
 
     def load(self) -> StateDoc:
+        data = read_json(self.path)
         try:
-            return codec.from_json(StateDoc, read_json(self.path))
-        except codec.CodecError:
+            return codec.from_json(StateDoc, data)
+        except codec.CodecError as e:
+            if data is not None and self.path not in _STATE_WARNED:      # a file from before the typed state: dropped, never migrated
+                _STATE_WARNED.add(self.path)
+                print(f"delegate: {self.path} is not a v{StateDoc.V} state file ({e}); starting from empty state", file=sys.stderr)
             return StateDoc()
 
     @contextlib.contextmanager

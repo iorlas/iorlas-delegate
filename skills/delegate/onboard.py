@@ -201,6 +201,13 @@ def doctor(R, cfg, deep=False, lane=None):
         notes.append({"id": "volumes", "say": "Container: whether ~/.codex and ~/.claude survive a rebuild is not checked. If your home folder is already a volume, run `route.py config ack volumes` and this goes away."})
     if not (Path(R.HERE).parents[1] / "src" / "delegate" / "contracts" / "wire.py").is_file():     # the typed records ship next to skills/
         notes.append({"id": "src", "say": "This install has no src/delegate: route.py cannot import its records. Reinstall the plugin."})
+    for k in R.retired_keys_present():
+        notes.append({"id": "retired_key", "key": k, "file": str(R.config_store().path),
+                      "say": f"{R.config_store().path}: '{k}' is retired and ignored; delete it from config.json."})
+    with open(Path(R.HERE) / "routing.json", encoding="utf-8") as f:
+        for k in R.split_retired(json.load(f).get("settings") or {})[1]:
+            notes.append({"id": "retired_key", "key": k, "file": str(Path(R.HERE) / "routing.json"),
+                          "say": f"{Path(R.HERE) / 'routing.json'}: '{k}' is retired and ignored."})
     for c in checks:
         if c["id"] in ack and not c["ok"]:
             c["skip"] = True
