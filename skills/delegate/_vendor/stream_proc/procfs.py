@@ -3,9 +3,9 @@
 A pid alone names no process: once its holder is reaped the number is handed to a stranger.
 The pair (pid, start token) does: the token is the process's start time in clock ticks since
 boot (``/proc/<pid>/stat`` field 22), which a reused pid cannot share. No ``ps``, no external
-tool. Where the OS keeps no ``/proc`` (macOS) there is no table and no token: ``proc_start``
-says ``None``, ``alive`` falls back to signal 0 on the pid, and the group signal alone carries
-a stop (``stream_proc.tree``).
+tool. Where the OS keeps no ``/proc`` this module has no table: ``proc_start`` says ``None`` and
+``alive`` falls back to signal 0 on the pid. macOS has its own module (``stream_proc.procmac``); callers
+use the selector ``stream_proc.proctable``, which gives the same API on both.
 """
 
 from __future__ import annotations
@@ -16,6 +16,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 PROC = Path("/proc")
+CLK_TCK = os.sysconf("SC_CLK_TCK") if hasattr(os, "sysconf") and "SC_CLK_TCK" in os.sysconf_names else 100
 
 
 @dataclass(frozen=True, slots=True)
@@ -28,6 +29,8 @@ class Proc:
     sid: int
     start: str
     state: str
+    cpu_s: float = 0.0
+    cmd: str = ""
 
 
 def has_proc() -> bool:
@@ -40,8 +43,10 @@ def read(pid: int) -> Proc | None:
     The command name may hold spaces and parentheses, so the fields are split after the last ``)``.
     """
     with contextlib.suppress(OSError, ValueError, IndexError):
-        rest = (PROC / str(int(pid)) / "stat").read_text(encoding="utf-8", errors="replace").rpartition(")")[2].split()
-        return Proc(int(pid), int(rest[1]), int(rest[2]), int(rest[3]), rest[19], rest[0])
+        head, _, tail = (PROC / str(int(pid)) / "stat").read_text(encoding="utf-8", errors="replace").rpartition(")")
+        rest = tail.split()
+        cpu = (int(rest[11]) + int(rest[12])) / CLK_TCK
+        return Proc(int(pid), int(rest[1]), int(rest[2]), int(rest[3]), rest[19], rest[0], cpu, head.partition("(")[2])
     return None
 
 
@@ -71,6 +76,11 @@ def alive(pid: int | None, start: str | None = None) -> bool:
     if has_proc():
         token = proc_start(pid)
         return token is not None and (not start or token == start)
+    return signal0(pid)
+
+
+def signal0(pid: int) -> bool:
+    """True when signal 0 reaches ``pid`` (a pid we may not signal still exists); the tokenless fallback."""
     try:
         os.kill(pid, 0)
     except ProcessLookupError:

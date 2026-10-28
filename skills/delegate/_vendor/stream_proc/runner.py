@@ -9,7 +9,7 @@ import time
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Literal
 
-from stream_proc import procfs
+from stream_proc import proctable
 from stream_proc.hold import popen_held
 from stream_proc.tree import stop_tree
 
@@ -115,7 +115,7 @@ def run(
             reader = threading.Thread(target=_pump, args=(stream, cb, lambda: last.__setitem__(0, time.monotonic())), daemon=True)
             reader.start()
             readers.append(reader)
-        start = procfs.proc_start(p.pid)
+        start = proctable.proc_start(p.pid)
         kind = _wait(p, t0=t0, last=last, timeout=timeout, idle=idle, stop=stop)
         if kind is not None:
             survivors = stop_tree(p, grace=grace, prove=prove)

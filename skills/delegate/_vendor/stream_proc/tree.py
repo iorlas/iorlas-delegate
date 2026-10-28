@@ -8,7 +8,7 @@ token still match, so a reused pid is never hit.
 The order: SIGTERM to the group and to each noted descendant, a grace period, SIGKILL to what
 is left, then a proof loop that re-reads the table and kills again until nothing of the tree lives or
 the proof time is out. Survivors are returned, never hidden. Nothing here runs ``ps`` or any tool.
-Where the OS keeps no ``/proc`` only the group is signalled and the proof is "the group is empty".
+Where there is no process table (``/proc`` or libproc unreadable) only the group is signalled and the proof is "the group is empty".
 """
 
 from __future__ import annotations
@@ -19,7 +19,7 @@ import signal
 import subprocess
 import time
 
-from stream_proc import procfs
+from stream_proc import proctable
 
 
 def own_ids() -> set[int]:
@@ -42,16 +42,6 @@ def _hit(pid: int, sig: int, *, group: bool = True) -> None:
         os.kill(pid, sig)
 
 
-def _group_empty(pgid: int) -> bool:
-    try:
-        os.killpg(pgid, 0)
-    except ProcessLookupError:
-        return True
-    except OSError:
-        return False
-    return False
-
-
 def _leads(p: subprocess.Popen[bytes]) -> bool:
     """True when the child leads a group of its own. An unreaped child's pid is its group id, so it cannot have been reused."""
     try:
@@ -63,16 +53,16 @@ def _leads(p: subprocess.Popen[bytes]) -> bool:
 def _survivors(p: subprocess.Popen[bytes], *, led: bool, noted: dict[int, str]) -> list[int]:
     """Pids of the tree still alive: the noted ones with an unchanged start token, the group's members, and all below those."""
     ours = own_ids()
-    if not procfs.has_proc():
-        return [p.pid] if led and not _group_empty(p.pid) else []
-    rows = procfs.table()
-    live = {pid for pid, start in noted.items() if procfs.alive(pid, start)}
-    if p.returncode is None and procfs.alive(p.pid):
+    if not proctable.has_table():
+        return [p.pid] if led and proctable.group_alive(p.pid) else []
+    rows = proctable.table()
+    live = {pid for pid, start in noted.items() if proctable.alive(pid, start)}
+    if p.returncode is None and proctable.alive(p.pid):
         live.add(p.pid)
     if led:
         live |= {r.pid for r in rows.values() if r.pgid == p.pid and not r.state.startswith(("Z", "X"))}
     for pid in list(live):
-        live |= {r.pid for r in procfs.descendants(pid, rows) if not r.state.startswith(("Z", "X"))}
+        live |= {r.pid for r in proctable.descendants(pid, rows) if not r.state.startswith(("Z", "X"))}
     return sorted(live - ours)
 
 
@@ -83,8 +73,8 @@ def stop_tree(p: subprocess.Popen[bytes], *, grace: float = 5.0, prove: float = 
     its own group is signalled alone, never through a group that is ours.
     """
     led = _leads(p)
-    rows = procfs.table()
-    noted = {r.pid: r.start for r in procfs.descendants(p.pid, rows)}
+    rows = proctable.table()
+    noted = {r.pid: r.start for r in proctable.descendants(p.pid, rows)}
     for pid in noted:
         _hit(pid, signal.SIGTERM)
     if led and p.pid not in own_ids():
