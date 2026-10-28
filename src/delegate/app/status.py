@@ -9,6 +9,8 @@ from atomic_io import atomic_write_text
 from delegate.adapters import netprobe
 from delegate.app import cockpit, decide, env, net, roles, usage
 from delegate.app.fleet import settle_holds
+from delegate.contracts import codec
+from delegate.contracts import status as wire
 from delegate.contracts.state import StateDoc
 from delegate.domain.health import ledger as health_ledger
 from delegate.domain.holds.book import HoldBook
@@ -17,7 +19,12 @@ from delegate.domain.lanes.leases import LeaseBook, suspect
 from delegate.domain.routing.router import Router
 
 
-def status_payload(cfg: dict, lanes: dict[str, Lane], ck: dict, st: StateDoc, t: float):
+def status_payload(cfg: dict, lanes: dict[str, Lane], ck: dict, st: StateDoc, t: float) -> dict:
+    """The answer, passed through contracts/status.py: a key or type the schema in contract.json does not name fails here, not at a caller."""
+    return codec.to_json(codec.from_json(wire.Status, _raw_payload(cfg, lanes, ck, st, t)))
+
+
+def _raw_payload(cfg: dict, lanes: dict[str, Lane], ck: dict, st: StateDoc, t: float):
     return {"v": 1, "ts": t,
             "lanes": {n: {"family": l.family, "kind": l.kind, "out": l.out, "out_until": l.out_until, "reason": l.out_reason if l.out else None, "five": l.five, "week": l.week,
                           "pace": l.pace, "burn": l.burn, "notes": l.notes} for n, l in lanes.items()},

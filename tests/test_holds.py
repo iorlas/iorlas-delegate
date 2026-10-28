@@ -161,7 +161,8 @@ class StaleHolds(unittest.TestCase):
         self.assertTrue(HoldBook(st2.holds).rows(env.now())[0]["stale"])
 
     def test_status_carries_asks(self):
-        payload = status.status_payload(CFG, self.lanes(50), [], env.load_state(), env.now())
+        ck = {"v": 1, "at": env.now(), "legend": {}, "next_worker": {"action": "stop", "lane": None, "model": None, "effort": None, "say": None}, "lanes": []}
+        payload = status.status_payload(CFG, self.lanes(50), ck, env.load_state(), env.now())
         self.assertEqual(payload["asks"], [])
         self.assertIn("health", payload)
 

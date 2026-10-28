@@ -1,0 +1,425 @@
+{
+ "v": 1,
+ "ts": 1793189325.6771207,
+ "lanes": {
+  "CLAUDE_SUBSCRIPTION": {
+   "family": "claude",
+   "kind": "subscription",
+   "out": false,
+   "out_until": null,
+   "reason": null,
+   "five": null,
+   "week": null,
+   "pace": null,
+   "burn": false,
+   "notes": []
+  },
+  "OPENAI_SUBSCRIPTION": {
+   "family": "openai",
+   "kind": "subscription",
+   "out": false,
+   "out_until": null,
+   "reason": null,
+   "five": null,
+   "week": 0.0,
+   "pace": 3.1001450265683794,
+   "burn": false,
+   "notes": []
+  }
+ },
+ "cockpit": {
+  "v": 1,
+  "at": 1793189325.6771207,
+  "legend": {
+   "\u2705": "ready",
+   "\u23f3": "usage limit",
+   "\ud83d\udd11": "logged out",
+   "\ud83d\udcb8": "spend/credit limit",
+   "\ud83d\udc22": "slow/hung",
+   "\u26d4": "disabled",
+   "\u2753": "no read yet"
+  },
+  "next_worker": {
+   "action": "run",
+   "lane": "OPENAI_SUBSCRIPTION",
+   "model": "gpt-6.1-sol",
+   "effort": "medium",
+   "pass": "strict",
+   "fallback": false,
+   "why": null
+  },
+  "lanes": [
+   {
+    "id": "CLAUDE_SUBSCRIPTION",
+    "label": "Claude subscription",
+    "family": "claude",
+    "kind": "subscription",
+    "model": "sonnet-5.5 medium",
+    "state": "unknown",
+    "emoji": "\u2753",
+    "reason": "no read yet: no usage reading",
+    "detail": null,
+    "unlock": {
+     "locked": false,
+     "known": false,
+     "at": null,
+     "in_s": null,
+     "text": null,
+     "why": "not locked"
+    },
+    "windows": [],
+    "low_tokens": [],
+    "warnings": [],
+    "meter": true,
+    "login": {
+     "ok": true,
+     "why": "",
+     "checked_at": 1793189270.1443503
+    },
+    "running": 0
+   },
+   {
+    "id": "OPENAI_SUBSCRIPTION",
+    "label": "ChatGPT / Codex",
+    "family": "openai",
+    "kind": "subscription",
+    "model": "gpt-6.1-sol medium",
+    "state": "ready",
+    "emoji": "\u2705",
+    "reason": "ready",
+    "detail": null,
+    "unlock": {
+     "locked": false,
+     "known": false,
+     "at": null,
+     "in_s": null,
+     "text": null,
+     "why": "not locked"
+    },
+    "windows": [
+     {
+      "name": "weekly",
+      "used_pct": 0.0,
+      "resets_at": 1793775376,
+      "resets_in_s": 586050,
+      "source": "live read (codex app-server)",
+      "age_s": 55
+     }
+    ],
+    "low_tokens": [],
+    "warnings": [],
+    "meter": true,
+    "login": {
+     "ok": true,
+     "why": "",
+     "checked_at": 1793189270.1443503
+    },
+    "running": 0
+   },
+   {
+    "id": "GROK_SUBSCRIPTION",
+    "label": "SuperGrok / OpenCode",
+    "family": "xai",
+    "kind": "subscription",
+    "model": "grok-4.7 medium",
+    "state": "off",
+    "emoji": "\u26d4",
+    "reason": "unavailable (no sandbox): opencode lanes need macOS sandbox-exec",
+    "detail": null,
+    "unlock": {
+     "locked": false,
+     "known": false,
+     "at": null,
+     "in_s": null,
+     "text": null,
+     "why": "not in use"
+    },
+    "windows": [],
+    "low_tokens": [],
+    "warnings": [],
+    "meter": false,
+    "login": {
+     "ok": true,
+     "why": "",
+     "checked_at": 1793189270.1443503
+    },
+    "running": 0
+   },
+   {
+    "id": "DEEPSEEK_FREE",
+    "label": "DeepSeek / OpenCode Free",
+    "family": "deepseek",
+    "kind": "subscription",
+    "model": "deepseek-v4.1-flash-free high",
+    "state": "off",
+    "emoji": "\u26d4",
+    "reason": "disabled: `route.py config set deepseek_free_enabled true` turns it on",
+    "detail": null,
+    "unlock": {
+     "locked": false,
+     "known": false,
+     "at": null,
+     "in_s": null,
+     "text": null,
+     "why": "not in use"
+    },
+    "windows": [],
+    "low_tokens": [],
+    "warnings": [],
+    "meter": false,
+    "login": {
+     "ok": true,
+     "why": "",
+     "checked_at": 1793189270.1443503
+    },
+    "running": 0
+   },
+   {
+    "id": "ZAI_CODING_SUBSCRIPTION",
+    "label": "Z.ai GLM Coding Plan",
+    "family": "zai",
+    "kind": "subscription",
+    "model": "glm-5.3 high",
+    "state": "off",
+    "emoji": "\u26d4",
+    "reason": "disabled: `route.py config set zai_coding_enabled true` turns it on",
+    "detail": null,
+    "unlock": {
+     "locked": false,
+     "known": false,
+     "at": null,
+     "in_s": null,
+     "text": null,
+     "why": "not in use"
+    },
+    "windows": [],
+    "low_tokens": [],
+    "warnings": [],
+    "meter": false,
+    "login": {
+     "ok": false,
+     "why": "",
+     "checked_at": 1793189270.1443503
+    },
+    "running": 0
+   }
+  ]
+ },
+ "running": [],
+ "needs_input": [
+  {
+   "what": "claude_usage",
+   "why": "Claude subscription use is unknown",
+   "how": "in the Claude desktop app call the get_usage tool and pass its windows as --claude-usage JSON ({five_hour:{used,resets_at},weekly:{used,resets_at}})"
+  }
+ ],
+ "holds": [],
+ "asks": [],
+ "health": [
+  {
+   "lane": "CLAUDE_SUBSCRIPTION",
+   "model": "opus-5.5",
+   "state": "up",
+   "until": null,
+   "source": null,
+   "kind": null,
+   "evidence": "",
+   "canary": false,
+   "rung": 0,
+   "leases": {
+    "live": 0,
+    "suspect": 0
+   },
+   "last_failures": [],
+   "needs_login": false,
+   "usage": {
+    "known": false,
+    "text": null
+   }
+  },
+  {
+   "lane": "CLAUDE_SUBSCRIPTION",
+   "model": "sonnet-5.5",
+   "state": "up",
+   "until": null,
+   "source": null,
+   "kind": null,
+   "evidence": "",
+   "canary": false,
+   "rung": 0,
+   "leases": {
+    "live": 0,
+    "suspect": 0
+   },
+   "last_failures": [],
+   "needs_login": false,
+   "usage": {
+    "known": false,
+    "text": null
+   }
+  },
+  {
+   "lane": "CLAUDE_SUBSCRIPTION",
+   "model": "haiku-5.5",
+   "state": "up",
+   "until": null,
+   "source": null,
+   "kind": null,
+   "evidence": "",
+   "canary": false,
+   "rung": 0,
+   "leases": {
+    "live": 0,
+    "suspect": 0
+   },
+   "last_failures": [],
+   "needs_login": false,
+   "usage": {
+    "known": false,
+    "text": null
+   }
+  },
+  {
+   "lane": "CLAUDE_SUBSCRIPTION",
+   "model": "fable-5.1",
+   "state": "up",
+   "until": null,
+   "source": null,
+   "kind": null,
+   "evidence": "",
+   "canary": false,
+   "rung": 0,
+   "leases": {
+    "live": 0,
+    "suspect": 0
+   },
+   "last_failures": [],
+   "needs_login": false,
+   "usage": {
+    "known": false,
+    "text": null
+   }
+  },
+  {
+   "lane": "OPENAI_SUBSCRIPTION",
+   "model": "gpt-6.1-sol",
+   "state": "up",
+   "until": null,
+   "source": null,
+   "kind": null,
+   "evidence": "",
+   "canary": false,
+   "rung": 0,
+   "leases": {
+    "live": 0,
+    "suspect": 0
+   },
+   "last_failures": [],
+   "needs_login": false,
+   "usage": {
+    "known": true,
+    "text": null
+   }
+  },
+  {
+   "lane": "OPENAI_SUBSCRIPTION",
+   "model": "gpt-6-luna",
+   "state": "up",
+   "until": null,
+   "source": null,
+   "kind": null,
+   "evidence": "",
+   "canary": false,
+   "rung": 0,
+   "leases": {
+    "live": 0,
+    "suspect": 0
+   },
+   "last_failures": [],
+   "needs_login": false,
+   "usage": {
+    "known": true,
+    "text": null
+   }
+  }
+ ],
+ "roles": {
+  "planner": {
+   "usable": true,
+   "lane": "OPENAI_SUBSCRIPTION",
+   "model": "gpt-6.1-sol",
+   "why": null,
+   "until": null,
+   "hosts": [
+    "chatgpt.com",
+    "api.anthropic.com"
+   ],
+   "net": {
+    "up": null,
+    "since": null,
+    "age_s": null
+   }
+  },
+  "worker": {
+   "usable": true,
+   "lane": "OPENAI_SUBSCRIPTION",
+   "model": "gpt-6.1-sol",
+   "why": null,
+   "until": null,
+   "hosts": [
+    "opencode.ai",
+    "api.z.ai",
+    "chatgpt.com",
+    "api.x.ai",
+    "api.anthropic.com"
+   ],
+   "net": {
+    "up": null,
+    "since": null,
+    "age_s": null
+   }
+  },
+  "reviewer": {
+   "usable": true,
+   "lane": "OPENAI_SUBSCRIPTION",
+   "model": "gpt-6.1-sol",
+   "why": null,
+   "until": null,
+   "hosts": [
+    "api.anthropic.com",
+    "opencode.ai",
+    "api.z.ai",
+    "chatgpt.com"
+   ],
+   "net": {
+    "up": null,
+    "since": null,
+    "age_s": null
+   }
+  },
+  "light": {
+   "usable": true,
+   "lane": "OPENAI_SUBSCRIPTION",
+   "model": "gpt-6-luna",
+   "why": null,
+   "until": null,
+   "hosts": [
+    "opencode.ai",
+    "api.z.ai",
+    "chatgpt.com",
+    "api.anthropic.com"
+   ],
+   "net": {
+    "up": null,
+    "since": null,
+    "age_s": null
+   }
+  }
+ },
+ "network": {
+  "up": null,
+  "since": null,
+  "age_s": null,
+  "why": null
+ }
+}

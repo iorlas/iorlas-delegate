@@ -114,7 +114,7 @@ def view(cached: dict | None, hosts: Iterable[str], t: float, fresh_s: float = F
     """-> {up: True|False|None, since, age_s} for a set of vendor `hosts` from a cached probe. None = no probe, or one older than fresh_s.
     A host the probe did not test says nothing; when none of them was tested the answer is the probe's overall `up`."""
     if not cached or t - cached["at"] > fresh_s:
-        return {"up": None, "since": cached and cached.get("since"), "age_s": int(t - cached["at"]) if cached else None}
+        return {"up": None, "since": cached.get("since") if cached else None, "age_s": int(t - cached["at"]) if cached else None}
     seen = [cached["hosts"][h] for h in hosts if h in (cached.get("hosts") or {})]
     up = any(x == "ok" for x in seen) if seen else bool(cached["up"])
     return {"up": up, "since": cached.get("since"), "age_s": int(t - cached["at"])}

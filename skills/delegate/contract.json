@@ -878,5 +878,872 @@
     "description": "how the worker's life ended; absent when no worker was launched"
    }
   }
+ },
+ "status_schema": {
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+   "v",
+   "ts",
+   "lanes",
+   "cockpit",
+   "running",
+   "needs_input",
+   "holds",
+   "asks",
+   "health",
+   "roles",
+   "network"
+  ],
+  "properties": {
+   "v": {
+    "type": "integer",
+    "enum": [
+     1
+    ]
+   },
+   "ts": {
+    "type": "number"
+   },
+   "lanes": {
+    "type": "object",
+    "additionalProperties": {
+     "type": "object",
+     "additionalProperties": false,
+     "required": [
+      "family",
+      "kind",
+      "out",
+      "out_until",
+      "reason",
+      "five",
+      "week",
+      "pace",
+      "burn",
+      "notes"
+     ],
+     "properties": {
+      "family": {
+       "type": "string"
+      },
+      "kind": {
+       "type": "string"
+      },
+      "out": {
+       "type": "boolean"
+      },
+      "out_until": {
+       "type": [
+        "number",
+        "null"
+       ]
+      },
+      "reason": {
+       "type": [
+        "string",
+        "null"
+       ],
+       "description": "why the lane is out (limit | logged_out | busy | error | credit | hung), else null"
+      },
+      "five": {
+       "type": [
+        "number",
+        "null"
+       ],
+       "description": "percent of the 5-hour window used, null = unknown"
+      },
+      "week": {
+       "type": [
+        "number",
+        "null"
+       ],
+       "description": "percent of the weekly window used, null = unknown"
+      },
+      "pace": {
+       "type": [
+        "number",
+        "null"
+       ]
+      },
+      "burn": {
+       "type": "boolean"
+      },
+      "notes": {
+       "type": "array",
+       "items": {
+        "type": "string"
+       }
+      }
+     }
+    }
+   },
+   "cockpit": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": [
+     "v",
+     "at",
+     "legend",
+     "next_worker",
+     "lanes"
+    ],
+    "properties": {
+     "v": {
+      "enum": [
+       1
+      ]
+     },
+     "at": {
+      "type": "number"
+     },
+     "legend": {
+      "type": "object",
+      "additionalProperties": {
+       "type": "string"
+      }
+     },
+     "next_worker": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+       "action",
+       "lane",
+       "model",
+       "effort"
+      ],
+      "properties": {
+       "action": {
+        "type": "string"
+       },
+       "lane": {
+        "type": [
+         "string",
+         "null"
+        ]
+       },
+       "model": {
+        "type": [
+         "string",
+         "null"
+        ]
+       },
+       "effort": {
+        "type": [
+         "string",
+         "null"
+        ]
+       },
+       "pass": {
+        "type": "string"
+       },
+       "fallback": {
+        "type": "boolean"
+       },
+       "why": {
+        "type": [
+         "string",
+         "null"
+        ]
+       },
+       "say": {
+        "type": [
+         "string",
+         "null"
+        ]
+       }
+      }
+     },
+     "lanes": {
+      "type": "array",
+      "items": {
+       "type": "object",
+       "additionalProperties": false,
+       "required": [
+        "id",
+        "label",
+        "family",
+        "kind",
+        "model",
+        "state",
+        "emoji",
+        "reason",
+        "detail",
+        "unlock",
+        "windows",
+        "low_tokens",
+        "warnings",
+        "meter",
+        "login",
+        "running"
+       ],
+       "properties": {
+        "id": {
+         "type": "string"
+        },
+        "label": {
+         "type": "string"
+        },
+        "family": {
+         "type": "string"
+        },
+        "kind": {
+         "type": "string"
+        },
+        "model": {
+         "type": [
+          "string",
+          "null"
+         ]
+        },
+        "state": {
+         "type": "string",
+         "enum": [
+          "ready",
+          "resting",
+          "logged_out",
+          "spend",
+          "slow",
+          "off",
+          "unknown"
+         ]
+        },
+        "emoji": {
+         "type": "string"
+        },
+        "reason": {
+         "type": "string"
+        },
+        "detail": {
+         "type": [
+          "string",
+          "null"
+         ]
+        },
+        "unlock": {
+         "type": "object",
+         "additionalProperties": false,
+         "required": [
+          "locked",
+          "known",
+          "at",
+          "in_s",
+          "text",
+          "why"
+         ],
+         "properties": {
+          "locked": {
+           "type": "boolean"
+          },
+          "known": {
+           "type": "boolean"
+          },
+          "at": {
+           "type": [
+            "number",
+            "null"
+           ]
+          },
+          "in_s": {
+           "type": [
+            "integer",
+            "null"
+           ]
+          },
+          "text": {
+           "type": [
+            "string",
+            "null"
+           ]
+          },
+          "why": {
+           "type": [
+            "string",
+            "null"
+           ]
+          }
+         }
+        },
+        "windows": {
+         "type": "array",
+         "items": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+           "name",
+           "used_pct",
+           "resets_at",
+           "resets_in_s",
+           "source",
+           "age_s"
+          ],
+          "properties": {
+           "name": {
+            "type": "string"
+           },
+           "used_pct": {
+            "type": [
+             "number",
+             "null"
+            ]
+           },
+           "resets_at": {
+            "type": [
+             "number",
+             "null"
+            ]
+           },
+           "resets_in_s": {
+            "type": [
+             "integer",
+             "null"
+            ]
+           },
+           "source": {
+            "type": [
+             "string",
+             "null"
+            ]
+           },
+           "age_s": {
+            "type": [
+             "integer",
+             "null"
+            ]
+           }
+          }
+         }
+        },
+        "low_tokens": {
+         "type": "array",
+         "items": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+           "window",
+           "used_pct",
+           "limit",
+           "over",
+           "limit_name"
+          ],
+          "properties": {
+           "window": {
+            "type": "string"
+           },
+           "used_pct": {
+            "type": "number"
+           },
+           "limit": {
+            "type": "number"
+           },
+           "over": {
+            "type": "string",
+            "enum": [
+             "ceiling",
+             "gate"
+            ]
+           },
+           "limit_name": {
+            "type": "string"
+           }
+          }
+         }
+        },
+        "warnings": {
+         "type": "array",
+         "items": {
+          "type": "string"
+         }
+        },
+        "meter": {
+         "type": "boolean"
+        },
+        "login": {
+         "type": "object",
+         "additionalProperties": false,
+         "required": [
+          "ok",
+          "why",
+          "checked_at"
+         ],
+         "properties": {
+          "ok": {
+           "type": [
+            "boolean",
+            "null"
+           ]
+          },
+          "why": {
+           "type": "string"
+          },
+          "checked_at": {
+           "type": [
+            "number",
+            "null"
+           ]
+          }
+         }
+        },
+        "running": {
+         "type": "integer"
+        }
+       }
+      }
+     }
+    }
+   },
+   "running": {
+    "type": "array",
+    "items": {
+     "type": "object",
+     "additionalProperties": false,
+     "required": [
+      "run_id",
+      "lane",
+      "role",
+      "task",
+      "started",
+      "age_s",
+      "pid",
+      "worker_pid",
+      "suspect"
+     ],
+     "properties": {
+      "run_id": {
+       "type": "string"
+      },
+      "lane": {
+       "type": "string"
+      },
+      "role": {
+       "type": [
+        "string",
+        "null"
+       ]
+      },
+      "task": {
+       "type": "string"
+      },
+      "started": {
+       "type": "number"
+      },
+      "age_s": {
+       "type": "integer"
+      },
+      "pid": {
+       "type": "integer"
+      },
+      "worker_pid": {
+       "type": [
+        "integer",
+        "null"
+       ]
+      },
+      "suspect": {
+       "type": "boolean"
+      }
+     }
+    }
+   },
+   "needs_input": {
+    "type": "array",
+    "items": {
+     "type": "object",
+     "additionalProperties": false,
+     "required": [
+      "what",
+      "why",
+      "how"
+     ],
+     "properties": {
+      "what": {
+       "type": "string"
+      },
+      "why": {
+       "type": "string"
+      },
+      "how": {
+       "type": "string"
+      }
+     }
+    }
+   },
+   "holds": {
+    "type": "array",
+    "items": {
+     "type": "object",
+     "additionalProperties": false,
+     "required": [
+      "id",
+      "lane",
+      "roles",
+      "set_by",
+      "set_at",
+      "until",
+      "reason",
+      "stale_at",
+      "ends_in_s",
+      "stale"
+     ],
+     "properties": {
+      "id": {
+       "type": "string"
+      },
+      "lane": {
+       "type": "string"
+      },
+      "roles": {
+       "type": "array",
+       "items": {
+        "type": "string"
+       }
+      },
+      "set_by": {
+       "type": "string"
+      },
+      "set_at": {
+       "type": "number"
+      },
+      "until": {
+       "type": "number"
+      },
+      "reason": {
+       "type": "string"
+      },
+      "stale_at": {
+       "type": [
+        "number",
+        "null"
+       ]
+      },
+      "ends_in_s": {
+       "type": "integer"
+      },
+      "stale": {
+       "type": "boolean"
+      }
+     }
+    }
+   },
+   "asks": {
+    "type": "array",
+    "items": {
+     "type": "object",
+     "additionalProperties": false,
+     "required": [
+      "kind",
+      "id",
+      "lane",
+      "raised_at",
+      "used_pct",
+      "say",
+      "answer"
+     ],
+     "properties": {
+      "kind": {
+       "type": "string"
+      },
+      "id": {
+       "type": "string"
+      },
+      "lane": {
+       "type": "string"
+      },
+      "raised_at": {
+       "type": [
+        "number",
+        "null"
+       ]
+      },
+      "used_pct": {
+       "type": "number"
+      },
+      "say": {
+       "type": "string"
+      },
+      "answer": {
+       "type": "string"
+      }
+     }
+    }
+   },
+   "health": {
+    "type": "array",
+    "items": {
+     "type": "object",
+     "additionalProperties": false,
+     "required": [
+      "lane",
+      "model",
+      "state",
+      "until",
+      "source",
+      "kind",
+      "evidence",
+      "canary",
+      "rung",
+      "leases",
+      "last_failures",
+      "needs_login",
+      "usage"
+     ],
+     "properties": {
+      "lane": {
+       "type": "string"
+      },
+      "model": {
+       "type": "string"
+      },
+      "state": {
+       "type": "string"
+      },
+      "until": {
+       "type": [
+        "number",
+        "null"
+       ]
+      },
+      "source": {
+       "type": [
+        "string",
+        "null"
+       ]
+      },
+      "kind": {
+       "type": [
+        "string",
+        "null"
+       ]
+      },
+      "evidence": {
+       "type": "string"
+      },
+      "canary": {
+       "type": "boolean"
+      },
+      "rung": {
+       "type": "integer"
+      },
+      "leases": {
+       "type": "object",
+       "additionalProperties": false,
+       "required": [
+        "live",
+        "suspect"
+       ],
+       "properties": {
+        "live": {
+         "type": "integer"
+        },
+        "suspect": {
+         "type": "integer"
+        }
+       }
+      },
+      "last_failures": {
+       "type": "array",
+       "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+         "ts",
+         "outcome",
+         "say"
+        ],
+        "properties": {
+         "ts": {
+          "type": "number"
+         },
+         "outcome": {
+          "type": "string"
+         },
+         "say": {
+          "type": "string"
+         }
+        }
+       }
+      },
+      "needs_login": {
+       "type": "boolean"
+      },
+      "usage": {
+       "type": "object",
+       "additionalProperties": false,
+       "required": [
+        "known",
+        "text"
+       ],
+       "properties": {
+        "known": {
+         "type": "boolean"
+        },
+        "text": {
+         "type": [
+          "string",
+          "null"
+         ]
+        }
+       }
+      }
+     }
+    }
+   },
+   "roles": {
+    "type": "object",
+    "additionalProperties": {
+     "type": "object",
+     "additionalProperties": false,
+     "required": [
+      "usable",
+      "lane",
+      "model",
+      "why",
+      "until",
+      "hosts",
+      "net"
+     ],
+     "properties": {
+      "usable": {
+       "type": [
+        "boolean",
+        "null"
+       ]
+      },
+      "lane": {
+       "type": [
+        "string",
+        "null"
+       ]
+      },
+      "model": {
+       "type": [
+        "string",
+        "null"
+       ]
+      },
+      "why": {
+       "type": [
+        "string",
+        "null"
+       ]
+      },
+      "until": {
+       "type": [
+        "number",
+        "null"
+       ]
+      },
+      "hosts": {
+       "type": "array",
+       "items": {
+        "type": "string"
+       }
+      },
+      "net": {
+       "type": "object",
+       "additionalProperties": false,
+       "required": [
+        "up",
+        "since",
+        "age_s"
+       ],
+       "properties": {
+        "up": {
+         "type": [
+          "boolean",
+          "null"
+         ]
+        },
+        "since": {
+         "type": [
+          "number",
+          "null"
+         ]
+        },
+        "age_s": {
+         "type": [
+          "integer",
+          "null"
+         ]
+        }
+       }
+      },
+      "due": {
+       "type": "boolean",
+       "description": "`status --cheap` only: a stopped role's `until` has passed"
+      }
+     }
+    }
+   },
+   "network": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": [
+     "up",
+     "since",
+     "age_s",
+     "why"
+    ],
+    "properties": {
+     "up": {
+      "type": [
+       "boolean",
+       "null"
+      ]
+     },
+     "since": {
+      "type": [
+       "number",
+       "null"
+      ]
+     },
+     "age_s": {
+      "type": [
+       "integer",
+       "null"
+      ]
+     },
+     "why": {
+      "type": [
+       "string",
+       "null"
+      ]
+     }
+    }
+   },
+   "cheap": {
+    "type": "boolean"
+   },
+   "age_s": {
+    "type": [
+     "integer",
+     "null"
+    ],
+    "description": "`status --cheap` only: seconds since the snapshot"
+   },
+   "auth": {
+    "type": "object",
+    "additionalProperties": {
+     "type": "object",
+     "additionalProperties": false,
+     "required": [
+      "ok",
+      "why",
+      "age_s"
+     ],
+     "properties": {
+      "ok": {
+       "type": "boolean"
+      },
+      "why": {
+       "type": "string"
+      },
+      "age_s": {
+       "type": "integer"
+      }
+     }
+    },
+    "description": "`status --cheap` only: the cached logins by lane"
+   }
+  }
  }
 }
