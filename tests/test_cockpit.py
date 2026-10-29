@@ -204,7 +204,7 @@ class Command(unittest.TestCase):
         cfg = cfg_all()
         with tempfile.TemporaryDirectory() as d, patch.dict(os.environ, {"DELEGATE_CONFIG_DIR": d, "CLAUDE_CODE_ENTRYPOINT": "cli"}):
             (Path(d) / "state.json").write_text(json.dumps({"v": 1, **(state or {})}))
-            (Path(d) / "config.json").write_text(json.dumps({"profile": {"lanes": {"DEEPSEEK_FREE": "enabled", "ZAI_CODING_SUBSCRIPTION": "enabled"}}}))
+            (Path(d) / "config.json").write_text(json.dumps({"profile": {"lanes": {"DEEPSEEK_FREE": "enabled"}}}))
             ready = ready or dict.fromkeys(cfg["lanes"], True)
             noread = {k: (lambda lane_, S, st_, t, *a: None) for k in usage.READERS}
             logins = {"OPENAI_SUBSCRIPTION": (False, "Not logged in"), "GROK_SUBSCRIPTION": (True, "ok")}
