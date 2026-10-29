@@ -67,13 +67,15 @@ class Preflight(unittest.TestCase):
 
 class NoSandbox(unittest.TestCase):
     def test_off_darwin_the_opencode_lanes_are_unavailable_and_others_are_not(self):
-        cfg = {"settings": {"deepseek_free_enabled": True, "zai_coding_enabled": True}}
-        with mock.patch.object(OpenCodeHarness, "supported", return_value=False), mock.patch.object(env, "profile_lanes", return_value={}):
+        names = ("GROK_SUBSCRIPTION", "DEEPSEEK_FREE", "ZAI_CODING_SUBSCRIPTION", "OPENAI_SUBSCRIPTION")
+        cfg = {"lanes": {n: {"opt_in": n in ("DEEPSEEK_FREE", "ZAI_CODING_SUBSCRIPTION")} for n in names}}
+        on = {"DEEPSEEK_FREE": "enabled", "ZAI_CODING_SUBSCRIPTION": "enabled"}
+        with mock.patch.object(OpenCodeHarness, "supported", return_value=False), mock.patch.object(env, "profile_lanes", return_value=on):
             for lane in ("GROK_SUBSCRIPTION", "DEEPSEEK_FREE", "ZAI_CODING_SUBSCRIPTION"):
                 self.assertEqual(cockpit.off_reason(lane, cfg, (None, "", None)), cockpit.NO_SANDBOX)
             self.assertIn("not configured", cockpit.off_reason("OPENAI_SUBSCRIPTION", cfg, (None, "", None)))
             self.assertIn("no sandbox", onboard.fix_hint("GROK_SUBSCRIPTION"))
-            self.assertIn("deepseek_free_enabled", onboard.fix_hint("DEEPSEEK_FREE"))
+            self.assertIn("profile.lanes.DEEPSEEK_FREE", onboard.fix_hint("DEEPSEEK_FREE"))
             self.assertIn("codex", onboard.fix_hint("OPENAI_SUBSCRIPTION"))
 
 

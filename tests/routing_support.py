@@ -47,11 +47,11 @@ def router(cfg, t, st=None):
     return Router(env.typed_routing(cfg), HoldBook(doc.holds), doc.prev, t)
 
 
-def build_tiers(role_name, cfg, args):
+def build_tiers(role_name, cfg, args, off=frozenset()):
     """The role's tiers for `args` (a dict as `next` takes), as dicts: what the old route.build_tiers gave."""
     routing = env.typed_routing(cfg)
     ca = CallArgs(authored_by=args.get("authored_by"))
-    tiers = TierPlan(routing).tiers(routing.roles[role_name], ca)
+    tiers = TierPlan(routing).tiers(routing.roles[role_name], ca, off)
     return [[codec.to_json(s) for s in t] for t in tiers or []]
 
 

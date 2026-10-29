@@ -14,6 +14,11 @@ V = 1
 RETIRED_SETTINGS = ("codex_weekly_used_override", "codex_resume_after_stall", "claude_resume_after_stall", "opencode_resume_after_stall",
                     "codex_plan_review_only", "host_lanes", "contained_network", "cache_roots", "credit")
 
+def replaced_settings(lanes: dict) -> dict[str, str]:
+    """The per-lane enable settings an old config.json may carry (`<lane>_enabled`, from the lane name) -> the lane. They moved to the lane
+    profile: loading fails loudly with the exact fix, the old key is never honored."""
+    return {f"{n.removesuffix('_SUBSCRIPTION').lower()}_enabled": n for n, spec in lanes.items() if spec.get("opt_in")}
+
 
 def split_retired(settings: dict) -> tuple[dict, list[str]]:
     """(settings without the retired keys, the retired keys that were there, in file order)."""
@@ -70,8 +75,6 @@ class Settings:
     min_dwell_minutes: float
     usage_stale_minutes: float
     claude_weekly_reset: str = ""
-    deepseek_free_enabled: bool = False
-    zai_coding_enabled: bool = False
     breaker: BreakerPolicy = field(default_factory=BreakerPolicy)
 
 
@@ -93,6 +96,7 @@ class LaneSpec:
     label: str = ""
     ready: str = ""
     shared_with_orchestrator: bool = False
+    opt_in: bool = False        # off until profile.lanes.<lane> is "enabled"; others turn on when ready
 
 
 @record

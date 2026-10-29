@@ -2,7 +2,7 @@
 
 Uses OpenCode headlessly with the `zai-coding-plan` provider and saved subscription credential.
 User setup: `opencode auth login`, select **Z.AI Coding Plan**, enter the Coding Plan key privately;
-then `route.py config set zai_coding_enabled true`.
+then `route.py config set profile.lanes.ZAI_CODING_SUBSCRIPTION enabled`.
 
 Worker order: free DeepSeek → GLM-5.3 high → existing Codex/Grok/Claude fallbacks.
 Light work: free DeepSeek → GLM-5.3-Flash low → existing fallbacks.

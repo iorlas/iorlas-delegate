@@ -28,7 +28,6 @@ class DeepSeekTests(unittest.TestCase):
         obj.update(changes)
         return 'opencode/deepseek-v4.1-flash-free\n' + json.dumps(obj)
 
-    @patch.dict(CFG["settings"], {"deepseek_free_enabled": True})
     def test_free_first_light_and_worker_then_existing_fallback(self):
         ls = lanes()
         ls['DEEPSEEK_FREE'] = Lane('DEEPSEEK_FREE', 'deepseek', 'subscription')

@@ -28,8 +28,6 @@ spec.loader.exec_module(route)
 os.environ["DELEGATE_CONFIG_DIR"] = tempfile.mkdtemp()
 T = 1_000_000_000.0
 CFG = json.loads((ROOT / "skills" / "delegate" / "routing.json").read_text(encoding="utf-8"))
-CFG["settings"]["deepseek_free_enabled"] = True
-CFG["settings"]["zai_coding_enabled"] = True
 
 NAMES = {"openai": ("OPENAI_SUBSCRIPTION", "subscription"), "xai": ("GROK_SUBSCRIPTION", "subscription"), "deepseek": ("DEEPSEEK_FREE", "free"),
          "zai": ("ZAI_CODING_SUBSCRIPTION", "subscription"), "claude": ("CLAUDE_SUBSCRIPTION", "subscription")}

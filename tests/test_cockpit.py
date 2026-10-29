@@ -24,7 +24,6 @@ HOUR = 3600
 
 def cfg_all():
     cfg = copy.deepcopy(CFG)
-    cfg["settings"].update(deepseek_free_enabled=True, zai_coding_enabled=True)
     return cfg
 
 
@@ -111,7 +110,7 @@ class Emoji(unittest.TestCase):
 
     def test_disabled_and_not_configured(self):
         cfg = copy.deepcopy(CFG)
-        for name, text in (("DEEPSEEK_FREE", "disabled: `route.py config set deepseek_free_enabled true` turns it on"),):
+        for name, text in (("DEEPSEEK_FREE", "disabled: `route.py config set profile.lanes.DEEPSEEK_FREE enabled` turns it on"),):
             v = view(name, None, cfg=cfg, off=cockpit.off_reason(name, cfg, (True, "", T)))
             self.assertEqual((v["state"], v["emoji"], v["reason"]), ("off", "⛔", text))
             self.assertEqual(v["model"], "deepseek-v4.1-flash-free high")        # still shows what it would use
@@ -205,6 +204,7 @@ class Command(unittest.TestCase):
         cfg = cfg_all()
         with tempfile.TemporaryDirectory() as d, patch.dict(os.environ, {"DELEGATE_CONFIG_DIR": d, "CLAUDE_CODE_ENTRYPOINT": "cli"}):
             (Path(d) / "state.json").write_text(json.dumps({"v": 1, **(state or {})}))
+            (Path(d) / "config.json").write_text(json.dumps({"profile": {"lanes": {"DEEPSEEK_FREE": "enabled", "ZAI_CODING_SUBSCRIPTION": "enabled"}}}))
             ready = ready or dict.fromkeys(cfg["lanes"], True)
             noread = {k: (lambda lane_, S, st_, t, *a: None) for k in usage.READERS}
             logins = {"OPENAI_SUBSCRIPTION": (False, "Not logged in"), "GROK_SUBSCRIPTION": (True, "ok")}

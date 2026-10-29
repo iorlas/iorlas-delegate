@@ -29,19 +29,16 @@ class TierPlan:
         steps = [*role.steps, *(s for v in (role.by_author or {}).values() for s in v)]
         return sorted({why for s in steps if (why := self.barred(s, role))})
 
-    def steps_for(self, role: Role, args: CallArgs) -> list[Step] | None:
-        """None when the call names an author or a premium family the role/table does not know."""
+    def steps_for(self, role: Role, args: CallArgs, off: frozenset[str] = frozenset()) -> list[Step] | None:
+        """`off`: families of opt-in lanes the owner has not enabled; their steps are not in the ladder.
+        None when the call names an author or a premium family the role/table does not know."""
         steps = list(role.steps)
         if role.by_author is not None:
             w = args.authored_by or "unknown"
             if w not in role.by_author:
                 return None
             steps = list(role.by_author[w])
-        s = self.r.settings
-        if not s.deepseek_free_enabled:
-            steps = [x for x in steps if x.on != "deepseek"]
-        if not s.zai_coding_enabled:
-            steps = [x for x in steps if x.on != "zai"]
+        steps = [x for x in steps if x.on not in off]
         if args.premium:
             prem = self.r.premium.get(args.premium)
             if not prem:
@@ -49,8 +46,8 @@ class TierPlan:
             steps = [prem, *steps]
         return steps
 
-    def tiers(self, role: Role, args: CallArgs) -> list[list[Step]] | None:
-        steps = self.steps_for(role, args)
+    def tiers(self, role: Role, args: CallArgs, off: frozenset[str] = frozenset()) -> list[list[Step]] | None:
+        steps = self.steps_for(role, args, off)
         if steps is None:
             return None
         steps = [x for x in steps if not self.barred(x, role)]

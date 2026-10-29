@@ -93,7 +93,6 @@ class ClaudeLast(Fresh):
 
     def cfg(self):
         c = copy.deepcopy(CFG)
-        c["settings"].update(deepseek_free_enabled=True, zai_coding_enabled=True)
         return c
 
     def pick(self, role, ls, **args):

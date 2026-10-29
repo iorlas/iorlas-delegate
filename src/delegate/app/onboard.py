@@ -8,7 +8,6 @@ from pathlib import Path
 
 from delegate.adapters import statusline
 from delegate.adapters.harness.opencode import OpenCodeHarness
-from delegate.app import env
 
 
 def codex_home():
@@ -39,15 +38,13 @@ def check_opencode_xai():
 
 
 def check_opencode_deepseek_free():
-    """Explicit opt-in; free OpenCode access needs no provider credential."""
-    return (sys.platform == "darwin" and bool(OpenCodeHarness.find_exe())
-            and env.load_routing()["settings"].get("deepseek_free_enabled") is True)
+    """Free OpenCode access needs no provider credential."""
+    return sys.platform == "darwin" and bool(OpenCodeHarness.find_exe())
 
 
 def check_opencode_zai_coding():
     """Subscription-specific saved credential only; never an API-credit provider or env key."""
-    if (sys.platform != "darwin" or not OpenCodeHarness.find_exe()
-            or env.load_routing()["settings"].get("zai_coding_enabled") is not True):
+    if sys.platform != "darwin" or not OpenCodeHarness.find_exe():
         return False
     f = Path(os.environ.get("XDG_DATA_HOME") or Path.home() / ".local" / "share") / "opencode" / "auth.json"
     try:
@@ -91,7 +88,7 @@ def _fix_hint(name: str):
     if name == "GROK_SUBSCRIPTION":
         return "macOS: install OpenCode (https://opencode.ai), then `opencode auth login` and pick xAI"
     if name == "DEEPSEEK_FREE":
-        return "macOS: install OpenCode, then `route.py config set deepseek_free_enabled true`"
+        return "macOS: install OpenCode, then `route.py config set profile.lanes.DEEPSEEK_FREE enabled`"
     if name == "ZAI_CODING_SUBSCRIPTION":
-        return "macOS: install OpenCode, `opencode auth login` (Z.AI Coding Plan), then `route.py config set zai_coding_enabled true`"
+        return "macOS: install OpenCode, `opencode auth login` (Z.AI Coding Plan), then `route.py config set profile.lanes.ZAI_CODING_SUBSCRIPTION enabled`"
     return ""

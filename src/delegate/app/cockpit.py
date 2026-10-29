@@ -67,9 +67,8 @@ def lane_model(cfg: dict, name: str):
 
 
 def off_reason(name: str, cfg: dict, login: tuple):
-    flag = {"DEEPSEEK_FREE": "deepseek_free_enabled", "ZAI_CODING_SUBSCRIPTION": "zai_coding_enabled"}.get(name)
-    if flag and cfg["settings"].get(flag) is not True:
-        return f"disabled: `route.py config set {flag} true` turns it on"
+    if cfg["lanes"][name].get("opt_in") and env.profile_lanes().get(name) != "enabled":
+        return f"disabled: `route.py config set profile.lanes.{name} enabled` turns it on"
     if env.profile_lanes().get(name) == "declined":
         return "declined: remove it from the profile in config.json to bring it back"
     if name in onboard.OPENCODE_LANES and not OpenCodeHarness.supported():

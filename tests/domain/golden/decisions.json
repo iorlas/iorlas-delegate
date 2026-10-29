@@ -1986,10 +1986,7 @@
    }
   ],
   "name": "worker_deepseek_enabled",
-  "settings": {
-   "deepseek_free_enabled": true,
-   "zai_coding_enabled": true
-  },
+  "settings": {},
   "state": {},
   "unattended": false
  },

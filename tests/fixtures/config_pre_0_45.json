@@ -1,8 +1,6 @@
 {
   "max_parallel": 3,
   "claude_weekly_reset": "mon 09:00",
-  "deepseek_free_enabled": true,
-  "zai_coding_enabled": false,
   "usage_stale_minutes": 20,
   "min_dwell_minutes": 5,
   "orchestrator_reserve": {"weekly": 25, "five_hour": 10},

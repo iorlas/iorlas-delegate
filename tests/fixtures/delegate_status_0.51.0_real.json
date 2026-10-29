@@ -153,7 +153,7 @@
     "model": "deepseek-v4.1-flash-free high",
     "state": "off",
     "emoji": "\u26d4",
-    "reason": "disabled: `route.py config set deepseek_free_enabled true` turns it on",
+    "reason": "disabled: `route.py config set profile.lanes.DEEPSEEK_FREE enabled` turns it on",
     "detail": null,
     "unlock": {
      "locked": false,
@@ -182,7 +182,7 @@
     "model": "glm-5.3 high",
     "state": "off",
     "emoji": "\u26d4",
-    "reason": "disabled: `route.py config set zai_coding_enabled true` turns it on",
+    "reason": "disabled: `route.py config set profile.lanes.ZAI_CODING_SUBSCRIPTION enabled` turns it on",
     "detail": null,
     "unlock": {
      "locked": false,

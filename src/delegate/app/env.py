@@ -17,7 +17,7 @@ from child_env import scrub_current
 
 from delegate.contracts import codec
 from delegate.contracts.history import HistoryRow
-from delegate.contracts.routing import Routing, split_retired
+from delegate.contracts.routing import Routing, replaced_settings, split_retired
 from delegate.contracts.state import StateDoc
 from delegate.contracts.stores import ConfigStore, HistoryStore, StateStore
 
@@ -69,6 +69,11 @@ def load_routing() -> dict:
     Retired settings keys are dropped with one stderr line each (stdout carries the answer); any other unknown key fails."""
     with open(SKILL_DIR / "routing.json", encoding="utf-8") as f:
         cfg = json.load(f)
+    moved = replaced_settings(cfg["lanes"])
+    for k in config_store().overrides():
+        if k in moved:
+            sys.exit(f"route.py: {config_store().path}: '{k}' is replaced by the lane profile. Fix: delete \"{k}\" from config.json, "
+                     f"then run `route.py config set profile.lanes.{moved[k]} enabled`")
     cfg["settings"], _ = split_retired(deep_merge(cfg["settings"], config_store().overrides()))
     for k in retired_keys_present():
         if k not in _RETIRED_WARNED:

@@ -44,8 +44,8 @@ class Onboarding(unittest.TestCase):
         o = rows["OPENAI_SUBSCRIPTION"]
         self.assertEqual((o["enabled"], o["ready"]), (True, False))
         self.assertIn("npm install -g @openai/codex", o["fix"])
-        self.assertFalse(rows["DEEPSEEK_FREE"]["enabled"])                            # an opt-in lane is off until its setting is true
-        self.assertIn("deepseek_free_enabled", rows["DEEPSEEK_FREE"]["fix"])
+        self.assertFalse(rows["DEEPSEEK_FREE"]["enabled"])                            # an opt-in lane is off until the profile enables it
+        self.assertIn("profile.lanes.DEEPSEEK_FREE", rows["DEEPSEEK_FREE"]["fix"])
         self._make_codex_ready()
         o = {r["lane"]: r for r in doctor.doctor(self.cfg)["lanes"]}["OPENAI_SUBSCRIPTION"]
         self.assertEqual((o["ready"], o["fix"]), (True, ""))

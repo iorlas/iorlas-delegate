@@ -60,7 +60,8 @@ class Router:
         role = self.r.roles.get(role_name)
         if role is None:
             return Error(error=f"unknown role {role_name}; roles: {', '.join(self.r.roles)}")
-        tiers = self.plan.tiers(role, args)
+        off = frozenset(c.family for n, c in self.r.lanes.items() if c.opt_in and n not in lanes)       # an opt-in lane the profile did not enable
+        tiers = self.plan.tiers(role, args, off)
         if tiers is None:
             return Error(error=self._tier_error(role, args))
         s, picker = self.r.settings, self._picker(lanes, role_name)

@@ -29,4 +29,4 @@ def all_hosts():
 
 LOGIN_CMD = {"OPENAI_SUBSCRIPTION": "codex login", "CLAUDE_SUBSCRIPTION": "claude auth login",
              "GROK_SUBSCRIPTION": "opencode auth login", "ZAI_CODING_SUBSCRIPTION": "opencode auth login, choose Z.AI Coding Plan",
-             "DEEPSEEK_FREE": "route.py config set deepseek_free_enabled true"}
+             "DEEPSEEK_FREE": "route.py config set profile.lanes.DEEPSEEK_FREE enabled"}

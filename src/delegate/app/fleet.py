@@ -38,8 +38,9 @@ class FleetBuilder:
         fleet = Fleet({})
         conf = self.configured() if check_config else {}
         health = self._health(t)
+        profile = self.config.profile()
         for name, spec in self.r.lanes.items():
-            if (name == "DEEPSEEK_FREE" and not s.deepseek_free_enabled) or (name == "ZAI_CODING_SUBSCRIPTION" and not s.zai_coding_enabled):
+            if spec.opt_in and profile.lanes.get(name) != "enabled":
                 continue
             mode = self._mode(name, spec, conf.get(name, True), fleet) if check_config else "on"
             if mode == "off":

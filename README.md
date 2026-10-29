@@ -23,7 +23,7 @@ Requirements: Claude Code. Base mode (Claude sub-agents only) needs nothing else
 
 | `DEEPSEEK_FREE` | temporary OpenCode free tier (macOS; explicit opt-in) | none; isolated from saved provider logins |
 
-Enable with `route.py config set deepseek_free_enabled true` (disable with `false`). Light work and implementation try DeepSeek first, then fall back to the existing lanes. Reviews preserve family independence; planning keeps their original chains. Before every launch the exact `opencode/deepseek-v4.1-flash-free` model must have zero input, output and cache prices in the CLI catalog. No paid DeepSeek replacement is selected. Free access can be withdrawn or rate-limited.
+Enable with `route.py config set profile.lanes.DEEPSEEK_FREE enabled` (disable with `declined`). Light work and implementation try DeepSeek first, then fall back to the existing lanes. Reviews preserve family independence; planning keeps their original chains. Before every launch the exact `opencode/deepseek-v4.1-flash-free` model must have zero input, output and cache prices in the CLI catalog. No paid DeepSeek replacement is selected. Free access can be withdrawn or rate-limited.
 
 Roles: `planner`, `worker`, `reviewer`, `light`. Chains, models and thresholds are data in `skills/delegate/routing.json`. The premium tier (Fable for claude) runs only when the user asks for it by name (`--premium`).
 

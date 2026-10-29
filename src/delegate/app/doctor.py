@@ -5,18 +5,17 @@ import os
 from typing import Any
 
 from delegate.app import env, onboard
+from delegate.contracts import codec
 from delegate.contracts.routing import split_retired
-
-OPT_IN = {"DEEPSEEK_FREE": "deepseek_free_enabled", "ZAI_CODING_SUBSCRIPTION": "zai_coding_enabled"}
+from delegate.contracts.state import Profile
 
 
 def lane_rows(cfg: dict):
-    """One row per lane: {lane, enabled, ready, fix}. enabled = the router may use it (not declined, its opt-in set); ready = the machine can run it."""
-    ready, declined = onboard.configured_lanes(cfg), env.profile_lanes()
+    """One row per lane: {lane, enabled, ready, fix}. enabled = the router may use it (not declined; an opt-in lane only when the profile enables it); ready = the machine can run it."""
+    ready, chosen = onboard.configured_lanes(cfg), env.profile_lanes()
     rows: list[dict[str, Any]] = []
     for name in cfg["lanes"]:
-        flag = OPT_IN.get(name)
-        enabled = declined.get(name) != "declined" and (flag is None or cfg["settings"].get(flag) is True)
+        enabled = chosen.get(name) != "declined" and (not cfg["lanes"][name].get("opt_in") or chosen.get(name) == "enabled")
         rows.append({"lane": name, "enabled": enabled, "ready": ready[name], "fix": "" if ready[name] and enabled else onboard.fix_hint(name)})
     return rows
 
@@ -40,7 +39,31 @@ def notes(cfg: dict):
     with open(env.SKILL_DIR / "routing.json", encoding="utf-8") as f:
         out += [{"id": "retired_key", "key": k, "file": str(env.SKILL_DIR / "routing.json"), "say": f"{env.SKILL_DIR / 'routing.json'}: '{k}' is retired and ignored."}
                 for k in split_retired(json.load(f).get("settings") or {})[1]]
-    return out + leftovers()
+    return out + leftovers() + smoke_problems(cfg)
+
+
+PROFILE_VALUES = ("enabled", "declined")
+SMOKE_IDS = ("bad_profile", "enabled_not_ready")
+
+
+def smoke_problems(cfg: dict):
+    """The post-update smoke check: the profile parses and names known lanes with known values, and every lane the owner enabled can run here
+    (its CLI resolves, its login is there). Each problem is a note (ids in SMOKE_IDS) with the exact fix; `doctor` exits 1 on any."""
+    out: list[dict[str, str]] = []
+    raw = env.config_store().read().get("profile") or {}
+    try:
+        codec.from_json(Profile, raw)
+        lanes = raw.get("lanes") or {}
+    except codec.CodecError as e:
+        return [{"id": "bad_profile", "say": f"{env.config_store().path}: profile does not parse ({e}). Fix: correct or delete the \"profile\" key."}]
+    for name, v in lanes.items():
+        if name not in cfg["lanes"] or v not in PROFILE_VALUES:
+            out.append({"id": "bad_profile", "lane": name, "say": f"profile.lanes.{name} = {v!r}: expected a lane of {sorted(cfg['lanes'])} "
+                        f"set to enabled or declined. Fix: `route.py config set profile.lanes.<LANE> enabled|declined`."})
+    ready = onboard.configured_lanes(cfg)
+    out += [{"id": "enabled_not_ready", "lane": n, "say": f"{n} is enabled but not ready: {onboard.fix_hint(n)}"}
+            for n, v in lanes.items() if v == "enabled" and n in ready and not ready[n]]
+    return out
 
 
 def doctor(cfg: dict):
@@ -62,7 +85,7 @@ def cmd_doctor(a: env.Args, cfg: dict):
         print(json.dumps(d, indent=1))
     else:
         print_doctor(d)
-    return 0
+    return 1 if any(n["id"] in SMOKE_IDS for n in d["notes"]) else 0
 
 
 def config_set(key: str, value: str):
@@ -71,9 +94,12 @@ def config_set(key: str, value: str):
     except ValueError:
         val = value
 
+    parts = key.split(".")
+    if parts[:2] == ["profile", "lanes"] and (len(parts) != 3 or val not in PROFILE_VALUES):
+        raise SystemExit(f"route.py: config set profile.lanes.<LANE> enabled|declined (got {key} {value})")
+
     def put(cur: dict):
         node = cur
-        parts = key.split(".")
         for part in parts[:-1]:
             if not isinstance(node.get(part), dict):
                 node[part] = {}

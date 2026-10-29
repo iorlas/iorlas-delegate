@@ -23,7 +23,6 @@ from delegate.domain.lanes.lane import Lane
 class ZaiTests(unittest.TestCase):
     def choose(self, role, ls, **kwargs):
         cfg=copy.deepcopy(CFG)
-        cfg['settings'].update(deepseek_free_enabled=True, zai_coding_enabled=True)
         return support.decide(role,cfg,ls,{},T,dict(authored_by=None, premium=None, allow_degraded=False, **kwargs))
 
     def test_worker_priority_and_backoff(self):
@@ -40,7 +39,7 @@ class ZaiTests(unittest.TestCase):
         self.assertEqual(self.choose('worker',ls)['lane'],'OPENAI_SUBSCRIPTION')
 
     def test_zai_author_gets_other_family(self):
-        cfg=copy.deepcopy(CFG);cfg['settings'].update(deepseek_free_enabled=True,zai_coding_enabled=True)
+        cfg=copy.deepcopy(CFG)
         args=dict(authored_by='zai',premium=None,allow_degraded=False)
         d=support.decide('reviewer',cfg,lanes(),{},T,args)
         self.assertEqual(d['lane'],'OPENAI_SUBSCRIPTION')
@@ -50,12 +49,12 @@ class ZaiTests(unittest.TestCase):
 
     def test_disabled_does_not_change_original_rungs(self):
         cfg=copy.deepcopy(CFG)
-        steps=support.build_tiers('worker',cfg,{})[0]
+        steps=support.build_tiers('worker',cfg,{},frozenset({'deepseek','zai'}))[0]
         self.assertEqual(steps[0]['on'],'openai')
         self.assertEqual(steps[0]['idx'],0)
 
     def test_readiness_needs_subscription_credential(self):
-        cfg=copy.deepcopy(CFG);cfg['settings']['zai_coding_enabled']=True
+        cfg=copy.deepcopy(CFG)
         with tempfile.TemporaryDirectory() as tmp, patch.dict(os.environ,{'XDG_DATA_HOME':tmp}), patch.object(OpenCodeHarness,'find_exe',return_value='opencode'), patch.object(env, 'load_routing',return_value=cfg), patch.object(onboard.sys,'platform','darwin'):
             p=Path(tmp)/'opencode/auth.json';p.parent.mkdir()
             for auth,expected in [({'zai':{'type':'api','key':'test'}},False),({'zai-coding-plan':{}},False),({'zai-coding-plan':{'type':'api','key':'test'}},True)]:

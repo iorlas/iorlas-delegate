@@ -30,9 +30,7 @@
     "max_parallel": 4,
     "min_dwell_minutes": 30,
     "usage_stale_minutes": 30,
-    "claude_weekly_reset": "",
-    "deepseek_free_enabled": false,
-    "zai_coding_enabled": false
+    "claude_weekly_reset": ""
   },
   "models": {
     "opus-5.5": {
@@ -119,6 +117,7 @@
       "kind": "subscription",
       "reader": "none",
       "runner": "opencode",
+      "opt_in": true,
       "ready": "opencode_deepseek_free"
     },
     "ZAI_CODING_SUBSCRIPTION": {
@@ -127,6 +126,7 @@
       "kind": "subscription",
       "reader": "none",
       "runner": "opencode",
+      "opt_in": true,
       "ready": "opencode_zai_coding"
     }
   },
