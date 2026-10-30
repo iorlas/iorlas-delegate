@@ -157,11 +157,12 @@ class ResetTimes(unittest.TestCase):
 
     def test_out_rows_record_source_and_zone_and_report_is_manual(self):
         with tempfile.TemporaryDirectory() as d, mock.patch.object(env, "config_dir", return_value=Path(d)):
-            res = launch.settler().apply({}, classify.Outcome("rate_limited", "will reset at 2099-10-30 14:49:00 UTC", "event"), {"lane": "L1", "limit_reset": None},
+            end = (dt.datetime.now(dt.UTC) + dt.timedelta(days=5)).replace(second=0, microsecond=0)         # inside the 40 days a stated reset may be off
+            res = launch.settler().apply({}, classify.Outcome("rate_limited", f"will reset at {end:%Y-%m-%d %H:%M:%S} UTC", "event"), {"lane": "L1", "limit_reset": None},
                                time.time(), "codex", argparse_ns("worker", timeout=0))
             rec = env.load_state().out["L1"]
             self.assertEqual((rec.source, rec.zone), ("vendor", "UTC"))
-            self.assertEqual(rec.until, dt.datetime(2099, 10, 30, 14, 49, tzinfo=dt.UTC).timestamp())
+            self.assertEqual(rec.until, end.timestamp())
             for want_n in (0, 1, 2):          # three guesses in a row climb the ladder
                 launch.settler().apply({}, classify.Outcome("rate_limited", "slow down", "event"), {"lane": "L2"}, 1_800_000_000.0, "codex", argparse_ns("worker", timeout=0))
                 rec = env.load_state().out["L2"]
