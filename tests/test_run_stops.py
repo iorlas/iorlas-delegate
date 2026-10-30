@@ -164,8 +164,11 @@ class RunStops(RunBase):
         _, r = self.run_it(mode="late_error")
         self.assertEqual((r["ref"], r["stop"]["ref"]), ("thread-123", "thread-123"))
         self.assertIn("thread-123", env.load_state().refs)         # a later --resume finds the lane that made it
+        self.assertEqual((why(r), r["stop"]["resumable"], r["data"]), ("network", True, None))      # DELRESUME: ref present, resumable, no data
         row = json.loads(Path(env.history_path()).read_text().splitlines()[-1])
         self.assertEqual((row["outcome"], row["ref"]), ("network", "thread-123"))
+        _, r = self.run_it("--resume", "thread-123")                  # the retry with that ref goes through
+        self.assertEqual((r["stop"], r["ref"]), (None, "thread-123"))
 
     def test_every_stop_that_has_a_ref_carries_it(self):
         _, r = self.run_it(mode="limit")

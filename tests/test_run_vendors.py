@@ -16,6 +16,7 @@ from test_route import _call, at, route, why
 from delegate.app import answer, env, launch, net, watch
 from delegate.app import decide as dec
 from delegate.contracts import stops
+from delegate.contracts.state import RefRecord
 from delegate.domain.policy import worker
 from delegate.domain.policy.worker import is_policy_denial
 
@@ -226,6 +227,26 @@ class RunVendors(RunBase):
         self.assertEqual((r["stop"], r["text"]), (None, "the final answer"))
         self.assertEqual(r["warnings"], ["net_after_answer"])
         self.assertIsNone(r["stop"])
+        self.assertNotIn("OPENAI_SUBSCRIPTION", env.load_state().out)
+
+    def test_the_final_answer_then_a_drop_keeps_the_data_and_the_ref(self):
+        """DELRESUME: a drop after the final message loses neither the schema data nor the ref, and the retry with that ref works."""
+        schema = self.base / "s.json"
+        schema.write_text('{"type": "object", "required": ["a"], "properties": {"a": {"type": "integer"}}}')
+        _, r = self.run_it("--schema", str(schema), mode="ae6v_json")
+        self.assertEqual((r["stop"], r["data"], r["ref"]), (None, {"a": 1}, "thread-123"))
+        _, r = self.run_it("--resume", r["ref"])
+        self.assertEqual((r["stop"], r["ref"]), (None, "thread-123"))
+
+    def test_a_resume_with_a_ref_the_vendor_does_not_know_is_a_refusal_not_a_network_wait(self):
+        _, r = self.run_it("--resume", "never-made")                       # delegate itself has no such ref
+        self.assertEqual((why(r), r["stop"]["permanence"]), ("caller", "needs_owner"))
+        os.environ["FAKE_REF"] = "gone-1"
+        self.addCleanup(os.environ.pop, "FAKE_REF", None)
+        env.update_state(lambda s: s.refs.__setitem__("gone-1", RefRecord(lane="OPENAI_SUBSCRIPTION", model="gpt-6.1-sol", mode="write", effort="medium")))
+        _, r = self.run_it("--resume", "gone-1", mode="unknown_ref")        # delegate knows it, the vendor lost it
+        self.assertEqual((why(r), r["stop"]["permanence"]), ("bad_request", "needs_owner"))
+        self.assertIn("rejected the request", r["say"])
         self.assertNotIn("OPENAI_SUBSCRIPTION", env.load_state().out)
 
     def test_the_final_answer_then_a_drop_is_done_with_a_warning_claude(self):

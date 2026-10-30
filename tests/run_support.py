@@ -42,6 +42,8 @@ esac
 echo '{"type":"turn.completed","usage":{"input_tokens":100,"cached_input_tokens":40,"output_tokens":7}}'
 case "$FAKE_MODE" in
   drop_early) printf 'second try' > "$out";;
+  ae6v_json) printf '{"a": 1}' > "$out"; echo '{"type":"turn.failed","error":{"message":"stream disconnected before completion: websocket closed by server"}}'; exit 1;;
+  unknown_ref) echo "Error: thread/resume: no rollout found for thread id $FAKE_REF" >&2; exit 1;;
   ae6v) printf 'the final answer' > "$out"; echo '{"type":"turn.failed","error":{"message":"stream disconnected before completion: websocket closed by server"}}'; exit 1;;
   wait_recover) echo '{"type":"error","message":"Reconnecting... waiting for network (Connection failed: error sending request)"}'
                 echo '{"type":"item.completed","item":{"id":"i3","type":"command_execution","command":"ls","exit_code":0,"status":"completed"}}'; printf 'recovered' > "$out";;
