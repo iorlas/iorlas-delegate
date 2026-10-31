@@ -128,6 +128,31 @@ class RoutingTest(unittest.TestCase):
         d = self.decide("claude", engine_only=["slow"], unattended=False)
         self.assertEqual((d["action"], d["reason"]), ("stop", "engine_only_unenforced"))
 
+    def test_pinned_codex_reports_the_enforcement_failure_and_remedy(self):
+        d = self.decide("openai", "claude", only_family=["openai"], engine_only=["slow", "e2e"])
+        self.assertEqual((d["action"], d["reason"]), ("stop", "engine_only_unenforced"))
+        for text in ("OPENAI_SUBSCRIPTION", "--engine-only slow, e2e", "--engine-only-advisory"):
+            self.assertIn(text, d["say"])
+        self.assertNotIn("over its limit", d["say"])
+
+    def test_advisory_runs_codex_with_or_without_a_family_pin(self):
+        for pin in ([], ["openai"]):
+            with self.subTest(pin=pin):
+                d = self.decide("openai", "xai", "claude", only_family=pin, engine_only=["slow", "e2e"], engine_only_advisory=True)
+                self.assertEqual((d["action"], d["lane"], d["flag"]), ("run", "OPENAI_SUBSCRIPTION", "engine_only_advisory"))
+                self.assertEqual(
+                    d["warning"], "OPENAI_SUBSCRIPTION cannot deny --engine-only slow, e2e: advisory only, the brief must say so")
+                self.assertFalse(any("OPENAI_SUBSCRIPTION: rejected" in x for x in d["trace"]))
+
+    def test_advisory_does_not_warn_when_enforcement_is_available_or_unneeded(self):
+        for up, kw in (("claude", {"engine_only": ["slow"]}), ("openai", {}),
+                       ("openai", {"role": "reviewer", "engine_only": ["slow"]})):
+            with self.subTest(up=up, kw=kw):
+                d = self.decide(up, engine_only_advisory=True, **kw)
+                self.assertEqual(d["action"], "run")
+                self.assertNotEqual(d["flag"], "engine_only_advisory")
+                self.assertNotIn("warning", d)
+
     def test_read_only_steps_ignore_the_list(self):
         self.assertEqual(self.decide("openai", role="reviewer", engine_only=["slow"])["lane"], "OPENAI_SUBSCRIPTION")
 
@@ -135,6 +160,13 @@ class RoutingTest(unittest.TestCase):
         rec = RefRecord(lane="OPENAI_SUBSCRIPTION", model="gpt-6.1-sol", effort="high", mode="write")
         d = support.router(copy.deepcopy(CFG), T).route("worker", CallArgs(resume="r1", engine_only=("slow",)), lanes("openai"), rec)
         self.assertEqual((d.as_dict()["action"], d.as_dict()["reason"]), ("stop", "engine_only_unenforced"))
+
+    def test_advisory_resume_keeps_its_lane_and_warns(self):
+        rec = RefRecord(lane="OPENAI_SUBSCRIPTION", model="gpt-6.1-sol", effort="high", mode="write")
+        args = CallArgs(resume="r1", engine_only=("slow",), engine_only_advisory=True)
+        d = support.router(copy.deepcopy(CFG), T).route("worker", args, lanes("openai"), rec).as_dict()
+        self.assertEqual((d["action"], d["lane"], d["flag"]), ("run", rec.lane, "engine_only_advisory"))
+        self.assertIn("advisory only, the brief must say so", d["warning"])
 
 
 if __name__ == "__main__":

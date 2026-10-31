@@ -119,7 +119,8 @@ def fleet_builder(cfg: dict):
 def call_args(a: env.Args, unattended: bool):
     return CallArgs(authored_by=a.authored_by, premium=a.premium,
                     allow_degraded=a.allow_degraded, unattended=unattended, resume=getattr(a, "resume", None), cap=getattr(a, "cap", None),
-                    only_family=tuple(getattr(a, "only_family", None) or ()), engine_only=tuple(getattr(a, "engine_only", None) or ()))
+                    only_family=tuple(getattr(a, "only_family", None) or ()), engine_only=tuple(getattr(a, "engine_only", None) or ()),
+                    engine_only_advisory=bool(getattr(a, "engine_only_advisory", False)))
 
 
 def decision(a: env.Args, cfg: dict, unattended: bool = False):

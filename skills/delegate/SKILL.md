@@ -5,7 +5,8 @@ description: Delegate a sub-task to another model or subscription, only when the
 
 `DELEGATE_DEPTH` set = you are a worker: do not delegate.
 Use Bash `run_in_background`.
-`python3 ${CLAUDE_SKILL_DIR}/route.py run ROLE [--cwd D] [--authored-by openai|claude|xai|deepseek] [--premium] [--allow-degraded] [--claude-usage JSON] [--engine-only RECIPE]... [--only-family F]... < brief`  (engine-only: write guard blocks `just RECIPE`; only-family: only F or stop)
+`python3 ${CLAUDE_SKILL_DIR}/route.py run ROLE [--cwd D] [--authored-by F] [--engine-only RECIPE]... [--only-family F]... < brief`
+`--engine-only-advisory`: allows unsupported guards; disclose in brief. Details: `docs/dev/integrations.md`.
 Roles: planner (plan) · worker (implement) · reviewer (`--authored-by`: author's family) · light (read).
 
 | answer | do |
@@ -13,7 +14,7 @@ Roles: planner (plan) · worker (implement) · reviewer (`--authored-by`: author
 | `stop` null, `agent_model` | Agent call: `agent_model`, `brief_prefix` + brief, in `cwd`, no worktree, effort in brief |
 | `stop` null | `text` is the answer; rerun acceptance check. `git_violation`: show it, check `git reflog`, never auto-revert. |
 | `ask_user` | ask; yes = `--allow-degraded` |
-| `stop.retry.kind` predicted/poll | rerun |
+| `stop.retry.kind` predicted/poll | rerun at `stop.retry.at`; busy includes `--only-family` |
 | `stop.reason` timeout | shrink the task |
 | other `stop` | tell user `say`, `stop.fix`; setup: `modes/init.md`; no secret in chat |
 | `needs_input` `claude_usage` | `get_usage`; rerun with `--claude-usage '<plan.windows>'` |

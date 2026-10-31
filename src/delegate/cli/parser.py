@@ -14,7 +14,7 @@ The model supplies only what the script cannot read itself; the script decides.
   route.py next ROLE [--authored-by openai|claude|xai] [--premium [FAMILY]] [--allow-degraded]
                      [--claude-usage JSON|@file|-] [--cwd DIR] [--verbose]
   route.py run ROLE [--cwd DIR] [--brief FILE] [--schema FILE] [--resume REF] [--cap USD] [--timeout SEC] [--unattended] [--authored-by W] [--premium] [--allow-degraded] [--only-family F]...
-                    [--claude-usage JSON] [--parent SESSION] [--task ID] [--title T]    brief on stdin; one JSON object on stdout, exit 0 (see docs/dev/integrations.md)
+                    [--engine-only RECIPE]... [--engine-only-advisory] [--claude-usage JSON] [--parent SESSION] [--task ID] [--title T]    brief on stdin; one JSON object on stdout, exit 0 (see docs/dev/integrations.md)
   route.py net [--lane L] [--host H ...]    is the machine online? stdlib sockets, no quota, answers in under 3 s: {up, why, hosts}
   route.py report --lane LANE --event out|ok [--until EPOCH|ISO]
   route.py capture-limits [--print]  (status line JSON on stdin)
@@ -64,6 +64,7 @@ def build():
     ru.add_argument("--claude-usage"); ru.add_argument("--cwd"); ru.add_argument("--brief"); ru.add_argument("--timeout", type=int, help="seconds; none by default"); ru.add_argument("--idle", type=int, help="seconds without worker output before it is hung; default per CLI"); ru.add_argument("--unattended", action="store_true")
     ru.add_argument("--schema"); ru.add_argument("--resume"); ru.add_argument("--cap", type=float); ru.add_argument("--parent"); ru.add_argument("--task"); ru.add_argument("--title")
     ru.add_argument("--engine-only", action="append", default=[], help="a recipe only the engine runs; a write step's guard blocks it; repeatable")
+    ru.add_argument("--engine-only-advisory", action="store_true", help="allow write lanes that cannot deny engine-only recipes, with a warning; the brief must say so")
     ru.add_argument("--only-family", action="append", default=[], metavar="FAMILY", help="use only this family's steps, no fallback outside; repeatable")
     ru.add_argument("--call-id", help="the caller's id for this call: echoed in the answer and written to history.jsonl, the key that joins the caller's record to ours")
     ho = sub.add_parser("hold", help="stop a lane for some roles until a time; --until is mandatory"); ho.add_argument("lane"); ho.add_argument("--until"); ho.add_argument("--roles")

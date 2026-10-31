@@ -27,7 +27,7 @@ state and in Claude Code's own transcripts.
 
 ## 2. `route.py run` is a contract; everything else is not
 
-task-loop's engine calls `route.py run ROLE --unattended --brief FILE --cwd DIR [--schema F] [--resume REF] [--cap USD] [--timeout S] [--parent SESSION] [--task ID] [--title T] [--engine-only RECIPE]...`
+task-loop's engine calls `route.py run ROLE --unattended --brief FILE --cwd DIR [--schema F] [--resume REF] [--cap USD] [--timeout S] [--parent SESSION] [--task ID] [--title T] [--engine-only RECIPE]... [--engine-only-advisory]`
 as a script, with no Claude session behind it. The contract is `skills/delegate/contract.json` (reasons, facts, flags, answer schema); the consumer is iorlas-task-loop.
 
 - Handshake: `route.py contract --json` prints one line `{contract: 3, reasons{reason: {scope, permanence, retry, health, wording}}, run_args[]}`; a caller
@@ -37,8 +37,9 @@ as a script, with no Claude session behind it. The contract is `skills/delegate/
   scope: `bead`, `caller`, `machine`, `lane`, `model`. permanence: `transient`, `needs_owner` (a person must act: log in, set up, verify a denial). retry.kind: `none`, `predicted`
   (`at` = when the lane or hold ends), `poll` (`at` = look again about then, 60-120 s). A predicted row with no time answers `needs_owner`/`none`. `ref` is the vendor session when
   one existed; `resumable` and `partial` ride on `network` and `killed`; `fix` is set where delegate knows the cure. Scope `lane`/`model` is stamped by delegate alone (classifier or
-  breaker); `bead`, `caller` and `machine` stops (network, killed, bad_request, secrets, timeout) never mark a lane. `busy` (all of a lane's slots taken, also for a `--resume` on that
-  lane) polls with `at` = when a slot is expected; `rate_limited` means the lane itself is out (limit refusal, or over its usage ceiling), with `at` = the reset of the window it is over.
+  breaker); `bead`, `caller` and `machine` stops (network, killed, bad_request, secrets, timeout) never mark a lane. `busy` (all of an otherwise usable lane's slots taken, also for
+  `--resume` or a pinned `--only-family`) polls with `at` jittered 60-120 s ahead. A pinned family uses a free lane first; if none is usable but one would be with a free slot,
+  it answers `busy` even when another lane is out. `rate_limited` means the lane itself is out (limit refusal, or over its usage ceiling), with `at` = the reset of the window it is over.
   A limit refusal mid-run (matched on Codex's error event or stderr, never the model's answer) marks the lane out until the time the message names ("try again at 5:50 AM"), else the
   window a fresh reading shows full, else the soonest window reset, else an hour. A Codex reading taken after the refusal that shows room
   (both windows under 95%) drops it. Every answer given without launching a worker is a history.jsonl line too
@@ -47,6 +48,7 @@ as a script, with no Claude session behind it. The contract is `skills/delegate/
   `fallback_reason` (busy, out, ceiling) and `first_lane` (the first choice's lane, set only on a fallback) on every answer that picked a lane; a resume repeats the original run's. Unattended, a first choice
   that is only busy (slots full, otherwise usable) answers `busy` with its `at` instead of falling to the next rung.
 - Roles own models: the caller picks the role, never the model. The reviewer's Claude rungs run Sonnet.
+- `--engine-only RECIPE` (repeatable) requires a write lane whose harness can deny `just RECIPE`. Codex has no such hook under `codex exec` and is dropped by default. When a pinned `--only-family openai` lane is dropped, `stop.reason` is `engine_only_unenforced` (caller / needs_owner / none), with the lane, recipes, and `--engine-only-advisory` remedy in `say`. With that flag, unsupported lanes remain eligible, including on resume, and the answer carries `flag: "engine_only_advisory"` and a one-line `warning`: "<lane> cannot deny --engine-only <recipes>: advisory only, the brief must say so". No consent is needed. The caller must state in the brief that those recipes are reserved for the engine and enforcement is advisory. Supported harness guards remain active; read steps ignore the list. `RunRequest.engine_only_advisory` defaults to false and emits the flag only when true.
 - `context` (per run, scripts only; interactive answers leave it out): `{instructions: [repo instruction files given], env_keys: [names passed]}`;
 - With `--schema`, delegate checks the answer (type, required, properties, items, enum), re-asks once in the same thread, and answers
   `schema_invalid` when it still does not fit; tokens and denials of both turns add up.

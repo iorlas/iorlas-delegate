@@ -37,8 +37,8 @@ class Router:
         return runner in ENGINE_ONLY_RUNNERS or (runner == "agent_tool" and args.unattended)
 
     def _writable(self, step: Step, args: CallArgs, lanes: dict[str, Lane], trace: list[str], skipped: list[str]) -> dict[str, Lane]:
-        """The lanes a step may use: with engine-only recipes set, a write step only on a lane that enforces them (a read step ignores the list)."""
-        if step.mode != "write" or not args.engine_only:
+        """Write steps require recipe enforcement unless explicitly advisory; read steps ignore the list."""
+        if step.mode != "write" or not args.engine_only or args.engine_only_advisory:
             return lanes
         out = {n: lane for n, lane in lanes.items() if lane.family != step.on or self.enforces_engine_only(lane, args)}
         for n in lanes.keys() - out.keys():
@@ -71,7 +71,7 @@ class Router:
         first = next((x for x in steps if any(lane.family == x.on for lane in lanes.values())), steps[0] if steps else None)
         mine = [lane for lane in lanes.values() if first and lane.family == first.on]
         busy = [lane for lane in mine if lane.busy and lane.usable_if_free(s)]
-        if busy and wait_busy and not any(picker.usable(lane, True)[0] for lane in mine):
+        if busy and wait_busy and not args.only_family and not any(picker.usable(lane, True)[0] for lane in mine):
             until = min(lane.out_until or 0 for lane in busy)      # the first choice is only waiting for a slot: a minute beats a round on the next rung
             return Stop(reason="busy", lane=busy[0].name, retry_after=until, trace=(),
                         say=f"{busy[0].name} (the role's first choice) has no free slot: {busy[0].notes[0]}")
@@ -84,27 +84,42 @@ class Router:
                     if lane is None:
                         continue
                     fb = step is not first
-                    return Run(role=role_name, lane=lane.name, model=step.model, effort=step.effort, mode=step.mode, cap=step.cap, flag=step.flag,
+                    return self._advisory(Run(role=role_name, lane=lane.name, model=step.model, effort=step.effort, mode=step.mode, cap=step.cap, flag=step.flag,
                                pass_="relaxed" if relaxed else "strict", rung=step.idx, fallback=fb, fallback_reason=why_not_first if fb else None,
                                first_lane=first_lane if fb else None, trace=tuple(trace),
-                               warning=self._warning(step, args.authored_by, lanes, picker))
+                               warning=self._warning(step, args.authored_by, lanes, picker)), lane, args)
+        if args.only_family:
+            busy = [lane for step in steps for lane in self._writable(step, args, lanes, trace, skipped).values()
+                    if lane.family == step.on and (lane.busy or lane.out_reason == "busy")
+                    and not (lane.out and lane.out_reason != "busy")
+                    and picker.usable(replace(lane, out=False), True, step.model)[0]]
+            if busy:
+                lane = min(busy, key=lambda lane: lane.out_until or 0)
+                return Stop(reason="busy", lane=lane.name, retry_after=lane.out_until, trace=tuple(trace),
+                            say=f"--only-family {', '.join(args.only_family)}: {self._family_state(lane.family, {lane.name: lane})}")
         stop = self._stop(role_name, role, tiers, args, lanes, trace)
         return self._typed_stop(stop, args, lanes, skipped)
 
     def _typed_stop(self, stop: Stop, args: CallArgs, lanes: dict[str, Lane], skipped: list[str]) -> Stop:
-        """A stop with no reason yet gets the one the call's own limits explain: --only-family, else --engine-only."""
+        """Explain enforcement rejections before the generic family-unready stop."""
         if stop.reason is not None:
             return stop
-        if args.only_family:
-            return self._only_family_stop(stop, args, lanes)
         if skipped:
             names = ", ".join(sorted(set(skipped)))
             return replace(stop, reason="engine_only_unenforced", ask_user=None,
-                           say=f"{stop.say} --engine-only {', '.join(args.engine_only)} cannot be denied to a write step on {names}: the lane is not used for it.")
+                           say=f"{stop.say} --engine-only {', '.join(args.engine_only)} cannot be denied to a write step on {names}: the lane is not used for it. Use --engine-only-advisory to proceed with a warning; the brief must say so.")
+        if args.only_family:
+            return self._only_family_stop(stop, args, lanes)
         return stop
 
+    def _advisory(self, run: Run, lane: Lane, args: CallArgs) -> Run:
+        if run.mode != "write" or not args.engine_only or not args.engine_only_advisory or self.enforces_engine_only(lane, args):
+            return run
+        warning = f"{lane.name} cannot deny --engine-only {', '.join(args.engine_only)}: advisory only, the brief must say so"
+        return replace(run, flag="engine_only_advisory", warning="; ".join(x for x in (run.warning, warning) if x))
+
     def _only_family_stop(self, stop: Stop, args: CallArgs, lanes: dict[str, Lane]) -> Stop:
-        down = "; ".join(self._family_state(f, lanes) for f in args.only_family)
+        down = "; ".join(self._family_state(f, lanes, stop.role) for f in args.only_family)
         return replace(stop, reason="only_family_unready", ask_user=None,
                        say=f"{stop.say} --only-family {', '.join(args.only_family)}: no step of that family is ready ({down}); no other family is used.")
 
@@ -127,17 +142,34 @@ class Router:
                           then=f"route.py next {role_name} --allow-degraded")
         return Stop(role=role_name, say=say, reason=reason, resets=resets, ask_user=ask, trace=tuple(trace))
 
-    def _family_state(self, fam: str, lanes: dict[str, Lane]) -> str:
-        """Why no lane of `fam` is usable, in a few words: 'xai out until Sat 24 Oct 18:00', 'claude logged out', 'claude over its limit'."""
+    def _family_state(self, fam: str, lanes: dict[str, Lane], role: str | None = None) -> str:
+        """Why no lane of `fam` is usable, without mistaking full slots for usage limits."""
         mine = [lane for lane in lanes.values() if lane.family == fam]
         if not mine:
             return f"{fam} not set up"
-        lane = mine[0]
-        if lane.out:
-            if lane.out_reason == "logged_out":
-                return f"{fam} logged out"
-            return f"{fam} out" + (f" until {local(lane.out_until)}" if lane.out_until else "")
-        return f"{fam} over its limit"
+        lane = next((lane for lane in mine if (lane.busy or lane.out_reason == "busy")
+                     and not (lane.out and lane.out_reason != "busy")
+                     and replace(lane, out=False).usable(self.r.settings, True,
+                         hold=self.holds.covering(lane.name, role, self.t))[0]), mine[0])
+        if lane.out and lane.out_reason != "busy":
+            return self._family_out_state(fam, lane)
+        free = replace(lane, out=False) if lane.out_reason == "busy" else lane
+        usable, why = free.usable(self.r.settings, True)
+        if why.startswith(("weekly", "5h")):
+            return f"{fam} over its limit"
+        hold = self.holds.covering(lane.name, role, self.t)
+        if hold:
+            return f"{fam} {hold_text(hold)}"
+        if usable and (lane.busy or lane.out_reason == "busy"):
+            note = next((note for note in lane.notes if note.startswith("busy:")), "busy")
+            return f"{fam} {note}"
+        return f"{fam} not ready"
+
+    @staticmethod
+    def _family_out_state(fam: str, lane: Lane) -> str:
+        if lane.out_reason == "logged_out":
+            return f"{fam} logged out"
+        return f"{fam} out" + (f" until {local(lane.out_until)}" if lane.out_until else "")
 
     def _warning(self, step: Step, author: str | None, lanes: dict[str, Lane], picker: LanePicker) -> str | None:
         """One line for a same_family or degraded step; None for any other step."""
@@ -162,12 +194,12 @@ class Router:
             return LaneOut(lane=rec.lane, outcome="held", retry_after=hold.until,
                            say=f"{rec.lane} is on hold, {hold_text(hold)}. Continue with a fresh writer on another lane; existing file changes remain in the working directory.")
         s, lane = self.r.settings, lanes.get(rec.lane)
-        if lane is not None and rec.mode == "write" and args.engine_only and not self.enforces_engine_only(lane, args):
+        if lane is not None and rec.mode == "write" and args.engine_only and not args.engine_only_advisory and not self.enforces_engine_only(lane, args):
             return Stop(role=role, reason="engine_only_unenforced", lane=lane.name, trace=(f"{lane.name}: " + NO_ENGINE_ONLY.format(recipes=", ".join(args.engine_only)),),
-                        say=f"{ref} runs on {lane.name}, whose harness cannot deny --engine-only {', '.join(args.engine_only)} to a write step. Start a fresh writer on another lane.")
+                        say=f"{ref} runs on {lane.name}, whose harness cannot deny --engine-only {', '.join(args.engine_only)} to a write step. Start a fresh writer on another lane or use --engine-only-advisory; the brief must say so.")
         if lane is not None and lane.usable(s, True, rec.model)[0]:
-            return Run(role=role, lane=lane.name, model=rec.model, effort=rec.effort, mode=rec.mode, cap=args.cap or rec.cap, pass_="resume",
-                       rung=rec.rung, fallback=rec.fallback, fallback_reason=rec.fallback_reason, first_lane=rec.first_lane)
+            return self._advisory(Run(role=role, lane=lane.name, model=rec.model, effort=rec.effort, mode=rec.mode, cap=args.cap or rec.cap, pass_="resume",
+                       rung=rec.rung, fallback=rec.fallback, fallback_reason=rec.fallback_reason, first_lane=rec.first_lane), lane, args)
         why = lane.usable(s, True, rec.model)[1] if lane else "not usable by this caller"
         if lane is not None and lane.busy:       # its slots are taken: wait for one, the thread stays on its lane
             return Stop(reason="busy", lane=rec.lane, retry_after=lane.out_until, say=f"{rec.lane} has no free slot to continue {ref}: {lane.notes[0]}")

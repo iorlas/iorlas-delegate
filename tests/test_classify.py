@@ -26,7 +26,7 @@ from delegate.domain.policy.worker import denial, denial_item
 
 FIXTURES = sorted((ROOT / "tests" / "contract" / "fixtures").glob("*.json"))
 CONTRACT = json.loads((ROOT / "skills" / "delegate" / "contract.json").read_text(encoding="utf-8"))
-LAUNCH_ONLY = {"duplicate_task", "busy", "no_lane", "caller", "crash", "schema_invalid", "lock", "setup", "held"}      # answered outside the ladder
+LAUNCH_ONLY = {"duplicate_task", "busy", "no_lane", "caller", "engine_only_unenforced", "crash", "schema_invalid", "lock", "setup", "held"}      # answered outside the ladder
 
 
 def load(path):

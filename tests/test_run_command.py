@@ -1,5 +1,6 @@
 """`route.py run`: leases and slots, who runs unattended, history and status, limits and resume."""
 import dataclasses
+import io
 import json
 import os
 import sys
@@ -15,7 +16,8 @@ from stream_proc import proc_start
 from test_route import at, route, why
 
 from delegate.adapters.harness import opencode_sandbox as box
-from delegate.app import env, status
+from delegate.app import env, status, usage
+from delegate.app.fleet import Fleet
 from delegate.contracts.state import UsageCache
 from delegate.domain.lanes import leases
 from delegate.domain.lanes.lane import Lane
@@ -97,6 +99,98 @@ class RunCommand(RunBase):
         self.lease("c0", "CLAUDE_SUBSCRIPTION")
         _, r = self.run_it()
         self.assertEqual(why(r), "no_lane")          # one slot, taken: the first choice is out, so nothing waits for a slot
+
+    def strain_openai(self, five=85, week=8):
+        def read(lane, *args):
+            lane.five, lane.week = five, week
+        usage.READERS["codex_app_server"] = read
+
+    def test_a_pinned_strained_lane_retries_when_its_one_slot_is_taken(self):
+        self.strain_openai()
+        self.lease("r0", "OPENAI_SUBSCRIPTION", task="T-busy")
+        for unattended in (False, True):
+            with self.subTest(unattended=unattended):
+                before = time.time()
+                code, r = self.run_it("--only-family", "openai", unattended=unattended)
+                self.assertEqual((code, why(r), r["lane"]), (0, "busy", "OPENAI_SUBSCRIPTION"))
+                self.assertEqual((r["stop"]["permanence"], r["stop"]["retry"]["kind"]), ("transient", "poll"))
+                self.assertTrue(before + 60 <= at(r) <= time.time() + 120)
+                self.assertIn("openai busy: 1 running, 1 allowed", r["say"])
+                self.assertNotIn("over its limit", r["say"])
+                if unattended:
+                    self.assertEqual(r["transcript_status"], "not_launched")
+                last = json.loads(env.history_path().read_text().splitlines()[-1])
+                self.assertEqual((last["kind"], last["outcome"]), ("refusal", "busy"))
+        self.assertEqual(self.args_seen(), "")
+        with mock.patch.object(sys, "stdout", new_callable=io.StringIO) as out:
+            route.main(["status", "--json"])
+            running = json.loads(out.getvalue())["running"]
+        self.assertEqual([(r["run_id"], r["task"]) for r in running], [("r0", "T-busy")])
+
+    def test_a_pinned_family_uses_a_free_lane_or_waits_for_a_busy_one(self):
+        cfg = env.load_routing()
+        cfg["lanes"]["OPENAI_OTHER"] = dict(cfg["lanes"]["OPENAI_SUBSCRIPTION"])
+        self.lease("r0", "OPENAI_SUBSCRIPTION")
+        for other_out in (True, False):
+            with self.subTest(other_out=other_out):
+                fleet = {"OPENAI_OTHER": Lane("OPENAI_OTHER", "openai", "subscription", out=other_out),
+                         "OPENAI_SUBSCRIPTION": Lane("OPENAI_SUBSCRIPTION", "openai", "subscription", five=85, week=8)}
+                builder = mock.Mock()
+                builder.build.return_value = Fleet(fleet)
+                with mock.patch.object(env, "load_routing", return_value=cfg), mock.patch("delegate.app.decide.fleet_builder", return_value=builder):
+                    _, r = self.run_it("--only-family", "openai")
+                self.assertEqual(why(r), "busy" if other_out else None)
+                self.assertEqual(r["lane"], "OPENAI_SUBSCRIPTION" if other_out else "OPENAI_OTHER")
+
+    def test_a_pinned_family_really_out_or_over_ceiling_does_not_poll(self):
+        self.lease("r0", "OPENAI_SUBSCRIPTION")
+        for out in (False, True):
+            with self.subTest(out=out):
+                self.strain_openai(five=85, week=8 if out else 100)  # genuinely over the weekly ceiling, even with a free slot
+                if out:
+                    self.codex_out()
+                _, r = self.run_it("--only-family", "openai")
+                self.assertEqual(why(r), "no_lane")
+                self.assertNotEqual(r["stop"]["retry"]["kind"], "poll")
+                self.assertIn("openai out" if out else "openai over its limit", r["say"])
+                self.assertNotIn("openai busy", r["say"])
+
+    def test_a_pinned_busy_lane_on_hold_does_not_poll_for_a_slot(self):
+        self.strain_openai()
+        self.lease("r0", "OPENAI_SUBSCRIPTION")
+        support.add_hold("OPENAI_SUBSCRIPTION", env.now() + 3600, "owner hold")
+        _, r = self.run_it("--only-family", "openai")
+        self.assertEqual(why(r), "no_lane")
+        self.assertNotEqual(r["stop"]["retry"]["kind"], "poll")
+
+    def test_a_pinned_ready_lane_with_an_unsupported_guard_is_not_over_limit(self):
+        _, r = self.run_it("--only-family", "openai", "--engine-only", "release-check")
+        self.assertEqual(why(r), "engine_only_unenforced")
+        for text in ("OPENAI_SUBSCRIPTION", "--engine-only release-check", "--engine-only-advisory"):
+            self.assertIn(text, r["say"])
+        self.assertNotIn("over its limit", r["say"])
+        self.assertEqual((r["stop"]["scope"], r["stop"]["permanence"], r["stop"]["retry"]),
+                         ("caller", "needs_owner", {"kind": "none", "at": None}))
+        self.assertEqual(r["transcript_status"], "not_launched")
+        self.assertEqual(self.args_seen(), "")
+
+    def test_a_pinned_codex_writer_can_run_with_engine_only_advisory(self):
+        code, r = self.run_it("--only-family", "openai", "--engine-only", "release-check", "--engine-only", "e2e", "--engine-only-advisory")
+        self.assertEqual((code, r["stop"], r["lane"], r["flag"]), (0, None, "OPENAI_SUBSCRIPTION", "engine_only_advisory"))
+        self.assertEqual(r["warning"], "OPENAI_SUBSCRIPTION cannot deny --engine-only release-check, e2e: advisory only, the brief must say so")
+        self.assertTrue(self.args_seen())
+
+    def test_unpinned_engine_only_still_uses_an_enforcing_lane(self):
+        _, r = self.run_it("--engine-only", "release-check")
+        self.assertEqual((r["stop"], r["lane"]), (None, "CLAUDE_SUBSCRIPTION"))
+        self.assertNotEqual(r["flag"], "engine_only_advisory")
+        self.assertNotIn("warning", r)
+
+    def test_unpinned_engine_only_without_an_enforcing_lane_keeps_no_lane(self):
+        support.put_out("CLAUDE_SUBSCRIPTION", env.now() + 3600)
+        _, r = self.run_it("--engine-only", "release-check")
+        self.assertEqual(why(r), "no_lane")
+        self.assertEqual(self.args_seen(), "")
 
     def test_the_same_task_never_runs_twice_at_once(self):
         self.lease("r0", "OPENAI_SUBSCRIPTION", task="T-1")

@@ -131,7 +131,7 @@
    "permanence": "transient",
    "retry": "poll",
    "health": "none",
-   "wording": "every slot of the lane is taken"
+   "wording": "every slot of an otherwise usable lane is taken, including a pinned --only-family"
   },
   "no_lane": {
    "scope": "machine",
@@ -139,6 +139,13 @@
    "retry": "none",
    "health": "none",
    "wording": "no lane can take this role now"
+  },
+  "engine_only_unenforced": {
+   "scope": "caller",
+   "permanence": "needs_owner",
+   "retry": "none",
+   "health": "none",
+   "wording": "a write lane cannot deny the engine-only recipes, including with --only-family; use --engine-only-advisory and state it in the brief to proceed"
   },
   "duplicate_task": {
    "scope": "bead",
@@ -193,6 +200,7 @@
   "--task",
   "--title",
   "--engine-only",
+  "--engine-only-advisory",
   "--only-family",
   "--call-id"
  ],

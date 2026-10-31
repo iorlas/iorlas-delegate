@@ -144,6 +144,7 @@ class CallArgs:
     cap: float | None = None
     only_family: tuple[str, ...] = ()       # the families a call may use: the role's steps are filtered to them, no fallback outside
     engine_only: tuple[str, ...] = ()       # recipes only the engine runs: a write step needs a lane whose harness can deny them
+    engine_only_advisory: bool = False     # allow unsupported write lanes with an explicit warning
 
 
 @record
@@ -174,7 +175,7 @@ class Run:
         d: dict[str, Any] = {"action": "run", "role": self.role, "pass": self.pass_, "rung": self.rung, "fallback": self.fallback,
              "fallback_reason": self.fallback_reason, "first_lane": self.first_lane, "lane": self.lane, "model": self.model,
              "effort": self.effort, "mode": self.mode, "cap": self.cap}
-        if self.pass_ != "resume":
+        if self.pass_ != "resume" or self.flag is not None:
             d["flag"] = self.flag
         if self.trace is not None:
             d["trace"] = list(self.trace)

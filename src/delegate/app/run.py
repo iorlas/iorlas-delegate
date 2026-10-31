@@ -94,6 +94,8 @@ class Run:
             self.extra.update(ask_user=d["ask_user"], ask_kind="decision")
         if d.get("reason") == "busy":
             return self.refuse("busy", d["say"], d["retry_after"], lane=d.get("lane"))
+        if d.get("reason") == "engine_only_unenforced" and getattr(a, "only_family", None):
+            return self.refuse("engine_only_unenforced", d["say"], None)
         return self.refuse("no_lane", d["say"], retry)
 
     def _run(self, d: dict, lanes: dict, t: float, who: dict, brief: str):

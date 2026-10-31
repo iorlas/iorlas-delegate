@@ -9,7 +9,7 @@ from unittest import mock
 import hermetic  # noqa: F401  (a home of its own for every test)
 from test_route import route
 
-from delegate.app import launch
+from delegate.app import decide, launch
 from delegate.cli import parser
 from delegate.contracts import wire
 from delegate.domain.policy.worker import judge
@@ -52,6 +52,17 @@ class EngineOnlyRequestTest(unittest.TestCase):
         self.assertNotIn("--engine-only", argv)
         self.assertNotIn("engine-only", cmd)
         self.assertEqual(guard("just unity-tests")[0], 0)
+
+    def test_advisory_request_reaches_the_router_and_keeps_supported_guards(self):
+        argv, cmd = self.flags(engine_only=["unity-tests", "e2e"], engine_only_advisory=True)
+        ns = parser.build().parse_args(argv[2:])
+        args = decide.call_args(ns, unattended=True)
+        self.assertTrue(args.engine_only_advisory)
+        self.assertEqual(args.engine_only, ("unity-tests", "e2e"))
+        self.assertIn("--engine-only=unity-tests", cmd)
+        self.assertEqual(argv.count("--engine-only-advisory"), 1)
+        default = wire.RunRequest(role="writer", brief_file="b", cwd="/w").to_argv("route.py")
+        self.assertNotIn("--engine-only-advisory", default)
 
 
 class WriterGuardTest(unittest.TestCase):

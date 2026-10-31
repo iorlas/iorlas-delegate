@@ -84,6 +84,18 @@
    }
   },
   {
+   "id": "engine_only_unenforced",
+   "expected_reason": "engine_only_unenforced",
+   "synthetic": true,
+   "source": "tests/test_run_command.py::RunCommand::test_a_pinned_ready_lane_with_an_unsupported_guard_is_not_over_limit",
+   "expected_stop": {
+    "reason": "engine_only_unenforced",
+    "scope": "caller",
+    "permanence": "needs_owner",
+    "retry_kind": "none"
+   }
+  },
+  {
    "id": "crash",
    "expected_reason": "crash",
    "history": {
