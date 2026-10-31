@@ -89,11 +89,24 @@ class Router:
                                first_lane=first_lane if fb else None, trace=tuple(trace),
                                warning=self._warning(step, args.authored_by, lanes, picker))
         stop = self._stop(role_name, role, tiers, args, lanes, trace)
-        if skipped and stop.reason is None:
+        return self._typed_stop(stop, args, lanes, skipped)
+
+    def _typed_stop(self, stop: Stop, args: CallArgs, lanes: dict[str, Lane], skipped: list[str]) -> Stop:
+        """A stop with no reason yet gets the one the call's own limits explain: --only-family, else --engine-only."""
+        if stop.reason is not None:
+            return stop
+        if args.only_family:
+            return self._only_family_stop(stop, args, lanes)
+        if skipped:
             names = ", ".join(sorted(set(skipped)))
             return replace(stop, reason="engine_only_unenforced", ask_user=None,
                            say=f"{stop.say} --engine-only {', '.join(args.engine_only)} cannot be denied to a write step on {names}: the lane is not used for it.")
         return stop
+
+    def _only_family_stop(self, stop: Stop, args: CallArgs, lanes: dict[str, Lane]) -> Stop:
+        down = "; ".join(self._family_state(f, lanes) for f in args.only_family)
+        return replace(stop, reason="only_family_unready", ask_user=None,
+                       say=f"{stop.say} --only-family {', '.join(args.only_family)}: no step of that family is ready ({down}); no other family is used.")
 
     def _tier_error(self, role: Role, args: CallArgs) -> str:
         if args.premium and not self.r.premium.get(args.premium):
@@ -107,7 +120,7 @@ class Router:
         barred = self.plan.all_barred(role)
         if barred and not tiers:
             reason, say = "loop_excluded", f"{role.stop} Nothing is left to route: " + "; ".join(barred) + "."
-        consent = [x for x in role.degraded_needs_consent if not self.plan.barred(x, role)]
+        consent = [x for x in role.degraded_needs_consent if not self.plan.barred(x, role) and self.plan.in_family(x, args)]
         ask = None
         if consent and not args.allow_degraded:
             ask = AskUser(question="No adequate model is available. Run a degraded option?", options=tuple(f"{x.model} {x.effort}" for x in consent),

@@ -142,6 +142,7 @@ class CallArgs:
     unattended: bool = False
     resume: str | None = None
     cap: float | None = None
+    only_family: tuple[str, ...] = ()       # the families a call may use: the role's steps are filtered to them, no fallback outside
     engine_only: tuple[str, ...] = ()       # recipes only the engine runs: a write step needs a lane whose harness can deny them
 
 

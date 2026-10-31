@@ -5,8 +5,8 @@ description: Delegate a sub-task to another model or subscription, only when the
 
 `DELEGATE_DEPTH` set = you are a worker: do not delegate.
 Use Bash `run_in_background`.
-`python3 ${CLAUDE_SKILL_DIR}/route.py run ROLE [--cwd D] [--authored-by openai|claude|xai|deepseek] [--premium] [--allow-degraded] [--claude-usage JSON] [--engine-only RECIPE]... < brief`  (engine-only: write guard blocks `just RECIPE`)
-Roles: planner (plan) · worker (implement) · reviewer (`--authored-by`: family that wrote it) · light (read).
+`python3 ${CLAUDE_SKILL_DIR}/route.py run ROLE [--cwd D] [--authored-by openai|claude|xai|deepseek] [--premium] [--allow-degraded] [--claude-usage JSON] [--engine-only RECIPE]... [--only-family F]... < brief`  (engine-only: write guard blocks `just RECIPE`; only-family: only F or stop)
+Roles: planner (plan) · worker (implement) · reviewer (`--authored-by`: author's family) · light (read).
 
 | answer | do |
 |---|---|
@@ -19,7 +19,7 @@ Roles: planner (plan) · worker (implement) · reviewer (`--authored-by`: family
 | `needs_input` `claude_usage` | `get_usage`; rerun with `--claude-usage '<plan.windows>'` |
 | `notice` | tell the user once |
 
-No Python 3.8+: Agent tool only, no worktree, effort in the brief.
+No Python 3.8+: Agent tool only.
 
 <!-- base-table -->
 | role | agent, in order |
@@ -30,7 +30,7 @@ No Python 3.8+: Agent tool only, no worktree, effort in the brief.
 | light | haiku low > sonnet low |
 <!-- /base-table -->
 
-Review never blocks: if only the author's family is up, it reviews itself (`flag` same_family: say so).
+Review never blocks: only the author's family up = self-review (`flag` same_family: say so).
 
 Brief: goal, files, constraints, acceptance check, "no commits". Own git; parallel writers: one directory each. `--premium` only if the user names it. Never delegate scope, design, plan, acceptance.
 `modes/`: init codex extend zai-coding deepseek-free

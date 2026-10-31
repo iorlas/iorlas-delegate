@@ -29,6 +29,10 @@ class TierPlan:
         steps = [*role.steps, *(s for v in (role.by_author or {}).values() for s in v)]
         return sorted({why for s in steps if (why := self.barred(s, role))})
 
+    @staticmethod
+    def in_family(step: Step, args: CallArgs) -> bool:
+        return not args.only_family or step.on in args.only_family
+
     def steps_for(self, role: Role, args: CallArgs, off: frozenset[str] = frozenset()) -> list[Step] | None:
         """`off`: families of opt-in lanes the owner has not enabled; their steps are not in the ladder.
         None when the call names an author or a premium family the role/table does not know."""
@@ -44,7 +48,7 @@ class TierPlan:
             if not prem:
                 return None
             steps = [prem, *steps]
-        return steps
+        return [x for x in steps if self.in_family(x, args)]
 
     def tiers(self, role: Role, args: CallArgs, off: frozenset[str] = frozenset()) -> list[list[Step]] | None:
         steps = self.steps_for(role, args, off)
@@ -63,5 +67,5 @@ class TierPlan:
         tiers = [x for x in tiers if x]
         if args.allow_degraded and role.degraded_needs_consent:
             tiers.append([replace(x, flag="degraded_with_consent", idx=len(steps) + i)
-                          for i, x in enumerate(role.degraded_needs_consent) if not self.barred(x, role)])
+                          for i, x in enumerate(role.degraded_needs_consent) if not self.barred(x, role) and self.in_family(x, args)])
         return tiers
