@@ -48,15 +48,28 @@ class Router:
             skipped.append(n)
         return out
 
-    def route(self, role: str, args: CallArgs, lanes: dict[str, Lane], rec: RefRecord | None = None) -> Decision:
+    def route(self, role: str, args: CallArgs, lanes: dict[str, Lane], rec: RefRecord | None = None,
+              avoid: frozenset[tuple[str, str]] = frozenset()) -> Decision:
         """The call's decision: `--resume` continues its thread on its lane; otherwise the role's chain. An unattended caller (an engine) has
         no one to ask, and waits for a busy first choice."""
         if args.resume:
             return self.resume(role, args, rec, lanes)
-        d = self.decide(role, replace(args, allow_degraded=args.allow_degraded and not args.unattended), lanes, wait_busy=args.unattended)
+        args = replace(args, allow_degraded=args.allow_degraded and not args.unattended)
+        alternative: Decision | None = None
+        if avoid:
+            alternative = self.decide(role, args, lanes, avoid=avoid)
+            if isinstance(alternative, Run):
+                return alternative
+        d = self.decide(role, args, lanes, wait_busy=args.unattended)
+        if avoid and isinstance(d, Run):
+            why = "; ".join(alternative.trace or ()) if isinstance(alternative, Stop) else "no eligible step"
+            pin = f" within --only-family {', '.join(args.only_family)}" if args.only_family else ""
+            warning = f"no other lane/model ready{pin} after timeout/schema_invalid: {why or 'no eligible alternative'}"
+            d = replace(d, warning="; ".join(x for x in (d.warning, warning) if x))
         return replace(d, ask_user=None) if args.unattended and isinstance(d, Stop) else d
 
-    def decide(self, role_name: str, args: CallArgs, lanes: dict[str, Lane], wait_busy: bool = False) -> Decision:
+    def decide(self, role_name: str, args: CallArgs, lanes: dict[str, Lane], wait_busy: bool = False,
+               avoid: frozenset[tuple[str, str]] = frozenset()) -> Decision:
         role = self.r.roles.get(role_name)
         if role is None:
             return Error(error=f"unknown role {role_name}; roles: {', '.join(self.r.roles)}")
@@ -80,7 +93,11 @@ class Router:
         for tier in tiers:
             for relaxed in (False, True):
                 for step in tier:
-                    lane = picker.pick(step.on, self._writable(step, args, lanes, trace, skipped), relaxed, trace, step.model)
+                    eligible = self._writable(step, args, lanes, trace, skipped)
+                    for n in eligible:
+                        if (n, step.model) in avoid:
+                            trace.append(f"{n}/{step.model}: avoided after timeout/schema_invalid")
+                    lane = picker.pick(step.on, {n: candidate for n, candidate in eligible.items() if (n, step.model) not in avoid}, relaxed, trace, step.model)
                     if lane is None:
                         continue
                     fb = step is not first

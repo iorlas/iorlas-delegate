@@ -15,7 +15,7 @@ from test_route import ROOT
 
 sys.path.insert(0, str(ROOT / "skills" / "delegate"))
 import stream_proc
-from stream_proc import alive, procfs
+from stream_proc import alive, proc_start
 
 from delegate.adapters import procs
 from delegate.adapters.harness.base import LaunchSpec
@@ -118,7 +118,7 @@ class RealProcesses(unittest.TestCase):
         self.assertEqual(json.loads(out.out.splitlines()[-1])["result"], "fake answer")
         end = procs.worker_end(hooks.stops, None)
         self.assertEqual((end.end, end.stopped), (wire.END_OK, False))
-        self.assertEqual((out.worker.pgid, bool(out.worker.start)), (out.worker.pid, procfs.has_proc()))
+        self.assertEqual((out.worker.pgid, bool(out.worker.start)), (out.worker.pid, bool(proc_start(os.getpid()))))
 
     def test_call_timeout_stops_a_worker_that_ignores_sigterm(self):
         t0 = time.time()

@@ -198,7 +198,7 @@ class RunStops(RunBase):
         self.assertEqual((r["stop"], r["data"]), (None, {"a": 1}))
         self.assertIn("resume", self.args_seen().splitlines()[-1])
         self.assertEqual(r["tokens"]["in"], 200)
-        _, r = self.run_it("--schema", str(schema), mode="badjson_always")
+        _, r = self.run_it("--schema", str(schema), "--only-family", "openai", mode="badjson_always")
         self.assertEqual((why(r), r["stop"]["permanence"]), ("schema_invalid", "transient"))
         self.assertIn("$.a is missing", r["say"])
 

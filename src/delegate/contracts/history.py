@@ -31,6 +31,8 @@ class RunRow:
     outcome: str | None = None
     fingerprint: str | None = None
     say: str | None = None
+    raw_answer: str | None = None
+    schema_problem: str | None = None
     until: float | None = None
     warnings: list[str] | None = None
     stream_tail: Any = None

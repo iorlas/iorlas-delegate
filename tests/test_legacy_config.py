@@ -29,7 +29,8 @@ class LegacyConfig(unittest.TestCase):
 
     def run_py(self, *args):
         os.environ["FAKE_MODE"] = "ok"
-        p = subprocess.run([sys.executable, str(ROUTE_PY), *args], input="do the thing\nthe brief", env=os.environ, capture_output=True, text=True, timeout=60)
+        penv = dict(os.environ, PATH=str(self.base / "bin") + os.pathsep + os.defpath)
+        p = subprocess.run([sys.executable, str(ROUTE_PY), *args], input="do the thing\nthe brief", env=penv, capture_output=True, text=True, timeout=60)
         return p
 
     def run_worker(self):

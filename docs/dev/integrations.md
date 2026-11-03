@@ -50,8 +50,13 @@ as a script, with no Claude session behind it. The contract is `skills/delegate/
 - Roles own models: the caller picks the role, never the model. The reviewer's Claude rungs run Sonnet.
 - `--engine-only RECIPE` (repeatable) requires a write lane whose harness can deny `just RECIPE`. Codex has no such hook under `codex exec` and is dropped by default. When a pinned `--only-family openai` lane is dropped, `stop.reason` is `engine_only_unenforced` (caller / needs_owner / none), with the lane, recipes, and `--engine-only-advisory` remedy in `say`. With that flag, unsupported lanes remain eligible, including on resume, and the answer carries `flag: "engine_only_advisory"` and a one-line `warning`: "<lane> cannot deny --engine-only <recipes>: advisory only, the brief must say so". No consent is needed. The caller must state in the brief that those recipes are reserved for the engine and enforcement is advisory. Supported harness guards remain active; read steps ignore the list. `RunRequest.engine_only_advisory` defaults to false and emits the flag only when true.
 - `context` (per run, scripts only; interactive answers leave it out): `{instructions: [repo instruction files given], env_keys: [names passed]}`;
-- With `--schema`, delegate checks the answer (type, required, properties, items, enum), re-asks once in the same thread, and answers
-  `schema_invalid` when it still does not fit; tokens and denials of both turns add up.
+- With `--schema`, delegate checks the answer (type, required, properties, items, enum) and re-asks once in the same thread.
+  If that still fails, a fresh call tries one different ready lane/model (two attempts total, each with its own re-ask and history row).
+  Resume calls stay on their original thread. If no alternative is ready, `schema_invalid.say` explains why no reroute happened.
+  Tokens, cost and denials of a re-ask add to its attempt; the answer describes the last attempt, history keeps usage for every attempt.
+- Fresh `--task` calls avoid lane/model pairs that ended with `timeout` or `schema_invalid` for the same task and role in the last six hours.
+  `--only-family` filters first; if no different pair is ready, the normal choice proceeds with a `warning` explaining why. Resume and calls
+  without `--task` do not consult task failures. Schema reroutes use the same avoidance, including when no task was given.
 - stdout is exactly one JSON object (`contract` = 3, `stop`, `context`, `data`, `text`, `ref`, `lane`, `model`, `effort`, `family`, `flag`, `cost`, `tokens`, `secs`, `run_id`,
   `transcript`, `say`, `git_violation`, plus `usage`, `call_id`, `transcript_info`, `transcript_status`; `agent_model`, `brief_prefix`, `cwd` on the interactive handoff); `tokens` is `{in, cached, out}` or null, and `in` counts all input including cache reads
   (and Claude cache writes); exit 0 whenever it was printed, a bad flag or argument of `run` included (`bad_request`, `fix` names the argparse message, no worker started).
@@ -127,7 +132,10 @@ as a script, with no Claude session behind it. The contract is `skills/delegate/
   `state.json` or `history.jsonl`.
   A lane's `reason` (when `out`): limit, logged_out, busy or error.
 - `history.jsonl` (config dir, private; rotated: lines older than 14 days are dropped once it passes 1 MB): one line per finished run: role, task, lane, model, effort, done or outcome, secs, cost, tokens, 5-hour and weekly use before and after, ids of runs
-  that overlapped it, slots. For calibration; never the brief. Not part of the contract.
+  that overlapped it, slots. Schema failures also keep `raw_answer` (first 20 KiB, cut at a UTF-8 boundary) and `schema_problem`; `say` includes the problem.
+  For calibration; never the brief. Not part of the contract. These diagnostics remain in private history: the linked agent-runs v1 spec
+  returned 404 when checked, so no compatible diagnostic field could be verified. The v1 record still reports failure and transcript;
+  `tl trace` cannot show the raw answer from that record alone.
 - `route.py status --claude-usage '<get_usage plan.windows JSON>'` is part of the contract: it stores the reading for later `run`s. Keep that command and input shape, or bump `v`.
 - `reviewer`: `--authored-by openai|claude|xai|deepseek|zai` is optional (the family that wrote the diff). Order (delegate-qjw, delegate-pnz): Codex first wherever it is another family; then the other non-Claude
   families, cheapest first by the `cost` configured per model in `routing.json` (roles with `"order": "cost"`; never by name); then the author's own non-Claude family; then Claude Sonnet last. The same-family review
