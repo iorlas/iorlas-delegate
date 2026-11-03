@@ -6,6 +6,7 @@ import routing_support as support
 from run_support import RunBase
 from test_route import CFG, lanes, why
 
+from delegate.adapters import git
 from delegate.app import env, launch
 from delegate.contracts import history as hist
 from delegate.contracts.routing import CallArgs, Step
@@ -112,6 +113,25 @@ class RunReroute(RunBase):
         self.assertEqual(worker.call_count, 4)
         self.assertIsNone(worker.call_args_list[2].args[2].resume)
         self.assertEqual(why(result), "schema_invalid")
+
+    def test_reroute_reports_first_attempt_head_change(self):
+        state = {"head": "111111111", "branch": "main"}
+
+        def worker(d, *args):
+            res = self.fake(d, *args)
+            if d["lane"] == "OPENAI_SUBSCRIPTION":
+                state["head"] = "222222222"
+            else:
+                res.update(data={"a": 1}, text='{"a":1}')
+            return res
+
+        with support.fleet_patches(lanes()), mock.patch.object(git, "state", side_effect=lambda cwd: dict(state)), \
+                mock.patch.object(launch, "launch_worker", side_effect=worker) as launched:
+            _, result = self.run_it("--schema", self.schema())
+        self.assertIsNone(result["stop"])
+        self.assertEqual(launched.call_count, 3)
+        self.assertEqual([r.done for r in self.rows()], [False, True])
+        self.assertEqual(result["git_violation"], ["HEAD 111111111 -> 222222222"])
 
     def test_schema_single_lane_says_why_it_did_not_reroute(self):
         with support.fleet_patches(lanes()), mock.patch.object(launch, "launch_worker", side_effect=self.fake) as worker:
