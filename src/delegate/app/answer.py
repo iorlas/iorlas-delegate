@@ -6,17 +6,46 @@ from typing import Any
 from delegate.contracts import codec, stops, wire
 from delegate.domain.cost import accounting
 
+TYPES = ("object", "array", "string", "boolean", "null", "number", "integer")
+
+
+def is_type(data: Any, w: str) -> bool:
+    """JSON Schema type test: a bool is no number, and 1.0 is an integer."""
+    if w in ("number", "integer"):
+        return not isinstance(data, bool) and (isinstance(data, int) or (isinstance(data, float) and (w == "number" or data.is_integer())))
+    return isinstance(data, {"object": dict, "array": list, "string": str, "boolean": bool, "null": type(None)}[w])
+
+
+def same(a: Any, b: Any) -> bool:
+    """JSON equality: True is not 1 (Python's `True == 1` would accept it), at any depth."""
+    if isinstance(a, bool) or isinstance(b, bool):
+        return isinstance(a, bool) and isinstance(b, bool) and a == b
+    if isinstance(a, list) and isinstance(b, list):
+        return len(a) == len(b) and all(same(x, y) for x, y in zip(a, b, strict=True))
+    if isinstance(a, dict) and isinstance(b, dict):
+        return a.keys() == b.keys() and all(same(a[k], b[k]) for k in a)
+    return a == b
+
+
+def type_problem(data: Any, schema: dict, at: str) -> str | None:
+    want = schema.get("type")
+    want = want if isinstance(want, list) else [want] if want else []
+    unknown = next((w for w in want if w not in TYPES), None)
+    if unknown is not None:
+        return f"{at}: unsupported schema type {unknown!r}"
+    if want and not any(is_type(data, w) for w in want):
+        return f"{at} is not {'/'.join(want)}"
+    return None
+
 
 def schema_problem(data: Any, schema: dict, at: str = "$"):
     """None when `data` fits the JSON schema subset delegate checks (type, required, properties, items, enum), else what is wrong."""
     if not isinstance(schema, dict):
         return None
-    kinds = {"object": dict, "array": list, "string": str, "boolean": bool, "null": type(None), "number": (int, float), "integer": int}
-    want = schema.get("type")
-    want = want if isinstance(want, list) else [want] if want else []
-    if want and not any(isinstance(data, kinds.get(w, object)) and not (w in ("number", "integer") and isinstance(data, bool)) for w in want):
-        return f"{at} is not {'/'.join(want)}"
-    if "enum" in schema and data not in schema["enum"]:
+    why = type_problem(data, schema, at)
+    if why:
+        return why
+    if "enum" in schema and not any(same(data, e) for e in schema["enum"]):
         return f"{at} is not one of {schema['enum']}"
     if isinstance(data, dict):
         for k in schema.get("required") or []:
