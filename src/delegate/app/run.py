@@ -81,6 +81,7 @@ class Run:
         brief = Path(self.a.brief).read_text(encoding="utf-8", errors="replace") if self.a.brief else sys.stdin.read()
         if not brief.strip():
             return self.emit("caller", **who, call_id=call_id, say="empty brief: pass it on stdin or with --brief FILE", **self.extra)
+        self.git_before = git.state(h["cwd"])
         res = self._run(d, lanes, t, who, brief)
         if isinstance(res, dict) and res.get("outcome") == "schema_invalid" and not self.a.resume:
             res = self._reroute(res, brief)
@@ -138,8 +139,8 @@ class Run:
         meta = {"parent_session": a.parent or "", "title": a.title or brief.strip().splitlines()[0][:120]}
         if a.task:
             meta["task"] = a.task
-        fam, cwd = who["family"], h["cwd"]
-        git_before, t0 = git.state(cwd), time.time()
+        fam = who["family"]
+        git_before, t0 = self.git_before, time.time()
         t_from = file_size(harnesses.find_transcript(a.resume, fam)) if a.resume else 0
         try:
             res = self._launch(d, brief, rid, t, meta, hooks, canary_due)
