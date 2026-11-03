@@ -31,9 +31,9 @@
   },
   {
     "name": "stream_proc",
-    "shelf_tag": "stream-proc-v0.2.1",
-    "shelf_commit": "cc2d51190e27117f9b2475d49a7b9b54608d9047",
-    "tree_hash": "61674c044156d7524f4185b439971f883dac8773bbd597cc27af91c50e6c5c3f"
+    "shelf_tag": "stream-proc-v0.2.2",
+    "shelf_commit": "c3b4e94d40f55bf386036cd9c6246af5ea763d0d",
+    "tree_hash": "e23a7644f5f7490f5b766fc2102bc40acc79d3c679cfe3fef863f4500c9fcf40"
   },
   {
     "name": "timefmt",
