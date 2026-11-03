@@ -1,0 +1,17 @@
+# The root config plus what the domain never touches: the world (a clock or a path is passed in). TID251 names the one-file stdlib
+# modules import-linter cannot (see .importlinter). Imports inside a function are PLC0415, selected by the root PL.
+extend = "../../../ruff.toml"
+
+[lint]
+extend-select = ["TID251"]
+
+[lint.flake8-tidy-imports.banned-api]
+"os".msg = "the domain computes; the world is passed in"
+"subprocess".msg = "the domain computes; the world is passed in"
+"socket".msg = "the domain computes; the world is passed in"
+"time".msg = "the domain computes; a clock is passed in"
+"random".msg = "the domain computes; randomness is passed in"
+"shutil".msg = "the domain computes; the world is passed in"
+"pathlib".msg = "the domain computes; the world is passed in"
+"sys".msg = "the domain computes; the world is passed in"
+"uuid".msg = "the domain computes; ids are passed in"

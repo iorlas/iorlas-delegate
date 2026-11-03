@@ -97,7 +97,6 @@ max-complexity = 12
 "tests/test_hermetic.py" = ["SIM115"]
 "tests/test_holds.py" = ["E501", "E741", "PLC0415", "RUF059"]
 "tests/test_kill_tree.py" = ["E501", "PLC0415", "UP031"]
-"tests/test_layers.py" = ["E501"]
 "tests/test_legacy_config.py" = ["E501", "PLW1510"]
 "tests/test_live_events.py" = ["B007", "E501"]
 "tests/test_net.py" = ["E402", "E501", "E731", "E741", "PLC0415", "UP031"]
