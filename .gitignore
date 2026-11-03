@@ -10,3 +10,4 @@ __pycache__/
 .beads/proxieddb/
 *.gate.lock*
 .mise/
+.worktrees/
