@@ -1,9 +1,12 @@
 """The router is pure and replays the characterization goldens (golden/decisions.json, taken from route.py before D2 moved it)."""
 import json
+import os
 import socket
 import sys
+import time
 import unittest
 from pathlib import Path
+from unittest import mock
 
 import hermetic  # noqa: F401  (a home of its own for every test)
 
@@ -55,6 +58,13 @@ def run_scenario(sc):
 
 
 class Replay(unittest.TestCase):
+    def setUp(self):
+        zone = mock.patch.dict(os.environ, TZ="UTC")
+        zone.start()
+        self.addCleanup(time.tzset)
+        self.addCleanup(zone.stop)
+        time.tzset()
+
     def test_every_golden_decision_is_reproduced(self):
         for sc in GOLDEN:
             with self.subTest(sc["name"]):

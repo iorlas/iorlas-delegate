@@ -26,9 +26,9 @@ class RunOpenCode(RunBase):
         self.assertLess(time.time() - t0, 20)
         self.assertEqual((why(r), r["stop"]["permanence"], r["lane"]), ("rate_limited", "transient", "GROK_SUBSCRIPTION"))
         out = env.load_state().out["GROK_SUBSCRIPTION"]
-        self.assertIn("Free usage limit reached", out["why"])
-        self.assertGreater(out["until"], time.time())
-        self.assertLessEqual(out["until"], (time.time() // 86400 + 1) * 86400 + 1)
+        self.assertIn("Free usage limit reached", out.why)
+        self.assertGreater(out.until, time.time())
+        self.assertLessEqual(out.until, (time.time() // 86400 + 1) * 86400 + 1)
         self.assert_child_gone(pid)
 
     @unittest.skipIf(sys.platform != "darwin", "the Grok lane runs commands under sandbox-exec: macOS only")
@@ -63,7 +63,8 @@ class RunOpenCode(RunBase):
         self.assertEqual(r["tokens"], {"in": 50, "cached": 40, "out": 5})
         self.assertTrue(r["transcript"].endswith("opencode-sessions/ses_1.json") and Path(r["transcript"]).is_file())
         args, env = self.args_seen().splitlines()[-1], Path(os.environ["FAKE_ENV"]).read_text()
-        self.assertIn("run --pure --format json -m xai/grok-4.7 --variant medium", args)
+        self.assertIn("run --pure --format json", args)
+        self.assertIn("-m xai/grok-4.7 --variant medium", args)
         self.assertIn("OPENCODE_DISABLE_PROJECT_CONFIG=1", env)
         self.assertNotIn(f"XDG_CONFIG_HOME={self.tmp.name}\n", env)         # the user's ~/.config/opencode stays out
         perm = json.loads(next(l for l in env.splitlines() if l.startswith("OPENCODE_CONFIG_CONTENT="))[len("OPENCODE_CONFIG_CONTENT="):])["permission"]

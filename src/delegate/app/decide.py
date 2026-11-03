@@ -11,6 +11,7 @@ from delegate.adapters import agent_runs, git
 from delegate.app import env, onboard
 from delegate.app.fleet import FleetBuilder, drift_warnings, mark_busy, settle_holds
 from delegate.app.usage import READERS
+from delegate.contracts.history import RunRow
 from delegate.contracts.routing import CallArgs, Run
 from delegate.contracts.state import StateDoc
 from delegate.contracts.stores import CheckpointStore
@@ -123,7 +124,10 @@ def call_args(a: env.Args, unattended: bool):
                     engine_only_advisory=bool(getattr(a, "engine_only_advisory", False)))
 
 
-def decision(a: env.Args, cfg: dict, unattended: bool = False):
+RETRY_LOOKBACK_S = 6 * 3600
+
+
+def decision(a: env.Args, cfg: dict, unattended: bool = False, avoid: frozenset[tuple[str, str]] = frozenset()):
     """next and run share this: build the fleet, route, remember the lane choice. -> (d, lanes, warnings, t); d is the JSON answer of `next`."""
     t = env.now()
     st = env.load_state()
@@ -134,8 +138,11 @@ def decision(a: env.Args, cfg: dict, unattended: bool = False):
     publish_lanes(fleet.lanes, st, t)
     lanes = mark_busy(fleet.lanes, st, routing.settings, t, busy_jitter)
     args = call_args(a, unattended)
+    if getattr(a, "task", None) and not args.resume:
+        avoid |= frozenset((r.lane, r.model) for r in env.history_store().rows(t - RETRY_LOOKBACK_S)
+                           if isinstance(r, RunRow) and r.ts <= t and r.task == a.task and r.role == a.role and r.outcome in ("timeout", "schema_invalid"))
     router = Router(routing, HoldBook(st.holds), st.prev, t)
-    pick = router.route(a.role, args, lanes, st.refs.get(args.resume or ""))
+    pick = router.route(a.role, args, lanes, st.refs.get(args.resume or ""), avoid)
     d = pick.as_dict()
     if isinstance(pick, Run):
         step: dict[str, Any] = {"model": pick.model, "effort": pick.effort, "mode": pick.mode}

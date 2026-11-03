@@ -27,6 +27,7 @@ from delegate.domain.policy.worker import GIT_RULES, SECRET_RULE
 
 CANARY_BRIEF = "Reply with exactly: OK"
 CANARY_TIMEOUT_S = 30
+SCHEMA_RAW_BYTES = 20 * 1024
 IDENTITY = ("lane", "model", "effort", "family", "flag", "rung", "fallback", "fallback_reason", "first_lane")
 
 
@@ -80,6 +81,26 @@ class Run:
         brief = Path(self.a.brief).read_text(encoding="utf-8", errors="replace") if self.a.brief else sys.stdin.read()
         if not brief.strip():
             return self.emit("caller", **who, call_id=call_id, say="empty brief: pass it on stdin or with --brief FILE", **self.extra)
+        res = self._run(d, lanes, t, who, brief)
+        if isinstance(res, dict) and res.get("outcome") == "schema_invalid" and not self.a.resume:
+            res = self._reroute(res, brief)
+        return self.emit(res.pop("outcome", None), **res) if isinstance(res, dict) else res
+
+    def _reroute(self, res: dict, brief: str):
+        """One fresh attempt after the re-ask failed; each attempt has already kept its own history and usage."""
+        pair = (res["lane"], res["model"])
+        d, lanes, warnings, t = decide.decision(self.a, self.cfg, self.unattended, frozenset((pair,)))
+        if d["action"] != "run" or (d["lane"], d["model"]) == pair or d["how"]["kind"] == "agent_tool":
+            res["say"] += "; no reroute: " + (d.get("warning") or d.get("say") or "no other executable lane/model ready")
+            return res
+        if warnings:
+            self.extra["warnings"] = warnings
+        self.extra.pop("warning", None)
+        if d.get("warning"):
+            self.extra["warning"] = d["warning"]
+            print("warning: " + d["warning"], file=sys.stderr)
+        who = {k: d.get(k) for k in IDENTITY}
+        who["family"] = self.cfg["lanes"][d["lane"]]["family"]
         return self._run(d, lanes, t, who, brief)
 
     def _stopped(self, d: dict, lanes: dict, t: float):
@@ -98,7 +119,7 @@ class Run:
             return self.refuse("engine_only_unenforced", d["say"], None)
         return self.refuse("no_lane", d["say"], retry)
 
-    def _run(self, d: dict, lanes: dict, t: float, who: dict, brief: str):
+    def _run(self, d: dict, lanes: dict, t: float, who: dict, brief: str) -> dict[str, Any] | int:
         a, h = self.a, d["how"]
         rid = str(uuid.uuid4())
         lane = lanes[d["lane"]]
@@ -208,12 +229,12 @@ class Run:
             res = again
             why = None if res.get("outcome") else "the answer is not JSON" if res.get("data") is None else answer.schema_problem(res["data"], schema)
         if why and res.get("outcome") is None:
-            res.update(outcome="schema_invalid", say=f"the answer does not match the schema: {why}")
+            res.update(outcome="schema_invalid", say=f"the answer does not match the schema: {why}", schema_problem=why)
         return res
 
     # -- the end: history, usage, the answer ----------------------------------------------------------------------------------------------------
     def _finish(self, res: dict, d: dict, lane: Lane, who: dict, rid: str, lease: RunLease, hooks: RunHooks, launched: dict, cap: int | None,
-                started: tuple):
+                started: tuple) -> dict[str, Any]:
         a, cfg, extra = self.a, self.cfg, self.extra
         t0, t_from, git_before = started
         fam, cwd = who["family"], d["how"]["cwd"]
@@ -235,6 +256,8 @@ class Run:
         env.history_add(hist.RunRow(
             ts=env.now(), run_id=rid, call_id=getattr(a, "call_id", None), ref=res.get("ref"), **health_ledger.failure_fields(res.get("outcome"), "", detail or res.get("say"), res.get("retry_after")),
             role=a.role, task=a.task or "", lane=d["lane"], model=d["model"], effort=d["effort"], done=done, warnings=res.get("warnings"), stream_tail=res.pop("stream_tail", None),
+            schema_problem=res.pop("schema_problem", None),
+            raw_answer=(res.get("text") or "").encode("utf-8")[:SCHEMA_RAW_BYTES].decode("utf-8", errors="ignore") if res.get("outcome") == "schema_invalid" else None,
             denials=sum(1 for x in res.get("denied") or [] if x.get("kind") != "sandbox_limit"), secs=secs, cost=res.get("cost", 0), tokens=res.get("tokens"),
             cumulative=res.get("cumulative"), five_before=lane.five, week_before=lane.week,
             overlap=lease.overlap, slots=cap, transcript=transcript))
@@ -255,7 +278,7 @@ class Run:
             wk.pid, wk.pgid, wk.start = launched["pid"], launched["pgid"], launched["start"]
         if wk.survivors and res.get("outcome") is None:      # a done answer must not hide a worker still running
             res.update(outcome="worker_survived", say="worker pids outlived SIGTERM and SIGKILL: " + ", ".join(str(x.pid) for x in wk.survivors))
-        return self.emit(res.pop("outcome", None), worker=codec.to_json(wk), **res)
+        return dict(res, worker=codec.to_json(wk))
 
 
 def transcript_info(path: str | None, family: str, start: int = 0):

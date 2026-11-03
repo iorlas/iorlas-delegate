@@ -1,12 +1,13 @@
 ---
 name: delegate
-description: Delegate a sub-task to another model or subscription, only when the user or a skill asks to delegate. route.py picks lane, model and effort; never pick them yourself.
+description: Delegate a task to another model or subscription, only when the user or a skill asks to delegate. route.py picks lane, model and effort; never pick them yourself.
 ---
 
 `DELEGATE_DEPTH` set = you are a worker: do not delegate.
 Use Bash `run_in_background`.
 `python3 ${CLAUDE_SKILL_DIR}/route.py run ROLE [--cwd D] [--authored-by F] [--engine-only RECIPE]... [--only-family F]... < brief`
-`--engine-only-advisory`: allows unsupported guards; disclose in brief. Details: `docs/dev/integrations.md`.
+`--engine-only-advisory`: disclose in brief.
+`--schema`: re-ask/reroute. `--task`: avoid timeout/schema failures or warn.
 Roles: planner (plan) · worker (implement) · reviewer (`--authored-by`: author's family) · light (read).
 
 | answer | do |
@@ -33,5 +34,5 @@ No Python 3.8+: Agent tool only.
 
 Review never blocks: only the author's family up = self-review (`flag` same_family: say so).
 
-Brief: goal, files, constraints, acceptance check, "no commits". Own git; parallel writers: one directory each. `--premium` only if the user names it. Never delegate scope, design, plan, acceptance.
+Brief: goal, files, constraints, acceptance, "no commits". Own git; parallel writers: separate directories. `--premium` only if user names it. Never delegate scope, design, plan, acceptance.
 `modes/`: init codex extend zai-coding deepseek-free
