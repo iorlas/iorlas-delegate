@@ -182,7 +182,6 @@
   "tests/test_kill_tree.py::E501": 1,
   "tests/test_kill_tree.py::PLC0415": 1,
   "tests/test_kill_tree.py::UP031": 1,
-  "tests/test_layers.py::E501": 1,
   "tests/test_legacy_config.py::E501": 1,
   "tests/test_legacy_config.py::PLW1510": 1,
   "tests/test_live_events.py::B007": 1,

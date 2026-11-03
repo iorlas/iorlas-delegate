@@ -1,0 +1,28 @@
+# The architecture rules of src/delegate (replaced the AST test tests/test_layers.py). Run by `just rules` with src/ on PYTHONPATH.
+# One-file stdlib modules (os, subprocess, time, ...) cannot be root packages here: the domain's ban on them and on imports inside
+# functions is ruff (src/delegate/domain/ruff.toml, PLC0415).
+[importlinter]
+root_packages =
+    delegate
+    re
+include_external_packages = True
+
+[importlinter:contract:layers]
+name = Layers: cli > app > adapters > domain > contracts
+type = layers
+layers =
+    delegate.cli
+    delegate.app
+    delegate.adapters
+    delegate.domain
+    delegate.contracts
+
+[importlinter:contract:re-only-in-adapters-and-domain-matchers]
+name = import re only in adapters and domain matchers (not contracts, app, cli, other domain modules)
+type = forbidden
+source_modules = delegate
+forbidden_modules = re
+allow_indirect_imports = True
+ignore_imports =
+    delegate.adapters.** -> re
+    delegate.domain.**.matchers -> re

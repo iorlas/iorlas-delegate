@@ -19,6 +19,7 @@ types:
     uv tool run "pyrefly@$(just pin pipx:pyrefly)" check
 
 rules:
+    PYTHONPATH=src uv tool run --from "import-linter@$(just pin pipx:import-linter)" lint-imports
     python3 -m unittest discover -s tests -p test_rules.py
 
 # The version mise.toml pins for a tool (one source for the pins).
