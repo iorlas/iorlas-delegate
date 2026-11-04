@@ -1,0 +1,34 @@
+{
+  "description": {
+    "chars": {"max": 162, "note": "2026-11-04: frontmatter description value, excluding YAML key and newline."},
+    "tokens_estimate": {"max": 40.5, "note": "Description characters / 4; estimate, not tokenizer tokens."}
+  },
+  "body": {
+    "chars": {"max": 1698, "note": "2026-11-04: all text after the closing frontmatter delimiter, including whitespace."},
+    "tokens_estimate": {"max": 424.5, "note": "Body characters / 4; worker tokens excluded."}
+  },
+  "modes/codex.md": {
+    "chars": {"max": 1407, "note": "2026-11-04: entire codex mode, including whitespace."},
+    "tokens_estimate": {"max": 351.75, "note": "Codex mode characters / 4; loaded only on demand."}
+  },
+  "modes/deepseek-free.md": {
+    "chars": {"max": 480, "note": "2026-11-04: entire deepseek-free mode, including whitespace."},
+    "tokens_estimate": {"max": 120, "note": "DeepSeek mode characters / 4; loaded only on demand."}
+  },
+  "modes/extend.md": {
+    "chars": {"max": 1270, "note": "2026-11-04: entire extend mode, including whitespace."},
+    "tokens_estimate": {"max": 317.5, "note": "Extend mode characters / 4; loaded only on demand."}
+  },
+  "modes/init.md": {
+    "chars": {"max": 985, "note": "2026-11-04: entire init mode, including whitespace."},
+    "tokens_estimate": {"max": 246.25, "note": "Init mode characters / 4; setup is outside the initialized hot path."}
+  },
+  "modes/zai-coding.md": {
+    "chars": {"max": 878, "note": "2026-11-04: entire zai-coding mode, including whitespace."},
+    "tokens_estimate": {"max": 219.5, "note": "Z.ai mode characters / 4; loaded only on demand."}
+  },
+  "run_worker": {
+    "chars": {"max": 542, "note": "2026-11-04: run worker Agent handoff JSON plus newline; initialized Claude-only fixture at /workspace/project."},
+    "tokens_estimate": {"max": 135.5, "note": "Emitted JSON characters / 4, including brief_prefix; no worker launch or answer."}
+  }
+}
