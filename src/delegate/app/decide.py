@@ -17,6 +17,7 @@ from delegate.contracts.state import StateDoc
 from delegate.contracts.stores import CheckpointStore
 from delegate.domain.holds.book import HoldBook
 from delegate.domain.lanes.lane import Lane
+from delegate.domain.routing.dwell import DwellMemory
 from delegate.domain.routing.router import Router
 
 # Every codex run and resume gets these, so neither the user's config nor a repo file widens or narrows them. The sandbox has no network and
@@ -155,7 +156,7 @@ def decision(a: env.Args, cfg: dict, unattended: bool = False, avoid: frozenset[
                 d["cap"] = d["how"]["cap"] = args.cap if d["how"]["kind"] == "claude_p" else d["how"].get("cap")
 
             def mark(s: StateDoc):
-                new = router.dwell.note(fam, pick.lane, t)
+                new = DwellMemory(s.prev, routing.settings.min_dwell_minutes).note(fam, pick.lane, t)
                 if new:
                     s.prev[fam] = new
             if sum(1 for lane in lanes.values() if lane.family == fam) > 1:
