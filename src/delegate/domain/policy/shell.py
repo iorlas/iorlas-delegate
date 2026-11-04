@@ -2,7 +2,7 @@
 import shlex
 
 from delegate.contracts.wire import RECIPE_RUNNERS
-from delegate.domain.policy.matchers import name_of, pieces, unwrap, writes_or_substitutes
+from delegate.domain.policy.matchers import name_of, pieces, sed_print_only, unwrap, writes_or_substitutes
 
 # A read-only Claude step (reviewer, planner, light) gets Bash for reading only: every piece of the command line must start with one of
 # these, with no output redirection or command substitution. Codex read steps get the same from their read-only sandbox, enforced by the OS;
@@ -16,6 +16,23 @@ READ_ONLY_HELP = ("this step is read-only: Bash allows only reading commands (gi
 GIT_LISTING = ("--list", "-l", "-a", "-r", "--show-current", "-v", "-vv", "--contains", "--merged", "--no-merged", "--points-at", "--format", "--sort")
 GIT_CHANGING = ("commit", "push", "checkout", "switch", "merge", "rebase", "reset", "cherry-pick", "revert", "am", "pull")
 FIND_RUNS = {"-exec", "-execdir", "-ok", "-okdir", "-delete", "-fprint", "-fprintf", "-fls"}
+
+
+def unsafe_options(name: str, args: list[str]) -> bool:
+    """Reader options that launch programs or write files, including long-option abbreviations."""
+    long = {"sort": ("--compress-program", "--output"), "rg": ("--pre", "--pre-glob", "--hostname-bin"),
+            "git": ("--open-files-in-pager", "--ext-diff", "--textconv", "--output", "--exec-path"),
+            "jq": ("--run-tests", "--in-place", "--library-path", "--from-file"), "diff": ("--output",)}
+    short = {"sort": "o", "git": "O", "jq": "Lf"}
+    for word in args:
+        if word == "--":
+            break
+        option = word.partition("=")[0]
+        if option.startswith("--") and any(x.startswith(option) for x in long.get(name, ())):
+            return True
+        if option.startswith("-") and not option.startswith("--") and any(c in short.get(name, "") for c in option[1:]):
+            return True
+    return False
 
 
 def git_args(t: list[str]) -> list[str]:
@@ -49,10 +66,10 @@ def piece_problem(t: list[str]) -> str | None:
         return f"`{name}` is not a reading command"
     if name == "find" and set(t) & FIND_RUNS:
         return "find may not run or delete"
-    if name == "sed" and any(x.startswith(("-i", "--in-place")) for x in t):
-        return "sed -i writes"
-    if name == "rg" and any(x.startswith("--pre") for x in t):
-        return "rg --pre runs a program"
+    if name == "sed" and not sed_print_only(t[1:]):
+        return "sed only allows inline print scripts"
+    if unsafe_options(name, t[1:]):
+        return f"{name} option may execute a program or write a file"
     if name == "git":
         args = git_args(t)
         sub = args[0] if args else ""

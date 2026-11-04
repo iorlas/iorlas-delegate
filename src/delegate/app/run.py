@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import Any
 
 from delegate.adapters import agent_runs, git, procs
-from delegate.app import answer, cockpit, decide, env, harnesses, launch, net, usage, watch
+from delegate.app import answer, cockpit, codex_policy, decide, env, harnesses, launch, net, usage, watch
 from delegate.app.lease import RunLease
 from delegate.app.supervisor import RunHooks
 from delegate.contracts import codec
@@ -51,7 +51,13 @@ class Run:
     # -- the call --------------------------------------------------------------------------------------------------------------------------
     def go(self):
         try:
+            try:
+                codex_policy.admit_request(getattr(self.a, "writer_exec_allow", []), tuple(getattr(self.a, "engine_only", None) or ()))
+            except (ValueError, OSError) as error:
+                return self.refuse("bad_request", str(error), None)
             return self._go()
+        except codex_policy.ExecAllowError as error:
+            return self.refuse("bad_request", str(error), None)
         except TimeoutError as e:       # state lock held too long: transient, so stop with a retry time (error means permanent)
             return self.refuse("lock", str(e), env.now() + decide.busy_jitter())
 
@@ -67,6 +73,7 @@ class Run:
         if d["action"] in ("error", "stop"):
             return self._stopped(d, lanes, t)
         h = d["how"]
+        codex_policy.require_writer_mode(h, getattr(self.a, "writer_exec_allow", []))
         who = {k: d.get(k) for k in IDENTITY}
         who["family"] = self.cfg["lanes"][d["lane"]]["family"]
         if not self.unattended:
@@ -91,7 +98,8 @@ class Run:
         """One fresh attempt after the re-ask failed; each attempt has already kept its own history and usage."""
         pair = (res["lane"], res["model"])
         d, lanes, warnings, t = decide.decision(self.a, self.cfg, self.unattended, frozenset((pair,)))
-        if d["action"] != "run" or (d["lane"], d["model"]) == pair or d["how"]["kind"] == "agent_tool":
+        if d["action"] != "run" or (d["lane"], d["model"]) == pair or d["how"]["kind"] == "agent_tool" \
+                or (getattr(self.a, "writer_exec_allow", []) and d["how"]["kind"] != "codex"):
             res["say"] += "; no reroute: " + (d.get("warning") or d.get("say") or "no other executable lane/model ready")
             return res
         if warnings:

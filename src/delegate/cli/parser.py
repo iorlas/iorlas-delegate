@@ -1,5 +1,6 @@
 """The command line: `route.py VERB ...`. A bad flag in `run` is the caller's fault, answered as a bad_request stop (exit 0, no usage text)."""
 import argparse
+import json
 import sys
 from typing import NoReturn, override
 
@@ -56,6 +57,9 @@ def build():
     dr = sub.add_parser("doctor", aliases=["init"]); dr.add_argument("--json", action="store_true")
     g = sub.add_parser("guard"); g.add_argument("--read-only", action="store_true")
     g.add_argument("--engine-only", action="append", default=[], help="a recipe only the engine runs; repeatable")
+    g.add_argument("--config-dir", help="owner state folder, pinned by the hook launcher")
+    g.add_argument("--exec-policy", help="the per-call argv grant written by delegate")
+    g.add_argument("--exec-allow", nargs=argparse.REMAINDER, help="execute one host.json writer argv through the guard")
     nt = sub.add_parser("net", help="is the machine online? stdlib sockets, no quota"); nt.add_argument("--lane"); nt.add_argument("--host", action="append", help="a host or host:port; repeatable")
     sub.add_parser("contract").add_argument("--json", action="store_true")
     cf = sub.add_parser("config"); cf.add_argument("action", choices=["set", "show"]); cf.add_argument("key", nargs="?"); cf.add_argument("value", nargs="?")
@@ -65,6 +69,7 @@ def build():
     ru.add_argument("--schema"); ru.add_argument("--resume"); ru.add_argument("--cap", type=float); ru.add_argument("--parent"); ru.add_argument("--task"); ru.add_argument("--title")
     ru.add_argument("--engine-only", action="append", default=[], help="a recipe only the engine runs; a write step's guard blocks it; repeatable")
     ru.add_argument("--engine-only-advisory", action="store_true", help="allow write lanes that cannot deny engine-only recipes, with a warning; the brief must say so")
+    ru.add_argument("--writer-exec-allow", type=json.loads, default=[], help="JSON argv list for guarded host execution; Codex writers only")
     ru.add_argument("--only-family", action="append", default=[], metavar="FAMILY", help="use only this family's steps, no fallback outside; repeatable")
     ru.add_argument("--call-id", help="the caller's id for this call: echoed in the answer and written to history.jsonl, the key that joins the caller's record to ours")
     ho = sub.add_parser("hold", help="stop a lane for some roles until a time; --until is mandatory"); ho.add_argument("lane"); ho.add_argument("--until"); ho.add_argument("--roles")

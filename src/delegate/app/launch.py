@@ -17,7 +17,7 @@ from delegate.adapters.harness.base import Harness, LaunchInputs, LaunchSpec
 from delegate.adapters.harness.claude import ClaudeHarness
 from delegate.adapters.harness.codex import CodexHarness
 from delegate.adapters.harness.opencode import OpenCodeHarness, Profile
-from delegate.app import answer, decide, env, harnesses, net, settle, watch
+from delegate.app import answer, codex_policy, decide, env, harnesses, net, settle, watch
 from delegate.app.publish import LiveSink
 from delegate.app.supervisor import LogWatcher, RunHooks, Supervisor
 from delegate.contracts.state import StateDoc
@@ -43,6 +43,7 @@ def guard_settings(read_only: bool | None, engine_only: tuple[str, ...] = ()):
     """--settings for claude -p: delegate's PreToolUse hook (route.py guard), read-only for steps that may not write."""
     argv = [sys.executable, str(env.SKILL_DIR / "route.py"), "guard"] + (["--read-only"] if read_only else [])
     argv += [f"--engine-only={x}" for x in engine_only] if not read_only else []
+    argv += ["--config-dir", str(env.config_dir())]
     cmd = shlex.join(argv)
     return {"hooks": {"PreToolUse": [{"matcher": "*", "hooks": [{"type": "command", "command": cmd}]}]}}
 
@@ -118,8 +119,15 @@ def prepare_codex(d: dict, brief: str, a: env.Args, rid: str, t: float, cfg: dic
     spec = hx.launch_spec(LaunchInputs(
         exe=exe, cwd=h["cwd"], model=h["model"], effort=d["effort"], sandbox=h["sandbox"], out_file=str(env.config_dir() / f"codex-last-{rid[:8]}.txt"), env=decide.codex_env(env.child_env(), h["cwd"], h["sandbox"]),
         cli=h["cli"], access=decide.CODEX_ACCESS, isolation=h["isolation"], schema=a.schema, resume=a.resume,
-        prompt=" ".join((SECRET_RULE, GIT_RULES, EDIT_RULE, NO_SUBAGENTS_RULE, ESCALATE_RULE, DENIED_RULE)) + "\n\n" + brief))
-    before = (codex_account.thread_total(a.resume) or env.history_store().last_cumulative(a.resume)) if a.resume else None
+        prompt=" ".join((SECRET_RULE, GIT_RULES, EDIT_RULE, NO_SUBAGENTS_RULE,
+                         "" if getattr(a, "writer_exec_allow", []) else ESCALATE_RULE, DENIED_RULE)) + "\n\n" + brief))
+    try:
+        spec, hx.overlay = codex_policy.configure_writer(spec, getattr(a, "writer_exec_allow", []), env.config_dir(),
+                                                        tuple(getattr(a, "engine_only", None) or ()))
+        before = (codex_account.thread_total(a.resume) or env.history_store().last_cumulative(a.resume)) if a.resume else None
+    except BaseException:
+        hx.cleanup()
+        raise
     return Prep(hx, spec, {"before": before, "started": time.time()})       # wall clock, not env.now(): it is compared with file times
 
 
@@ -210,6 +218,15 @@ def launch_worker(d: dict, brief: str, a: env.Args, rid: str, t: float, cfg: dic
     prep = PREPARE[h["kind"]](d, brief, a, rid, t, cfg)
     if isinstance(prep, dict):
         return prep
+    try:
+        return run_prepared(prep, d, a, rid, t, meta, hooks)
+    finally:
+        prep.hx.cleanup()
+
+
+def run_prepared(prep: Prep, d: dict, a: env.Args, rid: str, t: float, meta: dict, hooks: RunHooks):
+    """Use an already prepared harness; launch_worker owns cleanup even if publication or supervision raises."""
+    h = d["how"]
     hx, spec, x = prep
     field = REF_FIELD[h["kind"]]
 
@@ -226,10 +243,7 @@ def launch_worker(d: dict, brief: str, a: env.Args, rid: str, t: float, cfg: dic
     log = LogWatcher(hx.log_dir, classify.LIMIT_RE.search, hx.echoes_input) if hx.log_dir else None
     sup = Supervisor(hx, watch.CLI_OF_KIND[h["kind"]], dataclasses.replace(hooks, ref=on_ref), live, gone=lane_gone_check(d["lane"], time.time()), log=log,
                      policy=secret_in if hx.secret_event else None, net_up=lambda: net.net_up(d["lane"]))
-    try:
-        out = sup.run(spec, a.timeout)
-    finally:
-        hx.cleanup()
+    out = sup.run(spec, a.timeout)
     hx.export(spec.env)
     with contextlib.suppress(Exception):        # one history row per inter-event gap over watch.LONG_GAP_S (role "gap"): the health fold ignores it
         sup.dog.flush(env.history_add, d["lane"], d["model"], out.watch.why is None)

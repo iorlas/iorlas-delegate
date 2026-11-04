@@ -25,7 +25,7 @@ class RunVendors(RunBase):
     def test_done_is_one_object_with_ref_family_and_a_clean_child_env(self):
         code, r = self.run_it()
         self.assertEqual(code, 0)
-        self.assertEqual((r["contract"], r["stop"], r["family"], r["lane"], r["ref"]), (3, None, "openai", "OPENAI_SUBSCRIPTION", "thread-123"))
+        self.assertEqual((r["contract"], r["stop"], r["family"], r["lane"], r["ref"]), (4, None, "openai", "OPENAI_SUBSCRIPTION", "thread-123"))
         self.assertEqual(r["text"], "done: the brief")
         self.assertEqual(r["git_violation"], [])
         env = Path(os.environ["FAKE_ENV"]).read_text()
@@ -294,7 +294,7 @@ class RunVendors(RunBase):
 
     def test_every_answer_carries_call_id_usage_transcript_object_and_typed_stop(self):
         schema = stops.CONTRACT["answer_schema"]
-        rollout = Path(self.tmp.name) / ".codex" / "sessions" / "2026" / "10" / "21"
+        rollout = Path(os.environ["CODEX_HOME"]) / "sessions" / "2026" / "10" / "21"
         rollout.mkdir(parents=True)
         (rollout / "rollout-2026-10-21T19-45-28-thread-123.jsonl").write_text("x" * 40)
         _, r = self.run_it("--call-id", "run1#3")

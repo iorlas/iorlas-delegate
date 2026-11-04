@@ -30,6 +30,7 @@ def home(base):
     h = Path(base)
     for sub in (".config", ".local/share", "cfg", "tmp"):
         (h / sub).mkdir(parents=True, exist_ok=True)
+    (h / "cfg" / "host.json").write_text('{"binaries":{},"writer_exec_allow":[]}')
     real = Path(REAL_HOME) / ".gitconfig"
     if real.is_file() and not (h / ".gitconfig").exists():      # tests commit with the identity it holds; HOME no longer finds it
         shutil.copyfile(real, h / ".gitconfig")

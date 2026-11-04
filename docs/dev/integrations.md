@@ -30,8 +30,10 @@ state and in Claude Code's own transcripts.
 task-loop's engine calls `route.py run ROLE --unattended --brief FILE --cwd DIR [--schema F] [--resume REF] [--cap USD] [--timeout S] [--parent SESSION] [--task ID] [--title T] [--engine-only RECIPE]... [--engine-only-advisory]`
 as a script, with no Claude session behind it. The contract is `skills/delegate/contract.json` (reasons, facts, flags, answer schema); the consumer is iorlas-task-loop.
 
-- Handshake: `route.py contract --json` prints one line `{contract: 3, reasons{reason: {scope, permanence, retry, health, wording}}, run_args[]}`; a caller
-  requires `contract == 3`. What a worker sees and what cannot be blocked is stated once, in "What a worker sees" below.
+- Handshake: `route.py contract --json` prints one line `{contract: 4, capabilities[], reasons{reason: {scope, permanence, retry, health, wording}}, run_args[]}`; a caller
+  requires `contract == 4`. The optional `writer_exec_allow: [[argv...], ...]` request field (`--writer-exec-allow JSON`, default `[]`) also requires capability
+  `writer_exec_allow`; unsupported delegates must be refused before sending it. Nonempty grants require a Codex writer and create a per-call home whose rules
+  allow only guard invocations. Details and caller admission: [exec-allow.md](exec-allow.md). What a worker sees is stated once, in "What a worker sees" below.
 - Every answer carries `stop`: `null` when it is done (or the interactive handoff to the Agent tool, which sets `agent_model`), else
   `{reason, scope, permanence, retry{kind, at}, ref, fix?, resumable?, partial?}`. The caller's whole policy is `(scope, permanence, retry.kind)`; `reason` is for wording and stats.
   scope: `bead`, `caller`, `machine`, `lane`, `model`. permanence: `transient`, `needs_owner` (a person must act: log in, set up, verify a denial). retry.kind: `none`, `predicted`
@@ -57,7 +59,7 @@ as a script, with no Claude session behind it. The contract is `skills/delegate/
 - Fresh `--task` calls avoid lane/model pairs that ended with `timeout` or `schema_invalid` for the same task and role in the last six hours.
   `--only-family` filters first; if no different pair is ready, the normal choice proceeds with a `warning` explaining why. Resume and calls
   without `--task` do not consult task failures. Schema reroutes use the same avoidance, including when no task was given.
-- stdout is exactly one JSON object (`contract` = 3, `stop`, `context`, `data`, `text`, `ref`, `lane`, `model`, `effort`, `family`, `flag`, `cost`, `tokens`, `secs`, `run_id`,
+- stdout is exactly one JSON object (`contract` = 4, `stop`, `context`, `data`, `text`, `ref`, `lane`, `model`, `effort`, `family`, `flag`, `cost`, `tokens`, `secs`, `run_id`,
   `transcript`, `say`, `git_violation`, plus `usage`, `call_id`, `transcript_info`, `transcript_status`; `agent_model`, `brief_prefix`, `cwd` on the interactive handoff); `tokens` is `{in, cached, out}` or null, and `in` counts all input including cache reads
   (and Claude cache writes); exit 0 whenever it was printed, a bad flag or argument of `run` included (`bad_request`, `fix` names the argparse message, no worker started).
 - `--unattended` is how an engine says no Claude session is behind it. Without it the caller is a Claude session and may get `agent`. With it: never `agent`, `ask_user`
@@ -70,11 +72,13 @@ as a script, with no Claude session behind it. The contract is `skills/delegate/
   (`default_permissions`) can block reads such as `~/.ssh`, but an approved escalation under a profile stays sandboxed (Unity fails), so delegate does not use them; network off
   is what keeps a read secret from leaving without review. Claude always gets `--restricted --tools <list> --strict-mcp-config --permission-mode auto --permission-prompts none` (the repo's and the
   user's hooks, plugins and settings do not load; subscription login still works; never `--bare`, it disables login). Worker env drops credential-looking variables.
+- The guard requires owner `host.json` in delegate's state folder and audits every authorization in `guard.jsonl` there. Its explicit argv execution endpoint,
+  allowed rule shapes, and per-call Codex overlay are documented in [exec-allow.md](exec-allow.md).
 - Git is the coordinator's on every Claude step: the guard blocks, per piece of a command line, commit, push, checkout, switch, merge,
   rebase, reset, cherry-pick, revert, am, pull, and stash/branch/tag/worktree except their listing forms (stash list/show, branch -a/--contains/...,
   tag -l, worktree list). A blocked git write is policy and stays out of `denied`.
 - Read-only Claude steps (reviewer, planner, light) get Bash limited by the guard (`route.py guard --read-only`) to reading commands:
-  git diff/log/show/status/blame/grep/ls-files..., rg, grep, cat, head, tail, ls, find (no -exec/-delete), sed (no -i), wc, sort, diff, jq; no `>`, no
+  git diff/log/show/status/blame/grep/ls-files..., rg, grep, cat, head, tail, ls, find (no execution/output actions), sed (inline print scripts only), wc, sort, diff, jq; no `>`, no
   `$(...)`. A blocked write is policy and stays out of `denied` (a secret path stays in). Codex read steps read freely inside their read-only sandbox.
 - Secrets tripwire (delegate-internal): every worker prompt, and `brief_prefix` for interactive Agent-tool steps, starts with a rule never to touch credential files (~/.ssh, .env but not .env.example, ~/.aws, ~/.azure,
   ~/.gnupg, ~/.config/gh, ~/.docker/config.json, ~/.netrc, ~/.git-credentials, keychains). Claude steps get a PreToolUse hook (`route.py guard`, passed with `--settings`,
