@@ -8,8 +8,11 @@ import subprocess
 import time
 from collections.abc import Callable
 from pathlib import Path
+from typing import override
 
+from delegate.adapters import codex_account
 from delegate.adapters.harness.base import Evidence, LaunchInputs, LaunchSpec, Quiet, Summary
+from delegate.adapters.harness.codex_overlay import CodexOverlay
 from delegate.contracts import events as ev
 
 RECONNECT_RE = re.compile(r"^\s*Reconnecting\.\.\.\s*(\d+)/(\d+)")        # codex retrying its stream: progress until n == of
@@ -63,6 +66,13 @@ class CodexHarness(Quiet):
         self.clock = clock
         self.evidence = Evidence(ref=resume)
         self.out_file = ""
+        self.overlay: CodexOverlay | None = None
+
+    @override
+    def cleanup(self) -> None:
+        if self.overlay is not None:
+            self.overlay.cleanup()
+            self.overlay = None
 
     # -- launch ----------------------------------------------------------------------------------------------------------------------------
     def launch_spec(self, i: LaunchInputs) -> LaunchSpec:
@@ -186,7 +196,7 @@ class CodexHarness(Quiet):
         """The rollout file of thread `ref`, or None."""
         if not ref:
             return None
-        hits = sorted((Path.home() / ".codex" / "sessions").rglob(f"*{ref}.jsonl"))
+        hits = sorted(codex_account.sessions_root().rglob(f"*{ref}.jsonl"))
         return str(hits[0]) if hits else None
 
     def login_probe(self, timeout: float) -> tuple[bool | None, str]:

@@ -2,7 +2,7 @@
  "agent_model": "sonnet-5.5",
  "brief_prefix": "Secrets are off limits.",
  "call_id": null,
- "contract": 3,
+ "contract": 4,
  "cost": 0.5,
  "cwd": "/w",
  "data": null,

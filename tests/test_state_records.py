@@ -81,7 +81,8 @@ class Breaker(unittest.TestCase):
                     apply_health(lane, env.typed_routing(CFG).models, led, led.fold(self.rows(name, model, outcome="vendor_blip")), T + 1)
                     self.assertFalse(lane.usable(env.settings_of(CFG), True, model)[0])
         import inspect
-        self.assertIn("Supervisor(", inspect.getsource(launch.launch_worker))         # all three harnesses run under the one supervisor, so under its watchdog
+        self.assertIn("run_prepared(", inspect.getsource(launch.launch_worker))       # every prepared harness uses the same supervisor
+        self.assertIn("Supervisor(", inspect.getsource(launch.run_prepared))
 
     def test_history_rotation_survives_a_corrupt_line(self):
         canary = lambda ts, rid: json.dumps(codec.to_json(hist.CanaryRow(ts=ts, run_id=rid, lane="L", model="m")))

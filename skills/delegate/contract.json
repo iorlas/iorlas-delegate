@@ -1,6 +1,6 @@
 {
- "contract": 3,
- "about": "Hand-edited with any classifier change. contract 3: every answer carries `stop` (null = done, or the agent-tool handoff when `agent_model` is set); no `status`, `next`, `reason`, `retry_after`. Reasons are an open list, facts are closed. A bump means a change to the answer or to the `run` flags the engine passes.",
+ "contract": 4,
+ "about": "Contract 4 adds writer_exec_allow (guarded Codex host execution); require capability writer_exec_allow before sending the field. Every answer carries stop (null = done or agent handoff). Reasons are open, facts are closed. A bump means a change to the answer or the run flags.",
  "scopes": [
   "bead",
   "caller",
@@ -202,7 +202,8 @@
   "--engine-only",
   "--engine-only-advisory",
   "--only-family",
-  "--call-id"
+  "--call-id",
+  "--writer-exec-allow"
  ],
  "usage": {
   "tokens": "in includes cached; also per call, never cumulative: in_fresh (uncached input), cache_read, cache_write (null when the vendor does not report it), out, and cache_write_by_ttl {5m,1h} on claude",
@@ -248,7 +249,7 @@
   "properties": {
    "contract": {
     "enum": [
-     3
+     4
     ]
    },
    "data": {},
@@ -1752,6 +1753,101 @@
      }
     },
     "description": "`status --cheap` only: the cached logins by lane"
+   }
+  }
+ },
+ "capabilities": [
+  "writer_exec_allow"
+ ],
+ "request_schema": {
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+   "role",
+   "brief_file",
+   "cwd"
+  ],
+  "properties": {
+   "role": {
+    "type": "string"
+   },
+   "brief_file": {
+    "type": "string"
+   },
+   "cwd": {
+    "type": "string"
+   },
+   "schema_file": {
+    "type": [
+     "string",
+     "null"
+    ]
+   },
+   "resume": {
+    "type": [
+     "string",
+     "null"
+    ]
+   },
+   "authored_by": {
+    "type": [
+     "string",
+     "null"
+    ]
+   },
+   "timeout_s": {
+    "type": [
+     "integer",
+     "null"
+    ]
+   },
+   "idle_s": {
+    "type": [
+     "integer",
+     "null"
+    ]
+   },
+   "unattended": {
+    "type": "boolean"
+   },
+   "parent": {
+    "type": "string"
+   },
+   "task": {
+    "type": "string"
+   },
+   "title": {
+    "type": "string"
+   },
+   "call_id": {
+    "type": [
+     "string",
+     "null"
+    ]
+   },
+   "live_file": {
+    "type": [
+     "string",
+     "null"
+    ]
+   },
+   "engine_only": {
+    "type": "array",
+    "items": {
+     "type": "string"
+    }
+   },
+   "engine_only_advisory": {
+    "type": "boolean"
+   },
+   "writer_exec_allow": {
+    "type": "array",
+    "items": {
+     "type": "array",
+     "items": {
+      "type": "string"
+     }
+    }
    }
   }
  }

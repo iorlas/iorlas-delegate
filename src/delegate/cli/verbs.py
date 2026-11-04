@@ -1,16 +1,14 @@
 """The verbs of route.py that are not a module of their own: holds, report, capture-limits, guard, contract, next, run. Each takes the parsed
 arguments and the routing table and returns the exit code."""
-import contextlib
 import json
 import sys
 import uuid
 
 from delegate.adapters import statusline
-from delegate.app import cockpit, decide, env, launch, run
+from delegate.app import cockpit, codex_policy, decide, env, launch, run
 from delegate.contracts import codec, stops
 from delegate.contracts import history as hist
 from delegate.domain.holds.book import HoldBook, new_hold
-from delegate.domain.policy import worker as policy
 from delegate.domain.time.spec import local, to_epoch
 
 
@@ -74,21 +72,13 @@ def cmd_capture(a: env.Args, cfg: dict):
 
 
 def cmd_guard(a: env.Args, cfg: dict | None = None):
-    """Claude PreToolUse hook: exit 2 (block, reason on stderr) when a tool call names a secret path, changes git, or, with --read-only, does
-    more than read. The verdict is domain/policy's; this is the hook's stdin and exit code."""
-    with contextlib.suppress(ValueError, AttributeError):
-        j = json.load(sys.stdin)
-        v = policy.judge(j.get("tool_name"), j.get("tool_input") or {}, bool(getattr(a, "read_only", False)),
-                         tuple(getattr(a, "engine_only", None) or ()))
-        if v.blocked:
-            print(v.reason, file=sys.stderr)
-            return 2
-    return 0
+    """Fail-closed hook or explicit argv execution, audited in delegate's own state."""
+    return codex_policy.guard(a)
 
 
 def cmd_contract(a: env.Args, cfg: dict):
     """The handshake: the contract number, every reason with its facts, and the flags `run` accepts."""
-    print(json.dumps({"contract": stops.CONTRACT["contract"], "reasons": stops.CONTRACT["reasons"], "run_args": stops.CONTRACT["run_args"]}))
+    print(json.dumps({k: stops.CONTRACT[k] for k in ("contract", "capabilities", "reasons", "run_args")}))
     return 0
 
 

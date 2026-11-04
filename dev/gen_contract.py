@@ -17,6 +17,9 @@ PATH = ROOT / "skills" / "delegate" / "contract.json"
 
 def render() -> str:
     doc = json.loads(PATH.read_text(encoding="utf-8"))
+    doc["contract"] = wire.CONTRACT
+    doc["capabilities"] = list(wire.CAPABILITIES)
+    doc["request_schema"] = schema.of(wire.RunRequest)
     doc["answer_schema"] = schema.of(wire.RunResult)
     doc["status_schema"] = schema.of(status.Status)
     return json.dumps(doc, indent=1, ensure_ascii=False) + "\n"

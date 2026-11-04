@@ -103,7 +103,7 @@ def expected_tuple(f, row, reason):
 
 
 class Stop(unittest.TestCase):
-    """settle() + result() turn a classified row into the contract 3 answer; a request/machine fault must leave the lane's state byte for byte as it was."""
+    """settle() + result() turn a classified row into the contract 4 answer; a request/machine fault must leave the lane's state byte for byte as it was."""
 
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
@@ -223,10 +223,10 @@ class Stop(unittest.TestCase):
         self.assertEqual(denial_item(denial("policy", "edit", {"filePath": "x.py"}))["path"], "x.py")
         self.assertEqual(sum(1 for x in [d, denial_item(denial("policy", "bash", {}))] if x.get("kind") != "sandbox_limit"), 1)
 
-    def test_contract_3_has_no_wire_left(self):
+    def test_contract_4_has_no_wire_left(self):
         gone = ("v", "status", "reason", "next", "retry_after")
         for r in (answer.result(), answer.result("no_lane"), answer.result("rate_limited", retry_after=T)):
-            self.assertEqual(r["contract"], 3)
+            self.assertEqual(r["contract"], 4)
             for k in gone:
                 self.assertNotIn(k, r)
         for k in ("wire_reasons", "wire_default"):
@@ -248,7 +248,7 @@ class Stop(unittest.TestCase):
             self.assertIn(row["permanence"], CONTRACT["permanences"])
             self.assertIn(row["retry"], CONTRACT["retry_kinds"])
             self.assertIn(row["health"], CONTRACT["health_effects"])
-        self.assertEqual(CONTRACT["contract"], 3)
+        self.assertEqual(CONTRACT["contract"], 4)
 
 
 class Docs(unittest.TestCase):

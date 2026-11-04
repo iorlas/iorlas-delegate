@@ -12,7 +12,7 @@ def cmd_net_only(a: env.Args, cfg: dict | None = None):
     return net.cmd_net(a)
 
 
-NO_CONFIG = {"guard": verbs.cmd_guard, "net": cmd_net_only}      # a hook (no config, no state) and the probe
+NO_CONFIG = {"guard": verbs.cmd_guard, "net": cmd_net_only}      # guard loads host policy itself; neither needs routing.json
 
 
 def main(argv: list[str] | None = None):
@@ -23,7 +23,13 @@ def main(argv: list[str] | None = None):
                 reconfigure(encoding="utf-8", errors="replace")
     args = sys.argv[1:] if argv is None else list(argv)
     parser.CallParser.answers, parser.CallParser.unattended = args[:1] == ["run"], "--unattended" in args
-    a = parser.build().parse_args(argv)
+    exec_argv = None
+    if args[:1] == ["guard"] and "--exec-allow" in args:
+        index = args.index("--exec-allow")
+        args, exec_argv = args[:index], args[index + 1:]
+    a = parser.build().parse_args(args)
+    if a.cmd == "guard":
+        a.exec_allow = exec_argv
     if a.cmd in NO_CONFIG:
         return NO_CONFIG[a.cmd](a)
     return TABLE[a.cmd](a, env.load_routing())

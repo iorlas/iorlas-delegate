@@ -131,7 +131,7 @@ class RunStops(RunBase):
                  "logout": ("logged_out", "lane", "needs_owner"), "net": ("network", "machine", "transient"), "ok": None}
         for mode, want in cases.items():
             _, r = self.run_it(mode=mode)
-            self.assertEqual(r["contract"], 3)
+            self.assertEqual(r["contract"], 4)
             self.assertEqual(tuple(r["stop"][k] for k in ("reason", "scope", "permanence")) if r["stop"] else None, want, mode)
             for gone in ("v", "status", "reason", "next", "retry_after"):
                 self.assertNotIn(gone, r, mode)
@@ -212,7 +212,7 @@ class RunStops(RunBase):
             sys.stdout = real
         self.assertEqual(out.count("\n"), 1)
         c = json.loads(out)
-        self.assertEqual(c["contract"], 3)
+        self.assertEqual(c["contract"], 4)
         self.assertEqual(set(c["reasons"]), set(stops.CONTRACT["reasons"]))
         for row in c["reasons"].values():
             self.assertTrue({"scope", "permanence", "retry", "health", "wording"} <= set(row))
@@ -222,7 +222,7 @@ class RunStops(RunBase):
         self.run_it(mode="bad_request")
         self.assertEqual(env.load_state().out, before)
 
-    def test_handshake_declares_contract_3_and_the_reason_table(self):
+    def test_handshake_declares_contract_4_and_the_reason_table(self):
         import io
         real, sys.stdout = sys.stdout, io.StringIO()
         try:
@@ -230,8 +230,8 @@ class RunStops(RunBase):
             c = json.loads(sys.stdout.getvalue())
         finally:
             sys.stdout = real
-        self.assertEqual(c["contract"], 3)
-        self.assertEqual(set(c), {"contract", "reasons", "run_args"})
+        self.assertEqual(c["contract"], 4)
+        self.assertEqual(set(c), {"contract", "capabilities", "reasons", "run_args"})
         self.assertIn("--call-id", c["run_args"])
         self.assertNotIn("--host", c["run_args"])
         self.assertEqual(set(c["reasons"]), set(stops.CONTRACT["reasons"]))

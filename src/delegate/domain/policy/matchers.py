@@ -21,6 +21,32 @@ LOOP_HEADS = {"for", "while", "until"}
 SHELL_C_RE = re.compile(r"-[a-z]*c[a-z]*")
 EXCLUDE_WORD_RE = re.compile(r"--exclude(?:-dir|-from)?=|(?:--i?glob=|-g)!")
 EXCLUDE_PATHSPEC_RE = re.compile(r":(?:!|\(exclude\))")
+SED_PRINT_RE = re.compile(r"\s*(?:(?:\d+|\$)(?:,(?:\d+|\$))?)?[pP]\s*(?:;\s*(?:(?:\d+|\$)(?:,(?:\d+|\$))?)?[pP]\s*)*")
+
+
+def sed_print_only(args: list[str]) -> bool:
+    """Only inline print scripts; external scripts and sed's exec/write commands never qualify as readers."""
+    scripts: list[str] = []
+    i = 0
+    while i < len(args):
+        word = args[i]
+        if word in ("-e", "--expression"):
+            i += 1
+            if i == len(args):
+                return False
+            scripts.append(args[i])
+        elif word.startswith("--expression="):
+            scripts.append(word.partition("=")[2])
+        elif word.startswith("-e"):
+            scripts.append(word[2:])
+        elif word in ("-n", "--quiet", "--silent", "-E", "-r"):
+            pass
+        elif word.startswith("-"):
+            return False
+        elif not scripts:
+            scripts.append(word)
+        i += 1
+    return bool(scripts) and all(SED_PRINT_RE.fullmatch(script) for script in scripts)
 
 
 def unwrap(cmd: str, depth: int = 3) -> str:
@@ -91,7 +117,7 @@ def split_unquoted(text: str) -> list[str]:
             c = text[i]
         elif c in "'\"":
             quote = c
-        elif c in "|;&\n" and (c != "&" or text[i + 1:i + 2] == "&"):
+        elif c in "|;&\n":
             out.append("".join(cur))
             cur = []
             i += 2 if text[i + 1:i + 2] == c and c in "|&" else 1

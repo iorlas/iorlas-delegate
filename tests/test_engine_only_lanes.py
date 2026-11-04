@@ -7,6 +7,7 @@ import subprocess
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 import hermetic  # noqa: F401  (a home of its own for every test)
 import routing_support as support
@@ -86,9 +87,11 @@ class OpenCodeRulesTest(unittest.TestCase):
 
 class ClaudeHookTest(unittest.TestCase):
     def hook(self, command: str, engine_only=("slow",), read_only=False):
-        argv = hook_command(launch.guard_settings(read_only, engine_only))
         call = {"tool_name": "Bash", "tool_input": {"command": command}}
         with tempfile.TemporaryDirectory() as tmp:
+            Path(tmp, "host.json").write_text('{"binaries":{},"writer_exec_allow":[]}')
+            with mock.patch("delegate.app.env.config_dir", return_value=Path(tmp)):
+                argv = hook_command(launch.guard_settings(read_only, engine_only))
             r = subprocess.run(argv, shell=True, input=json.dumps(call), capture_output=True, text=True, check=False,
                                env={"PATH": "/usr/bin:/bin", "DELEGATE_CONFIG_DIR": tmp, "HOME": tmp})
         return r.returncode, r.stderr

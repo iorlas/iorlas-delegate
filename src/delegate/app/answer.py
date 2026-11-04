@@ -1,4 +1,4 @@
-"""The answer of a `run`: the contract 3 object (`result`), its validation against the caller's JSON schema (`schema_problem`), and the one JSON line
+"""The answer of a `run`: the contract 4 object (`result`), its validation against the caller's JSON schema (`schema_problem`), and the one JSON line
 on stdout (`emit`)."""
 import json
 from typing import Any
@@ -74,7 +74,7 @@ def parse_data(text: str, schema: str | None):
 
 
 def result(outcome: str | None = None, **kw: Any):
-    """The contract 3 answer. `outcome` is the contract.json reason behind a non-done answer (contracts/stops.py); None = done, or the agent-tool
+    """The contract 4 answer. `outcome` is the contract.json reason behind a non-done answer (contracts/stops.py); None = done, or the agent-tool
     handoff (`agent_model` set). `stop` is null exactly when outcome is None; its facts (scope, permanence, retry) come from the reason's row, and
     `retry_after` (a kw, never an answer field) becomes `stop.retry.at`."""
     retry_after, fix = kw.pop("retry_after", None), kw.pop("fix", None)

@@ -1,15 +1,17 @@
-"""The wire between a caller and `route.py run`: RunRequest in (argv + env), one RunResult JSON object out (contract 3).
+"""The wire between a caller and `route.py run`: RunRequest in (argv + env), one RunResult JSON object out (contract 4).
 
 `contract.json`'s answer_schema is generated from RunResult (dev/gen_contract.py). A key the wire leaves out when nobody set it is ABSENT;
 null is a value. The live JSONL a caller may tail is contracts/live.py.
 """
+import json
 import sys
 from dataclasses import field
 from typing import Any, Literal
 
 from delegate.contracts.codec import ABSENT, Absent, mutable, record
 
-CONTRACT = 3
+CONTRACT = 4
+CAPABILITIES = ("writer_exec_allow",)
 END_OK, END_ERROR, END_TIMEOUT, END_SURVIVED = "ok", "error", "timeout", "worker_survived"
 Scope = Literal["bead", "caller", "machine", "lane", "model"]
 Permanence = Literal["transient", "needs_owner"]
@@ -44,6 +46,12 @@ class WorkerEnd:
 RECIPE_RUNNERS = ("just", "make", "mise", "npm", "yarn", "pnpm", "uv")      # the commands that take an engine-only recipe by name (one list: the Claude hook and the OpenCode rules)
 
 
+def require_writer_exec_allow(contract: dict | None) -> None:
+    """The caller must handshake before sending a host execution grant. Never silently drop one for an older delegate."""
+    if not contract or contract.get("contract") != CONTRACT or "writer_exec_allow" not in contract.get("capabilities", ()):
+        raise ValueError("writer_exec_allow requires delegate contract 4 and capability writer_exec_allow")
+
+
 @record
 class RunRequest:
     role: str
@@ -62,8 +70,9 @@ class RunRequest:
     live_file: str | None = None     # DELEGATE_LIVE_FILE
     engine_only: list[str] = field(default_factory=list)     # recipes only the engine runs: a write step's guard blocks `just RECIPE`; --engine-only once per item
     engine_only_advisory: bool = False
+    writer_exec_allow: list[list[str]] = field(default_factory=list)  # Codex writers only; host.json bounds this per-call grant
 
-    def to_argv(self, route: str) -> list[str]:
+    def to_argv(self, route: str, *, contract: dict | None = None) -> list[str]:
         out = [sys.executable, route, "run", self.role, "--brief", self.brief_file, "--cwd", self.cwd]
         opt = [("--schema", self.schema_file), ("--resume", self.resume), ("--authored-by", self.authored_by), ("--timeout", self.timeout_s),
                ("--idle", self.idle_s), ("--parent", self.parent), ("--task", self.task), ("--title", self.title[:120]), ("--call-id", self.call_id)]
@@ -74,6 +83,9 @@ class RunRequest:
             out += ["--engine-only", recipe]
         if self.engine_only_advisory:
             out += ["--engine-only-advisory"]
+        if self.writer_exec_allow:
+            require_writer_exec_allow(contract)
+            out += ["--writer-exec-allow", json.dumps(self.writer_exec_allow)]
         return out + (["--unattended"] if self.unattended else [])
 
     def env(self) -> dict[str, str]:
@@ -172,7 +184,7 @@ class AskUser:
 class RunResult:
     """The answer of `route.py run`. stop is null exactly when the call is done or is the agent-tool handoff (agent_model set)."""
 
-    contract: Literal[3]
+    contract: Literal[4]
     data: Any
     text: str
     ref: str | None
